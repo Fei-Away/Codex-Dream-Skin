@@ -13,32 +13,11 @@
 
 <p align="center">
   <a href="https://passion8.cc/register?aff=TuPe">
-    <img src="docs/images/sponsor-passion8.png" alt="Passion8" height="110">
-  </a>
+    <img src="docs/images/sponsor-passion8.png" alt="Passion8" height="72">
+  </a><br>
+  感谢 <a href="https://passion8.cc/register?aff=TuPe"><strong>passion8.cc</strong></a> 赞助本项目。<br>
+  <sub>AI API 中转 · 支持 Codex / Claude Code / Grok 等 · 主题安装与 API 配置互相独立，不会自动改写你的模型供应商设置</sub>
 </p>
-
-<p align="center">
-  <a href="https://passion8.cc/register?aff=TuPe"><strong>Passion8｜感谢 passion8.cc 赞助本项目</strong></a><br>
-  感谢 <a href="https://passion8.cc/register?aff=TuPe">passion8.cc</a> 赞助本项目。Passion8 提供稳定、易接入的 AI API 中转服务，支持 Codex / Claude Code / Grok 等常用编程工具接入。
-</p>
-
-<table>
-  <tr>
-    <th width="180">🏆 赞助商 🏆</th>
-    <th>介绍</th>
-  </tr>
-  <tr>
-    <td align="center">
-      <a href="https://passion8.cc/register?aff=TuPe">
-        <img src="docs/images/sponsor-passion8.png" alt="Passion8" height="80">
-      </a>
-    </td>
-    <td>
-      <a href="https://passion8.cc/register?aff=TuPe"><strong>Passion8｜passion8.cc</strong></a><br>
-      感谢 passion8.cc 赞助了本项目！主题安装与 API 配置互相独立，本项目不会自动改写你的模型供应商设置。
-    </td>
-  </tr>
-</table>
 
 ## 效果预览
 
