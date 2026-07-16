@@ -23,7 +23,6 @@
 | 状态 / 日志 | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Codex 配置 | `~/.codex/config.toml`（仅外观相关项可能被改，可恢复） |
 | 稳定入口 | `~/Applications/栋哥 Codex.app`（桌面有软链接） |
-| 专用入口 | `~/Applications/栋哥 Codex.app` |
 
 ### Windows
 
