@@ -3,13 +3,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { CODEX_DOM_SELECTORS } from "../scripts/codex-markers.mjs";
 import { earlyPayloadFor } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
-function createFixture() {
+function createFixture(selectorIndex = 0) {
   const observers = [];
   const timers = new Map();
   let nextTimer = 1;
@@ -19,8 +20,8 @@ function createFixture() {
     document: {
       documentElement: {},
       querySelector(selector) {
-        if (selector === "main.main-surface") return markers.shell ? {} : null;
-        if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
+        if (selector === CODEX_DOM_SELECTORS.shell[selectorIndex]) return markers.shell ? {} : null;
+        if (selector === CODEX_DOM_SELECTORS.sidebar[selectorIndex]) return markers.sidebar ? {} : null;
         return null;
       },
     },
@@ -49,6 +50,12 @@ assert.deepEqual(guarded.context.window.installs, [], "Auxiliary app targets mus
 guarded.markers.shell = true;
 guarded.observers[0].callback([]);
 assert.deepEqual(guarded.context.window.installs, [], "A main surface without the Codex sidebar is not sufficient.");
+
+const fallback = createFixture(1);
+fallback.markers.shell = true;
+fallback.markers.sidebar = true;
+vm.runInNewContext(earlyPayloadFor('window.installs.push("fallback")', "fallback"), fallback.context);
+assert.deepEqual(fallback.context.window.installs, ["fallback"], "Fallback shell markers must permit early injection.");
 
 const generations = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);

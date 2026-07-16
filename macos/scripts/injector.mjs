@@ -4,6 +4,11 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readImageMetadata } from "./image-metadata.mjs";
+import {
+  CODEX_PROBE_MARKERS,
+  buildCodexMarkerInspectionSource,
+  isCodexMarkerSet,
+} from "./codex-markers.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
@@ -13,6 +18,8 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
 let staticPayloadAssets = null;
+const CODEX_MARKER_INSPECTION_SOURCE = buildCodexMarkerInspectionSource();
+const CODEX_PROBE_MARKERS_JSON = JSON.stringify(CODEX_PROBE_MARKERS);
 
 function parseArgs(argv) {
   const options = {
@@ -204,20 +211,25 @@ async function listAppTargets(port) {
 }
 
 async function probeSession(session) {
-  return session.evaluate(`(() => {
-    const markers = {
-      shell: Boolean(document.querySelector('main.main-surface')),
-      sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
-      composer: Boolean(document.querySelector('.composer-surface-chrome')),
-      main: Boolean(document.querySelector('[role="main"]')),
-    };
+  const probe = await session.evaluate(`(() => {
+    ${CODEX_MARKER_INSPECTION_SOURCE}
+    const probeMarkers = ${CODEX_PROBE_MARKERS_JSON};
     return {
       title: document.title,
       href: location.href,
-      markers,
-      codex: markers.shell && markers.sidebar,
+      markers: markerInspection.markers,
+      markerMatches: Object.fromEntries(probeMarkers.map((name) => [name, markerInspection.matches[name]])),
+      markerMisses: probeMarkers.filter((name) => !markerInspection.markers[name]),
     };
   })()`);
+  return probe ? { ...probe, codex: isCodexMarkerSet(probe.markers) } : probe;
+}
+
+function describeMarkerProbe(probe) {
+  const matches = CODEX_PROBE_MARKERS.flatMap((name) =>
+    probe?.markerMatches?.[name] ? [`${name}=${probe.markerMatches[name]}`] : []);
+  const missing = Array.isArray(probe?.markerMisses) ? probe.markerMisses : CODEX_PROBE_MARKERS;
+  return `matched [${matches.join(", ") || "none"}]; missing [${missing.join(", ") || "none"}]`;
 }
 
 async function waitForCodexProbe(session, timeoutMs = 1800) {
@@ -238,6 +250,7 @@ async function connectTarget(target, port) {
 async function connectCodexTargets(port, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
+  let lastProbe;
   while (Date.now() < deadline) {
     try {
       const targets = await listAppTargets(port);
@@ -248,14 +261,18 @@ async function connectCodexTargets(port, timeoutMs) {
           session = await connectTarget(target, port);
           const probe = await probeSession(session);
           if (probe?.codex) connected.push({ target, session, probe });
-          else session.close();
+          else {
+            lastProbe = probe;
+            session.close();
+          }
         } catch (error) {
           session?.close();
           lastError = error;
         }
       }
       if (connected.length) return connected;
-      lastError = new Error("No page matched the expected Codex shell markers");
+      const diagnostic = lastProbe ? `: ${describeMarkerProbe(lastProbe)}` : "";
+      lastError = new Error(`No page matched the expected Codex shell markers${diagnostic}`);
     } catch (error) {
       lastError = error;
     }
@@ -527,19 +544,18 @@ async function verifySession(session) {
         visible: r.width > 0 && r.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
       };
     };
-    const homeIndicator = document.querySelector('[data-testid="home-icon"]');
-    const homeSignal = homeIndicator ?? document.querySelector('[data-feature="game-source"]') ??
-      document.querySelector('.group\\\\/home-suggestions');
+    ${CODEX_MARKER_INSPECTION_SOURCE}
+    const homeSignal = markerInspection.nodes.homeSignal;
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
-    const home = document.querySelector('[role="main"].dream-skin-home');
-    const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
+    const home = markerInspection.nodes.home;
+    const suggestions = home ? markerInspection.nodes.suggestions : null;
     const cardBoxes = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
     const visibleCards = cardBoxes.filter((item) => item?.visible);
     const hero = box(home?.firstElementChild?.firstElementChild?.firstElementChild);
-    const projectButton = box(home?.querySelector('.group\\\\/project-selector > button'));
-    const shell = box(document.querySelector('main.main-surface'));
-    const composer = box(document.querySelector('.composer-surface-chrome'));
-    const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
+    const projectButton = box(home ? markerInspection.nodes.projectButton : null);
+    const shell = box(markerInspection.nodes.shell);
+    const composer = box(markerInspection.nodes.composer);
+    const sidebar = box(markerInspection.nodes.sidebar);
     const chrome = document.getElementById('codex-dream-skin-chrome');
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
@@ -556,6 +572,10 @@ async function verifySession(session) {
       shell,
       composer,
       sidebar,
+      markerDiagnostics: {
+        matches: markerInspection.matches,
+        missing: markerInspection.missing,
+      },
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -675,8 +695,9 @@ export function earlyPayloadFor(payload, revision) {
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
       if (!document.documentElement) return false;
-      const shell = document.querySelector('main.main-surface');
-      const sidebar = document.querySelector('aside.app-shell-left-panel');
+      ${CODEX_MARKER_INSPECTION_SOURCE}
+      const shell = markerInspection.nodes.shell;
+      const sidebar = markerInspection.nodes.sidebar;
       if (!shell || !sidebar) return false;
       stop();
       ${payload};
