@@ -151,12 +151,19 @@
     }
 
     for (const [name, value] of Object.entries(variables)) {
-      if (typeof value === "string" && value) root.style.setProperty(name, value);
+      if (typeof value === "string" && value && root.style.getPropertyValue(name) !== value) {
+        root.style.setProperty(name, value);
+      }
     }
-    root.style.setProperty("--dream-skin-name", cssString(THEME.name || "Codex Dream Skin"));
-    root.style.setProperty("--dream-skin-tagline", cssString(THEME.tagline || "Make something wonderful."));
-    root.style.setProperty("--dream-skin-project-prefix", cssString(THEME.projectPrefix || "选择项目 · "));
-    root.style.setProperty("--dream-skin-project-label", cssString(THEME.projectLabel || "◉  选择项目"));
+    const textVariables = {
+      "--dream-skin-name": cssString(THEME.name || "Codex Dream Skin"),
+      "--dream-skin-tagline": cssString(THEME.tagline || "Make something wonderful."),
+      "--dream-skin-project-prefix": cssString(THEME.projectPrefix || "选择项目 · "),
+      "--dream-skin-project-label": cssString(THEME.projectLabel || "◉  选择项目"),
+    };
+    for (const [name, value] of Object.entries(textVariables)) {
+      if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value);
+    }
   };
 
   const existingStyle = document.getElementById(STYLE_ID);
@@ -170,9 +177,12 @@
     const root = document.documentElement;
     if (!root) return;
     const shell = detectShellMode();
-    root.classList.add("codex-dream-skin");
-    root.setAttribute(SHELL_ATTR, shell);
-    root.style.setProperty("--dream-skin-art", `url("${artUrl}")`);
+    if (!root.classList.contains("codex-dream-skin")) root.classList.add("codex-dream-skin");
+    if (root.getAttribute(SHELL_ATTR) !== shell) root.setAttribute(SHELL_ATTR, shell);
+    const artValue = `url("${artUrl}")`;
+    if (root.style.getPropertyValue("--dream-skin-art") !== artValue) {
+      root.style.setProperty("--dream-skin-art", artValue);
+    }
     applyTheme(root, shell);
 
     let style = document.getElementById(STYLE_ID);
@@ -216,15 +226,24 @@
         <div class="dream-skin-orbit"></div>`;
       document.body.appendChild(chrome);
     }
-    chrome.querySelector(".dream-skin-brand b").textContent = THEME.name || "Codex Dream Skin";
-    chrome.querySelector(".dream-skin-brand small").textContent = THEME.brandSubtitle || "CODEX DREAM SKIN";
-    chrome.querySelector(".dream-skin-status span").textContent = THEME.statusText || "DREAM SKIN ONLINE";
-    chrome.querySelector(".dream-skin-quote").textContent = THEME.quote || "MAKE SOMETHING WONDERFUL";
+    const setText = (selector, value) => {
+      const node = chrome.querySelector(selector);
+      if (node && node.textContent !== value) node.textContent = value;
+    };
+    setText(".dream-skin-brand b", THEME.name || "Codex Dream Skin");
+    setText(".dream-skin-brand small", THEME.brandSubtitle || "CODEX DREAM SKIN");
+    setText(".dream-skin-status span", THEME.statusText || "DREAM SKIN ONLINE");
+    setText(".dream-skin-quote", THEME.quote || "MAKE SOMETHING WONDERFUL");
     const shellBox = shellMain.getBoundingClientRect();
-    chrome.style.left = `${Math.round(shellBox.left)}px`;
-    chrome.style.top = `${Math.round(shellBox.top)}px`;
-    chrome.style.width = `${Math.round(shellBox.width)}px`;
-    chrome.style.height = `${Math.round(shellBox.height)}px`;
+    const chromeBox = {
+      left: `${Math.round(shellBox.left)}px`,
+      top: `${Math.round(shellBox.top)}px`,
+      width: `${Math.round(shellBox.width)}px`,
+      height: `${Math.round(shellBox.height)}px`,
+    };
+    for (const [name, value] of Object.entries(chromeBox)) {
+      if (chrome.style[name] !== value) chrome.style[name] = value;
+    }
     chrome.classList.toggle("dream-skin-home-shell", Boolean(home));
     chrome.dataset.dreamShell = shell;
   };
@@ -260,14 +279,22 @@
       ensure();
     }, 180);
   };
-  const observer = new MutationObserver(scheduleEnsure);
+  const observer = new MutationObserver((mutations) => {
+    const root = document.documentElement;
+    const body = document.body;
+    const relevant = mutations.some((mutation) =>
+      mutation.type === "childList" ||
+      ((mutation.target === root || mutation.target === body) &&
+        ["class", "data-theme", "data-appearance", "data-color-mode"].includes(mutation.attributeName)));
+    if (relevant) scheduleEnsure();
+  });
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode", "style"],
   });
-  const timer = setInterval(ensure, 4000);
+  const timer = setInterval(ensure, 10000);
   const resizeHandler = scheduleEnsure;
   window.addEventListener("resize", resizeHandler, { passive: true });
 

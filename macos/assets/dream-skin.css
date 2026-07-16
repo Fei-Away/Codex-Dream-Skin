@@ -172,6 +172,10 @@ html.codex-dream-skin main.main-surface > header.app-header-tint {
 .dream-skin-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--ds-green); box-shadow: 0 0 10px var(--ds-green); }
 #codex-dream-skin-chrome.dream-skin-home-shell .dream-skin-status { display: flex; }
 
+#codex-dream-skin-chrome:not(.dream-skin-home-shell) .dream-skin-particles {
+  display: none !important;
+}
+
 .dream-skin-quote {
   position: absolute;
   right: 28px;
@@ -521,11 +525,18 @@ html.codex-dream-skin[data-dream-shell="light"] body::before {
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel {
-  background: linear-gradient(180deg, #ffffff 0%, #fbf7f8 100%) !important;
-  border: 1px solid rgba(40, 30, 32, .08) !important;
+  background:
+    linear-gradient(180deg, rgba(246, 253, 255, .84), rgba(232, 246, 251, .76)),
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--ds-cyan) 22%, transparent),
+      color-mix(in srgb, var(--ds-green) 13%, transparent)) !important;
+  border: 1px solid color-mix(in srgb, var(--ds-cyan) 24%, transparent) !important;
   border-left: 0 !important;
-  box-shadow: 8px 0 24px rgba(40, 20, 24, .05) !important;
-  color: #1f1a1b !important;
+  box-shadow:
+    10px 0 30px rgba(37, 103, 137, .10),
+    inset -1px 0 rgba(255, 255, 255, .58) !important;
+  backdrop-filter: none !important;
+  color: #18384a !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel,
@@ -537,19 +548,19 @@ html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel butto
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel a,
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel span,
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel div {
-  color: #2a2325 !important;
+  color: #18384a !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel svg {
-  color: #5a5053 !important;
+  color: #426b80 !important;
   opacity: 1 !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel button:hover {
-  background: rgba(217, 72, 86, .08) !important;
-  box-shadow: none !important;
+  background: color-mix(in srgb, var(--ds-cyan) 13%, rgba(255, 255, 255, .42)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-cyan) 16%, transparent) !important;
   transform: none !important;
-  color: #1f1a1b !important;
+  color: #102f41 !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel button[aria-label^="切换模式"] {
@@ -563,9 +574,11 @@ html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel butto
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel [aria-current="page"] {
-  background: rgba(217, 72, 86, .10) !important;
-  border: 1px solid rgba(217, 72, 86, .14) !important;
-  box-shadow: none !important;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--ds-green) 17%, rgba(255, 255, 255, .58)),
+    color-mix(in srgb, var(--ds-cyan) 10%, rgba(255, 255, 255, .46))) !important;
+  border: 1px solid color-mix(in srgb, var(--ds-green) 24%, transparent) !important;
+  box-shadow: inset 3px 0 var(--ds-green), 0 5px 16px rgba(123, 79, 105, .07) !important;
   color: #1f1a1b !important;
 }
 
@@ -592,13 +605,25 @@ html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-ski
   border: 1px solid rgba(40, 30, 32, .06);
   background: rgba(255, 255, 255, .86);
   box-shadow: 0 8px 20px rgba(40, 20, 24, .05);
-  backdrop-filter: blur(10px) saturate(108%);
+  backdrop-filter: blur(6px) saturate(106%);
+}
+
+/* Keep the native task summary interactive, but let the wallpaper tint it. */
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell)
+  .thread-scroll-container [class~="bg-token-dropdown-background"][class~="rounded-3xl"] {
+  background:
+    linear-gradient(145deg, rgba(235, 249, 254, .74), rgba(218, 240, 250, .58)) !important;
+  border: 1px solid color-mix(in srgb, var(--ds-cyan) 22%, rgba(255, 255, 255, .64)) !important;
+  box-shadow:
+    0 16px 40px rgba(33, 100, 136, .14),
+    inset 0 1px rgba(255, 255, 255, .72) !important;
+  backdrop-filter: blur(8px) saturate(118%) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface > header.app-header-tint {
   background: rgba(255, 255, 255, .88) !important;
   border-bottom: 1px solid rgba(40, 30, 32, .06) !important;
-  backdrop-filter: blur(12px) !important;
+  backdrop-filter: none !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child > div:first-child {
@@ -654,7 +679,7 @@ html.codex-dream-skin[data-dream-shell="light"] .composer-surface-chrome {
   border: 1px solid rgba(40, 30, 32, .08) !important;
   background: rgba(255, 255, 255, .94) !important;
   box-shadow: 0 10px 28px rgba(40, 20, 24, .07) !important;
-  backdrop-filter: blur(14px) saturate(110%) !important;
+  backdrop-filter: blur(8px) saturate(106%) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .composer-surface-chrome::before {
