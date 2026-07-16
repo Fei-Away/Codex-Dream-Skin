@@ -188,6 +188,15 @@ PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir
   const value = JSON.parse(process.argv[1]);
   if (!value.pass || value.themeName !== "测试主题" || value.imageBytes < 1) process.exit(1);
 ' "$PAYLOAD_JSON"
+/bin/mkdir -p "$TMP/missing-theme"
+if MISSING_THEME_OUTPUT="$(
+  "$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$TMP/missing-theme" 2>&1
+)"; then
+  printf 'Explicit theme directory without theme.json unexpectedly passed.\n' >&2
+  exit 1
+fi
+/usr/bin/printf '%s\n' "$MISSING_THEME_OUTPUT" | /usr/bin/grep -F -q \
+  "Explicit theme directory is missing theme.json: $TMP/missing-theme/theme.json"
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
 [ ! -e "$TMP/theme" ]
 
