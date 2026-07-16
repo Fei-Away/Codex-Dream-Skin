@@ -111,6 +111,12 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 /usr/bin/cmp -s "$NO_DESKTOP_CONFIG" "$TMP/original-without-desktop.toml"
 
 /usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.2" ]' _ "$ROOT"
-"$ROOT/scripts/doctor-macos.sh" >/dev/null
+
+DOCTOR_HOME="$TMP/doctor-home"
+DOCTOR_THEME="$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/theme"
+/bin/mkdir -p "$DOCTOR_HOME/.codex" "$DOCTOR_THEME"
+/usr/bin/printf '%s\n' 'model = "gpt-5"' > "$DOCTOR_HOME/.codex/config.toml"
+/bin/cp "$ROOT/assets/theme.json" "$ROOT/assets/portal-hero.png" "$DOCTOR_THEME/"
+HOME="$DOCTOR_HOME" "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
