@@ -58,11 +58,11 @@ That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio` e
 ## How it works (security boundary)
 
 1. Discover `com.openai.codex` and validate signature / Team ID / arch / bundled Node.
-2. Start Codex via user `launchd` with CDP bound to `127.0.0.1` only.
+2. Start Codex as a normal user process with CDP bound to `127.0.0.1` only; stale launchd jobs from older releases are removed first.
 3. Accept the debug port only when it belongs to Codex (or a legitimate child).
 4. Inject only into expected `app://` renderer targets.
 5. Keep a small injector alive across reloads and route changes.
-6. Restore stops the injector only when PID, path, and start time match the recorded job.
+6. Restore stops the injector only when PID, path, and start time match the recorded process.
 
 CDP is powerful and unauthenticated on loopback. Prefer Restore when you are done theming.
 
