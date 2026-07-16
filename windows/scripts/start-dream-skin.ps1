@@ -24,6 +24,57 @@ function Test-CodexDebugPort([int]$CandidatePort) {
   }
 }
 
+function Start-PackagedCodex([string]$PackageFamilyName, [string[]]$Arguments) {
+  if (-not ('CodexDreamSkin.PackageLauncher' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace CodexDreamSkin {
+  [Flags]
+  internal enum ActivateOptions : uint {
+    None = 0
+  }
+
+  [ComImport]
+  [Guid("2e941141-7f97-4756-ba1d-9decde894a3d")]
+  [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  internal interface IApplicationActivationManager {
+    [PreserveSig]
+    int ActivateApplication(
+      [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+      [MarshalAs(UnmanagedType.LPWStr)] string arguments,
+      ActivateOptions options,
+      out uint processId);
+  }
+
+  [ComImport]
+  [Guid("45ba127d-10a8-46ea-8ab7-56ea9078943c")]
+  internal class ApplicationActivationManager {}
+
+  public static class PackageLauncher {
+    public static uint Launch(string appUserModelId, string arguments) {
+      var manager = (IApplicationActivationManager)new ApplicationActivationManager();
+      uint processId;
+      int result = manager.ActivateApplication(appUserModelId, arguments, ActivateOptions.None, out processId);
+      Marshal.ThrowExceptionForHR(result);
+      return processId;
+    }
+  }
+}
+'@
+  }
+
+  foreach ($argument in $Arguments) {
+    if ($argument.Contains('"')) { throw 'Codex launch arguments cannot contain double quotes.' }
+  }
+  $argumentLine = ($Arguments | ForEach-Object {
+    if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
+  }) -join ' '
+  $appUserModelId = "$PackageFamilyName!App"
+  [void][CodexDreamSkin.PackageLauncher]::Launch($appUserModelId, $argumentLine)
+}
+
 $node = (Get-Command node -ErrorAction Stop).Source
 $debugReady = Test-CodexDebugPort $Port
 $mainProcesses = @(Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
@@ -48,7 +99,9 @@ if (-not (Test-CodexDebugPort $Port)) {
     New-Item -ItemType Directory -Force -Path $ProfilePath | Out-Null
     $arguments += "--user-data-dir=$ProfilePath"
   }
-  Start-Process -FilePath $exe -ArgumentList $arguments
+  # Store package executables can reject direct Start-Process calls even when
+  # their files are readable. Activate the registered full-trust app instead.
+  Start-PackagedCodex $package.PackageFamilyName $arguments
 }
 
 $deadline = (Get-Date).AddSeconds(30)
