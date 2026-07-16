@@ -8,7 +8,8 @@
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.timer) clearInterval(previous.timer);
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
-  const artUrl = previous?.artUrl || (() => {
+  if (previous?.artUrl) URL.revokeObjectURL(previous.artUrl);
+  const artUrl = (() => {
     const comma = artDataUrl.indexOf(",");
     const binary = atob(artDataUrl.slice(comma + 1));
     const bytes = new Uint8Array(binary.length);

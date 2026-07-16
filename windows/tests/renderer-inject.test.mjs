@@ -10,12 +10,16 @@ const template = await fs.readFile(path.join(windowsRoot, "assets", "renderer-in
 const payload = template
   .replace("__DREAM_CSS_JSON__", JSON.stringify(".fixture { color: blue; }"))
   .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="));
+const replacementPayload = template
+  .replace("__DREAM_CSS_JSON__", JSON.stringify(".fixture { color: green; }"))
+  .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AQ=="));
 
 function createFixture({ shellPresent, staleSkin = false }) {
   const nodes = new Map();
   const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
   const rootStyles = new Map(staleSkin ? [["--dream-art", "url(\"blob:stale\")"]] : []);
   const revokedUrls = [];
+  let objectUrlSequence = 0;
   let hasShell = shellPresent;
 
   const makeClassList = (classes = new Set()) => ({
@@ -99,7 +103,10 @@ function createFixture({ shellPresent, staleSkin = false }) {
       disconnect() {}
     },
     URL: {
-      createObjectURL() { return "blob:fixture"; },
+      createObjectURL() {
+        objectUrlSequence += 1;
+        return `blob:fixture-${objectUrlSequence}`;
+      },
       revokeObjectURL(value) { revokedUrls.push(value); },
     },
     Blob,
@@ -125,14 +132,18 @@ const main = createFixture({ shellPresent: true });
 const mainResult = vm.runInNewContext(payload, main.context);
 assert.equal(mainResult.installed, true);
 assert.equal(main.rootClasses.has("codex-dream-skin"), true);
-assert.equal(main.rootStyles.get("--dream-art"), 'url("blob:fixture")');
+assert.equal(main.rootStyles.get("--dream-art"), 'url("blob:fixture-1")');
 assert.equal(main.nodes.has("codex-dream-skin-style"), true);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), true);
+const replacementResult = vm.runInNewContext(replacementPayload, main.context);
+assert.equal(replacementResult.installed, true);
+assert.equal(main.rootStyles.get("--dream-art"), 'url("blob:fixture-2")');
+assert.deepEqual(main.revokedUrls, ["blob:fixture-1"]);
 assert.equal(main.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
 assert.equal(main.rootClasses.has("codex-dream-skin"), false);
 assert.equal(main.nodes.has("codex-dream-skin-style"), false);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), false);
-assert.deepEqual(main.revokedUrls, ["blob:fixture"]);
+assert.deepEqual(main.revokedUrls, ["blob:fixture-1", "blob:fixture-2"]);
 
 const auxiliary = createFixture({ shellPresent: false, staleSkin: true });
 const auxiliaryResult = vm.runInNewContext(payload, auxiliary.context);
