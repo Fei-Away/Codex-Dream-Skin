@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const [mode, configPath, backupPath] = process.argv.slice(2);
+const utf8 = new TextDecoder("utf-8", { fatal: true });
 // Backup these keys so Restore can put them back. Do NOT force dark —
 // Dream Skin CSS auto-adapts to light/dark via data-dream-shell.
 const settings = new Map([
@@ -23,12 +24,16 @@ function desktopSection(content) {
   return { bodyStart, bodyEnd, body: content.slice(bodyStart, bodyEnd) };
 }
 
-function replaceSetting(body, key, line) {
+function newlineFor(content) {
+  return content.includes("\r\n") ? "\r\n" : "\n";
+}
+
+function replaceSetting(body, key, line, newline) {
   const pattern = new RegExp(`^${key.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\s*=.*(?:\\r?\\n)?`, "m");
   if (line === null) return body.replace(pattern, "");
-  if (pattern.test(body)) return body.replace(pattern, `${line}\n`);
-  const separator = body.length && !body.endsWith("\n") ? "\n" : "";
-  return `${body}${separator}${line}\n`;
+  if (pattern.test(body)) return body.replace(pattern, `${line}${newline}`);
+  const separator = body.length && !body.endsWith("\n") ? newline : "";
+  return `${body}${separator}${line}${newline}`;
 }
 
 async function atomicWrite(file, value, modeBits) {
@@ -38,20 +43,35 @@ async function atomicWrite(file, value, modeBits) {
   await fs.chmod(file, modeBits);
 }
 
+async function readUtf8(file) {
+  const bytes = await fs.readFile(file);
+  let content;
+  try {
+    content = utf8.decode(bytes);
+  } catch {
+    throw new Error(`Refusing to rewrite a file that is not valid UTF-8: ${file}`);
+  }
+  if (content.includes("\0")) {
+    throw new Error(`Refusing to rewrite a file containing NUL characters: ${file}`);
+  }
+  return content;
+}
+
 let content;
 try {
-  content = await fs.readFile(configPath, "utf8");
+  content = await readUtf8(configPath);
 } catch (error) {
   if (error.code === "ENOENT") throw new Error(`Codex config not found: ${configPath}`);
   throw error;
 }
 
 const originalStat = await fs.stat(configPath);
+const newline = newlineFor(content);
 let section = desktopSection(content);
 
 if (mode === "install") {
   if (!section) {
-    content = `${content.trimEnd()}\n\n[desktop]\n`;
+    content = `${content.trimEnd()}${newline}${newline}[desktop]${newline}`;
     section = desktopSection(content);
   }
   try {
@@ -78,7 +98,7 @@ if (mode === "install") {
   let changed = false;
   for (const [key, line] of settings) {
     if (line === null) continue;
-    body = replaceSetting(body, key, line);
+    body = replaceSetting(body, key, line, newline);
     changed = true;
   }
   if (changed) {
@@ -89,7 +109,7 @@ if (mode === "install") {
 } else {
   let backup;
   try {
-    backup = JSON.parse(await fs.readFile(backupPath, "utf8"));
+    backup = JSON.parse(await readUtf8(backupPath));
   } catch (error) {
     if (error.code === "ENOENT") throw new Error("No selective pre-install theme backup is available.");
     throw new Error(`Could not read the theme backup: ${error.message}`);
@@ -104,11 +124,11 @@ if (mode === "install") {
       console.log("Restored the saved base-theme keys.");
       process.exit(0);
     }
-    content = `${content.trimEnd()}\n\n[desktop]\n`;
+    content = `${content.trimEnd()}${newline}${newline}[desktop]${newline}`;
     section = desktopSection(content);
   }
   let body = section.body;
-  for (const key of settings.keys()) body = replaceSetting(body, key, backup.values[key] ?? null);
+  for (const key of settings.keys()) body = replaceSetting(body, key, backup.values[key] ?? null, newline);
   const restored = content.slice(0, section.bodyStart) + body + content.slice(section.bodyEnd);
   await atomicWrite(configPath, restored, originalStat.mode & 0o777);
   await fs.unlink(backupPath);

@@ -86,6 +86,7 @@ CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
 /usr/bin/printf '%s\n' \
   'model = "gpt-5"' \
+  'project = "代码项目甲"' \
   '' \
   '[desktop]' \
   'appearanceTheme = "system"' \
@@ -94,6 +95,29 @@ BACKUP="$TMP/theme-backup.json"
 /bin/cp "$CONFIG" "$TMP/original.toml"
 "$NODE" "$ROOT/scripts/theme-config.mjs" install "$CONFIG" "$BACKUP" >/dev/null
 /usr/bin/cmp -s "$CONFIG" "$TMP/original.toml"
+
+CRLF_CONFIG="$TMP/config-crlf.toml"
+CRLF_BACKUP="$TMP/theme-backup-crlf.json"
+/usr/bin/printf 'model = "gpt-5"\r\n\r\n[desktop]\r\nappearanceTheme = "system"\r\n' > "$CRLF_CONFIG"
+"$NODE" "$ROOT/scripts/theme-config.mjs" install "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
+/usr/bin/printf 'model = "gpt-5"\r\n\r\n[desktop]\r\nappearanceTheme = "dark"\r\n' > "$CRLF_CONFIG"
+"$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
+"$NODE" -e '
+  const value = require("fs").readFileSync(process.argv[1], "utf8");
+  if (value.replace(/\r\n/g, "").includes("\n") || !value.includes(`appearanceTheme = "system"\r\n`)) process.exit(1);
+' "$CRLF_CONFIG"
+
+INVALID_UTF8_CONFIG="$TMP/config-invalid-utf8.toml"
+INVALID_UTF8_BACKUP="$TMP/theme-backup-invalid-utf8.json"
+"$NODE" -e 'require("fs").writeFileSync(process.argv[1], Buffer.from([0x66, 0x6f, 0x80]))' "$INVALID_UTF8_CONFIG"
+if "$NODE" "$ROOT/scripts/theme-config.mjs" install "$INVALID_UTF8_CONFIG" "$INVALID_UTF8_BACKUP" >/dev/null 2>&1; then
+  printf 'Invalid UTF-8 config unexpectedly passed theme backup validation.\n' >&2
+  exit 1
+fi
+[ ! -e "$INVALID_UTF8_BACKUP" ] || {
+  printf 'Invalid UTF-8 config created a theme backup before validation.\n' >&2
+  exit 1
+}
 "$NODE" -e '
   const backup = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
   if (backup.values.appearanceTheme !== `appearanceTheme = "system"`) process.exit(1);
