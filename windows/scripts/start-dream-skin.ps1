@@ -41,14 +41,21 @@ if (-not $debugReady -and -not $ProfilePath -and $mainProcesses.Count -gt 0) {
 if (-not (Test-CodexDebugPort $Port)) {
   $package = Get-AppxPackage OpenAI.Codex | Sort-Object Version -Descending | Select-Object -First 1
   if (-not $package) { throw 'The OpenAI.Codex Store package is not installed.' }
-  $exe = Join-Path $package.InstallLocation 'app\ChatGPT.exe'
-  if (-not (Test-Path -LiteralPath $exe)) { throw "Codex executable not found: $exe" }
+  # Launch via the shell AppX activator (shell:AppsFolder\<AUMID>) instead of
+  # running ChatGPT.exe directly. On current Windows builds the packaged binary
+  # requires package identity, so Start-Process on the exe fails with Access
+  # Denied for every caller (admin, standard, even ShellExecute). Activating by
+  # AppUserModelId uses the same path as the Start Menu and forwards
+  # --remote-debugging-port (and --user-data-dir) through to the process.
+  $manifest = Get-AppxPackageManifest $package
+  $appId = $manifest.Package.Applications.Application.Id
+  $aumid = "$($package.PackageFamilyName)!$appId"
   $arguments = @("--remote-debugging-port=$Port")
   if ($ProfilePath) {
     New-Item -ItemType Directory -Force -Path $ProfilePath | Out-Null
     $arguments += "--user-data-dir=$ProfilePath"
   }
-  Start-Process -FilePath $exe -ArgumentList $arguments
+  Start-Process -FilePath "shell:AppsFolder\$aumid" -ArgumentList $arguments
 }
 
 $deadline = (Get-Date).AddSeconds(30)
