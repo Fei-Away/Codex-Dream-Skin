@@ -276,6 +276,22 @@ state_field() {
   ' "$STATE_PATH" "$key"
 }
 
+restore_runtime_context_from_state() {
+  [ -f "$STATE_PATH" ] || return 0
+  local value=""
+
+  value="$(state_field codexBundle 2>/dev/null || true)"
+  [ -z "$value" ] || CODEX_BUNDLE="$value"
+  value="$(state_field codexExe 2>/dev/null || true)"
+  [ -z "$value" ] || CODEX_EXE="$value"
+  value="$(state_field codexVersion 2>/dev/null || true)"
+  [ -z "$value" ] || CODEX_VERSION="$value"
+  value="$(state_field codexTeamId 2>/dev/null || true)"
+  [ -z "$value" ] || CODEX_TEAM_ID="$value"
+
+  export CODEX_BUNDLE CODEX_EXE CODEX_VERSION CODEX_TEAM_ID
+}
+
 write_state() {
   local port="$1"
   local injector_pid="$2"
@@ -441,16 +457,7 @@ ensure_node_runtime() {
       : "${CODEX_EXE:=/Applications/Codex.app/Contents/MacOS/ChatGPT}"
       : "${CODEX_VERSION:=}"
       : "${CODEX_TEAM_ID:=}"
-      # Soft-fill from state if present
-      if [ -f "$STATE_PATH" ]; then
-        eval "$(/usr/bin/python3 -c 'import json,sys
-try:
-  s=json.load(open(sys.argv[1]))
-  for k,env in [("codexBundle","CODEX_BUNDLE"),("codexExe","CODEX_EXE"),("codexVersion","CODEX_VERSION"),("codexTeamId","CODEX_TEAM_ID")]:
-    v=s.get(k) or ""
-    if v: print(f"export {env}={json.dumps(v)}")
-except Exception: pass' "$STATE_PATH" 2>/dev/null || true)"
-      fi
+      restore_runtime_context_from_state
       return 0
     fi
   done

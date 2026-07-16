@@ -22,11 +22,44 @@ if /usr/bin/grep -R -n -E '(writeFile|rename|copyFile|rm).*app\.asar' "$ROOT/scr
   printf 'A runtime script appears to mutate app.asar.\n' >&2
   exit 1
 fi
+if /usr/bin/grep -n -E '/usr/bin/python3|(^|[[:space:]])eval([[:space:]]|$)' \
+  "$ROOT/scripts/common-macos.sh" >/dev/null; then
+  printf 'The shared macOS runtime must parse state with the bundled Node.js, without python3 or eval.\n' >&2
+  exit 1
+fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
 trap '/bin/rm -rf "$TMP"' EXIT
+
+RUNTIME_HOME="$TMP/runtime-home"
+RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
+RUNTIME_STATE="$RUNTIME_STATE_ROOT/state.json"
+STATE_EVAL_MARKER="$TMP/state-eval-marker"
+EXPECTED_BUNDLE="/Applications/Codex \$(touch \"$STATE_EVAL_MARKER\").app"
+EXPECTED_EXE="$EXPECTED_BUNDLE/Contents/MacOS/ChatGPT; touch \"$STATE_EVAL_MARKER\""
+EXPECTED_VERSION='1.1.2 "nightly"'
+EXPECTED_TEAM_ID="TEAM'ID"
+/bin/mkdir -p "$RUNTIME_STATE_ROOT"
+"$NODE" -e '
+  const fs = require("node:fs");
+  const [file, codexBundle, codexExe, codexVersion, codexTeamId] = process.argv.slice(1);
+  fs.writeFileSync(file, `${JSON.stringify({ codexBundle, codexExe, codexVersion, codexTeamId })}\n`);
+' "$RUNTIME_STATE" "$EXPECTED_BUNDLE" "$EXPECTED_EXE" "$EXPECTED_VERSION" "$EXPECTED_TEAM_ID"
+/usr/bin/env -u NODE -u NODE_VERSION HOME="$RUNTIME_HOME" /bin/bash -c '
+  . "$1/scripts/common-macos.sh"
+  ensure_node_runtime
+  [ "$CODEX_BUNDLE" = "$2" ]
+  [ "$CODEX_EXE" = "$3" ]
+  [ "$CODEX_VERSION" = "$4" ]
+  [ "$CODEX_TEAM_ID" = "$5" ]
+' _ "$ROOT" "$EXPECTED_BUNDLE" "$EXPECTED_EXE" "$EXPECTED_VERSION" "$EXPECTED_TEAM_ID"
+[ ! -e "$STATE_EVAL_MARKER" ] || {
+  printf 'Runtime state values were evaluated as shell code.\n' >&2
+  exit 1
+}
+
 /bin/mkdir -p "$TMP/theme"
 /bin/cp "$ROOT/assets/portal-hero.png" "$TMP/theme/background.png"
 "$NODE" "$ROOT/scripts/write-theme.mjs" custom --output-dir "$TMP/theme" \
@@ -37,6 +70,15 @@ PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir
   const value = JSON.parse(process.argv[1]);
   if (!value.pass || value.themeName !== "测试主题" || value.imageBytes < 1) process.exit(1);
 ' "$PAYLOAD_JSON"
+/bin/mkdir -p "$TMP/missing-theme"
+if MISSING_THEME_OUTPUT="$(
+  "$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$TMP/missing-theme" 2>&1
+)"; then
+  printf 'Explicit theme directory without theme.json unexpectedly passed.\n' >&2
+  exit 1
+fi
+/usr/bin/printf '%s\n' "$MISSING_THEME_OUTPUT" | /usr/bin/grep -F -q \
+  "Explicit theme directory is missing theme.json: $TMP/missing-theme/theme.json"
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
 [ ! -e "$TMP/theme" ]
 
@@ -72,4 +114,4 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 "$ROOT/app/tests/run-tests.sh"
 
-printf 'PASS: engine, configuration, signed runtime, doctor, and macOS app checks.\n'
+printf 'PASS: syntax, payload, runtime-state safety, custom-theme, config round-trips, HOME recovery, signed runtime, doctor, and macOS app checks.\n'
