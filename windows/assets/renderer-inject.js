@@ -21,10 +21,27 @@
     existingStyle.dataset.dreamVersion = "1";
   }
 
+  const clearSkinDom = () => {
+    document.documentElement?.classList.remove("codex-dream-skin");
+    document.documentElement?.style.removeProperty("--dream-art");
+    document.querySelectorAll(".dream-home").forEach((node) => node.classList.remove("dream-home"));
+    document.querySelectorAll(".dream-home-shell").forEach((node) => node.classList.remove("dream-home-shell"));
+    document.getElementById(STYLE_ID)?.remove();
+    document.getElementById(CHROME_ID)?.remove();
+  };
+
   const ensure = () => {
     if (window.__CODEX_DREAM_SKIN_DISABLED__) return;
     const root = document.documentElement;
-    if (!root) return;
+    if (!root || !document.body) return;
+
+    const shellMain = document.querySelector("main.main-surface");
+    const shellSidebar = document.querySelector("aside.app-shell-left-panel");
+    if (!shellMain || !shellSidebar) {
+      clearSkinDom();
+      return;
+    }
+
     root.classList.add("codex-dream-skin");
     root.style.setProperty("--dream-art", `url("${artUrl}")`);
 
@@ -39,14 +56,12 @@
       style.dataset.dreamVersion = "1";
     }
 
-    const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
     const home = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
     for (const candidate of document.querySelectorAll('[role="main"].dream-home')) {
       if (candidate !== home) candidate.classList.remove("dream-home");
     }
     if (home) home.classList.add("dream-home");
 
-    if (!shellMain || !document.body) return;
     shellMain.classList.toggle("dream-home-shell", Boolean(home));
     let chrome = document.getElementById(CHROME_ID);
     if (!chrome || chrome.parentElement !== document.body) {
@@ -72,12 +87,7 @@
 
   const cleanup = () => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
-    document.documentElement?.classList.remove("codex-dream-skin");
-    document.documentElement?.style.removeProperty("--dream-art");
-    document.querySelectorAll(".dream-home").forEach((node) => node.classList.remove("dream-home"));
-    document.querySelectorAll(".dream-home-shell").forEach((node) => node.classList.remove("dream-home-shell"));
-    document.getElementById(STYLE_ID)?.remove();
-    document.getElementById(CHROME_ID)?.remove();
+    clearSkinDom();
     const state = window[STATE_KEY];
     state?.observer?.disconnect();
     if (state?.timer) clearInterval(state.timer);

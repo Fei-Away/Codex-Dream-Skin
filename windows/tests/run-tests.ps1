@@ -314,6 +314,8 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Injector CDP self-test failed.' }
   & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload *> $null
   if ($LASTEXITCODE -ne 0) { throw 'Injector self-test failed.' }
+  & $node.Path (Join-Path $PSScriptRoot 'renderer-inject.test.mjs')
+  if ($LASTEXITCODE -ne 0) { throw 'Renderer auxiliary-window regression test failed.' }
 
   Write-Host 'PASS: config transactions, restore scoping, state safety, argument quoting, and loopback CDP validation.'
 } finally {

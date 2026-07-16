@@ -17,6 +17,7 @@
 - Sidebar: open a real task, then return to New Task.
 - Composer: type text, verify caret/readability, then clear it without sending.
 - Reload: use CDP `Page.reload`, wait, and confirm the injection marker returns.
+- Pet overlay: open a desktop pet and confirm its auxiliary window stays transparent with no skin background or decoration layer behind it.
 - Restore/reapply cycle: remove live skin, verify marker absent, apply again, verify marker present.
 - Update resilience: resolve the current `OpenAI.Codex` Appx location dynamically for launch. A versioned path saved for cleanup must be revalidated against the registered package full/family identity before any process is stopped.
 - Restart consent: an existing normal Codex window is never force-closed without explicit CLI authorization or shortcut confirmation.
@@ -42,6 +43,6 @@
 
 ## Automated checks
 
-- `tests/run-tests.ps1`: strict UTF-8/no-BOM writes, UTF-16 rejection, LF/CRLF preservation, concurrent-write detection, exact backup/recovery, `[desktop]`-scoped restore, ambiguous TOML rejection, non-ASCII paths, Appx/state identity, argument quoting, payload construction, Browser ID, and loopback URL rejection.
+- `tests/run-tests.ps1`: strict UTF-8/no-BOM writes, UTF-16 rejection, LF/CRLF preservation, concurrent-write detection, exact backup/recovery, `[desktop]`-scoped restore, ambiguous TOML rejection, non-ASCII paths, Appx/state identity, argument quoting, payload construction, Browser ID, loopback URL rejection, and renderer isolation for transparent auxiliary windows.
 - `node --check` for the injector and renderer payload.
 - Live Windows signoff remains required for Store process ownership, restart consent, screenshot, and CDP closure.
