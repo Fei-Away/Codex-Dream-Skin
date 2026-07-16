@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "shinkai-your-name",
+  "name": "你的名字。",
+  "brandSubtitle": "YOUR NAME · 2016 · 新海诚",
+  "tagline": "黄昏将两座城相连，把未完成的答案交给彼此。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "TWILIGHT ONLINE",
+  "quote": "穿过时间，找到彼此",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#1B2140",
+    "panel": "#282D53",
+    "panelAlt": "#393863",
+    "accent": "#E16C83",
+    "accentAlt": "#F49AAD",
+    "secondary": "#6DB6D9",
+    "highlight": "#E3B45C",
+    "text": "#FFF2E6",
+    "muted": "#C2BDD5",
+    "line": "rgba(225, 108, 131, .30)"
+  }
+}

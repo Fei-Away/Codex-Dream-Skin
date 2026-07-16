@@ -9,11 +9,13 @@
 5. Route changes, renderer reloads, and ordinary refreshes reapply the current theme while the verified injector runs.
 6. Official application signature and `app.asar` remain unchanged.
 7. Restore removes live DOM/CSS, restores the two saved base-theme values, closes the CDP session after restart, and supports later reinstallation.
+8. The theme chooser and SwiftBar menu expose all 13 bundled presets in manifest order; updating bundled presets preserves user-created themes.
 
 ## Automated checks
 
 - Shell and JavaScript syntax checks.
 - Payload construction with bundled demo and an isolated custom theme.
+- Manifest, image dimensions, payload construction, ordered listing, idempotent install, and user-theme preservation for all 13 bundled presets.
 - Reject unsupported theme config, unsafe image paths, invalid colors, oversized images, non-loopback WebSocket URLs, and unrecognized renderer targets.
 - Exact install/restore round trip for the two TOML settings while preserving unrelated values.
 - Empty `HOME` recovery.

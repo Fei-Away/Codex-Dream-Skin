@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-ponyo",
+  "name": "崖上的波妞",
+  "brandSubtitle": "PONYO · 2008",
+  "tagline": "浪花越过窗沿，今天也要带着好奇心出发。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "OCEAN ONLINE",
+  "quote": "喜欢，就勇敢靠近",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#123B4A",
+    "panel": "#195064",
+    "panelAlt": "#22677A",
+    "accent": "#EE6658",
+    "accentAlt": "#FF8A72",
+    "secondary": "#72D1D0",
+    "highlight": "#F1C86C",
+    "text": "#FFF8E9",
+    "muted": "#B6D8D8",
+    "line": "rgba(114, 209, 208, .32)"
+  }
+}

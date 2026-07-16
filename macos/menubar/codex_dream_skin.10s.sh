@@ -25,6 +25,7 @@ RESTORE="$SCRIPTS/restore-dream-skin-macos.sh"
 STATUS="$SCRIPTS/status-dream-skin-macos.sh"
 SWITCH="$SCRIPTS/switch-theme-macos.sh"
 LOAD_IMG="$SCRIPTS/load-image-theme-macos.sh"
+PRESETS_INDEX="$ENGINE/presets/index.json"
 [ -x "$APPLY" ] || APPLY="$START"
 
 STATE_ROOT="$HOME/Library/Application Support/CodexDreamSkinStudio"
@@ -78,24 +79,54 @@ echo "应用皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
 echo "暂停皮肤 | bash=\"$PAUSE\" terminal=false refresh=true"
 echo "换一张图… | bash=\"$CUSTOMIZE\" terminal=false refresh=true"
 
-# Dynamic: saved theme packs
-echo "已保存的主题"
-theme_count=0
+# Built-in presets stay in manifest order and are separated from user themes.
+builtin_ids=""
+if [ -f "$PRESETS_INDEX" ]; then
+  while IFS=$'\t' read -r collection tid; do
+    if [ "$collection" = "COLLECTION" ]; then
+      section="$tid"
+      echo "$section"
+      continue
+    fi
+    [ "$collection" = "THEME" ] || continue
+    builtin_ids="${builtin_ids}|${tid}|"
+    [ -f "$THEMES_ROOT/$tid/theme.json" ] || continue
+    tname="$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("name") or sys.argv[2])' "$THEMES_ROOT/$tid/theme.json" "$tid" 2>/dev/null)"
+    tname="$(printf '%s' "${tname:-$tid}" | /usr/bin/tr '\n|' '  ')"
+    mark=""
+    [ "$tname" = "$THEME_LINE" ] && mark=" ✓"
+    echo "-- $tname$mark | bash=\"$SWITCH\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
+  done < <(/usr/bin/python3 - "$PRESETS_INDEX" <<'PY' 2>/dev/null
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    manifest = json.load(f)
+for collection in manifest.get("collections", []):
+    print("COLLECTION", collection.get("name", "内置主题"), sep="\t")
+    for theme_id in collection.get("themes", []):
+        print("THEME", theme_id, sep="\t")
+PY
+  )
+fi
+
+echo "我的主题"
+custom_count=0
 if [ -d "$THEMES_ROOT" ]; then
   for dir in "$THEMES_ROOT"/*; do
     [ -d "$dir" ] || continue
     [ -f "$dir/theme.json" ] || continue
     tid="$(/usr/bin/basename "$dir")"
+    case "$tid" in ''|*[!a-zA-Z0-9._-]*) continue ;; esac
+    case "$builtin_ids" in *"|$tid|"*) continue ;; esac
     tname="$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("name") or sys.argv[2])' "$dir/theme.json" "$tid" 2>/dev/null)"
-    [ -n "$tname" ] || tname="$tid"
+    tname="$(printf '%s' "${tname:-$tid}" | /usr/bin/tr '\n|' '  ')"
     mark=""
     [ "$tname" = "$THEME_LINE" ] && mark=" ✓"
     echo "-- $tname$mark | bash=\"$SWITCH\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
-    theme_count=$((theme_count + 1))
+    custom_count=$((custom_count + 1))
   done
 fi
-if [ "$theme_count" -eq 0 ]; then
-  echo "-- (还没有，换图后会自动出现) | color=#888888"
+if [ "$custom_count" -eq 0 ]; then
+  echo "-- (换图后会自动保存到这里) | color=#888888"
 fi
 
 # Dynamic: pure images dropped into images/

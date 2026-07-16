@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-wind-rises",
+  "name": "起风了",
+  "brandSubtitle": "THE WIND RISES · 2013",
+  "tagline": "风从草原经过，把精密与梦想托向天空。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "WIND ONLINE",
+  "quote": "风起时，继续创造",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#1D3541",
+    "panel": "#294754",
+    "panelAlt": "#385B66",
+    "accent": "#8EBBC4",
+    "accentAlt": "#B7D4D6",
+    "secondary": "#D7C58B",
+    "highlight": "#B96A54",
+    "text": "#FFF6DE",
+    "muted": "#B8CBC9",
+    "line": "rgba(142, 187, 196, .30)"
+  }
+}

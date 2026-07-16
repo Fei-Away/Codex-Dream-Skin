@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-boy-and-heron",
+  "name": "你想活出怎样的人生",
+  "brandSubtitle": "THE BOY AND THE HERON · 2023",
+  "tagline": "穿过塔与水面，在失去之后重新选择自己的世界。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "TOWER ONLINE",
+  "quote": "世界并不完美，仍值得建造",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#182633",
+    "panel": "#223747",
+    "panelAlt": "#304A59",
+    "accent": "#A9B7B2",
+    "accentAlt": "#D3D9CF",
+    "secondary": "#C78C50",
+    "highlight": "#9D4A48",
+    "text": "#F7F0DD",
+    "muted": "#AFBFC0",
+    "line": "rgba(169, 183, 178, .30)"
+  }
+}

@@ -23,16 +23,20 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 # 2) Install to the stable path and create Desktop launchers
 ./scripts/install-dream-skin-macos.sh --no-launch
 
-# 3) Customize with your image (Finder picker if you omit flags)
+# 3) Choose one of the bundled themes
+~/.codex/codex-dream-skin-studio/scripts/choose-theme-macos.sh
+
+# 4) Or customize with your image (Finder picker if you omit flags)
 ~/.codex/codex-dream-skin-studio/scripts/customize-theme-macos.sh
 
-# 4) Start / re-apply, verify, or restore via Desktop:
+# 5) Start / re-apply, choose, verify, or restore via Desktop:
 #    Codex Dream Skin.command
+#    Codex Dream Skin - Themes.command
 #    Codex Dream Skin - Customize.command
 #    Codex Dream Skin - Verify.command
 #    Codex Dream Skin - Restore.command
 
-# 5) Optional: menu bar (SwiftBar) — apply / pause / change image
+# 6) Optional: menu bar (SwiftBar) — apply / pause / switch theme / change image
 ./Install\ Menu\ Bar.command
 # Look for 🎨 Skin in the top-right menu bar
 ```
@@ -44,6 +48,28 @@ Install location after step 2:
 | Engine | `~/.codex/codex-dream-skin-studio` |
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
+
+## Bundled theme library
+
+The installer copies 13 bundled presets into the local theme library and keeps them in manifest order:
+
+- 12 Miyazaki-directed theatrical features: Cagliostro, Nausicaä, Castle in the Sky, Totoro, Kiki, Porco Rosso, Princess Mononoke, Spirited Away, Howl, Ponyo, The Wind Rises, and The Boy and the Heron
+- Guest selection: Your Name (Makoto Shinkai; intentionally not labeled as a Miyazaki film)
+
+Choose interactively:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/choose-theme-macos.sh
+```
+
+Or switch a known id directly:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id miyazaki-spirited-away
+```
+
+Reinstalling or upgrading replaces only the 13 reserved bundled preset ids. Themes created through Customize remain untouched. The artwork is original generated environment art rather than film frames, posters, character art, or official studio assets; see `references/asset-provenance.md` and `NOTICE.md`.
 
 ## Customer ZIP (optional packaging)
 

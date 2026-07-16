@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "collections": [
+    {
+      "id": "miyazaki-directed-features",
+      "name": "宫崎骏导演长篇",
+      "description": "宫崎骏执导的 12 部剧场长篇动画主题。",
+      "themes": [
+        "miyazaki-cagliostro",
+        "miyazaki-nausicaa",
+        "miyazaki-laputa",
+        "miyazaki-totoro",
+        "miyazaki-kiki",
+        "miyazaki-porco-rosso",
+        "miyazaki-mononoke",
+        "miyazaki-spirited-away",
+        "miyazaki-howl",
+        "miyazaki-ponyo",
+        "miyazaki-wind-rises",
+        "miyazaki-boy-and-heron"
+      ]
+    },
+    {
+      "id": "guest-directors",
+      "name": "特别收录",
+      "description": "用户点名、但不属于宫崎骏作品的动画主题。",
+      "themes": [
+        "shinkai-your-name"
+      ]
+    }
+  ]
+}

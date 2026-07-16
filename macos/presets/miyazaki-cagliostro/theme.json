@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-cagliostro",
+  "name": "鲁邦三世：卡里奥斯特罗之城",
+  "brandSubtitle": "CAGLIOSTRO · 1979",
+  "tagline": "越过湖光与钟楼，把难题拆成一场轻快的冒险。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "ADVENTURE ONLINE",
+  "quote": "机敏，也要从容",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#17202A",
+    "panel": "#222E36",
+    "panelAlt": "#2C3B40",
+    "accent": "#D64B3C",
+    "accentAlt": "#F07A5A",
+    "secondary": "#D8C49A",
+    "highlight": "#71885A",
+    "text": "#FFF8E8",
+    "muted": "#C5C2AD",
+    "line": "rgba(216, 196, 154, .30)"
+  }
+}

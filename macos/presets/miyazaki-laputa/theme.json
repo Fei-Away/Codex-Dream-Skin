@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-laputa",
+  "name": "天空之城",
+  "brandSubtitle": "LAPUTA · 1986",
+  "tagline": "云层之上，古老机械与新想法一同苏醒。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "SKY ONLINE",
+  "quote": "向上，也向未知",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#142B3A",
+    "panel": "#1D3C4D",
+    "panelAlt": "#285264",
+    "accent": "#70B9D0",
+    "accentAlt": "#A9DCE8",
+    "secondary": "#E2C46D",
+    "highlight": "#6F8E62",
+    "text": "#F7F2DA",
+    "muted": "#AEC5C7",
+    "line": "rgba(112, 185, 208, .30)"
+  }
+}

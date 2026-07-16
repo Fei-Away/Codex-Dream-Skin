@@ -18,9 +18,14 @@ for required in \
   "$PROJECT_ROOT/assets/dream-skin.css" \
   "$PROJECT_ROOT/assets/renderer-inject.js" \
   "$PROJECT_ROOT/assets/theme.json" \
+  "$PROJECT_ROOT/presets/index.json" \
+  "$PROJECT_ROOT/scripts/theme-library.mjs" \
   "$PROJECT_ROOT/scripts/injector.mjs"; do
   [ -s "$required" ] || fail "Required project file is missing or empty: $required"
 done
+
+"$NODE" "$PROJECT_ROOT/scripts/theme-library.mjs" validate \
+  --presets-dir "$PROJECT_ROOT/presets" >/dev/null
 
 PAYLOAD_JSON="$("$NODE" "$INJECTOR" --check-payload --theme-dir "$THEME_DIR")"
 PORT=9341

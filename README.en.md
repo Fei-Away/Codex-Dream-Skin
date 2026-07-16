@@ -86,6 +86,22 @@ One image, one mood. Real theme previews you can ship:
   <sub>Stage Black-Gold</sub>
 </p>
 
+## Bundled animation themes (macOS)
+
+The installer bundles 13 ready-to-switch, original atmosphere themes: all 12 theatrical features directed by Hayao Miyazaki (following [Studio Ghibli's official “12th theatrical feature” scope](https://www.ghibli.jp/info/013753/)), plus Makoto Shinkai's *Your Name* in a separate “Guest selection” group. After installation, open `Codex Dream Skin - Themes.command` on the Desktop or choose a theme from SwiftBar.
+
+<p align="center">
+  <img src="docs/images/preset-themes.jpg" alt="13 bundled animation atmosphere themes" width="900"><br>
+  <sub>Film order: Cagliostro → Nausicaä → Castle in the Sky → Totoro → Kiki → Porco Rosso → Princess Mononoke → Spirited Away → Howl → Ponyo → The Wind Rises → The Boy and the Heron → Your Name.</sub>
+</p>
+
+| Collection | Themes |
+|------|------|
+| Miyazaki-directed features | *The Castle of Cagliostro*, *Nausicaä of the Valley of the Wind*, *Castle in the Sky*, *My Neighbor Totoro*, *Kiki's Delivery Service*, *Porco Rosso*, *Princess Mononoke*, *Spirited Away*, *Howl's Moving Castle*, *Ponyo*, *The Wind Rises*, *The Boy and the Heron* |
+| Guest selection | *Your Name* (Makoto Shinkai) |
+
+Every background is newly generated environment concept art for this project. The bundle contains no film stills, posters, character art, or official studio assets. Film titles are used descriptively for fan themes; this project is not affiliated with the filmmakers or studios. See [`macos/references/asset-provenance.md`](./macos/references/asset-provenance.md) for provenance and prompts.
+
 ## What it does
 
 - **Real UI** — Sidebar, cards, project picker, and input stay native. Not a fake full-window screenshot.
@@ -124,7 +140,7 @@ More detail:
 
 - See [`macos/LICENSE`](./macos/LICENSE) (MIT) and [`macos/NOTICE.md`](./macos/NOTICE.md)
 - Unofficial; Codex and related rights belong to their owners.
-- People / IP art in previews is illustrative only — clear rights before commercial redistribution.
+- Animation titles, characters, and related rights belong to their respective owners; clear any required rights before commercial redistribution.
 
 ---
 

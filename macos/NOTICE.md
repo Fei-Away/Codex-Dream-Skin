@@ -13,9 +13,13 @@ It does **not** grant rights to:
 - Any user-supplied images or third-party artwork you drop into a theme
 - Character likenesses, franchise art, or celebrity imagery
 
-## Demo artwork
+## Bundled artwork
 
 `assets/portal-hero.png` is original abstract geometric art generated for this open-source repository (no characters). Replace it with your own image before shipping a branded theme to customers.
+
+The backgrounds under `presets/` are newly generated environment concept art created for this repository. They do not contain copied film frames, posters, character art, or official studio assets. Their film titles are used only to describe unofficial fan-theme inspiration. Studio Ghibli, Hayao Miyazaki, Makoto Shinkai, the named films, their characters, and related marks and copyrights belong to their respective rights holders; no endorsement or affiliation is implied.
+
+To the extent the project maintainers hold rights in the generated preset backgrounds, those rights are offered under the repository's MIT License. That license does not grant rights in any third-party title, character, trademark, or underlying work. See `references/asset-provenance.md` for hashes and generation records.
 
 ## Runtime
 

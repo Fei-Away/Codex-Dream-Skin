@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-howl",
+  "name": "哈尔的移动城堡",
+  "brandSubtitle": "HOWL'S MOVING CASTLE · 2004",
+  "tagline": "齿轮、炉火与风，把不可能的房间搬到眼前。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "CASTLE ONLINE",
+  "quote": "让心重新有重量",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#20273A",
+    "panel": "#2C354C",
+    "panelAlt": "#3B4560",
+    "accent": "#C99856",
+    "accentAlt": "#E5BE77",
+    "secondary": "#79AFC2",
+    "highlight": "#C47787",
+    "text": "#FFF3DE",
+    "muted": "#BBC1D0",
+    "line": "rgba(201, 152, 86, .32)"
+  }
+}

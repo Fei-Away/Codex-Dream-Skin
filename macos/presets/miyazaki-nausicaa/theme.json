@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-nausicaa",
+  "name": "风之谷",
+  "brandSubtitle": "NAUSICAÄ · 1984",
+  "tagline": "让风穿过孢子之海，在复杂系统里寻找仍可呼吸的答案。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "WIND ONLINE",
+  "quote": "听见风，也听见生命",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#10272B",
+    "panel": "#17373A",
+    "panelAlt": "#20484A",
+    "accent": "#77BFC5",
+    "accentAlt": "#A9DBD4",
+    "secondary": "#D6C77A",
+    "highlight": "#6D8550",
+    "text": "#F2F6DE",
+    "muted": "#A9C4B6",
+    "line": "rgba(119, 191, 197, .30)"
+  }
+}

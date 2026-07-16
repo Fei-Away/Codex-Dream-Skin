@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-spirited-away",
+  "name": "千与千寻",
+  "brandSubtitle": "SPIRITED AWAY · 2001",
+  "tagline": "灯火亮起，穿过未知，也别忘记自己的名字。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "SPIRIT REALM ONLINE",
+  "quote": "记得来路，也继续向前",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#231B32",
+    "panel": "#322542",
+    "panelAlt": "#463052",
+    "accent": "#D74E45",
+    "accentAlt": "#EE7460",
+    "secondary": "#E8B85C",
+    "highlight": "#3E9090",
+    "text": "#FFF1D6",
+    "muted": "#C8B7C8",
+    "line": "rgba(232, 184, 92, .30)"
+  }
+}

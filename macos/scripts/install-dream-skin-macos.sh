@@ -52,6 +52,9 @@ discover_codex_app
 require_macos_runtime
 ensure_state_root
 [ -f "$CONFIG_PATH" ] || fail "Codex config not found: $CONFIG_PATH. Launch Codex once, close it, and rerun the installer."
+"$NODE" "$SCRIPT_DIR/theme-library.mjs" install \
+  --presets-dir "$PROJECT_ROOT/presets" \
+  --themes-dir "$STATE_ROOT/themes" >/dev/null
 "$NODE" "$INJECTOR" --check-payload --theme-dir "$THEME_DIR" >/dev/null
 "$NODE" "$SCRIPT_DIR/theme-config.mjs" install "$CONFIG_PATH" "$THEME_BACKUP_PATH"
 
@@ -76,11 +79,13 @@ write_launcher() {
 if [ "$CREATE_LAUNCHERS" = "true" ]; then
   /bin/mkdir -p "$HOME/Desktop"
   start_script="$(shell_quote "$SCRIPT_DIR/start-dream-skin-macos.sh")"
+  themes_script="$(shell_quote "$SCRIPT_DIR/choose-theme-macos.sh")"
   customize_script="$(shell_quote "$SCRIPT_DIR/customize-theme-macos.sh")"
   verify_script="$(shell_quote "$SCRIPT_DIR/verify-dream-skin-macos.sh")"
   restore_script="$(shell_quote "$SCRIPT_DIR/restore-dream-skin-macos.sh")"
   screenshot="$(shell_quote "$HOME/Desktop/Codex Dream Skin Verification.png")"
   write_launcher "$HOME/Desktop/Codex Dream Skin.command" "exec $start_script --port $PORT --prompt-restart"
+  write_launcher "$HOME/Desktop/Codex Dream Skin - Themes.command" "exec $themes_script"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Customize.command" "exec $customize_script"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Verify.command" "$verify_script --screenshot $screenshot && /usr/bin/open $screenshot"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Restore.command" "exec $restore_script --restore-base-theme --restart-codex"
@@ -88,7 +93,7 @@ fi
 
 printf 'Codex Dream Skin Studio %s installed at %s for Codex %s using its signed Node.js %s.\n' \
   "$SKIN_VERSION" "$PROJECT_ROOT" "$CODEX_VERSION" "$NODE_VERSION"
-printf 'Use the Desktop launchers to customize, start, verify, or restore the official appearance.\n'
+printf 'Use the Desktop launchers to choose a theme, customize, start, verify, or restore the official appearance.\n'
 
 if [ "$LAUNCH_AFTER_INSTALL" = "true" ]; then
   "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --prompt-restart

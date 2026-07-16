@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-porco-rosso",
+  "name": "红猪",
+  "brandSubtitle": "PORCO ROSSO · 1992",
+  "tagline": "掠过亚得里亚海，把自由写进每一次起飞。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "FLIGHT ONLINE",
+  "quote": "漂亮地完成它",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#153047",
+    "panel": "#1E4058",
+    "panelAlt": "#2A536C",
+    "accent": "#D34B3F",
+    "accentAlt": "#F06B52",
+    "secondary": "#E5C98A",
+    "highlight": "#4E8E9C",
+    "text": "#FFF4DB",
+    "muted": "#B8CDD3",
+    "line": "rgba(229, 201, 138, .30)"
+  }
+}

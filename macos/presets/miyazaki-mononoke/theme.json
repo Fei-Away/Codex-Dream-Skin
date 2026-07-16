@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-mononoke",
+  "name": "幽灵公主",
+  "brandSubtitle": "PRINCESS MONONOKE · 1997",
+  "tagline": "在森林与铁火之间，寻找不伤害彼此的解法。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "FOREST SPIRIT ONLINE",
+  "quote": "看清世界，仍选择行动",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#13251F",
+    "panel": "#1C352B",
+    "panelAlt": "#284638",
+    "accent": "#D7D5C4",
+    "accentAlt": "#F2EBD5",
+    "secondary": "#86A984",
+    "highlight": "#A8463D",
+    "text": "#F4F1DD",
+    "muted": "#ACC0AD",
+    "line": "rgba(215, 213, 196, .28)"
+  }
+}

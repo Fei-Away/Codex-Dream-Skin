@@ -32,7 +32,6 @@ fi
 
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
 trap '/bin/rm -rf "$TMP"' EXIT
-
 RUNTIME_HOME="$TMP/runtime-home"
 RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
 RUNTIME_STATE="$RUNTIME_STATE_ROOT/state.json"
@@ -59,6 +58,53 @@ EXPECTED_TEAM_ID="TEAM'ID"
   printf 'Runtime state values were evaluated as shell code.\n' >&2
   exit 1
 }
+
+LIBRARY_JSON="$("$NODE" "$ROOT/scripts/theme-library.mjs" validate)"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (!value.pass || value.collectionCount !== 2 || value.themeCount !== 13) process.exit(1);
+' "$LIBRARY_JSON"
+while IFS= read -r preset; do
+  PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$preset")"
+  "$NODE" -e '
+    const value = JSON.parse(process.argv[1]);
+    if (!value.pass || value.imageBytes < 1) process.exit(1);
+  ' "$PAYLOAD_JSON"
+  image="$("$NODE" -e 'const p=require("path"),fs=require("fs");const d=process.argv[1],t=JSON.parse(fs.readFileSync(p.join(d,"theme.json"),"utf8"));process.stdout.write(p.join(d,t.image))' "$preset")"
+  width="$(/usr/bin/sips -g pixelWidth "$image" 2>/dev/null | /usr/bin/awk '/pixelWidth/{print $2}')"
+  height="$(/usr/bin/sips -g pixelHeight "$image" 2>/dev/null | /usr/bin/awk '/pixelHeight/{print $2}')"
+  [ "$width" -ge 2000 ] && [ "$height" -ge 650 ] && [ "$((width * 10))" -ge "$((height * 28))" ] \
+    || { printf 'Preset is not a sufficiently wide banner: %s (%sx%s)\n' "$preset" "$width" "$height" >&2; exit 1; }
+done < <(/usr/bin/find "$ROOT/presets" -mindepth 1 -maxdepth 1 -type d -print | /usr/bin/sort)
+
+THEMES_ROOT="$TMP/themes"
+CUSTOM_THEME="$THEMES_ROOT/custom-keep"
+/bin/mkdir -p "$CUSTOM_THEME"
+/bin/cp "$ROOT/assets/portal-hero.png" "$CUSTOM_THEME/background.png"
+"$NODE" "$ROOT/scripts/write-theme.mjs" custom --output-dir "$CUSTOM_THEME" \
+  --image background.png --name '保留的用户主题' >/dev/null
+"$NODE" "$ROOT/scripts/theme-library.mjs" install --themes-dir "$THEMES_ROOT" >/dev/null
+[ -f "$CUSTOM_THEME/theme.json" ]
+[ "$(/usr/bin/find "$THEMES_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | /usr/bin/wc -l | /usr/bin/tr -d ' ')" -eq 14 ]
+/usr/bin/touch "$THEMES_ROOT/miyazaki-totoro/stale-file"
+"$NODE" "$ROOT/scripts/theme-library.mjs" install --themes-dir "$THEMES_ROOT" >/dev/null
+[ ! -e "$THEMES_ROOT/miyazaki-totoro/stale-file" ]
+[ -f "$CUSTOM_THEME/theme.json" ]
+THEME_LIST="$("$NODE" "$ROOT/scripts/theme-library.mjs" list --themes-dir "$THEMES_ROOT")"
+"$NODE" -e '
+  const themes = JSON.parse(process.argv[1]);
+  if (themes.length !== 14) process.exit(1);
+  if (themes.filter((theme) => theme.bundled).length !== 13) process.exit(1);
+  if (!themes.some((theme) => theme.name === "保留的用户主题" && !theme.bundled)) process.exit(1);
+' "$THEME_LIST"
+
+MENU_HOME="$TMP/menu-home"
+MENU_THEMES="$MENU_HOME/Library/Application Support/CodexDreamSkinStudio/themes"
+"$NODE" "$ROOT/scripts/theme-library.mjs" install --themes-dir "$MENU_THEMES" >/dev/null
+MENU_OUTPUT="$(HOME="$MENU_HOME" CODEX_DREAM_SKIN_ENGINE="$ROOT" /bin/bash "$ROOT/menubar/codex_dream_skin.10s.sh")"
+[ "$(printf '%s\n' "$MENU_OUTPUT" | /usr/bin/grep -Ec 'param2="(miyazaki|shinkai)-')" -eq 13 ]
+printf '%s\n' "$MENU_OUTPUT" | /usr/bin/grep -q '^宫崎骏导演长篇$'
+printf '%s\n' "$MENU_OUTPUT" | /usr/bin/grep -q '^特别收录$'
 
 /bin/mkdir -p "$TMP/theme"
 /bin/cp "$ROOT/assets/portal-hero.png" "$TMP/theme/background.png"
@@ -111,6 +157,13 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 /usr/bin/cmp -s "$NO_DESKTOP_CONFIG" "$TMP/original-without-desktop.toml"
 
 /usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.2" ]' _ "$ROOT"
-"$ROOT/scripts/doctor-macos.sh" >/dev/null
+DOCTOR_HOME="$TMP/doctor-home"
+DOCTOR_THEME="$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/theme"
+/bin/mkdir -p "$DOCTOR_HOME/.codex" "$DOCTOR_THEME"
+/usr/bin/printf '%s\n' 'model = "gpt-5"' > "$DOCTOR_HOME/.codex/config.toml"
+/bin/cp "$ROOT/assets/portal-hero.png" "$DOCTOR_THEME/background.png"
+"$NODE" "$ROOT/scripts/write-theme.mjs" custom --output-dir "$DOCTOR_THEME" \
+  --image background.png --name 'Doctor 测试主题' >/dev/null
+HOME="$DOCTOR_HOME" "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
-printf 'PASS: syntax, payload, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
+printf 'PASS: syntax, 13 presets, library install preservation, payload, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

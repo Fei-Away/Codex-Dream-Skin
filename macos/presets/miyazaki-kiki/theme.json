@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-kiki",
+  "name": "魔女宅急便",
+  "brandSubtitle": "KIKI'S DELIVERY SERVICE · 1989",
+  "tagline": "海风掠过红屋顶，把今天的任务准时送达。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "DELIVERY ONLINE",
+  "quote": "独立，也保持热爱",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#172733",
+    "panel": "#223746",
+    "panelAlt": "#2D4959",
+    "accent": "#C94D49",
+    "accentAlt": "#E57768",
+    "secondary": "#E4B96B",
+    "highlight": "#4B8290",
+    "text": "#FFF5DE",
+    "muted": "#B9C6C8",
+    "line": "rgba(228, 185, 107, .30)"
+  }
+}

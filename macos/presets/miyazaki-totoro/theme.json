@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "miyazaki-totoro",
+  "name": "龙猫",
+  "brandSubtitle": "TOTORO · 1988",
+  "tagline": "雨落田野，安静的陪伴让漫长任务也有了呼吸。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "FOREST ONLINE",
+  "quote": "慢一点，灵感会来",
+  "image": "background.jpg",
+  "colors": {
+    "background": "#182A24",
+    "panel": "#243A31",
+    "panelAlt": "#304C3E",
+    "accent": "#8DB77B",
+    "accentAlt": "#B9D49A",
+    "secondary": "#E5C66E",
+    "highlight": "#667E76",
+    "text": "#F7F2DD",
+    "muted": "#B6C5B2",
+    "line": "rgba(141, 183, 123, .32)"
+  }
+}
