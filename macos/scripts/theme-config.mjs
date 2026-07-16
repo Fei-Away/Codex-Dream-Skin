@@ -48,12 +48,12 @@ try {
 
 const originalStat = await fs.stat(configPath);
 let section = desktopSection(content);
-if (!section) {
-  content = `${content.trimEnd()}\n\n[desktop]\n`;
-  section = desktopSection(content);
-}
 
 if (mode === "install") {
+  if (!section) {
+    content = `${content.trimEnd()}\n\n[desktop]\n`;
+    section = desktopSection(content);
+  }
   try {
     await fs.access(backupPath);
   } catch {
@@ -96,6 +96,16 @@ if (mode === "install") {
   }
   if (backup.schemaVersion !== 1 || backup.configPath !== configPath || !backup.values) {
     throw new Error("Theme backup identity or schema does not match this config; nothing was restored.");
+  }
+  if (!section) {
+    const hasSavedSetting = [...settings.keys()].some((key) => backup.values[key]);
+    if (!hasSavedSetting) {
+      await fs.unlink(backupPath);
+      console.log("Restored the saved base-theme keys.");
+      process.exit(0);
+    }
+    content = `${content.trimEnd()}\n\n[desktop]\n`;
+    section = desktopSection(content);
   }
   let body = section.body;
   for (const key of settings.keys()) body = replaceSetting(body, key, backup.values[key] ?? null);
