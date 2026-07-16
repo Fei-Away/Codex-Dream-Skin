@@ -13,8 +13,8 @@ trap '/bin/rm -rf "$TMP"' EXIT
 /bin/mkdir -p "$PACK"
 /usr/bin/rsync -a --exclude '.DS_Store' --exclude 'release/' "$ROOT/macos/" "$PACK/macOS/"
 /usr/bin/rsync -a --exclude '.DS_Store' "$ROOT/windows/" "$PACK/Windows/"
-/usr/bin/rsync -a --exclude '.DS_Store' "$ROOT/themes/" "$PACK/主题预览与说明/"
 /bin/cp "$ROOT/README.md" "$PACK/README.md"
+/bin/cp "$ROOT/themes/README.md" "$PACK/主题说明.md"
 /usr/bin/printf '%s\n' \
   "栋哥 Codex 皮肤包 $VERSION" \
   '' \
