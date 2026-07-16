@@ -10,6 +10,19 @@ $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-t
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
+  $atomicReplacePath = Join-Path $temporaryRoot 'atomic-replace.txt'
+  [System.IO.File]::WriteAllText($atomicReplacePath, 'before')
+  Write-DreamSkinUtf8FileAtomically -Path $atomicReplacePath -Content 'after'
+  if ((Read-DreamSkinUtf8File -Path $atomicReplacePath) -cne 'after') {
+    throw 'Atomic writer did not replace an existing file under Windows PowerShell.'
+  }
+  $atomicArtifacts = @(Get-ChildItem -LiteralPath $temporaryRoot -Force |
+    Where-Object { $_.FullName -ne $atomicReplacePath })
+  if ($atomicArtifacts.Count -ne 0) {
+    throw 'Atomic writer left internal replacement artifacts behind.'
+  }
+  Remove-Item -LiteralPath $atomicReplacePath -Force
+
   $configPath = Join-Path $temporaryRoot 'config.toml'
   $backupPath = Join-Path $temporaryRoot 'config.before-dream-skin.toml'
   $projectName = -join @([char]0x4EE3, [char]0x7801, [char]0x9879, [char]0x76EE, [char]0x7532)
