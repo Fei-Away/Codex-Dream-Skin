@@ -27,6 +27,9 @@ THEMES_ROOT="$STATE_ROOT/themes"
 /bin/mkdir -p "$IMAGES_DIR" "$THEMES_ROOT" "$THEME_DIR"
 
 if [ -n "$FROM_LIBRARY" ]; then
+  case "$FROM_LIBRARY" in
+    */*|.|..) fail "Invalid image library name: $FROM_LIBRARY" ;;
+  esac
   IMAGE="$IMAGES_DIR/$FROM_LIBRARY"
 fi
 
@@ -61,39 +64,41 @@ progress "Loading image..."
 ensure_node_runtime
 
 image_name="background.jpg"
-temporary="$THEME_DIR/.${image_name}.tmp.jpg"
-prepared="$THEME_DIR/$image_name"
-/bin/rm -f "$THEME_DIR"/background.* "$THEME_DIR"/.*.tmp.jpg 2>/dev/null || true
+staged="$(/usr/bin/mktemp -d "$STATE_ROOT/theme.import.XXXXXX")"
+previous="$(/usr/bin/mktemp -d "$STATE_ROOT/theme.previous.XXXXXX")"
+/bin/rmdir "$previous"
+temporary="$staged/.${image_name}.tmp.jpg"
+prepared="$staged/$image_name"
+cleanup_import() {
+  /bin/rm -rf "$staged" "$previous"
+}
+trap cleanup_import EXIT
 
 # Prefer copying already-JPEG; sips only when needed (large PNG conversion is the slow part)
 ext="$(printf '%s' "$IMAGE" | /usr/bin/tr '[:upper:]' '[:lower:]')"
 case "$ext" in
   *.jpg|*.jpeg)
     /bin/cp -f "$IMAGE" "$prepared"
-    /bin/chmod 600 "$prepared"
     ;;
   *)
     /usr/bin/sips -s format jpeg -s formatOptions 82 -Z 2400 "$IMAGE" --out "$temporary" >/dev/null \
       || fail "Could not convert image. Use PNG/JPEG/HEIC/TIFF/WebP."
     [ -s "$temporary" ] || fail "Converted image is empty."
-    PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$temporary")"
-    [ "$PREPARED_BYTES" -le 16777216 ] || fail "Prepared image larger than 16 MB."
     /bin/mv -f "$temporary" "$prepared"
-    /bin/chmod 600 "$prepared"
     ;;
 esac
 
+PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$prepared")"
+[ "$PREPARED_BYTES" -le 16777216 ] || fail "Prepared image larger than 16 MB."
+/bin/chmod 600 "$prepared"
+
 "$NODE" "$SCRIPT_DIR/write-theme.mjs" custom \
-  --output-dir "$THEME_DIR" --image "$image_name" \
+  --output-dir "$staged" --image "$image_name" \
   --name "$THEME_NAME" \
   --tagline "dynamic pure background" \
   --quote "MAKE SOMETHING WONDERFUL" \
   --accent "#E25563" --secondary "#F3A8AF" --highlight "#C93D4C" >/dev/null
-
-lib_dir="$THEMES_ROOT/$theme_id"
-/bin/mkdir -p "$lib_dir"
-/bin/cp -f "$THEME_DIR/$image_name" "$THEME_DIR/theme.json" "$lib_dir/"
-/bin/chmod 600 "$lib_dir/"* 2>/dev/null || true
+"$NODE" "$INJECTOR" --check-payload --theme-dir "$staged" >/dev/null
 
 dest_lib_img="$IMAGES_DIR/$(/usr/bin/basename "$IMAGE")"
 src_dir="$(cd "$(dirname "$IMAGE")" && pwd -P)"
@@ -101,6 +106,19 @@ img_dir="$(cd "$IMAGES_DIR" && pwd -P)"
 if [ "$src_dir/$(/usr/bin/basename "$IMAGE")" != "$img_dir/$(/usr/bin/basename "$IMAGE")" ]; then
   /bin/cp -f "$IMAGE" "$dest_lib_img" 2>/dev/null || true
 fi
+
+if [ -e "$THEME_DIR" ]; then /bin/mv "$THEME_DIR" "$previous"; fi
+if ! /bin/mv "$staged" "$THEME_DIR"; then
+  [ ! -e "$previous" ] || /bin/mv "$previous" "$THEME_DIR"
+  fail "Could not activate imported image theme."
+fi
+/bin/rm -rf "$previous"
+trap - EXIT
+
+lib_dir="$THEMES_ROOT/$theme_id"
+/bin/mkdir -p "$lib_dir"
+/bin/cp -f "$THEME_DIR/$image_name" "$THEME_DIR/theme.json" "$lib_dir/"
+/bin/chmod 600 "$lib_dir/"* 2>/dev/null || true
 
 if [ "$APPLY_NOW" != "true" ]; then
   progress "Ready: ${THEME_NAME} (not applied)"

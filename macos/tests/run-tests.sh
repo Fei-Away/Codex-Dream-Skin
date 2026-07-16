@@ -82,6 +82,28 @@ fi
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
 [ ! -e "$TMP/theme" ]
 
+IMPORT_HOME="$TMP/import-home"
+IMPORT_STATE="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio"
+/bin/mkdir -p "$IMPORT_STATE/theme" "$IMPORT_STATE/images"
+/usr/bin/printf '%s\n' 'preserve-active-theme' > "$IMPORT_STATE/theme/sentinel"
+OVERSIZED_JPEG="$TMP/oversized.jpg"
+"$NODE" -e '
+  const fs = require("fs");
+  fs.writeFileSync(process.argv[1], "");
+  fs.truncateSync(process.argv[1], 17 * 1024 * 1024);
+' "$OVERSIZED_JPEG"
+if HOME="$IMPORT_HOME" NODE="$NODE" NODE_VERSION="$($NODE --version)" \
+  /bin/bash "$ROOT/scripts/load-image-theme-macos.sh" --file "$OVERSIZED_JPEG" --no-apply >/dev/null 2>&1; then
+  printf 'Oversized prepared image unexpectedly replaced the active theme.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'preserve-active-theme' "$IMPORT_STATE/theme/sentinel"
+if HOME="$IMPORT_HOME" NODE="$NODE" NODE_VERSION="$($NODE --version)" \
+  /bin/bash "$ROOT/scripts/load-image-theme-macos.sh" --from-library ../oversized.jpg --no-apply >/dev/null 2>&1; then
+  printf 'Image library traversal unexpectedly passed validation.\n' >&2
+  exit 1
+fi
+
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
 /usr/bin/printf '%s\n' \
