@@ -15,13 +15,45 @@ $StdoutPath = Join-Path $StateRoot 'injector.log'
 $StderrPath = Join-Path $StateRoot 'injector-error.log'
 New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
 
-function Test-CodexDebugPort([int]$CandidatePort) {
+function Test-CdpWebSocketUrl([string]$Value, [int]$CandidatePort) {
   try {
-    $targets = Invoke-RestMethod "http://127.0.0.1:$CandidatePort/json/list" -TimeoutSec 1
-    return [bool]($targets | Where-Object { $_.type -eq 'page' -and $_.url -like 'app://*' })
+    $uri = [Uri]$Value
+    $host = $uri.Host.ToLowerInvariant()
+    return $uri.Scheme -eq 'ws' -and $uri.Port -eq $CandidatePort -and
+      $host -in @('127.0.0.1', 'localhost', '::1', '[::1]')
   } catch {
     return $false
   }
+}
+
+function Test-CodexDebugPort([int]$CandidatePort) {
+  try {
+    $targets = Invoke-RestMethod "http://127.0.0.1:$CandidatePort/json/list" -TimeoutSec 1
+    return [bool]($targets | Where-Object {
+      $_.type -eq 'page' -and
+      $_.url -like 'app://*' -and
+      (Test-CdpWebSocketUrl $_.webSocketDebuggerUrl $CandidatePort)
+    })
+  } catch {
+    return $false
+  }
+}
+
+function Stop-PreviousInjector([object]$State, [string]$ExpectedNode, [string]$ExpectedInjector) {
+  if (-not $State.injectorPid) { return }
+  $injectorPid = [int]$State.injectorPid
+  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $injectorPid" -ErrorAction SilentlyContinue
+  if (-not $process) { return }
+
+  $commandLine = "$($process.CommandLine)"
+  $executable = "$($process.ExecutablePath)"
+  $nodeMatches = $executable -and ([System.IO.Path]::GetFullPath($executable) -ieq [System.IO.Path]::GetFullPath($ExpectedNode))
+  $injectorMatches = $commandLine.IndexOf($ExpectedInjector, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+  if (-not ($nodeMatches -and $injectorMatches)) {
+    Write-Warning "Skipping stale injector PID $injectorPid because it no longer matches this Dream Skin injector."
+    return
+  }
+  Stop-Process -Id $injectorPid -Force -ErrorAction SilentlyContinue
 }
 
 $node = (Get-Command node -ErrorAction Stop).Source
@@ -43,7 +75,7 @@ if (-not (Test-CodexDebugPort $Port)) {
   if (-not $package) { throw 'The OpenAI.Codex Store package is not installed.' }
   $exe = Join-Path $package.InstallLocation 'app\ChatGPT.exe'
   if (-not (Test-Path -LiteralPath $exe)) { throw "Codex executable not found: $exe" }
-  $arguments = @("--remote-debugging-port=$Port")
+  $arguments = @("--remote-debugging-address=127.0.0.1", "--remote-debugging-port=$Port")
   if ($ProfilePath) {
     New-Item -ItemType Directory -Force -Path $ProfilePath | Out-Null
     $arguments += "--user-data-dir=$ProfilePath"
@@ -60,7 +92,7 @@ while (-not (Test-CodexDebugPort $Port)) {
 if (Test-Path -LiteralPath $StatePath) {
   try {
     $old = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
-    if ($old.injectorPid) { Stop-Process -Id ([int]$old.injectorPid) -Force -ErrorAction SilentlyContinue }
+    Stop-PreviousInjector $old $node $Injector
   } catch {}
 }
 
@@ -74,6 +106,8 @@ $daemon = Start-Process -FilePath $node -ArgumentList $injectorArgs -WindowStyle
 @{
   port = $Port
   injectorPid = $daemon.Id
+  injectorPath = $Injector
+  nodePath = $node
   startedAt = (Get-Date).ToString('o')
   skillRoot = $SkillRoot
   profilePath = $ProfilePath

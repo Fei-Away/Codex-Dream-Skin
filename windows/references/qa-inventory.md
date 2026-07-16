@@ -8,6 +8,7 @@
 4. The skin survives route changes and renderer reloads while the injector daemon runs.
 5. The official Store package and `app.asar` remain unchanged.
 6. Restore removes the injected DOM/CSS and install/restore can be repeated.
+7. A custom Windows theme image, name, tagline, signature, and accent palette can be saved and applied without editing source files.
 
 ## Functional checks
 
@@ -17,6 +18,7 @@
 - Composer: type text, verify caret/readability, then clear it without sending.
 - Reload: use CDP `Page.reload`, wait, and confirm the injection marker returns.
 - Restore/reapply cycle: remove live skin, verify marker absent, apply again, verify marker present.
+- Custom theme cycle: run `set-dream-theme.ps1` with a test image and colors, launch/apply, verify the theme name appears in injector verification output, then reset the theme.
 - Update resilience: resolve the current `OpenAI.Codex` Appx location dynamically; never store a versioned WindowsApps path.
 
 ## Visual checks

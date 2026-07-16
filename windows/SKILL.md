@@ -9,11 +9,12 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 
 ## Workflow
 
-1. Run `scripts/install-dream-skin.ps1` once to set the matching official base colors and create launch/restore shortcuts.
-2. Run `scripts/start-dream-skin.ps1`. Add `-RestartExisting` only when the user authorized restarting an already-open Codex app.
-3. Run `scripts/verify-dream-skin.ps1 -ScreenshotPath <absolute-path>` after launch. Treat a missing hero, native composer, sidebar skin, or injection marker as failure. The native suggestion count is responsive and may be two to four.
-4. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
-5. Run `scripts/restore-dream-skin.ps1` for live removal. Add `-Uninstall` to delete shortcuts; add `-RestoreBaseTheme` when the user also wants the pre-install config backup restored.
+1. Run `scripts/install-dream-skin.ps1` once to set the matching official base colors and create launch/restore/theme shortcuts. Use `-SkipBaseTheme` if the user does not want `.codex/config.toml` touched.
+2. Optional: run `scripts/set-dream-theme.ps1 -ImagePath <image> -Name <name> -Accent <#hex> -Apply` to save a custom Windows theme. The interactive shortcut uses the same script with `-Interactive`.
+3. Run `scripts/start-dream-skin.ps1`. Add `-RestartExisting` only when the user authorized restarting an already-open Codex app.
+4. Run `scripts/verify-dream-skin.ps1 -ScreenshotPath <absolute-path>` after launch. Treat a missing hero, native composer, sidebar skin, or injection marker as failure. The native suggestion count is responsive and may be two to four.
+5. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
+6. Run `scripts/restore-dream-skin.ps1` for live removal. Add `-Uninstall` to delete shortcuts; add `-RestoreBaseTheme` when the user also wants the pre-install config backup restored.
 
 ## Guardrails
 
@@ -28,9 +29,11 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 
 ## Resources
 
-- `scripts/injector.mjs`: CDP connection, renderer injection, verification, screenshot, and removal.
+- `scripts/injector.mjs`: CDP connection, renderer injection, theme loading, verification, screenshot, and removal.
+- `scripts/set-dream-theme.ps1`: Windows theme image/text/color customization.
 - `assets/dream-skin.css`: full visual layer.
 - `assets/renderer-inject.js`: idempotent DOM integration and cleanup.
+- `assets/theme.json`: bundled fallback theme.
 - `assets/dream-reference.png`: user-provided visual reference used only in cropped decorative regions.
 - `references/qa-inventory.md`: required functional and visual signoff coverage.
 - `references/runtime-notes.md`: troubleshooting and update behavior.

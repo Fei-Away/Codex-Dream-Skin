@@ -40,7 +40,7 @@
 | 启动 + 注入 | ✅ | ✅ |
 | 一键恢复 | ✅ | ✅ |
 | 实机 verify / 截图 | ✅ | ✅ |
-| 用户选图定制 | ✅ | ❌ |
+| 用户选图定制 | ✅ | ✅（`windows/scripts/set-dream-theme.ps1`） |
 | 官方签名校验 | ✅ | 部分（Store 包发现） |
 | 客户部署提示词 | ✅ | ❌（可用 Mac 文案改写） |
 | 打客户 ZIP | ✅ `build-client-release.sh` | 手动压缩 `windows/` |

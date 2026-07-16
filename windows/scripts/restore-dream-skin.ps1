@@ -11,10 +11,27 @@ $injector = Join-Path $PSScriptRoot 'injector.mjs'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $StatePath = Join-Path $StateRoot 'state.json'
 
+function Stop-PreviousInjector([object]$State, [string]$ExpectedNode, [string]$ExpectedInjector) {
+  if (-not $State.injectorPid) { return }
+  $injectorPid = [int]$State.injectorPid
+  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $injectorPid" -ErrorAction SilentlyContinue
+  if (-not $process) { return }
+
+  $commandLine = "$($process.CommandLine)"
+  $executable = "$($process.ExecutablePath)"
+  $nodeMatches = $executable -and ([System.IO.Path]::GetFullPath($executable) -ieq [System.IO.Path]::GetFullPath($ExpectedNode))
+  $injectorMatches = $commandLine.IndexOf($ExpectedInjector, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+  if (-not ($nodeMatches -and $injectorMatches)) {
+    Write-Warning "Skipping stale injector PID $injectorPid because it no longer matches this Dream Skin injector."
+    return
+  }
+  Stop-Process -Id $injectorPid -Force -ErrorAction SilentlyContinue
+}
+
 if (Test-Path -LiteralPath $StatePath) {
   try {
     $state = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
-    if ($state.injectorPid) { Stop-Process -Id ([int]$state.injectorPid) -Force -ErrorAction SilentlyContinue }
+    Stop-PreviousInjector $state $node $injector
   } catch {}
   Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue
 }
@@ -27,6 +44,7 @@ if ($Uninstall) {
   @(
     (Join-Path $desktop 'Codex Dream Skin.lnk'),
     (Join-Path $desktop 'Codex Dream Skin - Restore.lnk'),
+    (Join-Path $desktop 'Codex Dream Skin - Theme.lnk'),
     (Join-Path $startMenu 'Codex Dream Skin.lnk')
   ) | ForEach-Object { Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue }
 }

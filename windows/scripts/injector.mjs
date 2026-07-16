@@ -4,9 +4,28 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
+const assetsRoot = path.join(root, "assets");
+const defaultThemePath = path.join(assetsRoot, "theme.json");
+const stateRoot = process.env.LOCALAPPDATA
+  ? path.join(process.env.LOCALAPPDATA, "CodexDreamSkin")
+  : path.join(root, ".state");
+const defaultThemeDir = path.join(stateRoot, "theme");
+const imageTypes = new Map([
+  [".png", "image/png"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".webp", "image/webp"],
+]);
 
 function parseArgs(argv) {
-  const options = { port: 9335, mode: "watch", timeoutMs: 30000, screenshot: null, reload: false };
+  const options = {
+    port: 9335,
+    mode: "watch",
+    timeoutMs: 30000,
+    screenshot: null,
+    reload: false,
+    themeDir: defaultThemeDir,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--port") options.port = Number(argv[++i]);
@@ -16,13 +35,117 @@ function parseArgs(argv) {
     else if (arg === "--remove") options.mode = "remove";
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
+    else if (arg === "--theme-dir") options.themeDir = path.resolve(argv[++i]);
     else if (arg === "--reload") options.reload = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   if (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535) {
     throw new Error(`Invalid port: ${options.port}`);
   }
+  if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1) {
+    throw new Error(`Invalid timeout: ${options.timeoutMs}`);
+  }
   return options;
+}
+
+function validateWebSocketUrl(value, port) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "ws:" &&
+      Number(url.port) === port &&
+      (host === "127.0.0.1" || host === "localhost" || host === "[::1]" || host === "::1");
+  } catch {
+    return false;
+  }
+}
+
+function cleanText(value, fallback, maxLength) {
+  const next = typeof value === "string" && value.trim() ? value.trim() : fallback;
+  return next.length > maxLength ? next.slice(0, maxLength) : next;
+}
+
+function cleanHex(value, fallback) {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fallback;
+}
+
+function cleanCssColor(value, fallback) {
+  return typeof value === "string" && value.length <= 80 ? value : fallback;
+}
+
+async function readJson(pathname) {
+  return JSON.parse(await fs.readFile(pathname, "utf8"));
+}
+
+async function pathExists(pathname) {
+  try {
+    await fs.access(pathname);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function mergeTheme(defaultTheme, userTheme = {}) {
+  const defaultColors = defaultTheme.colors || {};
+  const userColors = userTheme.colors || {};
+  return {
+    schemaVersion: 1,
+    name: cleanText(userTheme.name, defaultTheme.name || "Codex Dream Skin", 80),
+    brandSubtitle: cleanText(userTheme.brandSubtitle, defaultTheme.brandSubtitle || "CODEX DREAM SKIN", 80),
+    tagline: cleanText(userTheme.tagline, defaultTheme.tagline || "Make something wonderful", 160),
+    projectPrefix: cleanText(userTheme.projectPrefix, defaultTheme.projectPrefix || "选择项目 · ", 40),
+    projectLabel: cleanText(userTheme.projectLabel, defaultTheme.projectLabel || "♡  选择项目", 40),
+    statusText: cleanText(userTheme.statusText, defaultTheme.statusText || "DREAM SKIN ONLINE", 80),
+    quote: cleanText(userTheme.quote, defaultTheme.quote || "Make something wonderful", 100),
+    signature: cleanText(userTheme.signature, defaultTheme.signature || "Dream Skin ♡", 80),
+    image: path.basename(cleanText(userTheme.image, defaultTheme.image || "dream-reference.png", 160)),
+    colors: {
+      background: cleanHex(userColors.background, cleanHex(defaultColors.background, "#fff3f9")),
+      panel: cleanHex(userColors.panel, cleanHex(defaultColors.panel, "#ffffff")),
+      panelAlt: cleanHex(userColors.panelAlt, cleanHex(defaultColors.panelAlt, "#fff7fb")),
+      accent: cleanHex(userColors.accent, cleanHex(defaultColors.accent, "#b65cff")),
+      accentAlt: cleanHex(userColors.accentAlt, cleanHex(defaultColors.accentAlt, "#cf61f0")),
+      secondary: cleanHex(userColors.secondary, cleanHex(defaultColors.secondary, "#ff73bd")),
+      highlight: cleanHex(userColors.highlight, cleanHex(defaultColors.highlight, "#8b3dce")),
+      text: cleanHex(userColors.text, cleanHex(defaultColors.text, "#4c2364")),
+      muted: cleanHex(userColors.muted, cleanHex(defaultColors.muted, "#9e58bd")),
+      line: cleanCssColor(userColors.line, cleanCssColor(defaultColors.line, "rgba(221, 122, 184, .42)")),
+    },
+  };
+}
+
+async function loadTheme(themeDir) {
+  const defaultTheme = await readJson(defaultThemePath);
+  let theme = mergeTheme(defaultTheme);
+  let imageBase = assetsRoot;
+  const customThemePath = path.join(themeDir, "theme.json");
+
+  if (await pathExists(customThemePath)) {
+    theme = mergeTheme(defaultTheme, await readJson(customThemePath));
+    imageBase = themeDir;
+  }
+
+  const extension = path.extname(theme.image).toLowerCase();
+  if (!imageTypes.has(extension)) {
+    throw new Error(`Unsupported theme image extension: ${extension || "(none)"}`);
+  }
+
+  let imagePath = path.join(imageBase, theme.image);
+  if (!(await pathExists(imagePath))) {
+    imagePath = path.join(assetsRoot, theme.image);
+  }
+  if (!(await pathExists(imagePath))) {
+    imagePath = path.join(assetsRoot, defaultTheme.image || "dream-reference.png");
+    theme.image = path.basename(imagePath);
+  }
+
+  const imageStat = await fs.stat(imagePath);
+  if (!imageStat.isFile() || imageStat.size < 1 || imageStat.size > 16 * 1024 * 1024) {
+    throw new Error("Theme image must be non-empty and no larger than 16 MB.");
+  }
+
+  return { theme, imagePath, mime: imageTypes.get(path.extname(imagePath).toLowerCase()) };
 }
 
 class CdpSession {
@@ -107,7 +230,11 @@ async function waitForTargets(port, timeoutMs) {
       const response = await fetch(`http://127.0.0.1:${port}/json/list`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const targets = await response.json();
-      const pages = targets.filter((item) => item.type === "page" && item.url.startsWith("app://"));
+      const pages = targets.filter((item) =>
+        item.type === "page" &&
+        typeof item.url === "string" &&
+        item.url.startsWith("app://") &&
+        validateWebSocketUrl(item.webSocketDebuggerUrl, port));
       if (pages.length) return pages;
     } catch (error) {
       lastError = error;
@@ -117,20 +244,54 @@ async function waitForTargets(port, timeoutMs) {
   throw new Error(`No Codex renderer target on 127.0.0.1:${port}: ${lastError?.message ?? "timed out"}`);
 }
 
-async function loadPayload() {
-  const [css, template, art] = await Promise.all([
-    fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
-    fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
-    fs.readFile(path.join(root, "assets", "dream-reference.png")),
+async function loadPayload(themeDir) {
+  const [{ theme, imagePath, mime }, css, template] = await Promise.all([
+    loadTheme(themeDir),
+    fs.readFile(path.join(assetsRoot, "dream-skin.css"), "utf8"),
+    fs.readFile(path.join(assetsRoot, "renderer-inject.js"), "utf8"),
   ]);
-  const artDataUrl = `data:image/png;base64,${art.toString("base64")}`;
+  const art = await fs.readFile(imagePath);
+  const artDataUrl = `data:${mime};base64,${art.toString("base64")}`;
   return template
     .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
+    .replace("__DREAM_THEME_JSON__", JSON.stringify(theme))
     .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl));
 }
 
-async function connectTarget(target) {
+async function connectTarget(target, port) {
+  if (!validateWebSocketUrl(target.webSocketDebuggerUrl, port)) {
+    throw new Error(`Refusing non-loopback or mismatched CDP target: ${target.webSocketDebuggerUrl}`);
+  }
   return new CdpSession(target).open();
+}
+
+async function probeCodexSession(session) {
+  return session.evaluate(`(() => {
+    const hasCodexShell = Boolean(
+      document.querySelector('main.main-surface') ||
+      document.querySelector('aside.app-shell-left-panel') ||
+      document.querySelector('.composer-surface-chrome') ||
+      document.querySelector('[role="main"]')
+    );
+    return {
+      url: location.href,
+      protocolOk: location.protocol === 'app:',
+      hasCodexShell,
+      title: document.title,
+      ready: location.protocol === 'app:' && hasCodexShell,
+    };
+  })()`);
+}
+
+async function waitForCodexSession(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastProbe;
+  while (Date.now() < deadline) {
+    lastProbe = await probeCodexSession(session);
+    if (lastProbe.ready) return lastProbe;
+    await new Promise((resolve) => setTimeout(resolve, 350));
+  }
+  throw new Error(`Target is not a ready Codex renderer: ${JSON.stringify(lastProbe)}`);
 }
 
 async function applyToSession(session, payload) {
@@ -144,6 +305,21 @@ async function removeFromSession(session) {
     if (state?.cleanup) return state.cleanup();
     document.documentElement?.classList.remove('codex-dream-skin');
     document.documentElement?.style.removeProperty('--dream-art');
+    for (const name of [
+      '--dream-ink',
+      '--dream-purple',
+      '--dream-violet',
+      '--dream-pink',
+      '--dream-blush',
+      '--dream-pearl',
+      '--dream-line',
+      '--dream-panel-alt',
+      '--dream-accent-alt',
+      '--dream-muted',
+      '--dream-tagline-content',
+      '--dream-project-prefix-content',
+      '--dream-project-label-content',
+    ]) document.documentElement?.style.removeProperty(name);
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
     return true;
@@ -160,9 +336,11 @@ async function verifySession(session) {
     const home = document.querySelector('.dream-home');
     const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
     const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
+    const state = window.__CODEX_DREAM_SKIN_STATE__ ?? {};
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
-      version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
+      version: state.version ?? null,
+      themeName: state.themeName ?? null,
       stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
       chromePresent: Boolean(document.getElementById('codex-dream-skin-chrome')),
       chromePointerEvents: getComputedStyle(document.getElementById('codex-dream-skin-chrome') || document.body).pointerEvents,
@@ -219,11 +397,12 @@ async function capture(session, outputPath) {
 
 async function runOneShot(options) {
   const targets = await waitForTargets(options.port, options.timeoutMs);
-  const payload = (options.mode === "once" || options.reload) ? await loadPayload() : null;
+  const payload = (options.mode === "once" || options.reload) ? await loadPayload(options.themeDir) : null;
   const results = [];
   for (const target of targets) {
-    const session = await connectTarget(target);
+    const session = await connectTarget(target, options.port);
     try {
+      await waitForCodexSession(session, Math.min(options.timeoutMs, 10000));
       if (options.mode === "remove") await removeFromSession(session);
       else if (options.mode === "once") await applyToSession(session, payload);
       if (options.mode === "once") {
@@ -250,7 +429,7 @@ async function runOneShot(options) {
 }
 
 async function runWatch(options) {
-  const payload = await loadPayload();
+  const payload = await loadPayload(options.themeDir);
   const sessions = new Map();
   let stopping = false;
   const stop = () => { stopping = true; };
@@ -278,7 +457,8 @@ async function runWatch(options) {
     for (const target of targets) {
       if (sessions.has(target.id)) continue;
       try {
-        const session = await connectTarget(target);
+        const session = await connectTarget(target, options.port);
+        await waitForCodexSession(session, 10000);
         session.on("Page.loadEventFired", () => {
           setTimeout(() => applyToSession(session, payload).catch((error) => {
             console.error(`[dream-skin] reinject failed: ${error.message}`);

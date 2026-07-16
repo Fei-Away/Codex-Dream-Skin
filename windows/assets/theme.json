@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "name": "Codex Dream Skin",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "与灵感一起，把每天写成作品 ♡",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "♡  选择项目",
+  "statusText": "DREAM SKIN ONLINE",
+  "quote": "Make something wonderful",
+  "signature": "Dream Skin ♡",
+  "image": "dream-reference.png",
+  "colors": {
+    "background": "#fff3f9",
+    "panel": "#ffffff",
+    "panelAlt": "#fff7fb",
+    "accent": "#b65cff",
+    "accentAlt": "#cf61f0",
+    "secondary": "#ff73bd",
+    "highlight": "#8b3dce",
+    "text": "#4c2364",
+    "muted": "#9e58bd",
+    "line": "rgba(221, 122, 184, .42)"
+  }
+}

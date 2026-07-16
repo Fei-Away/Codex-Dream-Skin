@@ -7,13 +7,19 @@
   --dream-blush: #fff3f9;
   --dream-pearl: rgba(255, 251, 253, .92);
   --dream-line: rgba(221, 122, 184, .42);
+  --dream-panel-alt: #fff7fb;
+  --dream-accent-alt: #cf61f0;
+  --dream-muted: #9e58bd;
+  --dream-tagline-content: "与灵感一起，把每天写成作品 ♡";
+  --dream-project-prefix-content: "选择项目 · ";
+  --dream-project-label-content: "♡  选择项目";
 }
 
 html.codex-dream-skin body {
   background:
     radial-gradient(circle at 78% 2%, rgba(255, 184, 215, .66), transparent 25%),
     radial-gradient(circle at 24% 12%, rgba(210, 171, 255, .48), transparent 28%),
-    linear-gradient(135deg, #fff9fc 0%, #fceef8 48%, #f3eafd 100%) !important;
+    linear-gradient(135deg, #fff9fc 0%, var(--dream-blush) 48%, #f3eafd 100%) !important;
   color: var(--dream-ink) !important;
   font-family: "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif !important;
 }
@@ -181,6 +187,7 @@ html.codex-dream-skin main.main-surface > header.app-header-tint {
   filter: drop-shadow(0 4px 5px rgba(166,66,137,.26));
 }
 #codex-dream-skin-chrome.dream-home-shell .dream-ribbon { display: flex; }
+.dream-ribbon strong { font-size: 15px; font-weight: 700; color: var(--dream-muted); max-width: min(420px, 44vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dream-ribbon span { font-size: 15px; color: #c36dff; }
 
 html.codex-dream-skin [role="main"] {
@@ -273,7 +280,7 @@ html.codex-dream-skin .dream-home {
 }
 
 .dream-home [data-feature="game-source"]::after {
-  content: "与凯琪一起，把灵感写进每一天 ♡";
+  content: var(--dream-tagline-content);
   display: block;
   margin-top: 13px;
   color: rgba(255,248,255,.94);
@@ -296,7 +303,7 @@ html.codex-dream-skin .dream-home {
 }
 
 .dream-home [data-feature="game-source"] button::before {
-  content: "选择项目 · ";
+  content: var(--dream-project-prefix-content);
   font-size: .48em;
   font-weight: 600;
   vertical-align: middle;
@@ -399,7 +406,7 @@ html.codex-dream-skin .composer-surface-chrome::before {
 }
 
 .dream-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
-  content: "♡  选择项目";
+  content: var(--dream-project-label-content);
   position: absolute;
   left: 13px;
   top: 6px;
