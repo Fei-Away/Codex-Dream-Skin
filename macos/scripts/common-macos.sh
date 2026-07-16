@@ -43,6 +43,30 @@ ensure_state_root() {
   /bin/chmod 700 "$STATE_ROOT"
 }
 
+ensure_default_theme() {
+  ensure_state_root
+  [ -f "$THEME_DIR/theme.json" ] && return 0
+
+  /bin/mkdir -p "$THEME_DIR"
+  /bin/chmod 700 "$THEME_DIR"
+
+  local image_name
+  image_name="$("$NODE" -e '
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const theme = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const image = String(theme.image || "");
+    if (!image || path.basename(image) !== image) process.exit(1);
+    process.stdout.write(image);
+  ' "$PROJECT_ROOT/assets/theme.json")" || fail "Bundled default theme is invalid."
+
+  [ -s "$PROJECT_ROOT/assets/theme.json" ] || fail "Bundled default theme config is missing."
+  [ -s "$PROJECT_ROOT/assets/$image_name" ] || fail "Bundled default theme image is missing: $image_name"
+  /bin/cp -f "$PROJECT_ROOT/assets/theme.json" "$THEME_DIR/theme.json"
+  /bin/cp -f "$PROJECT_ROOT/assets/$image_name" "$THEME_DIR/$image_name"
+  /bin/chmod 600 "$THEME_DIR/theme.json" "$THEME_DIR/$image_name" 2>/dev/null || true
+}
+
 discover_codex_app() {
   local candidate=""
   local identifier=""

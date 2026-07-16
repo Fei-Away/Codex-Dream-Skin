@@ -44,6 +44,15 @@ if (mode === "reset-demo") {
     throw new Error("Refusing to delete the bundled demo assets; pass a user --output-dir.");
   }
   await fs.rm(outputDir, { recursive: true, force: true });
+  const bundledThemePath = path.join(root, "assets", "theme.json");
+  const bundledTheme = JSON.parse(await fs.readFile(bundledThemePath, "utf8"));
+  const image = String(bundledTheme.image || "");
+  if (!image || path.basename(image) !== image) throw new Error("Bundled demo theme image is invalid.");
+  await fs.mkdir(outputDir, { recursive: true, mode: 0o700 });
+  await fs.copyFile(bundledThemePath, themePath);
+  await fs.copyFile(path.join(root, "assets", image), path.join(outputDir, image));
+  await fs.chmod(themePath, 0o600);
+  await fs.chmod(path.join(outputDir, image), 0o600);
   console.log("Restored the bundled abstract demo preset.");
   process.exit(0);
 }

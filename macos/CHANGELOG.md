@@ -9,6 +9,7 @@
 - 恢复原本没有 `[desktop]` 配置段的用户设置时，不再额外写入空段
 - 热切换读取运行状态时复用 Codex 内置 Node.js，不再依赖系统 `python3` 或执行 `eval`
 - 显式传入的 `--theme-dir` 缺少 `theme.json` 时立即报错，不再静默回退到内置 demo 主题
+- 首次安装会在 payload 校验前初始化内置 demo 主题；重置 demo 时也会重新写入完整主题文件
 
 ---
 

@@ -79,8 +79,15 @@ if MISSING_THEME_OUTPUT="$(
 fi
 /usr/bin/printf '%s\n' "$MISSING_THEME_OUTPUT" | /usr/bin/grep -F -q \
   "Explicit theme directory is missing theme.json: $TMP/missing-theme/theme.json"
+DEFAULT_THEME_HOME="$TMP/default-theme-home"
+/usr/bin/env HOME="$DEFAULT_THEME_HOME" NODE="$NODE" /bin/bash -c '
+  . "$1/scripts/common-macos.sh"
+  ensure_default_theme
+  "$NODE" "$INJECTOR" --check-payload --theme-dir "$THEME_DIR" >/dev/null
+' _ "$ROOT"
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
-[ ! -e "$TMP/theme" ]
+[ -s "$TMP/theme/theme.json" ]
+"$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$TMP/theme" >/dev/null
 
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
