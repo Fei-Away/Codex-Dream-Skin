@@ -22,6 +22,10 @@ if /usr/bin/grep -R -n -E '(writeFile|rename|copyFile|rm).*app\.asar' "$ROOT/scr
   printf 'A runtime script appears to mutate app.asar.\n' >&2
   exit 1
 fi
+if /usr/bin/grep -R -n '/tmp/dream-skin-verify' "$ROOT/scripts" >/dev/null; then
+  printf 'Verification output must use a private file under the protected state directory.\n' >&2
+  exit 1
+fi
 if /usr/bin/grep -n -E '/usr/bin/python3|(^|[[:space:]])eval([[:space:]]|$)' \
   "$ROOT/scripts/common-macos.sh" >/dev/null; then
   printf 'The shared macOS runtime must parse state with the bundled Node.js, without python3 or eval.\n' >&2

@@ -32,6 +32,9 @@ case "$PORT" in ''|*[!0-9]*) fail "Invalid port: $PORT" ;; esac
 discover_codex_app
 require_macos_runtime
 ensure_state_root
+VERIFY_OUTPUT="$(/usr/bin/mktemp "$STATE_ROOT/start-verify.XXXXXX.json")"
+cleanup_verify_output() { /bin/rm -f "$VERIFY_OUTPUT"; }
+trap cleanup_verify_output EXIT
 
 if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   saved_port="$(state_field port)" || fail "Could not read the existing state port."
@@ -86,28 +89,26 @@ write_state "$PORT" "$INJECTOR_PID" "$INJECTOR_STARTED_AT" "$CODEX_PID"
 
 # Soft verify: keep the injector even if secondary selectors differ by Codex version.
 set +e
-"$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 20000 >/tmp/dream-skin-verify.$$.json 2>/dev/null
+"$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 20000 >"$VERIFY_OUTPUT" 2>/dev/null
 verify_code=$?
 set -e
 if [ "$verify_code" -ne 0 ]; then
   # One more force inject before giving up
   "$NODE" "$INJECTOR" --once --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 15000 >/dev/null 2>&1 || true
   set +e
-  "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >/tmp/dream-skin-verify.$$.json 2>/dev/null
+  "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >"$VERIFY_OUTPUT" 2>/dev/null
   verify_code=$?
   set -e
 fi
 if [ "$verify_code" -ne 0 ]; then
   # If CSS markers are present, treat as soft success (do not kill injector).
-  if /usr/bin/grep -q '"installed": true' /tmp/dream-skin-verify.$$.json 2>/dev/null; then
+  if /usr/bin/grep -q '"installed": true' "$VERIFY_OUTPUT" 2>/dev/null; then
     printf 'Codex Dream Skin Studio %s is active (soft verify) on port %s.\n' "$SKIN_VERSION" "$PORT"
-    /bin/rm -f /tmp/dream-skin-verify.$$.json
     exit 0
   fi
   /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || /bin/kill -TERM "$INJECTOR_PID" 2>/dev/null || true
-  /bin/rm -f "$STATE_PATH" /tmp/dream-skin-verify.$$.json
+  /bin/rm -f "$STATE_PATH"
   fail "Injection verification failed. The injector was stopped; see $INJECTOR_ERROR_LOG"
 fi
-/bin/rm -f /tmp/dream-skin-verify.$$.json
 
 printf 'Codex Dream Skin Studio %s is active on loopback port %s.\n' "$SKIN_VERSION" "$PORT"
