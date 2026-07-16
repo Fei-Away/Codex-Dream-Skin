@@ -32,6 +32,6 @@ Live renderer verification returned `pass: true` after `Page.reload`:
 Private release builds included CDP screenshots under `docs/screenshots/`. Those captures may contain third-party UI chrome and demo art and are **not** shipped in this public tree. Reproduce evidence on your machine:
 
 ```bash
-~/.codex/codex-dream-skin-studio/scripts/verify-dream-skin-macos.sh \
+"$HOME/Library/Application Support/CodexDreamSkinStudio/engine/scripts/verify-dream-skin-macos.sh" \
   --reload --screenshot "$HOME/Desktop/Codex Dream Skin Verification.png"
 ```

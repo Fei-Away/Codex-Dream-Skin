@@ -19,9 +19,11 @@
 | 用途 | 路径 |
 |------|------|
 | 源码（本整理包） | `Codex-Dream-Skin/macos/` |
-| 安装后引擎 | `~/.codex/codex-dream-skin-studio` |
+| 安装后引擎 | `~/Library/Application Support/CodexDreamSkinStudio/engine` |
 | 状态 / 日志 | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Codex 配置 | `~/.codex/config.toml`（仅外观相关项可能被改，可恢复） |
+| 稳定入口 | `~/Applications/栋哥 Codex.app`（桌面有软链接） |
+| 专用入口 | `~/Applications/栋哥 Codex.app` |
 
 ### Windows
 
@@ -39,6 +41,8 @@
 | 安装脚本 | ✅ | ✅ |
 | 启动 + 注入 | ✅ | ✅ |
 | 一键恢复 | ✅ | ✅ |
+| 三主题切换 | ✅ | ✅ |
+| 普通图标重开 | 不注入，需手动退出后用 `栋哥 Codex.app` 打开 | 使用 `栋哥 Codex` 快捷方式 |
 | 实机 verify / 截图 | ✅ | ✅ |
 | 用户选图定制 | ✅ | ❌ |
 | 官方签名校验 | ✅ | 部分（Store 包发现） |

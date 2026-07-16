@@ -9,6 +9,6 @@
 - Treat loopback CDP as locally privileged but unauthenticated. Keep the themed session limited to trusted local use and close the port through a full Restore when finished.
 - Poll page targets and reinject after document loads. A debounced mutation observer plus a low-frequency safety timer handles in-page route changes.
 - Record injector PID, start time, executable, script path, app identity, selected port, and theme directory. Refuse to stop a PID when any required identity differs.
-- Store mutable data under `~/Library/Application Support/CodexDreamSkinStudio`; keep the installed program under `~/.codex/codex-dream-skin-studio`.
-- Back up and restore only `appearanceTheme` and `appearanceDarkCodeThemeId`. Leave `appearanceDarkChromeTheme` and unrelated TOML content untouched.
+- Store the engine and mutable data under `~/Library/Application Support/CodexDreamSkinStudio`; keeping executable scripts out of `~/.codex` avoids Codex's `scripts.DISABLED` isolation.
+- Back up and restore only `appearanceTheme` and `appearanceDarkCodeThemeId`. Install selects the light appearance required by the bundled Dongge preset; Restore returns the user's original values. Leave `appearanceDarkChromeTheme` and unrelated TOML content untouched.
 - Never modify, replace, unpack, repack, re-sign, or back up `app.asar`.

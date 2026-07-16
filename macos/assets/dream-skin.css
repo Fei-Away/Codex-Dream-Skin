@@ -496,36 +496,36 @@ html.codex-dream-skin [data-message-author-role] { border-radius: 18px; }
 
 html.codex-dream-skin[data-dream-shell="light"] {
   color-scheme: light !important;
-  --ds-bg: #f6f2f3;
-  --ds-panel: #ffffff;
-  --ds-panel-2: #fff7f8;
-  --ds-text: #1f1a1b;
-  --ds-muted: #6b5f62;
-  --ds-line: rgba(196, 120, 128, .22);
-  --ds-ink-soft: #3d3437;
+  --ds-bg: #f4f0e7;
+  --ds-panel: #fcfbf8;
+  --ds-panel-2: #f7f3eb;
+  --ds-text: #292624;
+  --ds-muted: #766e68;
+  --ds-line: rgba(90, 72, 61, .18);
+  --ds-ink-soft: #4f4944;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] body {
   background:
-    radial-gradient(circle at 88% 6%, rgba(255, 200, 210, .22), transparent 34%),
-    linear-gradient(180deg, #fbf8f9 0%, #f3eef0 100%) !important;
+    radial-gradient(circle at 88% 6%, rgba(207, 191, 165, .24), transparent 34%),
+    linear-gradient(180deg, #fbfaf7 0%, #f2ede5 100%) !important;
   color: var(--ds-text) !important;
   font-family: "SF Pro Text", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] body::before {
-  opacity: .12 !important;
+  opacity: .08 !important;
   background-image:
-    radial-gradient(circle, rgba(226, 85, 99, .35) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(243, 168, 175, .28) 0 1px, transparent 1.8px) !important;
+    radial-gradient(circle, rgba(79, 62, 55, .28) 0 1px, transparent 1.8px),
+    radial-gradient(circle, rgba(161, 75, 67, .16) 0 1px, transparent 1.8px) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel {
-  background: linear-gradient(180deg, #ffffff 0%, #fbf7f8 100%) !important;
-  border: 1px solid rgba(40, 30, 32, .08) !important;
+  background: linear-gradient(180deg, #fcfbf8 0%, #f5f0e8 100%) !important;
+  border: 1px solid rgba(79, 62, 55, .09) !important;
   border-left: 0 !important;
   box-shadow: 8px 0 24px rgba(40, 20, 24, .05) !important;
-  color: #1f1a1b !important;
+  color: var(--ds-text) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel,
@@ -537,23 +537,23 @@ html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel butto
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel a,
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel span,
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel div {
-  color: #2a2325 !important;
+  color: var(--ds-text) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel svg {
-  color: #5a5053 !important;
+  color: #615a54 !important;
   opacity: 1 !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel button:hover {
-  background: rgba(217, 72, 86, .08) !important;
+  background: rgba(161, 75, 67, .07) !important;
   box-shadow: none !important;
   transform: none !important;
-  color: #1f1a1b !important;
+  color: var(--ds-text) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel button[aria-label^="切换模式"] {
-  color: #1f1a1b !important;
+  color: var(--ds-text) !important;
   text-shadow: none !important;
 }
 
@@ -563,24 +563,37 @@ html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel butto
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel [aria-current="page"] {
-  background: rgba(217, 72, 86, .10) !important;
-  border: 1px solid rgba(217, 72, 86, .14) !important;
+  background: rgba(161, 75, 67, .09) !important;
+  border: 1px solid rgba(161, 75, 67, .13) !important;
   box-shadow: none !important;
-  color: #1f1a1b !important;
+  color: var(--ds-text) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface {
   background:
-    linear-gradient(180deg, rgba(252, 250, 251, .82) 0%, rgba(247, 242, 243, .9) 100%),
+    linear-gradient(180deg, rgba(252, 251, 248, .84) 0%, rgba(244, 239, 231, .92) 100%),
     var(--dream-skin-art) 70% 12% / cover no-repeat !important;
   border: 1px solid rgba(40, 30, 32, .07) !important;
   box-shadow: inset 0 1px rgba(255, 255, 255, .85) !important;
 }
 
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface.dream-skin-home-shell {
+  background: linear-gradient(180deg, #faf8f4 0%, #f2ede5 100%) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child {
+  padding-top: 15px !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child {
+  flex-basis: 400px !important;
+  min-height: 400px !important;
+}
+
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) {
   background:
-    linear-gradient(105deg, rgba(252, 250, 251, .88) 0%, rgba(252, 250, 251, .58) 42%, rgba(252, 250, 251, .28) 78%, rgba(252, 250, 251, .16) 100%),
-    var(--dream-skin-art) 72% center / cover no-repeat !important;
+    radial-gradient(circle at 88% 7%, rgba(161, 75, 67, .045), transparent 30%),
+    linear-gradient(180deg, #fbfaf7 0%, #f4efe7 100%) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [role="main"] {
@@ -590,31 +603,40 @@ html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-ski
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) article {
   border: 1px solid rgba(40, 30, 32, .06);
-  background: rgba(255, 255, 255, .86);
+  background: rgba(252, 251, 248, .88);
   box-shadow: 0 8px 20px rgba(40, 20, 24, .05);
   backdrop-filter: blur(10px) saturate(108%);
 }
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface > header.app-header-tint {
-  background: rgba(255, 255, 255, .88) !important;
+  background: rgba(252, 251, 248, .9) !important;
+  border-bottom: 1px solid rgba(40, 30, 32, .06) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface.dream-skin-home-shell > header.app-header-tint {
+  background: rgba(252, 251, 248, .9) !important;
   border-bottom: 1px solid rgba(40, 30, 32, .06) !important;
   backdrop-filter: blur(12px) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child > div:first-child {
-  border: 1px solid rgba(40, 30, 32, .1) !important;
-  background-color: #1c1214 !important;
+  border: 1px solid rgba(79, 62, 55, .16) !important;
+  width: calc(100% - 32px) !important;
+  height: 400px !important;
+  min-height: 400px !important;
+  border-radius: 24px !important;
+  background-color: #f4f0e7 !important;
   background-image:
-    linear-gradient(100deg,
-      rgba(12, 8, 10, .38) 0%,
-      rgba(12, 8, 10, .12) 24%,
-      rgba(12, 8, 10, .03) 42%,
-      transparent 60%),
-    linear-gradient(0deg, rgba(12, 8, 10, .1) 0%, transparent 40%),
+    linear-gradient(90deg,
+      rgba(247, 243, 235, .98) 0%,
+      rgba(247, 243, 235, .94) 28%,
+      rgba(247, 243, 235, .52) 42%,
+      transparent 55%),
     var(--dream-skin-art) !important;
-  background-size: 100% 100%, 100% 100%, cover !important;
-  background-position: center, center, 58% center !important;
-  box-shadow: 0 16px 36px rgba(40, 16, 22, .14), inset 0 1px 0 rgba(255, 255, 255, .12) !important;
+  background-size: 100% 100%, cover !important;
+  background-position: center, 56% center !important;
+  box-shadow: 0 16px 38px rgba(69, 56, 43, .1) !important;
   overflow: hidden !important;
 }
 
@@ -623,42 +645,146 @@ html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-chi
   background: none !important;
 }
 
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child > div:first-child > div:first-child {
+  height: 232px !important;
+  min-height: 232px !important;
+  padding-left: 34px !important;
+}
+
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"] {
-  color: #fffaf9 !important;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, .32), 0 1px 0 rgba(0, 0, 0, .2) !important;
+  color: var(--ds-text) !important;
+  font-size: clamp(18px, 1.25vw, 20px) !important;
+  font-weight: 650 !important;
+  line-height: 1.34 !important;
+  letter-spacing: -.015em !important;
+  text-shadow: none !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"]::before {
-  color: #ffd6dc !important;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, .3) !important;
+  content: var(--dream-skin-tagline, "心理问题 · 先说清楚") !important;
+  color: var(--ds-green) !important;
+  margin-bottom: 11px !important;
+  font: 600 13px/1.35 "SF Pro Text", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif !important;
+  letter-spacing: .015em !important;
+  text-shadow: none !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"]::after {
-  color: rgba(255, 245, 247, .9) !important;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, .28) !important;
+  content: none !important;
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"] button {
+  margin: 0 3px !important;
+  padding: 3px 5px 2px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(161, 75, 67, .42) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--ds-green) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"] button::before {
+  content: none !important;
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child > div:first-child > div:nth-child(2) {
+  left: 14px !important;
+  right: 14px !important;
+  top: auto !important;
+  bottom: 14px !important;
+  margin-top: 0 !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button {
-  border: 1px solid rgba(255, 255, 255, .55) !important;
-  background: rgba(255, 255, 255, .78) !important;
-  color: #1f1a1b !important;
-  box-shadow: 0 10px 22px rgba(40, 16, 22, .08) !important;
-  backdrop-filter: blur(10px) saturate(112%) !important;
+  min-height: 124px !important;
+  padding: 18px 14px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  border: 1px solid rgba(79, 62, 55, .12) !important;
+  border-radius: 18px !important;
+  background: rgba(252, 251, 248, .94) !important;
+  color: var(--ds-text) !important;
+  box-shadow: 0 10px 22px rgba(69, 56, 43, .1) !important;
+  backdrop-filter: blur(12px) saturate(106%) !important;
+  transform: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button::before {
+  position: absolute !important;
+  left: 17px !important;
+  top: 14px !important;
+  color: rgba(161, 75, 67, .72) !important;
+  font: 600 10px/1 "SF Mono", "Cascadia Code", monospace !important;
+  letter-spacing: .08em !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions > div > :first-child > :nth-child(1) button::before { content: "01" !important; }
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions > div > :first-child > :nth-child(2) button::before { content: "02" !important; }
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions > div > :first-child > :nth-child(3) button::before { content: "03" !important; }
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions > div > :first-child > :nth-child(4) button::before { content: "04" !important; }
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button:hover {
+  border-color: rgba(161, 75, 67, .28) !important;
+  box-shadow: 0 12px 26px rgba(69, 56, 43, .13) !important;
+  transform: translateY(-2px) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button > span:first-child > span:first-child {
-  background: linear-gradient(145deg, #f07a86, #e25563) !important;
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button svg {
+  width: 17px !important;
+  height: 17px !important;
+  color: var(--ds-muted) !important;
+  opacity: .62 !important;
+  stroke-width: 1.45 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button > span:first-child,
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button > span:last-child {
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .composer-surface-chrome {
   border: 1px solid rgba(40, 30, 32, .08) !important;
-  background: rgba(255, 255, 255, .94) !important;
+  background: rgba(252, 251, 248, .95) !important;
   box-shadow: 0 10px 28px rgba(40, 20, 24, .07) !important;
   backdrop-filter: blur(14px) saturate(110%) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .composer-surface-chrome::before {
-  background: linear-gradient(180deg, #f07a86, #e25563) !important;
+  content: none !important;
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector) {
+  padding-top: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
+  content: none !important;
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/project-selector > button {
+  border: 1px solid rgba(161, 75, 67, .24) !important;
+  background: rgba(252, 251, 248, .92) !important;
+  color: var(--ds-text) !important;
+  box-shadow: none !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-brand,
@@ -666,11 +792,77 @@ html.codex-dream-skin[data-dream-shell="light"] .dream-skin-status {
   color: #4a4144 !important;
 }
 
+html.codex-dream-skin[data-dream-shell="light"] #codex-dream-skin-chrome {
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-brand {
+  left: 26px !important;
+  top: 10px !important;
+  height: 38px !important;
+  gap: 0 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-portal-mark {
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-brand b {
+  color: var(--ds-text) !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  letter-spacing: .015em !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-brand small {
+  margin-top: 2px !important;
+  color: var(--ds-muted) !important;
+  font: 500 10px/1.2 "SF Pro Text", "PingFang SC", system-ui, sans-serif !important;
+  letter-spacing: .02em !important;
+  text-transform: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-status {
+  right: 28px !important;
+  top: 20px !important;
+  padding: 5px 10px !important;
+  border: 1px solid rgba(161, 75, 67, .18) !important;
+  border-radius: 999px !important;
+  background: rgba(252, 251, 248, .78) !important;
+  color: var(--ds-green) !important;
+  font: 600 11px/1 "SF Pro Text", "PingFang SC", system-ui, sans-serif !important;
+  letter-spacing: .02em !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-status i {
+  width: 5px !important;
+  height: 5px !important;
+  background: var(--ds-green) !important;
+}
+
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-quote {
-  color: rgba(40, 30, 32, .45) !important;
+  color: rgba(41, 38, 36, .58) !important;
+  font-style: normal !important;
+  transform: none !important;
   text-shadow: 0 1px 0 rgba(255, 255, 255, .8) !important;
 }
 
-html.codex-dream-skin[data-dream-shell="light"] .dream-skin-particles {
-  opacity: .2 !important;
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-particles,
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-orbit {
+  display: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-portal-mark,
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-status i {
+  box-shadow: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
+  width: 44% !important;
+}
+
+@media (max-width: 900px) {
+  html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
+    width: 44% !important;
+  }
 }

@@ -115,25 +115,24 @@
 
   const applyTheme = (root, shell) => {
     const colors = THEME.colors || {};
-    const accent = colors.accent || (shell === "light" ? "#e25563" : "#7cff46");
+    const accent = colors.accent || (shell === "light" ? "#A14B43" : "#7cff46");
     const accentAlt = colors.accentAlt || accent;
-    const secondary = colors.secondary || (shell === "light" ? "#f3a8af" : "#36d7e8");
-    const highlight = colors.highlight || (shell === "light" ? "#c93d4c" : "#642a8c");
+    const secondary = colors.secondary || (shell === "light" ? "#8D7C6D" : "#36d7e8");
+    const highlight = colors.highlight || (shell === "light" ? "#4F3E37" : "#642a8c");
 
     let variables;
     if (shell === "light") {
-      // Structural tokens stay light so banners stay readable; accents follow theme.
       variables = {
-        "--ds-bg": "#f6f2f3",
-        "--ds-panel": "#ffffff",
-        "--ds-panel-2": "#fff7f8",
+        "--ds-bg": colors.background || "#F4F0E7",
+        "--ds-panel": colors.panel || "#FCFBF8",
+        "--ds-panel-2": colors.panelAlt || "#F7F3EB",
         "--ds-green": accent,
         "--ds-lime": accentAlt,
         "--ds-cyan": secondary,
         "--ds-purple": highlight,
-        "--ds-text": "#1f1a1b",
-        "--ds-muted": "#6b5f62",
-        "--ds-line": colors.line || "rgba(196, 120, 128, .22)",
+        "--ds-text": colors.text || "#292624",
+        "--ds-muted": colors.muted || "#766E68",
+        "--ds-line": colors.line || "rgba(90, 72, 61, .18)",
       };
     } else {
       variables = {

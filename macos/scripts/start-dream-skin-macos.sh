@@ -14,14 +14,10 @@ trap 'code=$?; record_start_error "$code" "$LINENO"' ERR
 
 PORT=9341
 PORT_EXPLICIT="false"
-RESTART_EXISTING="false"
-PROMPT_RESTART="false"
 FOREGROUND_INJECTOR="false"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --port) PORT="${2:-}"; PORT_EXPLICIT="true"; shift 2 ;;
-    --restart-existing) RESTART_EXISTING="true"; shift ;;
-    --prompt-restart) PROMPT_RESTART="true"; shift ;;
     --foreground-injector) FOREGROUND_INJECTOR="true"; shift ;;
     *) fail "Unknown start argument: $1" ;;
   esac
@@ -42,21 +38,13 @@ DEBUG_READY="false"
 if verified_cdp_endpoint "$PORT"; then DEBUG_READY="true"; fi
 
 if codex_is_running && [ "$DEBUG_READY" = "false" ]; then
-  if [ "$PROMPT_RESTART" = "true" ] && [ "$RESTART_EXISTING" = "false" ]; then
-    /usr/bin/osascript -e 'display dialog "Codex 需要重启一次才能启用 Dream Skin。" buttons {"取消", "重启并应用"} default button "重启并应用" with title "Codex Dream Skin Studio"' >/dev/null \
-      || fail "Theme launch was cancelled."
-    RESTART_EXISTING="true"
-  fi
-  [ "$RESTART_EXISTING" = "true" ] || fail "Codex is already running without the verified skin CDP endpoint. Close it first or pass --restart-existing."
-  stop_codex true
+  fail "Codex is already running without the skin debug port. Quit Codex yourself, then open '栋哥 Codex.app' again."
 fi
 
 if [ "$DEBUG_READY" = "false" ]; then
   PORT="$(select_available_port "$PORT")"
   printf 'Launching Codex with skin debug port %s…\n' "$PORT" >&2
   launch_codex_with_cdp "$PORT"
-  # Some builds open the window slowly; also try activating the app once.
-  /usr/bin/open -na "$CODEX_BUNDLE" --args --remote-debugging-address=127.0.0.1 --remote-debugging-port="$PORT" >/dev/null 2>&1 || true
   if ! wait_for_cdp "$PORT"; then
     # Last resort: if something already listens and answers HTTP, continue.
     if cdp_http_ready "$PORT"; then

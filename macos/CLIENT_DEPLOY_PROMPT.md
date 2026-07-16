@@ -33,17 +33,17 @@
 
 4. 确认官方 Codex 至少运行过一次，且 `~/.codex/config.toml` 已存在。运行：
    `<ENGINE>/scripts/install-dream-skin-macos.sh --no-launch`
-   完整项目应被安装到 `~/.codex/codex-dream-skin-studio`，并生成桌面启动、定制、验证和恢复入口。
+   完整项目应被安装到 `~/Library/Application Support/CodexDreamSkinStudio/engine`，并生成 `栋哥 Codex.app`、风格切换、验证和恢复入口。不要装回 `~/.codex`，新版 Codex 会隔离其中的 scripts 目录。
 
 5. 如果我上传了主题图片，使用安装后的脚本处理素材：
-   `~/.codex/codex-dream-skin-studio/scripts/customize-theme-macos.sh --image "<图片绝对路径>" --name "我的 Codex Dream Skin" --no-apply`
+   `"$HOME/Library/Application Support/CodexDreamSkinStudio/engine/scripts/customize-theme-macos.sh" --image "<图片绝对路径>" --name "我的 Codex Dream Skin" --no-apply`
    如果我在消息中另写了主题名称、口号或配色，则优先使用我提供的内容。必须让脚本完成图片转换与压缩，不要手工覆盖项目源文件。若没有图片，保留项目内置示例主题。
 
-6. 我明确授权你在本次部署中关闭并重启官方 Codex 一次，以启用本机回环 CDP。只允许处理官方 Codex 及本项目可核验身份的注入守护进程，不得关闭其他应用。使用安装后的启动脚本执行真实重启，不要让我自行猜测是否生效。
+6. 不要自动关闭或重启官方 Codex。如果官方 Codex 已经打开但缺少皮肤调试端口，请提示我手动退出后再打开“栋哥 Codex.app”。
 
 7. 启动后必须运行：
-   - `~/.codex/codex-dream-skin-studio/scripts/doctor-macos.sh --require-live`
-   - `~/.codex/codex-dream-skin-studio/scripts/verify-dream-skin-macos.sh --reload --screenshot "<首页验收截图绝对路径>"`
+   - `"$HOME/Library/Application Support/CodexDreamSkinStudio/engine/scripts/doctor-macos.sh" --require-live`
+   - `"$HOME/Library/Application Support/CodexDreamSkinStudio/engine/scripts/verify-dream-skin-macos.sh" --reload --screenshot "<首页验收截图绝对路径>"`
    验证器必须真实返回 `pass: true`。随后还要检查一个正常任务页面，确认背景存在且正文、菜单、侧栏和输入框仍清晰可用，并保存任务页截图。
 
 8. 检查桌面已存在以下四个入口：
@@ -52,7 +52,7 @@
    - `Codex Dream Skin - Verify.command`
    - `Codex Dream Skin - Restore.command`
 
-9. 如果失败，读取 `~/Library/Application Support/CodexDreamSkinStudio/` 下的日志并继续修复。不得降低代码签名、回环端口归属、PID 身份、原生结构或截图验证标准；不得用“预计重启后生效”“应该完成”等措辞代替验收。
+9. 如果失败，读取 `~/Library/Application Support/CodexDreamSkinStudio/` 下的日志并继续修复。不得降低代码签名、回环端口归属、PID 身份、原生结构或截图验证标准；不得用“预计重新打开后生效”“应该完成”等措辞代替验收。
 
 最终向我汇报：
 - Codex 主题编辑器版本与官方 Codex 版本；

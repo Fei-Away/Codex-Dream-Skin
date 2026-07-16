@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "dongge-marginalia",
+  "name": "栋哥 · 语言的用法",
+  "brandSubtitle": "维特根斯坦式批注",
+  "tagline": "心理问题 · 试试就知道",
+  "projectPrefix": "",
+  "projectLabel": "选择项目",
+  "statusText": "先把问题说清楚",
+  "quote": "语言的意义，在于它的用法",
+  "image": "background.png",
+  "colors": {
+    "background": "#F3EFE5",
+    "panel": "#FCFBF7",
+    "panelAlt": "#F5F1E8",
+    "accent": "#A34E43",
+    "accentAlt": "#B96155",
+    "secondary": "#66705A",
+    "highlight": "#3C4638",
+    "text": "#282824",
+    "muted": "#716E66",
+    "line": "rgba(65, 72, 58, .18)"
+  }
+}

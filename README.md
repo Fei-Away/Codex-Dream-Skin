@@ -17,6 +17,31 @@
   非 OpenAI 官方产品。不修改 <code>.app</code> / <code>app.asar</code> / WindowsApps。
 </p>
 
+## 栋哥三主题包
+
+1.3.0 把三套完整方向装进同一个 Mac / Windows 包：
+
+- **语言的用法**：维特根斯坦式书页、白板与批注
+- **开源工作台**：dbskill 蓝图、索引与开源分身
+- **心理问题举牌**：克制的中文独立杂志视觉
+
+另保留经典白板主题用于兼容旧安装。所有人物图都是 2172×724 纯背景，
+不包含假的 Codex 控件。
+
+<p align="center">
+  <img src="themes/dongge-light/background.png" alt="栋哥 dbskill 浅色主题" width="900">
+</p>
+
+主题清单与素材说明见 [`themes/`](./themes/)。
+
+### 重新打开的正确方式
+
+macOS 安装时会让用户选择默认栋哥图片，并生成 `栋哥 Codex.app`。日常从这个入口打开，皮肤调试端口和注入器会一起启动。
+如果官方 Codex 已经开着，脚本会直接停止并提示你手动退出官方 Codex，不会自动关闭或重启宿主 app。
+
+Windows 安装时也会让用户选择默认栋哥图片。安装后从桌面或开始菜单的 `栋哥 Codex` 快捷方式启动，快捷方式会一起
+拉起调试端口和注入器。
+
 ## 赞助商
 
 <p align="center">
@@ -99,7 +124,14 @@
 | 平台 | 目录 | 入口 |
 |------|------|------|
 | Apple Silicon / Intel Mac | [`macos/`](./macos/) | 双击 `Install Codex Dream Skin.command` |
-| Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
+| Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `栋哥 Codex` 快捷方式 |
+
+无人值守安装可直接指定主题：macOS 用 `--theme-id dongge-blueprint --no-launch`，
+Windows 用 `-ThemeId dongge-blueprint`。可选值：
+`dongge-marginalia`、`dongge-blueprint`、`dongge-placard`、`dongge-light`。
+
+统一 ZIP：运行 [`Build Dongge Skin Pack.command`](./Build%20Dongge%20Skin%20Pack.command)，或执行
+`scripts/build-unified-release.sh`。
 
 更细的说明：
 

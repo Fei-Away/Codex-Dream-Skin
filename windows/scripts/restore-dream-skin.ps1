@@ -10,6 +10,7 @@ $node = (Get-Command node -ErrorAction Stop).Source
 $injector = Join-Path $PSScriptRoot 'injector.mjs'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $StatePath = Join-Path $StateRoot 'state.json'
+$ThemeDir = Join-Path $StateRoot 'theme'
 
 if (Test-Path -LiteralPath $StatePath) {
   try {
@@ -19,15 +20,18 @@ if (Test-Path -LiteralPath $StatePath) {
   Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue
 }
 Start-Sleep -Milliseconds 250
-try { & $node $injector --remove --port $Port --timeout-ms 3000 } catch {}
+try { & $node $injector --remove --port $Port --theme-dir $ThemeDir --timeout-ms 3000 } catch {}
 
 if ($Uninstall) {
   $desktop = [Environment]::GetFolderPath('Desktop')
   $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
   @(
     (Join-Path $desktop 'Codex Dream Skin.lnk'),
+    (Join-Path $desktop '栋哥 Codex.lnk'),
+    (Join-Path $desktop '栋哥 Codex - 选择风格.lnk'),
     (Join-Path $desktop 'Codex Dream Skin - Restore.lnk'),
-    (Join-Path $startMenu 'Codex Dream Skin.lnk')
+    (Join-Path $startMenu 'Codex Dream Skin.lnk'),
+    (Join-Path $startMenu '栋哥 Codex.lnk')
   ) | ForEach-Object { Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue }
 }
 

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "dongge-dbskill-light",
+  "name": "栋哥的 dbskill",
+  "brandSubtitle": "一个开源分身",
+  "tagline": "心理问题 · 试试就知道",
+  "projectPrefix": "",
+  "projectLabel": "选择项目",
+  "statusText": "试试就知道",
+  "quote": "试试就知道",
+  "image": "background.png",
+  "colors": {
+    "background": "#F4F0E7",
+    "panel": "#FCFBF8",
+    "panelAlt": "#F7F3EB",
+    "accent": "#A14B43",
+    "accentAlt": "#B9655A",
+    "secondary": "#8D7C6D",
+    "highlight": "#4F3E37",
+    "text": "#292624",
+    "muted": "#766E68",
+    "line": "rgba(90, 72, 61, .18)"
+  }
+}

@@ -2,8 +2,8 @@
 
 ## User-visible claims
 
-1. The home screen visibly matches the reference mood: one cropped pink-purple starry hero, Fiona portrait crop, signature/brand treatment, native Codex suggestion cards, polaroid, and skinned native composer.
-2. The sidebar is blush glass rather than merely changing the accent color.
+1. The home screen visibly matches the selected Dongge reference: a warm paper-toned whiteboard hero, right-side portrait, `心理问题 / 试试就知道 / dbskill` treatment, native suggestion cards, and skinned native composer.
+2. The sidebar uses the warm off-white, charcoal, and restrained brick-red theme rather than merely changing the accent color.
 3. All real Codex controls remain interactive; the skin is not a screenshot overlay.
 4. The skin survives route changes and renderer reloads while the injector daemon runs.
 5. The official Store package and `app.asar` remain unchanged.
@@ -22,9 +22,9 @@
 ## Visual checks
 
 - 1280x820 initial home: hero, four native cards, real project selector, and composer are all visible without horizontal scrolling.
-- Narrower window: accept Codex's native responsive reduction to two or three suggestion cards; no essential control is covered and the polaroid may intentionally hide.
+- Narrower window: accept Codex's native responsive reduction to two or three suggestion cards; no essential control or the subject's face is covered.
 - Normal task: messages remain readable and composer does not overlap content.
-- Inspect the sidebar, header, hero edges, card labels, composer controls, scrollbar, ribbon, and bottom-right decoration.
+- Inspect the sidebar, header, hero crop, card labels, composer controls, scrollbar, top status, and quote.
 - Reject black/transparent sidebar artifacts, clipped cards, duplicated/disconnected project labels, rasterized native controls, weak contrast, or decorations intercepting clicks.
 
 ## Exploratory checks

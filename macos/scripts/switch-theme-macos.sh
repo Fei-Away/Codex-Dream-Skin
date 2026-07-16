@@ -57,11 +57,11 @@ if hot_reapply_theme "$PORT" 8000; then
 fi
 
 # Cold path only when debug port is missing
-progress "CDP not ready, full start..."
-if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing; then
+progress "CDP not ready, starting themed Codex..."
+if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT"; then
   progress "Done: ${THEME_NAME}"
   exit 0
 fi
 
-/usr/bin/osascript -e 'display alert "Codex Dream Skin" message "Theme switched but inject failed. Click Apply Skin."' >/dev/null 2>&1 || true
+/usr/bin/osascript -e 'display alert "Codex Dream Skin" message "Theme switched but inject failed. If official Codex is already open, quit it manually and open 栋哥 Codex.app."' >/dev/null 2>&1 || true
 exit 1

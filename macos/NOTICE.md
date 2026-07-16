@@ -4,7 +4,7 @@ Codex Dream Skin Studio is an **unofficial** customization project and is **not 
 
 ## Software license
 
-The MIT License in `LICENSE` applies to the **software source code** in this repository (scripts, CSS, injectors, docs that describe the software, and the abstract demo asset generated for this repo).
+The MIT License in `LICENSE` applies to the **software source code** in this repository (scripts, CSS, injectors, and docs that describe the software).
 
 It does **not** grant rights to:
 
@@ -13,9 +13,15 @@ It does **not** grant rights to:
 - Any user-supplied images or third-party artwork you drop into a theme
 - Character likenesses, franchise art, or celebrity imagery
 
-## Demo artwork
+## Bundled artwork
 
-`assets/portal-hero.png` is original abstract geometric art generated for this open-source repository (no characters). Replace it with your own image before shipping a branded theme to customers.
+The Dongge images under `assets/`, `bundled-themes/`, and the repository-level
+`themes/` directory were generated with Codex imagegen from user-supplied identity
+references. They are not covered by the MIT software license. Confirm the subject's
+likeness and publication permission before publishing or redistributing the artwork.
+
+`assets/portal-hero.png` is an older abstract, no-character replacement source;
+it is not the selected default preset.
 
 ## Runtime
 

@@ -13,14 +13,16 @@
 ## Automated checks
 
 - Shell and JavaScript syntax checks.
-- Payload construction with bundled demo and an isolated custom theme.
+- Payload construction with the bundled Dongge light preset and an isolated custom theme.
 - Reject unsupported theme config, unsafe image paths, invalid colors, oversized images, non-loopback WebSocket URLs, and unrecognized renderer targets.
 - Exact install/restore round trip for the two TOML settings while preserving unrelated values.
 - Empty `HOME` recovery.
 - Official app and internal Node signature, Team ID, architecture, and version validation.
 - Port collision selection and saved-port reuse.
 - PID reuse protection through PID, start time, executable, script path, and command-line matching.
-- Live verification after `Page.reload` returns version `1.0.0` and `pass: true`.
+- Live verification after `Page.reload` returns version `1.3.0` and `pass: true`.
+- Opening the official Codex icon directly is intentionally unsupported; it must not trigger host-app restarts or background repair.
+- Pause / Restore stops only the verified injector/session state and never restarts Codex.
 - Strict home verification requires a visible banner of at least 320×160, two to four visible native cards, visible project button, composer, sidebar, non-interactive decoration, and no horizontal overflow.
 
 ## Visual checks
@@ -29,6 +31,7 @@
 - Narrower window: quote/orbit decoration hides before covering essential controls.
 - Task route: background remains atmospheric, messages and output panels keep high contrast, and the composer remains reachable.
 - Selected image contains no fake interface controls or raster text intended to impersonate Codex.
+- Dongge's face and whiteboard text remain outside the native left-side title safe area at normal and narrow widths.
 - Inspect sidebar selection, header, banner edges, cards, project label, composer buttons, scrollbars, focus outlines, dialogs, and menus.
 
 ## Release signoff

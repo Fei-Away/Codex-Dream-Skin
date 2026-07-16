@@ -75,7 +75,7 @@ fi
 ensure_state_root
 progress "启动/连接调试口（可能 10–30 秒）…"
 
-"$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing >>"$LOG_OUT" 2>&1
+"$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" >>"$LOG_OUT" 2>&1
 code=$?
 
 if [ "$code" -eq 0 ]; then

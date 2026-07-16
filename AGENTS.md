@@ -23,7 +23,7 @@ Instructions for AI / human maintainers working in this repo.
 - `docs/images/gallery/*` are **preview composites**, not pure banner assets for `theme/`.
 - Pure backgrounds go through customize / `images/` / `themes/`; inject reads active `theme.json` + image.
 - CSS: dark portal base + optional light shell via `data-dream-shell`; do not force `appearanceTheme=dark` on install.
-- Prefer hot reapply when CDP is already up; full restart only when required.
+- Prefer hot reapply when CDP is already up; never restart an already-running host app during QA or normal theme application.
 
 ## Windows
 

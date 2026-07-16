@@ -74,7 +74,7 @@ else
 fi
 
 if [ "$APPLY_NOW" = "true" ]; then
-  "$SCRIPT_DIR/start-dream-skin-macos.sh" --port 9341 --prompt-restart
+  "$SCRIPT_DIR/start-dream-skin-macos.sh" --port 9341
 fi
 
 printf 'Codex Dream Skin Studio theme is ready.\n'

@@ -14,8 +14,22 @@
 </p>
 
 <p align="center">
-  Unofficial. Does not modify <code>.app</code> / <code>app.asar</code> / WindowsApps.
+Unofficial. Does not modify <code>.app</code> / <code>app.asar</code> / WindowsApps.
 </p>
+
+## Dongge three-theme pack
+
+Version 1.3.0 bundles three switchable themes for both macOS and Windows:
+
+- **Language in Use** — Wittgenstein-inspired paper, whiteboard, and marginalia
+- **Open-source Workbench** — dbskill blueprint and open-source persona
+- **Psychological Problem** — restrained Chinese independent-magazine styling
+
+The classic whiteboard preset remains for compatibility. macOS and Windows installers ask
+which Dongge image should be the default. On macOS, installation creates `栋哥 Codex.app`;
+use it as the daily entry point so the loopback port and injector start together. If the
+official Codex app is already open without that port, scripts stop and ask you to quit
+Codex manually. Windows users open through the `栋哥 Codex` shortcut.
 
 ## Sponsors
 
@@ -100,7 +114,7 @@ Platform scripts are ready — different plumbing, same goal: theme Codex.
 | Platform | Dir | Entry |
 |------|------|------|
 | Apple Silicon / Intel Mac | [`macos/`](./macos/) | Double-click `Install Codex Dream Skin.command` |
-| Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
+| Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `栋哥 Codex` shortcut |
 
 More detail:
 

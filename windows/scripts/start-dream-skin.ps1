@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
   [int]$Port = 9335,
-  [switch]$RestartExisting,
   [string]$ProfilePath,
   [switch]$ForegroundInjector
 )
@@ -11,9 +10,13 @@ $SkillRoot = Split-Path -Parent $PSScriptRoot
 $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $StatePath = Join-Path $StateRoot 'state.json'
+$ThemeDir = Join-Path $StateRoot 'theme'
 $StdoutPath = Join-Path $StateRoot 'injector.log'
 $StderrPath = Join-Path $StateRoot 'injector-error.log'
 New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
+if (-not (Test-Path -LiteralPath (Join-Path $ThemeDir 'theme.json'))) {
+  throw 'No active theme is installed. Run install-dream-skin.ps1 first.'
+}
 
 function Test-CodexDebugPort([int]$CandidatePort) {
   try {
@@ -29,13 +32,7 @@ $debugReady = Test-CodexDebugPort $Port
 $mainProcesses = @(Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
 
 if (-not $debugReady -and -not $ProfilePath -and $mainProcesses.Count -gt 0) {
-  if (-not $RestartExisting) {
-    throw "Codex is already running without dream-skin debugging on port $Port. Close Codex or rerun with -RestartExisting."
-  }
-  foreach ($process in $mainProcesses) { [void]$process.CloseMainWindow() }
-  Start-Sleep -Seconds 2
-  Get-Process ChatGPT -ErrorAction SilentlyContinue | Stop-Process -Force
-  Start-Sleep -Milliseconds 600
+  throw "Codex is already running without dream-skin debugging on port $Port. Close Codex manually, then open the Dongge Codex shortcut again."
 }
 
 if (-not (Test-CodexDebugPort $Port)) {
@@ -65,24 +62,25 @@ if (Test-Path -LiteralPath $StatePath) {
 }
 
 if ($ForegroundInjector) {
-  & $node $Injector --watch --port $Port
+  & $node $Injector --watch --port $Port --theme-dir $ThemeDir
   exit $LASTEXITCODE
 }
 
-$injectorArgs = @("`"$Injector`"", '--watch', '--port', "$Port")
+$injectorArgs = @("`"$Injector`"", '--watch', '--port', "$Port", '--theme-dir', "`"$ThemeDir`"")
 $daemon = Start-Process -FilePath $node -ArgumentList $injectorArgs -WindowStyle Hidden -PassThru -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
 @{
   port = $Port
   injectorPid = $daemon.Id
   startedAt = (Get-Date).ToString('o')
   skillRoot = $SkillRoot
+  themeDir = $ThemeDir
   profilePath = $ProfilePath
 } | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding utf8
 
 $verified = $false
 for ($attempt = 0; $attempt -lt 45; $attempt++) {
   Start-Sleep -Milliseconds 700
-  & $node $Injector --verify --port $Port *> $null
+  & $node $Injector --verify --port $Port --theme-dir $ThemeDir *> $null
   if ($LASTEXITCODE -eq 0) { $verified = $true; break }
 }
 if (-not $verified) { throw 'Dream skin launched but verification failed. See injector logs.' }

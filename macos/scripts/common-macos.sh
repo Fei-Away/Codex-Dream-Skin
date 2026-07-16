@@ -12,8 +12,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 INJECTOR="$SCRIPT_DIR/injector.mjs"
-INSTALL_ROOT="$HOME/.codex/codex-dream-skin-studio"
 STATE_ROOT="$HOME/Library/Application Support/CodexDreamSkinStudio"
+INSTALL_ROOT="$STATE_ROOT/engine"
 STATE_PATH="$STATE_ROOT/state.json"
 THEME_BACKUP_PATH="$STATE_ROOT/theme-backup.json"
 THEME_DIR="$STATE_ROOT/theme"
@@ -26,7 +26,7 @@ START_ERROR_LOG="$STATE_ROOT/start-error.log"
 CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
 EXPECTED_CODEX_TEAM_ID="${CODEX_EXPECTED_TEAM_ID:-2DC432GLL2}"
-SKIN_VERSION="1.1.1"
+SKIN_VERSION="1.3.0"
 
 fail() {
   local message="$*"
@@ -130,34 +130,6 @@ codex_is_running() {
 
 process_started_at() {
   /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
-}
-
-stop_codex() {
-  local allow_force="${1:-false}"
-  local deadline
-  local pid
-
-  release_codex_launchd_job
-  codex_is_running || return 0
-  /usr/bin/osascript -e 'tell application id "com.openai.codex" to quit' >/dev/null 2>&1 || true
-  deadline=$((SECONDS + 15))
-  while codex_is_running && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.25; done
-  codex_is_running || return 0
-
-  [ "$allow_force" = "true" ] || fail "Codex did not close within 15 seconds; explicit restart authorization is required for a forced stop."
-  while IFS= read -r pid; do
-    [ -n "$pid" ] && /bin/kill -TERM "$pid" 2>/dev/null || true
-  done < <(codex_main_pids)
-  deadline=$((SECONDS + 5))
-  while codex_is_running && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.25; done
-  if codex_is_running; then
-    while IFS= read -r pid; do
-      [ -n "$pid" ] && /bin/kill -KILL "$pid" 2>/dev/null || true
-    done < <(codex_main_pids)
-  fi
-  /bin/sleep 0.5
-  codex_is_running && fail "Codex could not be stopped safely."
-  return 0
 }
 
 listener_pids() {
@@ -379,7 +351,7 @@ launch_injector_daemon() {
   : > "$INJECTOR_ERROR_LOG"
   /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
 
-  # Prefer a direct background process — launchctl submit is unreliable on newer macOS.
+  # Keep the injector as a direct child process. It never owns the host app.
   /usr/bin/nohup "$NODE" "$INJECTOR" --watch --port "$port" --theme-dir "$THEME_DIR" \
     >>"$INJECTOR_LOG" 2>>"$INJECTOR_ERROR_LOG" &
   pid="$!"
@@ -389,18 +361,7 @@ launch_injector_daemon() {
     return 0
   fi
 
-  # Fallback: launchctl submit
-  /bin/launchctl submit -l "$INJECTOR_JOB_LABEL" -o "$INJECTOR_LOG" -e "$INJECTOR_ERROR_LOG" -- \
-    "$NODE" "$INJECTOR" --watch --port "$port" --theme-dir "$THEME_DIR" >/dev/null 2>&1 || true
-  /bin/launchctl kickstart -k "gui/$(/usr/bin/id -u)/$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
   while [ "$SECONDS" -lt "$deadline" ]; do
-    pid="$(/bin/launchctl print "gui/$(/usr/bin/id -u)/$INJECTOR_JOB_LABEL" 2>/dev/null \
-      | /usr/bin/awk '/^[[:space:]]*pid = [0-9]+/{print $3; exit}')"
-    if [ -n "$pid" ] && /bin/kill -0 "$pid" 2>/dev/null; then
-      printf '%s\n' "$pid"
-      return 0
-    fi
-    # Also detect the nohup node process by command line
     pid="$(/bin/ps -axo pid=,command= | /usr/bin/awk -v inj="$INJECTOR" -v port="$port" '
       index($0, inj) && index($0, "--watch") && index($0, port) { print $1; exit }
     ')"
@@ -497,9 +458,8 @@ hot_reapply_theme() {
   return 0
 }
 
-# Always tear down any leftover launchd babysitter for the themed Codex process.
-# Older builds used `launchctl submit` which can relaunch Codex after the user quits
-# or after SwiftBar exits — that is unexpected and unwanted.
+# Always tear down any leftover launchd babysitter from older builds so quitting
+# Codex stays quit.
 release_codex_launchd_job() {
   /bin/launchctl remove "gui/$(/usr/bin/id -u)/$CODEX_APP_JOB_LABEL" >/dev/null 2>&1 || true
   /bin/launchctl remove "$CODEX_APP_JOB_LABEL" >/dev/null 2>&1 || true
@@ -510,22 +470,15 @@ launch_codex_with_cdp() {
   : > "$APP_LOG"
   : > "$APP_ERROR_LOG"
   release_codex_launchd_job
-  # Start as a normal user process (NOT launchctl submit). submit keeps a job
-  # that will restart Codex when the window is closed.
+  # Launch through LaunchServices so Codex keeps its normal app lifecycle and
+  # can reuse its existing app-server. A short settle avoids a rapid-reopen race.
+  /bin/sleep 1
   /usr/bin/open -na "$CODEX_BUNDLE" --args \
     --remote-debugging-address=127.0.0.1 \
     --remote-debugging-port="$port" \
-    >>"$APP_LOG" 2>>"$APP_ERROR_LOG" || true
-  # Fallback if open failed to pass args on some builds
-  if ! codex_is_running; then
-    /usr/bin/nohup "$CODEX_EXE" \
-      --remote-debugging-address=127.0.0.1 \
-      --remote-debugging-port="$port" \
-      >>"$APP_LOG" 2>>"$APP_ERROR_LOG" &
-  fi
-}
-
-launch_codex_normally() {
-  release_codex_launchd_job
-  /usr/bin/open -na "$CODEX_BUNDLE"
+    >>"$APP_LOG" 2>>"$APP_ERROR_LOG"
+  local deadline=$((SECONDS + 8))
+  while ! codex_is_running && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.2; done
+  codex_is_running || fail "Codex did not start. See $APP_LOG and $APP_ERROR_LOG"
+  /usr/bin/open -a "$CODEX_BUNDLE" >/dev/null 2>&1 || true
 }

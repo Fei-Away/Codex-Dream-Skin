@@ -22,13 +22,20 @@ if /usr/bin/grep -R -n -E '(writeFile|rename|copyFile|rm).*app\.asar' "$ROOT/scr
   printf 'A runtime script appears to mutate app.asar.\n' >&2
   exit 1
 fi
+if /usr/bin/find "$ROOT" -type f \
+  ! -path "$ROOT/tests/*" \
+  ! -path "$ROOT/release/*" \
+  -print0 | /usr/bin/xargs -0 /usr/bin/grep -n -E -- '--restart-existing|auto-reapply|autoreapply|StartInterval|RunAtLoad|install-auto-reapply|launchctl submit' >/dev/null; then
+  printf 'Unsafe restart or recurring background automation remains in package files.\n' >&2
+  exit 1
+fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
 trap '/bin/rm -rf "$TMP"' EXIT
 /bin/mkdir -p "$TMP/theme"
-/bin/cp "$ROOT/assets/portal-hero.png" "$TMP/theme/background.png"
+/bin/cp "$ROOT/assets/dongge-light.png" "$TMP/theme/background.png"
 "$NODE" "$ROOT/scripts/write-theme.mjs" custom --output-dir "$TMP/theme" \
   --image background.png --name '测试主题' --tagline '测试口号' --quote 'TEST' \
   --accent '#11aa55' --secondary '#22bbcc' --highlight '#663399' >/dev/null
@@ -37,6 +44,15 @@ PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir
   const value = JSON.parse(process.argv[1]);
   if (!value.pass || value.themeName !== "测试主题" || value.imageBytes < 1) process.exit(1);
 ' "$PAYLOAD_JSON"
+
+for theme in "$ROOT"/bundled-themes/*; do
+  [ -f "$theme/theme.json" ] || continue
+  PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$theme")"
+  "$NODE" -e '
+    const value = JSON.parse(process.argv[1]);
+    if (!value.pass || value.imageBytes < 1) process.exit(1);
+  ' "$PAYLOAD_JSON"
+done
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
 [ ! -e "$TMP/theme" ]
 
@@ -51,11 +67,19 @@ BACKUP="$TMP/theme-backup.json"
   'keepMe = true' > "$CONFIG"
 /bin/cp "$CONFIG" "$TMP/original.toml"
 "$NODE" "$ROOT/scripts/theme-config.mjs" install "$CONFIG" "$BACKUP" >/dev/null
-/usr/bin/grep -q 'appearanceTheme = "dark"' "$CONFIG"
+/usr/bin/grep -q '^appearanceTheme = "light"$' "$CONFIG"
+/usr/bin/grep -q '^appearanceDarkCodeThemeId = "vscode-dark"$' "$CONFIG"
+/usr/bin/grep -q '^keepMe = true$' "$CONFIG"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CONFIG" "$BACKUP" >/dev/null
 /usr/bin/cmp -s "$CONFIG" "$TMP/original.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.1" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.3.0" ]' _ "$ROOT"
+
+/bin/mkdir -p "$TMP/home/Desktop"
+HOME="$TMP/home" "$ROOT/scripts/create-launcher-app-macos.sh" >/dev/null
+[ -x "$TMP/home/Applications/栋哥 Codex.app/Contents/MacOS/launch" ]
+/usr/bin/plutil -lint "$TMP/home/Applications/栋哥 Codex.app/Contents/Info.plist" >/dev/null
+[ ! -d "$TMP/home/Library/LaunchAgents" ] || ! /usr/bin/find "$TMP/home/Library/LaunchAgents" -name 'com.feiaway.codex-dream-skin*.plist' -print -quit | /usr/bin/grep -q .
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
-printf 'PASS: syntax, payload, custom-theme, config round-trip, HOME recovery, signature, and doctor checks.\n'
+printf 'PASS: syntax, all bundled themes, launcher app without LaunchAgents, custom-theme, config round-trip, HOME recovery, signature, and doctor checks.\n'

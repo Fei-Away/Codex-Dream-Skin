@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Dream Skin"
-  short_description: "Apply and safely restore the full pink-purple Codex skin"
+  short_description: "Apply and safely restore the Dongge dbskill light skin"
   default_prompt: "Use $codex-dream-skin to apply, verify, update, or restore the full Codex desktop skin."

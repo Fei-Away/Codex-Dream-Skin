@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dongge Codex Layout Reference Mockup</title>
+  <style>
+    :root {
+      --bg: #fff1f2;
+      --panel: #fff8f3;
+      --paper: #fffaf1;
+      --line: #efc7c6;
+      --ink: #3b2f2c;
+      --muted: #8f7771;
+      --red: #c75562;
+      --red-dark: #9f3544;
+      --green: #6f8b67;
+      --mint: #dcebd9;
+      --shadow: 0 16px 34px rgba(164, 83, 91, .18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #f4dfdf;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+    }
+
+    .app {
+      width: 1448px;
+      height: 1086px;
+      overflow: hidden;
+      border: 2px solid #f0bfc4;
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 84% 16%, rgba(255, 210, 217, .9), transparent 22%),
+        linear-gradient(180deg, #fff2f2 0%, #fff8f1 100%);
+      position: relative;
+    }
+
+    .topbar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid #f2cbd0;
+      background: rgba(255, 235, 238, .78);
+      color: #5f4a48;
+      font-size: 16px;
+    }
+
+    .top-left {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .menu {
+      display: flex;
+      gap: 28px;
+      margin-left: 4px;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 294px 1fr;
+      height: calc(100% - 52px);
+    }
+
+    aside {
+      position: relative;
+      padding: 24px 16px;
+      border-right: 1px solid #f0cbd0;
+      background: rgba(255, 242, 243, .76);
+    }
+
+    .brand {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 10px 24px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 38px;
+      line-height: 1;
+      font-family: Georgia, "Times New Roman", serif;
+      color: #b73355;
+      letter-spacing: 0;
+    }
+
+    .nav, .list { display: grid; gap: 6px; }
+
+    .row {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      border-radius: 9px;
+      color: #554442;
+      font-size: 17px;
+    }
+
+    .row.active {
+      color: var(--red-dark);
+      background: rgba(255, 224, 228, .82);
+      box-shadow: inset 0 0 0 1px rgba(199, 85, 98, .18);
+    }
+
+    .ico {
+      width: 22px;
+      color: var(--red);
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .divider {
+      margin: 24px 12px 8px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(209, 142, 145, .32);
+      display: flex;
+      justify-content: space-between;
+      color: #b06672;
+      font-size: 15px;
+    }
+
+    .small { height: 32px; font-size: 15px; color: #6a5654; }
+
+    .continue {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 88px;
+      height: 52px;
+      border-radius: 11px;
+      background: rgba(255, 232, 235, .9);
+      border: 1px solid rgba(199, 85, 98, .2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      color: var(--red-dark);
+      font-weight: 700;
+    }
+
+    .profile {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 18px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      border-radius: 12px;
+      background: rgba(255, 248, 243, .92);
+      border: 1px solid rgba(199, 85, 98, .18);
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: url("/var/folders/m_/6dmq7ld5155dyc3jvfm4k2cc0000gn/T/codex-clipboard-5706db81-d41f-4e95-8916-f9496d8e862c.png") center / cover no-repeat;
+      border: 2px solid #ffd6dc;
+    }
+
+    main {
+      position: relative;
+      padding: 18px 28px 24px;
+    }
+
+    .identity {
+      height: 76px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    .identity-mark {
+      width: 58px;
+      height: 58px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 32px;
+      background: #ffe2e7;
+      box-shadow: inset 0 0 0 1px rgba(199, 85, 98, .18);
+    }
+
+    .identity strong {
+      display: block;
+      font-size: 25px;
+      color: var(--red-dark);
+      margin-bottom: 4px;
+    }
+
+    .spark {
+      position: absolute;
+      color: rgba(199, 85, 98, .38);
+      font-size: 28px;
+    }
+
+    .s1 { top: 74px; left: 650px; }
+    .s2 { top: 430px; left: 1016px; }
+    .s3 { top: 782px; right: 198px; }
+
+    .hero {
+      height: 650px;
+      position: relative;
+      border-radius: 22px;
+      overflow: hidden;
+      border: 2px solid rgba(232, 178, 184, .82);
+      box-shadow: var(--shadow);
+      background:
+        linear-gradient(90deg, rgba(255, 239, 240, .98) 0%, rgba(255, 239, 240, .9) 42%, rgba(255, 239, 240, .08) 68%),
+        url("../themes/dongge-light/background.png") right top / auto 100% no-repeat,
+        #fff7ef;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 20px;
+      border-radius: 18px;
+      border: 2px dashed rgba(224, 149, 155, .5);
+      pointer-events: none;
+    }
+
+    .scallop {
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      height: 44px;
+      background:
+        radial-gradient(circle at 22px 36px, transparent 20px, rgba(255,255,255,.72) 21px) 0 0 / 44px 44px,
+        linear-gradient(#ffdce1, #fff5f3);
+      opacity: .88;
+    }
+
+    .deco {
+      position: absolute;
+      z-index: 3;
+      filter: drop-shadow(0 8px 10px rgba(169, 77, 87, .12));
+    }
+
+    .bubble {
+      border-radius: 999px;
+      padding: 8px 16px;
+      background: rgba(255, 251, 245, .9);
+      border: 1px solid rgba(199, 85, 98, .24);
+      color: var(--red-dark);
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .note {
+      width: 116px;
+      height: 84px;
+      border-radius: 16px;
+      background: #ffe9ec;
+      border: 1px solid #efbcc5;
+      display: grid;
+      place-items: center;
+      color: var(--red-dark);
+      font-size: 42px;
+      transform: rotate(-10deg);
+    }
+
+    .hero-title {
+      position: absolute;
+      left: 106px;
+      top: 178px;
+      width: 640px;
+      z-index: 4;
+      text-align: center;
+    }
+
+    .hero-title h2 {
+      margin: 0;
+      color: var(--red-dark);
+      font-size: 74px;
+      line-height: 1.02;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-shadow:
+        0 4px 0 #ffd5dc,
+        0 9px 18px rgba(150, 55, 70, .18);
+    }
+
+    .hero-title p {
+      display: inline-flex;
+      margin: 20px 0 0;
+      padding: 9px 28px;
+      border-radius: 999px;
+      border: 2px solid rgba(199, 85, 98, .26);
+      background: rgba(255, 250, 245, .88);
+      color: #7b4e50;
+      font-size: 21px;
+      font-weight: 700;
+    }
+
+    .portrait {
+      position: absolute;
+      right: 56px;
+      top: 66px;
+      width: 450px;
+      height: 360px;
+      border-radius: 28px;
+      background:
+        linear-gradient(90deg, rgba(255, 239, 240, .25), rgba(255, 239, 240, .02)),
+        url("../themes/dongge-light/background.png") 64% 36% / 980px auto no-repeat;
+      z-index: 2;
+    }
+
+    .stamp {
+      position: absolute;
+      right: 70px;
+      top: 374px;
+      z-index: 5;
+      width: 154px;
+      height: 88px;
+      border-radius: 18px;
+      background: rgba(255, 249, 242, .84);
+      border: 2px dashed rgba(199, 85, 98, .36);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--red-dark);
+      font-weight: 800;
+      transform: rotate(-6deg);
+    }
+
+    .cards {
+      position: absolute;
+      left: 78px;
+      right: 72px;
+      bottom: 42px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      z-index: 6;
+    }
+
+    .card {
+      height: 172px;
+      border-radius: 18px;
+      background: rgba(255, 249, 245, .92);
+      border: 2px solid rgba(232, 178, 184, .78);
+      box-shadow: 0 12px 22px rgba(164, 83, 91, .14);
+      position: relative;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--red-dark);
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .card::before {
+      content: "⌁";
+      position: absolute;
+      top: -19px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 48px;
+      height: 30px;
+      border-radius: 0 0 14px 14px;
+      background: #ffdbe1;
+      color: #bc4b58;
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      border: 1px solid #efbcc5;
+    }
+
+    .card-icon {
+      width: 70px;
+      height: 70px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #ffe1e6;
+      border: 2px solid #efbcc5;
+      font-size: 34px;
+      color: var(--red-dark);
+    }
+
+    .composer-wrap {
+      position: relative;
+      height: 236px;
+      margin-top: 18px;
+      padding: 0 34px;
+    }
+
+    .selector {
+      width: 864px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 18px;
+      border-radius: 14px 14px 0 0;
+      background: rgba(255, 247, 241, .94);
+      border: 2px solid rgba(232, 178, 184, .68);
+      border-bottom: 0;
+      color: var(--red-dark);
+      font-weight: 800;
+      font-size: 17px;
+    }
+
+    .composer {
+      width: 906px;
+      height: 168px;
+      border-radius: 0 22px 22px 22px;
+      background: rgba(255, 247, 244, .94);
+      border: 2px solid rgba(232, 178, 184, .72);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .composer::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 22px;
+      background: radial-gradient(circle at 16px -2px, transparent 16px, #ffdbe2 17px) 0 0 / 32px 22px;
+      opacity: .8;
+    }
+
+    .placeholder {
+      padding: 28px 30px;
+      color: #9c7b79;
+      font-size: 20px;
+    }
+
+    .controlbar {
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      bottom: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 2;
+      color: #5b4a47;
+      font-size: 17px;
+    }
+
+    .controls-left, .controls-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .round {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #fff9f4;
+      border: 1px solid #eabcc2;
+      color: var(--red-dark);
+      font-size: 30px;
+    }
+
+    .access {
+      height: 38px;
+      padding: 0 18px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffe2e7;
+      color: var(--red-dark);
+      border: 1px solid #efbcc5;
+      font-weight: 700;
+    }
+
+    .send {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: #d85e75;
+      font-size: 28px;
+      box-shadow: 0 10px 18px rgba(216, 94, 117, .3);
+    }
+
+    .photo-card {
+      position: absolute;
+      right: 30px;
+      bottom: 30px;
+      width: 150px;
+      height: 206px;
+      padding: 10px 10px 28px;
+      border-radius: 8px;
+      transform: rotate(-7deg);
+      background: #fff9f3;
+      border: 1px solid #efbcc5;
+      box-shadow: 0 14px 24px rgba(164, 83, 91, .18);
+      z-index: 10;
+    }
+
+    .photo {
+      height: 132px;
+      border-radius: 6px;
+      background: url("/var/folders/m_/6dmq7ld5155dyc3jvfm4k2cc0000gn/T/codex-clipboard-5706db81-d41f-4e95-8916-f9496d8e862c.png") center / cover no-repeat;
+      border: 1px solid #f0c4ca;
+    }
+
+    .caption {
+      text-align: center;
+      color: var(--red-dark);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 18px;
+      margin-top: 9px;
+    }
+
+    .footer-deco {
+      position: absolute;
+      left: 340px;
+      bottom: 18px;
+      color: rgba(111, 139, 103, .62);
+      font-size: 54px;
+      transform: rotate(-10deg);
+      z-index: 12;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="top-left">
+        <span>▯</span><span>←</span><span>→</span>
+        <div class="menu"><span>文件</span><span>编辑</span><span>视图</span><span>帮助</span></div>
+      </div>
+      <div>⌁ 语言的边界 ⌁</div>
+      <div>− □ ×</div>
+    </div>
+
+    <div class="shell">
+      <aside>
+        <div class="brand"><h1>Codex</h1><span class="ico">⌕</span></div>
+        <div class="nav">
+          <div class="row"><span class="ico">✎</span>新建任务</div>
+          <div class="row"><span class="ico">◷</span>已安排</div>
+          <div class="row"><span class="ico">✿</span>插件</div>
+          <div class="row"><span class="ico">▦</span>站点</div>
+          <div class="row"><span class="ico">⑂</span>拉取请求</div>
+          <div class="row"><span class="ico">☵</span>聊天</div>
+        </div>
+
+        <div class="divider"><span>项目</span><span>⌄</span></div>
+        <div class="list">
+          <div class="row active"><span class="ico">▣</span>dbskill 代码库</div>
+          <div class="row small"><span class="ico">□</span>维特根斯坦笔记</div>
+          <div class="row small"><span class="ico">□</span>心理问题实验室</div>
+          <div class="row small"><span class="ico">□</span>开源分身工具箱</div>
+          <div class="row small"><span class="ico">♡</span>一起试试</div>
+        </div>
+
+        <div class="divider"><span>任务</span><span></span></div>
+        <div class="list">
+          <div class="row small"><span class="ico">○</span>写一个清楚的问题</div>
+          <div class="row small"><span class="ico">○</span>跑一次 dbskill</div>
+          <div class="row small"><span class="ico">○</span>读一段维特根斯坦</div>
+          <div class="row small"><span class="ico">○</span>修复可爱小 Bug</div>
+          <div class="row small"><span class="ico">○</span>今天也要试试</div>
+        </div>
+
+        <div class="continue"><span>继续设置</span><span>0/4</span></div>
+        <div class="profile"><div class="avatar"></div><div><b>Ronnie</b><br><span style="color:#a07b7c;font-size:13px">栋哥版</span></div><span style="margin-left:auto;color:#c75562">⚙</span></div>
+      </aside>
+
+      <main>
+        <div class="identity">
+          <div class="identity-mark">?</div>
+          <div>
+            <strong>栋哥的 dbskill · 心理问题限定版</strong>
+            <span>Codex App 内部限定版</span>
+          </div>
+        </div>
+
+        <span class="spark s1">✧</span>
+        <span class="spark s2">✦</span>
+        <span class="spark s3">✧</span>
+
+        <section class="hero">
+          <div class="scallop"></div>
+          <div class="deco note" style="left:42px;top:66px;">?</div>
+          <div class="deco bubble" style="left:216px;top:72px;">dbskill · OPEN SOURCE</div>
+          <div class="deco bubble" style="right:224px;top:132px;">语言的边界</div>
+          <div class="deco note" style="left:90px;bottom:160px;transform:rotate(12deg);">⌘</div>
+          <div class="deco note" style="right:40px;top:84px;transform:rotate(10deg);">↗</div>
+          <div class="portrait"></div>
+          <div class="hero-title">
+            <h2>栋哥的<br>心理问题</h2>
+            <p>先说清楚，试试就知道</p>
+          </div>
+          <div class="stamp">心理问题 →<br>先说清楚 →<br>试试就知道</div>
+          <div class="cards">
+            <div class="card"><div><div class="card-icon">?</div>问题说清楚</div></div>
+            <div class="card"><div><div class="card-icon">≋</div>语言拆一遍</div></div>
+            <div class="card"><div><div class="card-icon">⌘</div>调用 dbskill</div></div>
+            <div class="card"><div><div class="card-icon">↗</div>试试就知道</div></div>
+          </div>
+        </section>
+
+        <div class="composer-wrap">
+          <div class="selector">▣ 与栋哥聊代码</div>
+          <div class="composer">
+            <div class="placeholder">说吧，今天遇到什么心理问题</div>
+            <div class="controlbar">
+              <div class="controls-left">
+                <div class="round">+</div>
+                <div class="access">♡ 完全访问</div>
+              </div>
+              <div class="controls-right">
+                <span>5.6 Sol 中</span><span>⌄</span><span>◉</span><div class="send">↑</div>
+              </div>
+            </div>
+          </div>
+          <div class="photo-card"><div class="photo"></div><div class="caption">Dongge</div></div>
+          <div class="footer-deco">⌁</div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

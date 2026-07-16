@@ -7,7 +7,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $node = (Get-Command node -ErrorAction Stop).Source
 $injector = Join-Path $PSScriptRoot 'injector.mjs'
-$arguments = @($injector, '--verify', '--port', "$Port")
+$themeDir = Join-Path (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin') 'theme'
+$arguments = @($injector, '--verify', '--port', "$Port", '--theme-dir', $themeDir)
 if ($ScreenshotPath) { $arguments += @('--screenshot', $ScreenshotPath) }
 & $node @arguments
 exit $LASTEXITCODE

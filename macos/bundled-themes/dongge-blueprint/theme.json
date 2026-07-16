@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "dongge-blueprint",
+  "name": "栋哥 · 开源工作台",
+  "brandSubtitle": "dbskill / 一个开源分身",
+  "tagline": "先说清楚，再动手",
+  "projectPrefix": "",
+  "projectLabel": "选择项目",
+  "statusText": "OPEN SOURCE · v1",
+  "quote": "心理问题？试试就知道",
+  "image": "background.png",
+  "colors": {
+    "background": "#F2F0E9",
+    "panel": "#FCFBF7",
+    "panelAlt": "#F5F3EC",
+    "accent": "#214F91",
+    "accentAlt": "#3566A4",
+    "secondary": "#A65347",
+    "highlight": "#1F3550",
+    "text": "#222831",
+    "muted": "#68717C",
+    "line": "rgba(33, 79, 145, .20)"
+  }
+}

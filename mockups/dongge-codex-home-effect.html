@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dongge Codex Skin Mockup</title>
+  <style>
+    :root {
+      --paper: #f8f3ea;
+      --paper-2: #fffaf1;
+      --ink: #252523;
+      --muted: #817d71;
+      --green: #7f8d65;
+      --green-2: #dfe7ce;
+      --red: #b35a4e;
+      --line: #ded5c4;
+      --shadow: 0 18px 48px rgba(70, 57, 38, .14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #eee7da;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .window {
+      width: 1448px;
+      height: 1086px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 86% 8%, rgba(179, 90, 78, .08), transparent 30%),
+        linear-gradient(135deg, #faf6ed 0%, #f6efe3 100%);
+      border: 1px solid #d9cfbd;
+      border-radius: 18px;
+      position: relative;
+    }
+
+    .topbar {
+      height: 54px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(96, 89, 76, .12);
+      color: #5e594f;
+      font-size: 16px;
+      background: rgba(255, 250, 241, .76);
+      backdrop-filter: blur(12px);
+    }
+
+    .top-left {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .traffic {
+      display: flex;
+      gap: 12px;
+      margin-right: 8px;
+    }
+
+    .traffic span {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #cfc6b5;
+      display: block;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      height: calc(100% - 54px);
+    }
+
+    aside {
+      padding: 26px 18px 20px;
+      border-right: 1px solid rgba(111, 101, 84, .16);
+      background: rgba(255, 251, 243, .62);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 12px 30px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 38px;
+      font-family: Georgia, "Times New Roman", serif;
+      letter-spacing: 0;
+      color: #4e653f;
+      font-weight: 700;
+    }
+
+    .nav, .projects, .tasks {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .nav-item, .project, .task {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      border-radius: 8px;
+      font-size: 18px;
+      color: #3d3a34;
+    }
+
+    .nav-item.active, .project.active {
+      background: rgba(223, 231, 206, .68);
+      color: #596d40;
+      box-shadow: inset 0 0 0 1px rgba(127, 141, 101, .16);
+    }
+
+    .icon {
+      width: 22px;
+      text-align: center;
+      color: var(--green);
+      font-size: 18px;
+    }
+
+    .section-title {
+      margin: 18px 12px 8px;
+      color: var(--muted);
+      font-size: 16px;
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px dashed rgba(127, 141, 101, .25);
+      padding-top: 12px;
+    }
+
+    .task {
+      height: 34px;
+      font-size: 16px;
+      color: #676158;
+    }
+
+    .user {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: 266px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      border: 1px solid rgba(127, 141, 101, .18);
+      border-radius: 12px;
+      background: rgba(255, 250, 241, .84);
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: url("../themes/dongge-light/background.png") center / 150px auto;
+      border: 2px solid #efe5d4;
+    }
+
+    main {
+      padding: 28px 32px 26px;
+      position: relative;
+    }
+
+    .identity {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px 0 10px;
+      color: var(--muted);
+    }
+
+    .identity strong {
+      display: block;
+      color: #4b5840;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .identity span {
+      font-size: 16px;
+    }
+
+    .dotted {
+      flex: 1;
+      height: 1px;
+      border-top: 2px dashed rgba(127, 141, 101, .28);
+      margin: 0 34px;
+      transform: translateY(-8px);
+    }
+
+    .status {
+      padding: 10px 18px;
+      border-radius: 999px;
+      color: var(--red);
+      background: rgba(255, 250, 241, .84);
+      border: 1px dashed rgba(179, 90, 78, .38);
+      font-size: 18px;
+      box-shadow: 0 8px 20px rgba(73, 58, 38, .08);
+    }
+
+    .hero {
+      height: 548px;
+      border-radius: 24px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid rgba(116, 106, 88, .26);
+      box-shadow: var(--shadow);
+      background:
+        linear-gradient(90deg, rgba(255, 250, 241, .98) 0%, rgba(255, 250, 241, .9) 37%, rgba(255, 250, 241, .16) 62%),
+        url("../themes/dongge-light/background.png") right center / cover no-repeat;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 250, 241, .22), rgba(248, 243, 234, .28)),
+        radial-gradient(circle at 15% 85%, rgba(127, 141, 101, .12), transparent 28%);
+      pointer-events: none;
+    }
+
+    .hero-copy {
+      position: absolute;
+      left: 54px;
+      top: 54px;
+      width: 510px;
+      z-index: 2;
+    }
+
+    .eyebrow {
+      color: var(--red);
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      margin-bottom: 22px;
+    }
+
+    .hero h2 {
+      margin: 0 0 18px;
+      font-size: 78px;
+      line-height: 1;
+      font-weight: 850;
+      letter-spacing: 0;
+      color: #272521;
+    }
+
+    .hero p {
+      margin: 0 0 28px;
+      color: #5e594f;
+      font-size: 30px;
+      line-height: 1.25;
+      font-weight: 600;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 10px 18px;
+      border: 1px solid rgba(127, 141, 101, .34);
+      background: rgba(255, 250, 241, .72);
+      color: #4e653f;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .quote {
+      position: absolute;
+      right: 44px;
+      bottom: 198px;
+      color: rgba(61, 58, 52, .58);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 24px;
+      transform: rotate(-2deg);
+      z-index: 2;
+    }
+
+    .stamp {
+      position: absolute;
+      right: 66px;
+      top: 70px;
+      width: 136px;
+      height: 136px;
+      border-radius: 50%;
+      border: 2px solid rgba(127, 141, 101, .42);
+      color: rgba(78, 101, 63, .62);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 800;
+      transform: rotate(-9deg);
+      z-index: 2;
+      background: rgba(255, 250, 241, .38);
+    }
+
+    .cards {
+      position: absolute;
+      left: 38px;
+      right: 38px;
+      bottom: 34px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      z-index: 3;
+    }
+
+    .card {
+      min-height: 142px;
+      border-radius: 18px;
+      background: rgba(255, 252, 247, .86);
+      border: 1px solid rgba(116, 106, 88, .18);
+      box-shadow: 0 14px 28px rgba(60, 49, 33, .12);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 18px;
+      color: #4d493f;
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .card .symbol {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+      display: grid;
+      place-items: center;
+      color: #fffaf1;
+      background: #7f8d65;
+      font-size: 24px;
+      box-shadow: inset 0 -8px 18px rgba(0, 0, 0, .08);
+    }
+
+    .selector {
+      height: 56px;
+      margin: 28px 28px 8px;
+      border-radius: 14px 14px 0 0;
+      border: 1px solid rgba(116, 106, 88, .18);
+      border-bottom: 0;
+      background: rgba(255, 250, 241, .7);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 22px;
+      color: #5d6d4d;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .composer {
+      height: 134px;
+      margin: 0 28px;
+      border-radius: 0 0 24px 24px;
+      border: 1px solid rgba(116, 106, 88, .22);
+      background: rgba(255, 252, 247, .92);
+      box-shadow: 0 14px 34px rgba(60, 49, 33, .1);
+      display: grid;
+      grid-template-rows: 1fr 50px;
+      overflow: hidden;
+    }
+
+    .placeholder {
+      color: #9b9588;
+      font-size: 20px;
+      padding: 24px 28px 0;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px 18px;
+      color: #5b574f;
+      font-size: 18px;
+    }
+
+    .left-controls, .right-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .plus, .send {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(116, 106, 88, .2);
+      font-size: 28px;
+      background: #fffaf1;
+    }
+
+    .send {
+      background: #7f8d65;
+      color: #fffaf1;
+      font-size: 24px;
+      border: 0;
+    }
+
+    .access {
+      padding: 9px 16px;
+      border-radius: 999px;
+      background: rgba(223, 231, 206, .58);
+      color: #4e653f;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="topbar">
+      <div class="top-left">
+        <div class="traffic"><span></span><span></span><span></span></div>
+        <span>←</span><span>→</span><span>文件</span><span>编辑</span><span>视图</span><span>帮助</span>
+      </div>
+      <div>语言的边界</div>
+      <div>— □ ×</div>
+    </div>
+
+    <div class="layout">
+      <aside>
+        <div class="brand">
+          <h1>Codex</h1>
+          <div class="icon">⌕</div>
+        </div>
+
+        <div class="nav">
+          <div class="nav-item active"><span class="icon">✎</span>新建任务</div>
+          <div class="nav-item"><span class="icon">◷</span>已安排</div>
+          <div class="nav-item"><span class="icon">◎</span>插件</div>
+          <div class="nav-item"><span class="icon">▦</span>站点</div>
+          <div class="nav-item"><span class="icon">⑂</span>拉取请求</div>
+          <div class="nav-item"><span class="icon">☰</span>聊天</div>
+        </div>
+
+        <div class="section-title"><span>项目</span><span>⌄</span></div>
+        <div class="projects">
+          <div class="project active"><span class="icon">◫</span>dbskill 代码库</div>
+          <div class="project"><span class="icon">□</span>维特根斯坦笔记</div>
+          <div class="project"><span class="icon">□</span>心理问题实验室</div>
+          <div class="project"><span class="icon">□</span>开源分身工具箱</div>
+        </div>
+
+        <div class="section-title"><span>任务</span><span>0/4</span></div>
+        <div class="tasks">
+          <div class="task"><span class="icon">○</span>写一个清楚的问题</div>
+          <div class="task"><span class="icon">○</span>读一段维特根斯坦</div>
+          <div class="task"><span class="icon">○</span>跑一次 dbskill</div>
+          <div class="task"><span class="icon">○</span>今天也要试试</div>
+        </div>
+
+        <div class="user">
+          <div class="avatar"></div>
+          <div>
+            <div style="font-size:18px;font-weight:700">Ronnie</div>
+            <div style="font-size:13px;color:#8b8376">内部限定</div>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <div class="identity">
+          <div>
+            <strong>栋哥的 dbskill</strong>
+            <span>Codex App 内部限定版</span>
+          </div>
+          <div class="dotted"></div>
+          <div class="status">试试就知道</div>
+        </div>
+
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow">栋哥的 dbskill</div>
+            <h2>心理问题</h2>
+            <p>先说清楚，试试就知道</p>
+            <div class="badge-row">
+              <div class="pill">dbskill · OPEN SOURCE</div>
+              <div class="pill">选择项目</div>
+            </div>
+          </div>
+          <div class="stamp">dbskill<br />OPEN SOURCE</div>
+          <div class="quote">语言的边界</div>
+          <div class="cards">
+            <div class="card"><div><div class="symbol">?</div>先把问题说清楚</div></div>
+            <div class="card"><div><div class="symbol">≋</div>拆开语言陷阱</div></div>
+            <div class="card"><div><div class="symbol">⌘</div>调用 dbskill</div></div>
+            <div class="card"><div><div class="symbol">↗</div>试试就知道</div></div>
+          </div>
+        </section>
+
+        <div class="selector"><span>▣</span><span>选择项目</span></div>
+        <div class="composer">
+          <div class="placeholder">说说你遇到的心理问题</div>
+          <div class="controls">
+            <div class="left-controls">
+              <div class="plus">+</div>
+              <div class="access">完全访问</div>
+            </div>
+            <div class="right-controls">
+              <span>5.6 Sol 中</span>
+              <span>⌄</span>
+              <span>◉</span>
+              <div class="send">↑</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

@@ -10,7 +10,7 @@
 
 set +e
 
-ENGINE="${CODEX_DREAM_SKIN_ENGINE:-$HOME/.codex/codex-dream-skin-studio}"
+ENGINE="${CODEX_DREAM_SKIN_ENGINE:-$HOME/Library/Application Support/CodexDreamSkinStudio/engine}"
 if [ ! -d "$ENGINE/scripts" ]; then
   HERE="$(cd "$(dirname "$0")" && pwd -P)"
   [ -d "$HERE/../scripts" ] && ENGINE="$(cd "$HERE/.." && pwd -P)"
@@ -120,6 +120,6 @@ fi
 echo "-- 打开图片文件夹 | bash=\"/usr/bin/open\" param1=\"$IMAGES_DIR\" terminal=false"
 
 echo "---"
-echo "完全恢复 | bash=\"$RESTORE\" param1=\"--restore-base-theme\" param2=\"--restart-codex\" terminal=false refresh=true"
+echo "完全恢复 | bash=\"$RESTORE\" param1=\"--restore-base-theme\" terminal=false refresh=true"
 echo "---"
 echo "刷新 | refresh=true"

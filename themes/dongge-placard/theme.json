@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "dongge-placard",
+  "name": "栋哥 · 心理问题",
+  "brandSubtitle": "独立杂志版",
+  "tagline": "心理问题 · 试试就知道",
+  "projectPrefix": "",
+  "projectLabel": "选择项目",
+  "statusText": "先试一次",
+  "quote": "问题不是标签，是要被说清楚的东西",
+  "image": "background.png",
+  "colors": {
+    "background": "#F4EFE6",
+    "panel": "#FCFAF6",
+    "panelAlt": "#F7F1E9",
+    "accent": "#B7493E",
+    "accentAlt": "#C65A4B",
+    "secondary": "#8B776D",
+    "highlight": "#332D2A",
+    "text": "#272321",
+    "muted": "#746B66",
+    "line": "rgba(183, 73, 62, .20)"
+  }
+}
