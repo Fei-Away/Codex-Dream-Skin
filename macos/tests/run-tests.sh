@@ -70,6 +70,17 @@ PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir
   const value = JSON.parse(process.argv[1]);
   if (!value.pass || value.themeName !== "测试主题" || value.imageBytes < 1) process.exit(1);
 ' "$PAYLOAD_JSON"
+/bin/mkdir -p "$TMP/symlink-theme"
+/bin/cp "$TMP/theme/theme.json" "$TMP/symlink-theme/theme.json"
+/bin/ln -s "$ROOT/assets/portal-hero.png" "$TMP/symlink-theme/background.png"
+if SYMLINK_THEME_OUTPUT="$(
+  "$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$TMP/symlink-theme" 2>&1
+)"; then
+  printf 'Theme image symlink unexpectedly passed payload validation.\n' >&2
+  exit 1
+fi
+/usr/bin/printf '%s\n' "$SYMLINK_THEME_OUTPUT" | /usr/bin/grep -F -q \
+  'Theme image must be a regular file inside its theme directory, not a symbolic link'
 /bin/mkdir -p "$TMP/missing-theme"
 if MISSING_THEME_OUTPUT="$(
   "$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$TMP/missing-theme" 2>&1

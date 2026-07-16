@@ -253,7 +253,10 @@ async function loadTheme(themeDir) {
     },
   };
   const imagePath = path.join(assetsRoot, theme.image);
-  const imageStat = await fs.stat(imagePath);
+  const imageStat = await fs.lstat(imagePath);
+  if (imageStat.isSymbolicLink()) {
+    throw new Error("Theme image must be a regular file inside its theme directory, not a symbolic link");
+  }
   if (!imageStat.isFile() || imageStat.size < 1 || imageStat.size > MAX_ART_BYTES) {
     throw new Error(`Theme image must be a non-empty file no larger than ${MAX_ART_BYTES} bytes`);
   }
