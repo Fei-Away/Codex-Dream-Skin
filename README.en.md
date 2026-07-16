@@ -95,16 +95,17 @@ One image, one mood. Real theme previews you can ship:
 
 ## Quick start
 
-Platform scripts are ready — different plumbing, same goal: theme Codex.
+The native macOS app is the recommended entry point. Script entry points remain available for development and automation.
 
 | Platform | Dir | Entry |
 |------|------|------|
-| Apple Silicon / Intel Mac | [`macos/`](./macos/) | Double-click `Install Codex Dream Skin.command` |
+| Apple Silicon / Intel Mac | [`macos/app/`](./macos/app/) | Build and open `Codex Dream Skin.app` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
 
 More detail:
 
-- Mac: [`macos/README.md`](./macos/README.md)
+- Mac visual app: [`macos/app/README.md`](./macos/app/README.md)
+- Mac scripts and engine: [`macos/README.md`](./macos/README.md)
 - Windows: [`windows/SKILL.md`](./windows/SKILL.md)
 - Paths: [`docs/platforms.md`](./docs/platforms.md)
 - Project notes: [`docs/PROJECT.md`](./docs/PROJECT.md)

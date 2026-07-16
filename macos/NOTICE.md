@@ -24,3 +24,7 @@ This project does not redistribute Node.js. At runtime it validates and uses the
 ## Security model
 
 Themes are applied through Chromium DevTools Protocol on **loopback only**. While a themed session is running, treat the local debugging port as sensitive: do not run untrusted local software that could attach to it. Use the Restore launcher to tear down the themed session and debugging port.
+
+## Visual app icon
+
+`app/Assets/AppIcon-1024.png` is original artwork generated specifically for this open-source project with OpenAI image generation. It contains no OpenAI or Codex logo, third-party trademark, or copied character artwork. `AppIcon.icns` is derived from that source image for macOS packaging.

@@ -14,6 +14,7 @@ if [ "${1:-}" != "--skip-tests" ]; then "$ROOT/tests/run-tests.sh"; fi
 /usr/bin/rsync -a \
   --exclude '.git/' \
   --exclude '.DS_Store' \
+  --exclude 'app/build/' \
   --exclude 'release/' \
   "$ROOT/" "$TMP/codex-dream-skin-studio/"
 /bin/chmod 755 "$TMP/codex-dream-skin-studio"/*.command

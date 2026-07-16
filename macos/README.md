@@ -16,6 +16,17 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 
 ## Quick start (from this repo)
 
+### Native visual app (recommended)
+
+```bash
+./app/build.sh
+open "./app/build/Codex Dream Skin.app"
+```
+
+The app provides image selection, three color presets, a demo theme, verification screenshots, restore, uninstall, progress feedback, logs, and destructive-action confirmations. Applying or restoring a theme restarts Codex once so it can change the local CDP launch mode.
+
+### Script workflow
+
 ```bash
 # 1) Optional static checks (needs Codex.app present for bundled Node path)
 ./tests/run-tests.sh

@@ -94,16 +94,17 @@
 
 ## 快速开始
 
-仓库内按平台放了现成脚本（实现细节不同，效果都是「主题化 Codex」）：
+macOS 用户推荐使用原生可视化 App；脚本入口继续保留给开发者和自动化场景：
 
 | 平台 | 目录 | 入口 |
 |------|------|------|
-| Apple Silicon / Intel Mac | [`macos/`](./macos/) | 双击 `Install Codex Dream Skin.command` |
+| Apple Silicon / Intel Mac | [`macos/app/`](./macos/app/) | 构建并打开 `Codex Dream Skin.app` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
 
 更细的说明：
 
-- Mac：[`macos/README.md`](./macos/README.md)
+- Mac 可视化 App：[`macos/app/README.md`](./macos/app/README.md)
+- Mac 脚本与引擎：[`macos/README.md`](./macos/README.md)
 - Windows：[`windows/SKILL.md`](./windows/SKILL.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
 - 项目记录：[`docs/PROJECT.md`](./docs/PROJECT.md)
