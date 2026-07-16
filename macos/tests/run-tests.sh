@@ -82,6 +82,28 @@ fi
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
 [ ! -e "$TMP/theme" ]
 
+SWITCH_HOME="$TMP/switch-home"
+SWITCH_STATE="$SWITCH_HOME/Library/Application Support/CodexDreamSkinStudio"
+/bin/mkdir -p "$SWITCH_STATE/theme" "$SWITCH_STATE/themes/valid" "$SWITCH_STATE/themes/invalid"
+/usr/bin/printf '%s\n' 'keep-current-theme' > "$SWITCH_STATE/theme/sentinel"
+/bin/cp "$ROOT/assets/theme.json" "$ROOT/assets/portal-hero.png" "$SWITCH_STATE/themes/valid/"
+/bin/cp "$ROOT/assets/theme.json" "$SWITCH_STATE/themes/invalid/"
+HOME="$SWITCH_HOME" NODE="$NODE" NODE_VERSION="$($NODE --version)" \
+  /bin/bash "$ROOT/scripts/switch-theme-macos.sh" --id valid --no-apply >/dev/null 2>&1
+[ -f "$SWITCH_STATE/theme/theme.json" ] && [ -f "$SWITCH_STATE/theme/portal-hero.png" ]
+/usr/bin/printf '%s\n' 'preserve-me' > "$SWITCH_STATE/theme/sentinel"
+if HOME="$SWITCH_HOME" NODE="$NODE" NODE_VERSION="$($NODE --version)" \
+  /bin/bash "$ROOT/scripts/switch-theme-macos.sh" --id invalid --no-apply >/dev/null 2>&1; then
+  printf 'Invalid saved theme unexpectedly replaced the active theme.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'preserve-me' "$SWITCH_STATE/theme/sentinel"
+if HOME="$SWITCH_HOME" NODE="$NODE" NODE_VERSION="$($NODE --version)" \
+  /bin/bash "$ROOT/scripts/switch-theme-macos.sh" --id ../valid --no-apply >/dev/null 2>&1; then
+  printf 'Theme ID traversal unexpectedly passed validation.\n' >&2
+  exit 1
+fi
+
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
 /usr/bin/printf '%s\n' \
