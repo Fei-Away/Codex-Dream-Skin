@@ -1,131 +1,38 @@
-# Codex Dream Skin
+# Codex Miku Stage
 
 <p align="center">
   <a href="./README.md">中文</a> · <strong>English</strong>
 </p>
 
-<p align="center">
-  <strong>Give Codex a face that breathes.</strong><br>
-  External themes for the Codex desktop app · Local CDP inject · No official package mutation
-</p>
+A reversible Hatsune Miku skin for the Windows Codex desktop app. It reuses the local CDP injection architecture from Codex Dream Skin while rebuilding the theme as fourteen independent component contracts with dark/light tokens, dedicated art, installation, restore, and verification.
 
-<p align="center">
-  One image, one mood · Code with atmosphere
-</p>
+![Miku Stage hero](windows/assets/miku-stage-hero.png)
 
-<p align="center">
-  Unofficial. Does not modify <code>.app</code> / <code>app.asar</code> / WindowsApps.
-</p>
+## Windows quick start
 
-## Sponsors
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\install-miku-skin.ps1 -EnableAutoHook
 
-<p align="center">
-  <a href="https://passion8.cc/register?aff=TuPe">
-    <img src="docs/images/sponsor-passion8.png" alt="Passion8" height="72">
-  </a>
-</p>
+The optional user-level logon hook ignores the currently running Codex process. On future normal Codex launches it detects a process without CDP, performs one controlled restart with loopback CDP, and injects the skin. It uses a limited scheduled task, not administrator privileges, IFEO, or binary interception.
 
-<p align="center">
-  <strong>Smarter Connections · Passionate Creation</strong><br>
-  <sub>Connect AI · Power Creation</sub>
-</p>
+Installation does not change Codex Appearance, code-theme, or Diff settings. If `config.toml` already exists, the installer may preserve one read-only backup for compatibility with older test builds.
 
-<p align="center">
-  Thanks to <a href="https://passion8.cc/register?aff=TuPe"><strong>passion8.cc</strong></a> for sponsoring this project.<br>
-  Full-power AI gateway: official models, no silent downgrades, no wrapper shells.<br>
-  One-line setup for Codex / Claude Code / Grok.
-</p>
+Static and live verification:
 
-<p align="center">
-  <sub>
-    Theme install and API config stay separate — this project never rewrites your provider settings.
-  </sub>
-</p>
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\test-windows-skin.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\verify-miku-skin.ps1 -ScreenshotPath C:\Temp\miku-stage.png
 
-## Gallery
+Live removal:
 
-One image, one mood. Real theme previews you can ship:
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\restore-miku-skin.ps1
 
-<p align="center">
-  <img src="docs/images/gallery/skin-01.jpg" alt="Pink Custom" width="900"><br>
-  <sub>Pink Custom</sub>
-</p>
+## Architecture and safety
 
-<p align="center">
-  <img src="docs/images/gallery/skin-02.jpg" alt="God of Wealth" width="900"><br>
-  <sub>God of Wealth</sub>
-</p>
+The launcher starts the official Store package with a loopback-only Chromium remote-debugging endpoint. The Node injector discovers app:// renderer targets, sends CDP messages over WebSocket, uses Runtime.evaluate to install the CSS/DOM layer, listens for Page.loadEventFired to reapply it, and can use Page.captureScreenshot for verification.
 
-<p align="center">
-  <img src="docs/images/gallery/skin-03.jpg" alt="Red-White Sci-Fi" width="900"><br>
-  <sub>Red-White Sci-Fi</sub>
-</p>
+CDP flags must exist at Chromium process creation time, so a Codex instance started from the stock icon cannot be attached in place; the hook must restart that new instance once.
 
-<p align="center">
-  <img src="docs/images/gallery/skin-04.jpg" alt="Clear Custom" width="900"><br>
-  <sub>Clear Custom</sub>
-</p>
+CDP is a powerful debugging surface, not an official Codex theme API. Keep it on 127.0.0.1, avoid untrusted local software while it runs, and repeat route-level QA after Codex updates. The project never edits WindowsApps, app.asar, signatures, user tasks, plugins, pets, or authentication data.
 
-<p align="center">
-  <img src="docs/images/gallery/skin-05.jpg" alt="Inspiration" width="900"><br>
-  <sub>Inspiration</sub>
-</p>
+The Miku Stage implementation is Windows-focused. The inherited macos/ directory is unchanged upstream code and does not implement this fourteen-component system.
 
-<p align="center">
-  <img src="docs/images/gallery/skin-06.jpg" alt="Purple Night" width="900"><br>
-  <sub>Purple Night</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-07.jpg" alt="Hatsune Miku" width="900"><br>
-  <sub>Hatsune Miku</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-08.jpg" alt="Stage Black-Gold" width="900"><br>
-  <sub>Stage Black-Gold</sub>
-</p>
-
-## What it does
-
-- **Real UI** — Sidebar, cards, project picker, and input stay native. Not a fake full-window screenshot.
-- **Swappable art** — Drop in an image you like and it becomes your theme.
-- **Restorable** — One-click restore to the stock look.
-- **Safer path** — Local-loopback CDP inject only. No official binary or signature changes.
-
-## Quick start
-
-Platform scripts are ready — different plumbing, same goal: theme Codex.
-
-| Platform | Dir | Entry |
-|------|------|------|
-| Apple Silicon / Intel Mac | [`macos/`](./macos/) | Double-click `Install Codex Dream Skin.command` |
-| Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
-
-More detail:
-
-- Mac: [`macos/README.md`](./macos/README.md)
-- Windows: [`windows/SKILL.md`](./windows/SKILL.md)
-- Paths: [`docs/platforms.md`](./docs/platforms.md)
-- Project notes: [`docs/PROJECT.md`](./docs/PROJECT.md)
-
-## Feedback & contributions
-
-- **Issues:** Use the [issue templates](./.github/ISSUE_TEMPLATE/) (bug / feature). Blank issues are disabled. Please try Verify / Restore self-checks before filing bugs.
-- **PRs:** Follow the [PR template](./.github/pull_request_template.md) — describe the change and tick the self-checks you actually ran (e.g. `macos/tests/run-tests.sh`, verify / restore).
-
-## Safety
-
-- CDP binds `127.0.0.1` only — avoid untrusted local processes while the theme runs.
-- Does not touch the official install directory or code signature.
-- **Never** rewrites API Key / Base URL; relay and theme stay separate.
-
-## License
-
-- See [`macos/LICENSE`](./macos/LICENSE) (MIT) and [`macos/NOTICE.md`](./macos/NOTICE.md)
-- Unofficial; Codex and related rights belong to their owners.
-- People / IP art in previews is illustrative only — clear rights before commercial redistribution.
-
----
-
-Star it, pick a look, and make Codex yours for today.
+See windows/NOTICE.md for derivation and character-rights notices and windows/LICENSE for the MIT License.

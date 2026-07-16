@@ -1,36 +1,26 @@
 ---
-name: codex-dream-skin
-description: Apply, launch, verify, repair, update, or restore a full decorative skin for the Windows Codex desktop app. Use when the user asks for a Codex theme that goes beyond official color settings, wants the pink-purple Dream/Fiona-style interface, needs the skin reapplied after a Codex update, or needs a safe rollback without modifying WindowsApps or app.asar.
+name: codex-miku-stage
+description: Use this skill to install, launch, verify, repair, or restore the reversible Windows Codex Miku Stage skin while preserving the official Store package and native controls.
 ---
 
-# Codex Dream Skin
+# Codex Miku Stage
 
-Apply a reversible renderer skin through Chromium DevTools Protocol while launching the official Store-installed Codex executable. Never replace or take ownership of files under `WindowsApps`.
+Apply the 14-component Miku Stage visual system through loopback Chromium DevTools Protocol (CDP). The skin decorates live Codex DOM; it never replaces the window with a screenshot and never edits WindowsApps, app.asar, signatures, user tasks, plugins, pets, or authentication data.
 
 ## Workflow
 
-1. Run `scripts/install-dream-skin.ps1` once to set the matching official base colors and create launch/restore shortcuts.
-2. Run `scripts/start-dream-skin.ps1`. Add `-RestartExisting` only when the user authorized restarting an already-open Codex app.
-3. Run `scripts/verify-dream-skin.ps1 -ScreenshotPath <absolute-path>` after launch. Treat a missing hero, native composer, sidebar skin, or injection marker as failure. The native suggestion count is responsive and may be two to four.
-4. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
-5. Run `scripts/restore-dream-skin.ps1` for live removal. Add `-Uninstall` to delete shortcuts; add `-RestoreBaseTheme` when the user also wants the pre-install config backup restored.
+1. Run scripts/install-miku-skin.ps1 to copy the runtime into %LOCALAPPDATA%\CodexMikuSkin\engine and create safe shortcuts. If config.toml exists the installer may preserve one read-only backup, but it must not change Codex Appearance, code-theme, or Diff settings. Add -EnableAutoHook only when the user wants ordinary future Codex launches intercepted and restarted once with CDP.
+2. Close an already-running Codex window, then run scripts/start-miku-skin.ps1. Use -RestartExisting only after explicit authorization.
+3. Run scripts/verify-miku-skin.ps1 -ScreenshotPath <absolute-path> and inspect references/qa-inventory.md for the relevant routes.
+4. Run scripts/restore-miku-skin.ps1 for live removal. Add -RestoreBaseTheme only to recover from an older build that changed appearance keys, or -Uninstall to remove the installed engine and shortcuts. Never combine -Uninstall with -KeepAutoHook.
 
-## Guardrails
+## Required checks
 
-- Preserve the official executable, package signature, user threads, pets, plugins, and authentication state.
-- Do not use the full reference screenshot as a fake whole-window overlay. It is only a cropped hero/polaroid asset; all controls remain live Codex controls.
-- Keep the reference image confined to the single top banner and decorative crop. Keep the cards below it as native Codex suggestion buttons with native labels/icons.
-- Attach the "选择项目" treatment to Codex's real project-selector toolbar and keep the current project button clickable; never draw a disconnected replacement.
-- Keep decorative layers `pointer-events: none` and keep real buttons, navigation, and composer above them.
-- On app updates, rerun install and launch; the scripts discover the current Appx package dynamically.
-- If port `9335` is occupied, choose another port consistently for start, verify, and restore.
-- Keep the injection daemon running for navigation/reload resilience. Its state and logs live under `%LOCALAPPDATA%\CodexDreamSkin`.
+- Treat failure of tests/test-windows-skin.ps1 as a release blocker.
+- Keep CDP on 127.0.0.1; if the selected port is occupied, stop and choose another port.
+- Keep the auto hook user-level and limited; never use IFEO, admin elevation, package mutation, or binary interception.
+- Keep all decorative layers pointer-events: none.
+- Verify real sidebar, composer, menus, Diff, terminal, and utility panels remain readable and interactive.
+- After Codex updates, rerun install, launch, static tests, and route-level screenshot QA.
 
-## Resources
-
-- `scripts/injector.mjs`: CDP connection, renderer injection, verification, screenshot, and removal.
-- `assets/dream-skin.css`: full visual layer.
-- `assets/renderer-inject.js`: idempotent DOM integration and cleanup.
-- `assets/dream-reference.png`: user-provided visual reference used only in cropped decorative regions.
-- `references/qa-inventory.md`: required functional and visual signoff coverage.
-- `references/runtime-notes.md`: troubleshooting and update behavior.
+Read references/runtime-notes.md only for CDP lifecycle, security, and troubleshooting. Read references/component-matrix.md only when changing component coverage or visual semantics.

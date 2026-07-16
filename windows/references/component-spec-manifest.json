@@ -1,0 +1,161 @@
+{
+  "project": "Codex Hatsune Miku UI Theme",
+  "generated_at": "2026-07-16",
+  "generator": "Web ChatGPT Image",
+  "source_repository": "codex-miku-ui-theme",
+  "source_subdirectory": "components",
+  "snapshot_scope": "Metadata-only snapshot. Component PNGs remain in the separate design source and are not shipped with this runtime repository.",
+  "asset_count": 14,
+  "unique_hash_count": 14,
+  "total_bytes": 21141377,
+  "qa": {
+    "decode_check": "passed",
+    "visual_check": "passed for all final assets",
+    "privacy_check": "passed for final assets",
+    "common_dimensions": "13 assets are 1672x941; token sheet is 1619x971"
+  },
+  "assets": [
+    {
+      "id": 1,
+      "file": "01-app-shell-sidebar.png",
+      "component": "App shell + global/project sidebar",
+      "references": [1, 3, 4, 5, 8],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1451137,
+      "sha256": "FCDE77A7B7986D0E4018F707907A6F7372FECFB25E6D4CE4F6B82CF1B524633F"
+    },
+    {
+      "id": 2,
+      "file": "02-task-conversation-composer.png",
+      "component": "Task conversation + composer",
+      "references": [1, 3, 4, 10, 12],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1573631,
+      "sha256": "C94B0832A1407A5D1DCA79A9ECE95B76CFC187BF78BB9A82EB947F5ACF35664C"
+    },
+    {
+      "id": 3,
+      "file": "03-new-task-empty-state.png",
+      "component": "New-task empty state + suggestion cards",
+      "references": [4],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1429202,
+      "sha256": "FCFBACB92B62357947804981B737213E0D7DE5E377139404D960748F5E0FB884"
+    },
+    {
+      "id": 4,
+      "file": "04-change-summary-diff.png",
+      "component": "Change summary + expanded Diff/review",
+      "references": [1, 3, 12],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1601083,
+      "sha256": "01ACD79B70DC3731E906FEC712321EA04063CFFFF077DFCA58DF318607BEFFFF"
+    },
+    {
+      "id": 5,
+      "file": "05-settings-controls.png",
+      "component": "Settings shell + form controls",
+      "references": [2, 13],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1494475,
+      "sha256": "6EF697C41927987A6FE30D99D20E7A91C483685B4992761283D2C43285BFCE3B"
+    },
+    {
+      "id": 6,
+      "file": "06-plugins-marketplace.png",
+      "component": "Plugins marketplace",
+      "references": [5],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1476651,
+      "sha256": "F1E5D7176570B4870E65FDCABF27557F8FB4796D88B363B0B2F65DF46810931B"
+    },
+    {
+      "id": 7,
+      "file": "07-scheduled-tasks.png",
+      "component": "Scheduled tasks / automations",
+      "references": [8],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1443887,
+      "sha256": "C3FA5DB15518317F12D397DBAB7B7D963B1E9F5D6B10E52303727695DA40E7B4"
+    },
+    {
+      "id": 8,
+      "file": "08-quick-chat-panel.png",
+      "component": "Quick chat floating panel",
+      "references": [7],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1557499,
+      "sha256": "992138DC33A12B0D40AD2046DC7B927C9AA052947010BF243A6CAAFF18775B8B"
+    },
+    {
+      "id": 9,
+      "file": "09-popovers-account-task.png",
+      "component": "Task hover card + account usage popover",
+      "references": [6, 9],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1570216,
+      "sha256": "C7F65A5390C546421151FDEC6C7C1049CC92F778EE3B6482184C3F2A3CEAA953"
+    },
+    {
+      "id": 10,
+      "file": "10-split-launcher-terminal.png",
+      "component": "Split-pane launcher + bottom terminal",
+      "references": [10, 11],
+      "reference_note": "Reference 11 is byte-identical to reference 10.",
+      "width": 1672,
+      "height": 941,
+      "bytes": 1427773,
+      "sha256": "AA99D73FD99CA62A28C3FE36A45363DEBE07F15542F090E0B787AECC3C626E1B"
+    },
+    {
+      "id": 11,
+      "file": "11-output-process-panel.png",
+      "component": "Output / background-process panel",
+      "references": [12],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1436592,
+      "sha256": "204533FA85BAA78FBE15F2D8D26F752FC6CC9A0249886C7B887E6FB385F6458C"
+    },
+    {
+      "id": 12,
+      "file": "12-profile-analytics.png",
+      "component": "Profile analytics",
+      "references": [13],
+      "width": 1672,
+      "height": 941,
+      "bytes": 1530974,
+      "sha256": "A2DD8E36E1D66ED490823800C267519E81AFE34F8DC04CA6ECA74C063D4336CA"
+    },
+    {
+      "id": 13,
+      "file": "13-appearance-pets.png",
+      "component": "Appearance + Pets supplement",
+      "references": [2, 6, 13],
+      "reference_note": "Safe extension of the existing settings shell; no commerce or game systems added.",
+      "width": 1672,
+      "height": 941,
+      "bytes": 1474024,
+      "sha256": "083BD38751088F6C92BD2B5058DF76B5AA0168B5F5C1BD0124506F5B7F70E6B3"
+    },
+    {
+      "id": 14,
+      "file": "14-states-tokens.png",
+      "component": "State inventory + design-token sheet",
+      "references": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "width": 1619,
+      "height": 971,
+      "bytes": 1674233,
+      "sha256": "E41FC680C8BA127422B3C10B1EB5883002179CCA10AF4E16B60F6EE2E7C4DEB6"
+    }
+  ]
+}

@@ -1,0 +1,988 @@
+:root.codex-miku-skin {
+  --miku-canvas: #07131f;
+  --miku-chrome: #081821;
+  --miku-surface: #0b1f2a;
+  --miku-elevated: #102a36;
+  --miku-raised: #12323d;
+  --miku-selected: #154047;
+  --miku-accent: #39c5bb;
+  --miku-accent-strong: #22d3c5;
+  --miku-text: #e8fffc;
+  --miku-secondary: #b8d5d2;
+  --miku-muted: #789896;
+  --miku-magenta: #ff4fa3;
+  --miku-info: #69a7ff;
+  --miku-success: #7be69c;
+  --miku-warning: #f4c95d;
+  --miku-error: #ff8995;
+  --miku-border: rgba(57, 197, 187, .18);
+  --miku-border-strong: rgba(34, 211, 197, .56);
+  --miku-shadow-1: 0 1px 2px rgba(0, 0, 0, .25);
+  --miku-shadow-2: 0 8px 24px rgba(0, 0, 0, .34);
+  --miku-shadow-3: 0 18px 46px rgba(0, 0, 0, .46);
+  --miku-focus: 0 0 0 2px rgba(34, 211, 197, .78);
+  color-scheme: dark;
+}
+
+:root.codex-miku-skin[data-miku-tone="light"] {
+  --miku-canvas: #f6f8fa;
+  --miku-chrome: #f3fffd;
+  --miku-surface: #ffffff;
+  --miku-elevated: #f1f4f7;
+  --miku-raised: #e6f6f3;
+  --miku-selected: #ccf2ed;
+  --miku-accent: #139f98;
+  --miku-accent-strong: #0faea4;
+  --miku-text: #102a32;
+  --miku-secondary: #29464c;
+  --miku-muted: #475569;
+  --miku-magenta: #b23a86;
+  --miku-info: #245fb6;
+  --miku-success: #12835d;
+  --miku-warning: #a86918;
+  --miku-error: #c63b63;
+  --miku-border: rgba(19, 159, 152, .18);
+  --miku-border-strong: rgba(15, 174, 164, .55);
+  --miku-shadow-1: 0 1px 2px rgba(15, 42, 50, .10);
+  --miku-shadow-2: 0 8px 24px rgba(15, 42, 50, .12);
+  --miku-shadow-3: 0 18px 46px rgba(15, 42, 50, .16);
+  --miku-focus: 0 0 0 2px rgba(15, 174, 164, .58);
+  --color-token-foreground: var(--miku-text);
+  --color-token-text-primary: var(--miku-text);
+  --color-token-text-secondary: var(--miku-secondary);
+  --color-token-text-tertiary: var(--miku-muted);
+  --color-text-foreground: var(--miku-text);
+  --color-text-foreground-secondary: var(--miku-secondary);
+  --color-text-foreground-tertiary: var(--miku-muted);
+  --color-token-description-foreground: var(--miku-muted);
+  --color-token-disabled-foreground: var(--miku-muted);
+  --color-token-icon-foreground: var(--miku-secondary);
+  --color-token-input-foreground: var(--miku-text);
+  --color-token-input-placeholder-foreground: var(--miku-muted);
+  --color-token-dropdown-foreground: var(--miku-text);
+  --color-token-main-surface-primary: var(--miku-canvas);
+  --color-token-input-background: rgba(255, 255, 255, .96);
+  --color-token-dropdown-background: #ffffff;
+  --color-token-border: rgba(15, 42, 50, .14);
+  --color-token-border-default: rgba(15, 42, 50, .14);
+  --color-token-border-heavy: rgba(15, 42, 50, .22);
+  --color-token-border-light: rgba(15, 42, 50, .08);
+  --color-token-list-hover-background: rgba(15, 174, 164, .08);
+  --vscode-foreground: var(--miku-text);
+  --vscode-titleBar-activeForeground: var(--miku-text);
+  --vscode-titleBar-inactiveForeground: var(--miku-muted);
+  --vscode-sideBar-foreground: var(--miku-text);
+  --vscode-sideBarTitle-foreground: var(--miku-text);
+  --vscode-sideBar-background: var(--miku-chrome);
+  --vscode-icon-foreground: var(--miku-secondary);
+  --vscode-descriptionForeground: var(--miku-muted);
+  --vscode-input-foreground: var(--miku-text);
+  --vscode-input-placeholderForeground: var(--miku-muted);
+  --vscode-input-background: rgba(255, 255, 255, .96);
+  --vscode-input-border: rgba(15, 42, 50, .22);
+  --vscode-dropdown-foreground: var(--miku-text);
+  --vscode-dropdown-background: #ffffff;
+  --vscode-dropdown-border: rgba(15, 42, 50, .14);
+  --vscode-menu-foreground: var(--miku-text);
+  --vscode-menu-background: #ffffff;
+  --vscode-list-hoverBackground: rgba(15, 174, 164, .08);
+  --vscode-menubar-selectionForeground: var(--miku-text);
+  --vscode-quickInput-foreground: var(--miku-text);
+  --vscode-quickInput-background: rgba(255, 255, 255, .98);
+  --vscode-editor-foreground: var(--miku-text);
+  --vscode-editor-placeholder-foreground: var(--miku-muted);
+  color-scheme: light;
+}
+
+html.codex-miku-skin,
+html.codex-miku-skin body {
+  background: var(--miku-canvas) !important;
+  color: var(--miku-text);
+  scrollbar-color: rgba(57, 197, 187, .48) transparent;
+}
+
+html.codex-miku-skin body {
+  font-family: Inter, "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif !important;
+  background-image:
+    radial-gradient(circle at 82% -10%, rgba(34, 211, 197, .10), transparent 33%),
+    radial-gradient(circle at 18% 110%, rgba(57, 197, 187, .07), transparent 36%) !important;
+}
+
+html.codex-miku-skin body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .19;
+  background-image:
+    linear-gradient(rgba(57, 197, 187, .08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57, 197, 187, .08) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(135deg, transparent 5%, #000 54%, transparent 96%);
+}
+
+html.codex-miku-skin ::selection {
+  background: rgba(34, 211, 197, .26);
+  color: var(--miku-text);
+}
+
+html.codex-miku-skin :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 1px solid var(--miku-accent-strong) !important;
+  outline-offset: 1px !important;
+  box-shadow: var(--miku-focus) !important;
+}
+
+html.codex-miku-skin :where(
+  #plugins-page-search,
+  #scheduled-page-search,
+  aside.app-shell-left-panel input[role="searchbox"]
+):focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+html.codex-miku-skin :where(
+  div:has(> #plugins-page-search:focus),
+  div:has(> #scheduled-page-search:focus),
+  div:has(> input[role="searchbox"]:focus)
+) {
+  border-color: rgba(57, 197, 187, .42) !important;
+  box-shadow: 0 0 0 1px rgba(34, 211, 197, .12) !important;
+}
+
+/* Keep the light skin readable even when Codex itself is still using dark tokens. */
+html.codex-miku-skin[data-miku-tone="light"] :where(
+  .miku-shell-sidebar,
+  .miku-task-surface,
+  .miku-composer,
+  .miku-home,
+  .miku-change-summary,
+  .miku-diff-surface,
+  .miku-settings-shell,
+  .miku-plugins-page,
+  .miku-scheduled-page,
+  .miku-dialog,
+  .miku-popover,
+  .miku-output-panel,
+  .miku-profile-page,
+  .miku-appearance-page,
+  .miku-pets-page
+) :where(.text-token-foreground, .text-token-text-primary) {
+  color: var(--miku-text) !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where(
+  .miku-shell-sidebar,
+  .miku-task-surface,
+  .miku-composer,
+  .miku-home,
+  .miku-change-summary,
+  .miku-diff-surface,
+  .miku-settings-shell,
+  .miku-plugins-page,
+  .miku-scheduled-page,
+  .miku-dialog,
+  .miku-popover,
+  .miku-output-panel,
+  .miku-profile-page,
+  .miku-appearance-page,
+  .miku-pets-page
+) :where(.text-token-text-secondary, .text-token-text-tertiary) {
+  color: var(--miku-muted) !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where(
+  .miku-composer,
+  .miku-settings-shell,
+  .miku-plugins-page,
+  .miku-scheduled-page,
+  .miku-dialog
+) :where(input, textarea, [contenteditable="true"])::placeholder {
+  color: var(--miku-muted) !important;
+  opacity: .82;
+}
+
+/* [01] App shell + global/project sidebar */
+html.codex-miku-skin aside.app-shell-left-panel,
+html.codex-miku-skin .miku-shell-sidebar {
+  background:
+    linear-gradient(180deg, rgba(8, 24, 33, .97), rgba(7, 19, 31, .96)) !important;
+  border-color: var(--miku-border) !important;
+  box-shadow: inset -1px 0 rgba(232, 255, 252, .035), 10px 0 28px rgba(0, 0, 0, .16) !important;
+  backdrop-filter: blur(18px) saturate(112%);
+}
+
+html.codex-miku-skin[data-miku-tone="light"] aside.app-shell-left-panel,
+html.codex-miku-skin[data-miku-tone="light"] .miku-shell-sidebar {
+  background: linear-gradient(180deg, rgba(243, 255, 253, .97), rgba(246, 248, 250, .95)) !important;
+}
+
+html.codex-miku-skin :where(aside.app-shell-left-panel, .miku-shell-sidebar) nav {
+  background: transparent !important;
+}
+
+html.codex-miku-skin :where(aside.app-shell-left-panel, .miku-shell-sidebar) button {
+  border-radius: 8px;
+  transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+html.codex-miku-skin :where(aside.app-shell-left-panel, .miku-shell-sidebar) button:hover {
+  background: rgba(57, 197, 187, .09) !important;
+  color: var(--miku-text) !important;
+}
+
+html.codex-miku-skin :where(aside.app-shell-left-panel, .miku-shell-sidebar)
+  :where([aria-current="page"], [class~="bg-token-list-hover-background"]) {
+  background: linear-gradient(90deg, rgba(21, 64, 71, .92), rgba(18, 50, 61, .72)) !important;
+  border: 1px solid rgba(57, 197, 187, .08) !important;
+  box-shadow: inset 2px 0 var(--miku-accent-strong) !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where(aside.app-shell-left-panel, .miku-shell-sidebar)
+  :where([aria-current="page"], [class~="bg-token-list-hover-background"]) {
+  background: linear-gradient(90deg, rgba(204, 242, 237, .94), rgba(230, 246, 243, .78)) !important;
+  border-color: rgba(15, 174, 164, .16) !important;
+}
+
+html.codex-miku-skin :where(aside.app-shell-left-panel, .miku-shell-sidebar)
+  :where([data-state="open"], [aria-expanded="true"]) > :where(svg, [data-slot="icon"]):last-child {
+  color: var(--miku-accent-strong) !important;
+}
+
+html.codex-miku-skin .miku-shell-separator {
+  position: relative;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.codex-miku-skin .miku-shell-separator::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  pointer-events: none;
+  background: rgba(184, 213, 210, .12);
+  transform: translateX(-.5px);
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+
+html.codex-miku-skin .miku-shell-separator:hover::after,
+html.codex-miku-skin .miku-shell-separator[data-state="dragging"]::after {
+  background: rgba(57, 197, 187, .55);
+  box-shadow: 0 0 8px rgba(34, 211, 197, .20);
+}
+
+html.codex-miku-skin main.main-surface {
+  background:
+    radial-gradient(circle at 86% 4%, rgba(57, 197, 187, .055), transparent 28%),
+    linear-gradient(180deg, var(--miku-canvas), var(--miku-canvas)) !important;
+  border-color: var(--miku-border) !important;
+  box-shadow: inset 1px 1px rgba(57, 197, 187, .06) !important;
+}
+
+html.codex-miku-skin main.main-surface > header.app-header-tint {
+  background: rgba(8, 24, 33, .88) !important;
+  border-bottom: 1px solid var(--miku-border) !important;
+  backdrop-filter: blur(18px) saturate(112%);
+}
+
+html.codex-miku-skin[data-miku-tone="light"] main.main-surface > header.app-header-tint {
+  background: rgba(243, 255, 253, .88) !important;
+}
+
+/* [02] Task conversation + composer */
+html.codex-miku-skin :where(article, [data-message-author-role]) {
+  border-radius: 14px;
+}
+
+html.codex-miku-skin [data-message-author-role="user"] {
+  background: linear-gradient(135deg, rgba(57, 197, 187, .14), rgba(34, 211, 197, .07)) !important;
+  border: 1px solid rgba(57, 197, 187, .16);
+}
+
+html.codex-miku-skin [data-message-author-role="assistant"] {
+  color: var(--miku-text);
+}
+
+html.codex-miku-skin :where(blockquote, [data-testid*="citation" i], [data-testid*="reference" i]) {
+  border-left-color: var(--miku-accent) !important;
+  background: rgba(57, 197, 187, .055) !important;
+}
+
+html.codex-miku-skin .composer-surface-chrome,
+html.codex-miku-skin .miku-composer {
+  overflow: visible !important;
+  border: 1px solid rgba(57, 197, 187, .16) !important;
+  border-radius: 18px !important;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(34, 211, 197, .08), transparent 30%),
+    rgba(11, 31, 42, .95) !important;
+  box-shadow: var(--miku-shadow-1), inset 0 1px rgba(232, 255, 252, .035) !important;
+  backdrop-filter: blur(18px) saturate(112%);
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where(.composer-surface-chrome, .miku-composer) {
+  background: rgba(255, 255, 255, .96) !important;
+}
+
+html.codex-miku-skin .composer-surface-chrome::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: -1px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--miku-accent-strong), transparent);
+  opacity: .22;
+  transition: opacity .16s ease;
+}
+
+html.codex-miku-skin .composer-surface-chrome:focus-within,
+html.codex-miku-skin .miku-composer:focus-within {
+  border-color: rgba(57, 197, 187, .38) !important;
+  box-shadow: var(--miku-shadow-2), inset 0 1px rgba(232, 255, 252, .05) !important;
+}
+
+html.codex-miku-skin .composer-surface-chrome:focus-within::before {
+  opacity: .72;
+}
+
+html.codex-miku-skin .ProseMirror {
+  color: var(--miku-text) !important;
+  caret-color: var(--miku-accent-strong) !important;
+}
+
+html.codex-miku-skin .composer-surface-chrome :where(button[class~="bg-token-foreground"], button[type="submit"]) {
+  background: linear-gradient(145deg, var(--miku-accent-strong), var(--miku-accent)) !important;
+  color: #041415 !important;
+  box-shadow: 0 5px 16px rgba(34, 211, 197, .22) !important;
+}
+
+html.codex-miku-skin .composer-surface-chrome :where(button, [role="button"]):hover {
+  border-color: rgba(34, 211, 197, .34) !important;
+}
+
+/* [03] New-task empty state + native suggestions */
+html.codex-miku-skin .miku-home {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 82% 26%, rgba(34, 211, 197, .11), transparent 32%),
+    linear-gradient(180deg, rgba(7, 19, 31, .20), rgba(7, 19, 31, .78)) !important;
+}
+
+html.codex-miku-skin .miku-home::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, var(--miku-canvas) 0%, rgba(7, 19, 31, .88) 35%, rgba(7, 19, 31, .22) 72%, rgba(7, 19, 31, .42) 100%),
+    var(--miku-art);
+  background-repeat: no-repeat;
+  background-size: 100% 100%, cover;
+  background-position: center, center right;
+  opacity: .68;
+  mask-image: linear-gradient(180deg, #000 0%, #000 72%, transparent 96%);
+}
+
+html.codex-miku-skin[data-miku-tone="light"] .miku-home::before {
+  background-image:
+    linear-gradient(90deg, rgba(246, 248, 250, .98) 0%, rgba(246, 248, 250, .88) 42%, rgba(246, 248, 250, .30) 78%, rgba(246, 248, 250, .62) 100%),
+    var(--miku-art);
+  opacity: .48;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] .miku-home {
+  background:
+    radial-gradient(circle at 82% 26%, rgba(15, 174, 164, .10), transparent 32%),
+    linear-gradient(180deg, #eef6f5, var(--miku-canvas)) !important;
+}
+
+html.codex-miku-skin .miku-home > * {
+  position: relative;
+  z-index: 1;
+}
+
+html.codex-miku-skin .miku-home [data-testid="home-icon"] {
+  color: var(--miku-accent-strong) !important;
+  filter: drop-shadow(0 0 12px rgba(34, 211, 197, .38));
+}
+
+html.codex-miku-skin .miku-home .group\/home-suggestions button {
+  min-height: 118px;
+  border: 1px solid rgba(57, 197, 187, .20) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, rgba(11, 31, 42, .92), rgba(16, 42, 54, .82)) !important;
+  color: var(--miku-text) !important;
+  box-shadow: var(--miku-shadow-1), inset 0 1px rgba(232, 255, 252, .04) !important;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] .miku-home .group\/home-suggestions button {
+  background: rgba(255, 255, 255, .90) !important;
+}
+
+html.codex-miku-skin .miku-home .group\/home-suggestions button:hover {
+  transform: translateY(-2px);
+  border-color: var(--miku-border-strong) !important;
+  box-shadow: var(--miku-shadow-2), 0 0 0 1px rgba(34, 211, 197, .09) !important;
+}
+
+html.codex-miku-skin .miku-home .group\/project-selector > button {
+  border-color: rgba(57, 197, 187, .24) !important;
+  background: rgba(11, 31, 42, .82) !important;
+  color: var(--miku-secondary) !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] .miku-home .group\/project-selector > button {
+  background: rgba(255, 255, 255, .88) !important;
+}
+
+#codex-miku-skin-chrome {
+  position: fixed;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+#codex-miku-skin-chrome > * {
+  display: none;
+}
+
+#codex-miku-skin-chrome.miku-home-shell .miku-stage-wordmark {
+  position: absolute;
+  right: 26px;
+  top: 22px;
+  display: block;
+  text-align: right;
+  color: var(--miku-text);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, .62);
+  opacity: .76;
+}
+
+.miku-stage-wordmark b {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: .28em;
+}
+
+.miku-stage-wordmark small {
+  display: block;
+  color: var(--miku-accent);
+  font-size: 8px;
+  line-height: 12px;
+  letter-spacing: .12em;
+}
+
+#codex-miku-skin-chrome.miku-home-shell .miku-stage-index {
+  position: absolute;
+  right: 27px;
+  top: 59px;
+  display: block;
+  color: var(--miku-magenta);
+  font: 600 10px/1 ui-monospace, "Cascadia Code", monospace;
+  opacity: .82;
+}
+
+#codex-miku-skin-chrome.miku-home-shell .miku-stage-wave {
+  position: absolute;
+  right: 26px;
+  top: 76px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 64px;
+  height: 18px;
+  opacity: .48;
+}
+
+#codex-miku-skin-chrome:not(.miku-home-shell) .miku-stage-wordmark {
+  position: absolute;
+  top: 18px;
+  right: 122px;
+  display: block;
+  color: var(--miku-secondary);
+  text-align: right;
+  opacity: .13;
+}
+
+#codex-miku-skin-chrome:not(.miku-home-shell) .miku-stage-wordmark b {
+  font-size: 9px;
+  line-height: 11px;
+}
+
+#codex-miku-skin-chrome:not(.miku-home-shell) .miku-stage-wordmark small {
+  display: none;
+}
+
+#codex-miku-skin-chrome:not(.miku-home-shell) .miku-stage-index {
+  position: absolute;
+  left: 18px;
+  top: 61px;
+  display: block;
+  color: var(--miku-magenta);
+  font: 600 9px/1 ui-monospace, "Cascadia Code", monospace;
+  opacity: .28;
+}
+
+#codex-miku-skin-chrome:not(.miku-home-shell) .miku-stage-wave {
+  position: absolute;
+  left: 18px;
+  top: 76px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 46px;
+  height: 14px;
+  opacity: .16;
+}
+
+#codex-miku-skin-chrome:not(.miku-home-shell) .miku-stage-wave i {
+  transform: scaleY(.72);
+  transform-origin: center;
+}
+
+.miku-stage-wave i {
+  width: 2px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--miku-accent-strong);
+}
+
+.miku-stage-wave i:nth-child(2),
+.miku-stage-wave i:nth-child(6) { height: 13px; }
+.miku-stage-wave i:nth-child(3),
+.miku-stage-wave i:nth-child(5) { height: 18px; }
+.miku-stage-wave i:nth-child(4) { height: 10px; }
+
+/* [04] Change summary + Diff/review */
+html.codex-miku-skin :where(.miku-change-summary, [data-testid*="change-summary" i]) {
+  border: 1px solid var(--miku-border) !important;
+  border-radius: 14px !important;
+  background: var(--miku-surface) !important;
+  box-shadow: var(--miku-shadow-1);
+}
+
+html.codex-miku-skin .miku-diff-surface {
+  --diff-added: var(--miku-success);
+  --diff-removed: var(--miku-error);
+  border-color: rgba(57, 197, 187, .12) !important;
+}
+
+html.codex-miku-skin :where(.miku-diff-surface, [data-testid*="diff" i])
+  :where([data-line-type="addition"], .diff-line-add, ins) {
+  background: rgba(123, 230, 156, .12) !important;
+  color: var(--miku-success) !important;
+  text-decoration: none;
+}
+
+html.codex-miku-skin :where(.miku-diff-surface, [data-testid*="diff" i])
+  :where([data-line-type="deletion"], .diff-line-remove, del) {
+  background: rgba(255, 137, 149, .12) !important;
+  color: var(--miku-error) !important;
+  text-decoration: none;
+}
+
+html.codex-miku-skin :where(.miku-diff-surface, [data-testid*="diff" i])
+  :where([aria-current="true"], [data-current-line="true"]) {
+  background: rgba(57, 197, 187, .09) !important;
+  box-shadow: inset 2px 0 var(--miku-accent);
+}
+
+html.codex-miku-skin :where(pre, code, .cm-editor, .monaco-editor) {
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace;
+}
+
+/* [05] Settings shell + form controls */
+html.codex-miku-skin :where(
+  input:not([class~="bg-transparent"]),
+  textarea:not([class~="bg-transparent"]),
+  select,
+  [role="combobox"]
+) {
+  border-color: rgba(57, 197, 187, .18) !important;
+  background-color: var(--miku-elevated) !important;
+  color: var(--miku-text) !important;
+  caret-color: var(--miku-accent-strong);
+}
+
+html.codex-miku-skin :where([role="tablist"], [data-testid*="segmented" i]) {
+  border: 1px solid rgba(57, 197, 187, .13);
+  border-radius: 10px;
+  background: rgba(16, 42, 54, .72) !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where([role="tablist"], [data-testid*="segmented" i]) {
+  background: var(--miku-elevated) !important;
+}
+
+html.codex-miku-skin :where([role="tab"][aria-selected="true"], [role="tab"][data-state="active"]) {
+  background: rgba(57, 197, 187, .18) !important;
+  color: var(--miku-accent-strong) !important;
+  box-shadow: inset 0 -2px var(--miku-accent);
+}
+
+html.codex-miku-skin [role="switch"] {
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+}
+
+html.codex-miku-skin [role="switch"] > span:first-child {
+  background: var(--miku-raised) !important;
+}
+
+html.codex-miku-skin button[aria-checked]:not([role="switch"]) {
+  border-color: rgba(57, 197, 187, .24) !important;
+  background: var(--miku-raised) !important;
+}
+
+html.codex-miku-skin [role="switch"][aria-checked="true"] > span:first-child,
+html.codex-miku-skin button[aria-checked="true"]:not([role="switch"]) {
+  background: var(--miku-accent) !important;
+  color: #041415 !important;
+}
+
+html.codex-miku-skin :where(.miku-settings-section, .miku-settings-shell [data-testid*="settings-card" i]) {
+  border-color: rgba(57, 197, 187, .10);
+}
+
+html.codex-miku-skin .miku-settings-card {
+  border-color: var(--miku-border) !important;
+  background: var(--miku-surface) !important;
+  color: var(--miku-text) !important;
+  box-shadow: var(--miku-shadow-1), inset 0 1px rgba(232, 255, 252, .035) !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] .miku-settings-card {
+  box-shadow: var(--miku-shadow-1), inset 0 1px rgba(255, 255, 255, .78) !important;
+}
+
+/* [06] Plugins marketplace */
+html.codex-miku-skin :where(.miku-plugin-surface, [data-testid*="plugin" i], [data-testid*="connector" i], [data-testid*="skill-card" i]) {
+  border-color: rgba(57, 197, 187, .14) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(145deg, var(--miku-surface), rgba(16, 42, 54, .76)) !important;
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where(.miku-plugin-surface, [data-testid*="plugin" i], [data-testid*="connector" i], [data-testid*="skill-card" i]) {
+  background: linear-gradient(145deg, var(--miku-surface), var(--miku-elevated)) !important;
+}
+
+html.codex-miku-skin :where(.miku-plugin-surface, [data-testid*="plugin" i], [data-testid*="connector" i], [data-testid*="skill-card" i]):hover {
+  border-color: var(--miku-border-strong) !important;
+  box-shadow: var(--miku-shadow-2);
+}
+
+html.codex-miku-skin :where([data-testid*="plugin" i], [data-testid*="connector" i])
+  :where(button:not([disabled]), [role="button"]):hover {
+  color: var(--miku-accent-strong) !important;
+}
+
+html.codex-miku-skin [data-status="installed"] {
+  color: var(--miku-success) !important;
+}
+
+/* [07] Scheduled tasks / automations */
+html.codex-miku-skin :where(.miku-scheduled-surface, [data-testid*="automation" i], [data-testid*="scheduled" i]) {
+  border-color: rgba(57, 197, 187, .12) !important;
+}
+
+html.codex-miku-skin :where([data-testid*="automation" i], [data-testid*="scheduled" i])
+  :where([data-status="running"], [data-state="running"]) {
+  color: var(--miku-accent-strong) !important;
+}
+
+html.codex-miku-skin :where([data-status="success"], [data-state="success"]) {
+  color: var(--miku-success) !important;
+}
+
+html.codex-miku-skin :where([data-status="paused"], [data-state="paused"]) {
+  color: var(--miku-warning) !important;
+}
+
+html.codex-miku-skin :where([data-status="failed"], [data-state="error"]) {
+  color: var(--miku-error) !important;
+}
+
+/* [08] Quick chat floating panel */
+html.codex-miku-skin .miku-dialog,
+html.codex-miku-skin [role="dialog"] {
+  border: 1px solid rgba(57, 197, 187, .22) !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(34, 211, 197, .08), transparent 38%),
+    rgba(11, 31, 42, .98) !important;
+  box-shadow: var(--miku-shadow-3), inset 0 1px rgba(232, 255, 252, .04) !important;
+  backdrop-filter: blur(22px) saturate(118%);
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where(.miku-dialog, [role="dialog"]) {
+  background: rgba(255, 255, 255, .98) !important;
+}
+
+html.codex-miku-skin :where(.miku-dialog, [role="dialog"]) .composer-surface-chrome {
+  border-radius: 16px !important;
+  box-shadow: var(--miku-shadow-1) !important;
+}
+
+/* [09] Task hover card + account/usage popovers */
+html.codex-miku-skin .miku-popover,
+html.codex-miku-skin :where([role="menu"], [role="tooltip"]) {
+  border: 1px solid rgba(57, 197, 187, .22) !important;
+  border-radius: 14px !important;
+  background: rgba(16, 42, 54, .98) !important;
+  color: var(--miku-text) !important;
+  box-shadow: var(--miku-shadow-3) !important;
+  backdrop-filter: blur(18px);
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where(.miku-popover, [role="menu"], [role="tooltip"]) {
+  background: rgba(255, 255, 255, .98) !important;
+}
+
+html.codex-miku-skin :where(.miku-popover, [role="menu"]) :where([role="menuitem"], button):hover {
+  background: rgba(57, 197, 187, .12) !important;
+  color: var(--miku-text) !important;
+}
+
+html.codex-miku-skin :where([data-testid*="usage" i], [aria-valuenow]) {
+  accent-color: var(--miku-accent);
+}
+
+/* [10] Split launcher + bottom terminal */
+html.codex-miku-skin .miku-neutral-separator {
+  background-color: rgba(184, 213, 210, .10) !important;
+}
+
+html.codex-miku-skin .miku-separator {
+  background-color: rgba(57, 197, 187, .15) !important;
+}
+
+html.codex-miku-skin .miku-separator:hover {
+  background-color: var(--miku-accent) !important;
+  box-shadow: 0 0 10px rgba(34, 211, 197, .36);
+}
+
+html.codex-miku-skin :where(.miku-terminal, [data-testid*="terminal" i], .xterm) {
+  background: #071820 !important;
+  color: #c6eeef !important;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace !important;
+}
+
+html.codex-miku-skin :where(.miku-terminal, .xterm) .xterm-cursor-layer {
+  color: var(--miku-accent-strong) !important;
+}
+
+html.codex-miku-skin :where([data-testid*="launcher" i], [data-testid*="split" i]) button {
+  border-color: rgba(57, 197, 187, .15) !important;
+  background: var(--miku-surface) !important;
+}
+
+html.codex-miku-skin :where([data-testid*="launcher" i], [data-testid*="split" i]) button:hover {
+  border-color: var(--miku-border-strong) !important;
+  background: var(--miku-raised) !important;
+}
+
+/* [11] Output / background-process panel */
+html.codex-miku-skin .miku-output-host {
+  background: transparent !important;
+}
+
+html.codex-miku-skin .miku-output-panel {
+  overflow: hidden;
+  border: 1px solid rgba(57, 197, 187, .13) !important;
+  border-radius: 16px !important;
+  background:
+    linear-gradient(145deg, rgba(16, 42, 54, .98), rgba(11, 31, 42, .98)) !important;
+  box-shadow: var(--miku-shadow-2), inset 0 1px rgba(232, 255, 252, .035) !important;
+  backdrop-filter: blur(18px) saturate(110%);
+}
+
+html.codex-miku-skin[data-miku-tone="light"] .miku-output-panel {
+  background: rgba(255, 255, 255, .97) !important;
+}
+
+html.codex-miku-skin .miku-output-row {
+  border-radius: 9px;
+  transition: background-color .14s ease, color .14s ease;
+}
+
+html.codex-miku-skin .miku-output-row:hover,
+html.codex-miku-skin .miku-output-row:focus-within {
+  background: rgba(57, 197, 187, .08) !important;
+}
+
+html.codex-miku-skin .miku-output-panel
+  :where([data-state="running"], [data-status="running"])::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--miku-accent);
+  box-shadow: 0 0 8px rgba(34, 211, 197, .54);
+}
+
+html.codex-miku-skin .miku-output-panel code {
+  color: var(--miku-secondary);
+}
+
+/* [12] Profile analytics */
+html.codex-miku-skin .miku-profile-page {
+  --chart-accent: var(--miku-accent);
+  --chart-high: var(--miku-accent-strong);
+  border-color: rgba(57, 197, 187, .12) !important;
+}
+
+html.codex-miku-skin .miku-profile-heatmap {
+  --profile-usage-level-0: rgba(120, 152, 150, .10) !important;
+  --profile-usage-level-1: rgba(57, 197, 187, .22) !important;
+  --profile-usage-level-2: rgba(57, 197, 187, .42) !important;
+  --profile-usage-level-3: rgba(34, 211, 197, .68) !important;
+  --profile-usage-level-4: var(--miku-accent-strong) !important;
+}
+
+html.codex-miku-skin .miku-profile-page
+  :where([data-level="1"], rect[data-level="1"]) { fill: rgba(57, 197, 187, .20) !important; }
+html.codex-miku-skin .miku-profile-page
+  :where([data-level="2"], rect[data-level="2"]) { fill: rgba(57, 197, 187, .42) !important; }
+html.codex-miku-skin .miku-profile-page
+  :where([data-level="3"], rect[data-level="3"]) { fill: rgba(34, 211, 197, .68) !important; }
+html.codex-miku-skin .miku-profile-page
+  :where([data-level="4"], rect[data-level="4"]) { fill: var(--miku-accent-strong) !important; }
+
+html.codex-miku-skin :where([data-testid*="metric" i], [data-testid*="insight" i]) {
+  border: 1px solid rgba(57, 197, 187, .12);
+  border-radius: 12px;
+  background: rgba(16, 42, 54, .58);
+}
+
+html.codex-miku-skin[data-miku-tone="light"] :where([data-testid*="metric" i], [data-testid*="insight" i]) {
+  background: var(--miku-elevated);
+}
+
+/* [13] Appearance + Pets */
+html.codex-miku-skin :where(.miku-appearance-page, .miku-pets-page, .miku-pet-surface) {
+  accent-color: var(--miku-accent);
+}
+
+html.codex-miku-skin :where(.miku-appearance-page, .miku-pets-page)
+  :where([aria-selected="true"], [data-state="selected"]) {
+  border-color: var(--miku-accent-strong) !important;
+  background: rgba(57, 197, 187, .11) !important;
+  box-shadow: var(--miku-focus) !important;
+}
+
+html.codex-miku-skin :where(.miku-theme-preview, [data-testid*="pet-preview" i]) {
+  overflow: hidden;
+  border: 1px solid rgba(57, 197, 187, .18) !important;
+  border-radius: 12px !important;
+  background:
+    linear-gradient(rgba(57, 197, 187, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57, 197, 187, .05) 1px, transparent 1px),
+    var(--miku-surface) !important;
+  background-size: 20px 20px !important;
+}
+
+html.codex-miku-skin input[type="range"] {
+  accent-color: var(--miku-accent);
+}
+
+/* [14] State inventory + design tokens */
+html.codex-miku-skin :where(button, [role="button"]) {
+  transition:
+    background-color .14s ease,
+    border-color .14s ease,
+    color .14s ease,
+    opacity .14s ease,
+    transform .14s ease;
+}
+
+html.codex-miku-skin :where(button, [role="button"]):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+html.codex-miku-skin :where(button, input, textarea, select, [role="button"]):disabled,
+html.codex-miku-skin [aria-disabled="true"] {
+  filter: saturate(.55);
+  opacity: .46 !important;
+}
+
+html.codex-miku-skin :where([data-unread="true"], [data-notification="true"])::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--miku-magenta);
+  box-shadow: 0 0 7px rgba(255, 79, 163, .48);
+}
+
+html.codex-miku-skin :where([role="alert"], [data-testid*="toast" i]) {
+  border: 1px solid var(--miku-border-strong) !important;
+  border-radius: 12px !important;
+  background: var(--miku-elevated) !important;
+  color: var(--miku-text) !important;
+  box-shadow: var(--miku-shadow-3) !important;
+}
+
+html.codex-miku-skin :where([data-loading="true"], [class*="skeleton" i]) {
+  background:
+    linear-gradient(90deg, rgba(57, 197, 187, .04), rgba(57, 197, 187, .14), rgba(57, 197, 187, .04)),
+    var(--miku-elevated) !important;
+  background-size: 220% 100% !important;
+  animation: miku-skeleton 1.8s ease-in-out infinite;
+}
+
+@keyframes miku-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -20% 0; }
+}
+
+@media (max-width: 1120px) {
+  html.codex-miku-skin .miku-home::before {
+    background-position: center, 70% center;
+    opacity: .54;
+  }
+  #codex-miku-skin-chrome .miku-stage-wordmark,
+  #codex-miku-skin-chrome .miku-stage-index,
+  #codex-miku-skin-chrome .miku-stage-wave {
+    display: none !important;
+  }
+}
+
+@media (max-width: 860px) {
+  html.codex-miku-skin .miku-home::before {
+    background-image:
+      linear-gradient(90deg, rgba(7, 19, 31, .95), rgba(7, 19, 31, .62)),
+      var(--miku-art);
+    opacity: .40;
+  }
+  html.codex-miku-skin .miku-home .group\/home-suggestions button {
+    min-height: 104px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.codex-miku-skin *,
+  html.codex-miku-skin *::before,
+  html.codex-miku-skin *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "name": "Codex Miku Stage",
+  "version": "2.0.3",
+  "defaultTone": "dark",
+  "art": "miku-stage-hero.png",
+  "stylesheet": "miku-stage.css",
+  "tokens": {
+    "dark": {
+      "canvas": "#07131F",
+      "chrome": "#081821",
+      "surface": "#0B1F2A",
+      "elevated": "#102A36",
+      "hover": "#12323D",
+      "selected": "#154047",
+      "accent": "#39C5BB",
+      "accentStrong": "#22D3C5",
+      "text": "#E8FFFC",
+      "muted": "#789896",
+      "magenta": "#FF4FA3",
+      "success": "#7BE69C",
+      "warning": "#F4C95D",
+      "error": "#FF8995"
+    },
+    "light": {
+      "canvas": "#F6F8FA",
+      "chrome": "#F3FFFD",
+      "surface": "#FFFFFF",
+      "elevated": "#F1F4F7",
+      "hover": "#E6F6F3",
+      "selected": "#CCF2ED",
+      "accent": "#139F98",
+      "accentStrong": "#0FAEA4",
+      "text": "#102A32",
+      "muted": "#475569",
+      "magenta": "#B23A86",
+      "success": "#12835D",
+      "warning": "#A86918",
+      "error": "#C63B63"
+    }
+  },
+  "components": [
+    { "id": "01", "slug": "app-shell-sidebar", "name": "App shell + sidebar" },
+    { "id": "02", "slug": "task-conversation-composer", "name": "Task conversation + composer" },
+    { "id": "03", "slug": "new-task-empty-state", "name": "New-task empty state" },
+    { "id": "04", "slug": "change-summary-diff", "name": "Change summary + Diff" },
+    { "id": "05", "slug": "settings-controls", "name": "Settings shell + controls" },
+    { "id": "06", "slug": "plugins-marketplace", "name": "Plugins marketplace" },
+    { "id": "07", "slug": "scheduled-tasks", "name": "Scheduled tasks" },
+    { "id": "08", "slug": "quick-chat-panel", "name": "Quick chat panel" },
+    { "id": "09", "slug": "popovers-account-task", "name": "Task/account popovers" },
+    { "id": "10", "slug": "split-launcher-terminal", "name": "Split launcher + terminal" },
+    { "id": "11", "slug": "output-process-panel", "name": "Output/process panel" },
+    { "id": "12", "slug": "profile-analytics", "name": "Profile analytics" },
+    { "id": "13", "slug": "appearance-pets", "name": "Appearance + Pets" },
+    { "id": "14", "slug": "states-tokens", "name": "States + design tokens" }
+  ]
+}

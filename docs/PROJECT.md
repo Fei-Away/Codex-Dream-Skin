@@ -1,150 +1,107 @@
-# Codex Dream Skin · 项目记录
+# Codex Miku Stage · 项目记录
 
-> 本地归档说明。面向维护者，不是用户安装手册。  
-> 仓库首页：[`../README.md`](../README.md)（中文）· [`../README.en.md`](../README.en.md)（English）  
-> GitHub：https://github.com/Fei-Away/Codex-Dream-Skin
+## 1. 目标与来源
 
----
+本仓库在 Codex Dream Skin 的 Windows CDP 引擎基础上制作一套新的初音未来主题。上游来源、base commit 和复用边界记录在 windows/NOTICE.md。
 
-## 1. 它是什么
+设计事实来源是本机 codex-miku-ui-theme 项目中的 14 张独立组件板；本仓保存其 manifest、哈希、组件矩阵和运行时映射，不把组件板拼成假 Codex 截图。
 
-**Codex Dream Skin** 是给 **OpenAI Codex 桌面端** 用的**外部主题 / 换肤**方案：
+14 项是设计与静态契约的完整性边界，不等于 14 个当前 Codex 路由已经完成 DOM 命中、交互回归和视觉签收。运行时覆盖必须按路由单独记录证据。
 
-- 本机 **CDP** 注入 CSS + 装饰 DOM
-- **不修改**官方 `.app` / `app.asar` / WindowsApps / 代码签名
-- 侧栏、建议卡、项目选择、输入框仍是**原生可点控件**（不是整窗假截图）
-- 可换图、可一键恢复
-- **不会**静默改写 API Key / Base URL（换肤与中转配置分开）
+## 2. 当前状态
 
-非 OpenAI 官方产品。
+Windows manifest 当前版本为 **2.0.3**。
 
----
+### 已实现
 
-## 2. 来源与时间线（简）
+- Windows loopback CDP 启动、target discovery、Runtime.evaluate 注入、reload 重注入、verify/screenshot、live cleanup。
+- 14 项设计契约、manifest 条目和顺序对应的 CSS 分区，可做静态完整性校验。
+- 深色与浅色 token；默认 Dark。
+- 专用 Miku Stage 插画，只在 New Task 空状态作为背景使用。
+- 安装到 %LOCALAPPDATA%\CodexMikuSkin\engine，创建安全快捷方式；配置存在时只保存一次备份，不写入外观、代码主题或 Diff 设置。
+- 恢复、配置回滚、卸载。
+- 可选的用户级 AtLogOn Auto Hook；注册时忽略当前进程，未来普通启动时只重启官方 Store Codex 一次以补齐 CDP 参数。
+- 14 项设计契约、PNG、Node/PowerShell 语法、loopback 和官方包不变性静态测试。这些测试不声明当前 DOM selector 已命中或真实控件已通过交互验收。
+- 2.0.3 保留并复验了 Dark 路由基线：home、task/output、Diff、terminal、popover、Settings、Plugins、Scheduled tasks、Quick Chat、Profile、Appearance 和 Pets，对应组件 01–13。
 
-| 阶段 | 说明 |
-|------|------|
-| 素材包 | 微信传播的 Win / Mac 皮肤包（RAR/ZIP），含注入脚本与主题资源 |
-| 安全审 | 核对是否改 asar、是否静默劫持 API；结论：以本机 CDP 注入为主，开源时明确禁止静默中转劫持 |
-| 整理开源 | 按平台拆成 `macos/`、`windows/`，补 README 图库与安装入口 |
-| 本地美化 | Mac 本机引擎装在 `~/.codex/codex-dream-skin-studio`；CSS 走浅色壳 + 可选底部赞助 chip |
-| 赞助 | Passion8（`aff=TuPe`）写在 README 顶部；强调满血中转卖点，且与换肤配置隔离 |
-| 图库 | `docs/images/gallery/skin-01`～`08`；粉系定制 → 财神打工 → 红白科幻… |
-| i18n | 默认中文 `README.md`，英文 `README.en.md`，顶部互链 |
+### 部分实现
 
-本地曾用过 `8765` 静态预览与临时 injector；**发布后不要求**常驻这两个进程。桌面快捷方式指向已安装引擎，不依赖本仓库路径。
+- DOM 适配使用当前 Codex 的语义 role、data-testid 和少量现有 class。组件 01–13 已有当前版本的 Dark 路由基线证据；组件 14 的 hover、disabled、loading 等全状态矩阵未逐项人工触发，仍为 Partial。
+- Light 模式有独立 token 与启动参数；home 和 settings-general 已通过视觉 smoke，但不外推为全 Light 路由签收。
 
----
+### 未实现 / 后续
 
-## 3. 架构（两边相同）
+- 没有自动导航 Codex 所有页面并批量截图；这会涉及控制正在使用的 Codex 窗口。
+- macos/ 仍是上游旧实现，没有迁移 14 组件规范。
+- 没有公开发行初音角色插画；公开或商业再分发前需单独做权利审核。
 
-```text
-用户本机主题工具（本仓库脚本 / 已安装引擎）
-    │  启动官方 Codex + 本机 CDP（127.0.0.1）
-    ▼
-官方 Codex Desktop（不改 asar / 签名）
-    │  注入 CSS + 装饰 DOM
-    ▼
-原生侧栏 / 输入框 / 建议卡 + 主题外观
-```
+## 3. Windows 架构
 
-更细的平台路径见 [`platforms.md`](./platforms.md)。
+    install-miku-skin.ps1
+      ├─ 校验 manifest / 插画 / CSS / Node
+      ├─ 复制独立 engine
+      ├─ 可选保存只读配置备份，不修改 Appearance
+      └─ 创建安全启动与恢复快捷方式
 
----
+    start-miku-skin.ps1
+      ├─ Get-AppxPackage 动态发现官方 Codex
+      ├─ 只在 127.0.0.1 打开 CDP
+      ├─ 启动 injector daemon
+      └─ 等待 Runtime.verify 通过
 
-## 4. 仓库结构
+    hook-miku-skin.ps1
+      ├─ Limited 用户计划任务 AtLogOn 启动
+      ├─ 精确匹配 Store Codex ChatGPT.exe 路径
+      ├─ 注册当下忽略现有 PID
+      └─ 新的无 CDP 启动 → 按 PID 受控重启一次 → start
 
-```text
-Codex-Dream-Skin/
-├── README.md              # 默认中文
-├── README.en.md           # English
-├── docs/
-│   ├── PROJECT.md         # 本文件（项目记录）
-│   ├── platforms.md       # Win/Mac 路径与能力矩阵
-│   ├── promo-copy.md      # 宣传文案（朋友圈等，注意肖像/IP）
-│   └── images/
-│       ├── gallery/       # README 效果图 skin-01…08
-│       └── sponsor-passion8.png
-├── macos/                 # Mac 脚本、资源、LICENSE、SKILL
-└── windows/               # Windows PowerShell / 注入脚本
-```
+    injector.mjs
+      ├─ /json/list → app:// page target
+      ├─ WebSocket CDP → Runtime + Page
+      ├─ manifest 校验 → CSS / renderer / art payload
+      ├─ Runtime.evaluate
+      ├─ Page.loadEventFired 重注入
+      └─ Page.captureScreenshot
 
-**安装后的运行位置（Mac，与仓库分离）：**
+    renderer-inject.js
+      ├─ root class + style + aria-hidden chrome
+      ├─ 语义 surface markers
+      ├─ MutationObserver + 5s 幂等 ensure
+      └─ cleanup
 
-| 用途 | 路径 |
-|------|------|
-| 引擎 | `~/.codex/codex-dream-skin-studio` |
-| 状态 / 主题 | `~/Library/Application Support/CodexDreamSkinStudio` |
-| 桌面启动器 | `~/Desktop/Codex Dream Skin*.command` → 指向上面的引擎脚本 |
+## 4. 关键契约
 
-Windows 状态目录见 `platforms.md`（`%LOCALAPPDATA%\CodexDreamSkin`）。
+- assets/miku-stage-theme.json 必须有 14 个唯一的 01–14 component、dark/light token、CSS 与 art 路径。
+- 当前 manifest 版本必须为 2.0.3，安装后引擎与工作树版本一致。
+- assets/miku-stage.css 必须有 14 个顺序一致的 section marker。
+- Home 的组件 03 owner 是包含 `home-icon` 的内层 `[role="main"]`；Diff 的组件 04 owner 优先使用右侧 `data-tab-id="diff"` tabpanel，不依赖易变的宽泛容器。
+- Settings General 必须命中真实的 `.miku-settings-card`；2.0.3 基线为 5 个原生卡片。
+- 装饰层必须 pointer-events: none；Diff、终端、输出和正文不得叠加高对比插画。
+- 远程调试 HTTP 与 WebSocket URL 必须都是 127.0.0.1。
+- 默认快捷方式不得使用 -RestartExisting。
+- 自动 Hook 不得使用 IFEO、管理员权限或通用 ChatGPT.exe 劫持；只能匹配当前 OpenAI.Codex Store 包路径。
+- 运行时必须保持单 Hook + 单 injector daemon；停止持久化 PID 前必须核对可执行文件、脚本路径、端口、命令行、启动时间和实例 token，Hook 另用单实例互斥。
+- installer 不得写入 appearance key；`-RestoreBaseTheme` 只用于旧测试版的显式兼容恢复。
+- 不写 WindowsApps，不读取或改写凭证，不改 provider、API Key 或 Base URL。
 
----
+## 5. 验收与覆盖模型
 
-## 5. Git / 移动目录说明
+验收分为三层，不得用上一层结果替代下一层：
 
-- **远程**：`origin` → `https://github.com/Fei-Away/Codex-Dream-Skin.git`
-- **分支**：`main`
-- **整夹移动本地路径**（例如从 `中转站/New-api` 挪到 `Personal_Developer`）：
-  - **不影响** `.git` 历史、commit、remote
-  - **不影响** GitHub 上的仓库
-  - 只需用 `mv` 移动整个含 `.git` 的目录；之后在新路径里 `git status` 即可
-  - 若 IDE / 终端仍开着旧路径工作区，需重新打开新路径
+1. **静态契约**：`windows/tests/test-windows-skin.ps1` 检查 14 项外部设计资产的元数据/哈希快照、runtime manifest、hero PNG、CSS 分区、语法和安全 guard。设计板 PNG 位于独立设计源，不在本仓重算。
+2. **路由检测**：在指定 Codex 路由记录 route key、预期 selector/marker 命中、样式注入状态和溢出情况。`verify-miku-skin.ps1` 的 root/style 健康结果不能单独证明全路由覆盖。
+3. **交互与视觉签收**：保存当前实现的实机截图，验证必要 hover/focus/selected/disabled/error 状态与原生点击、键盘、滚动行为。
 
-桌面 `.command` 与 `~/.codex/...` **不依赖**本仓库磁盘位置，移动开源目录后主题安装仍可用。
+路由状态使用以下口径：
 
----
+- **Unverified**：只有设计/静态契约，没有当前 Codex 版本的路由证据。
+- **Partial**：有路由命中、局部状态或截图证据，但未完成所有必查状态和交互回归。
+- **Verified**：当前实现上有 selector/marker 命中记录、实机截图和关键交互结果，且无未关闭的高优先级视觉问题。
 
-## 6. 安全与合规边界
+当前路由状态和缺口见 `windows/references/qa-inventory.md`。Codex 更新后必须重新执行三层验收；CDP 引擎可继续使用不代表 DOM selector 一定兼容。
 
-1. CDP **仅** `127.0.0.1`，主题运行期勿跑来路不明的本机程序  
-2. 不改官方安装目录与签名  
-3. **禁止**安装脚本静默写入第三方 Base URL / Key  
-4. 效果图含人物 / IP 时仅作主题示意；商用再分发需自行确认肖像与商标  
-5. 宣传文案见 `promo-copy.md`（避免未授权商业化表述）
+## 6. 分支说明
 
----
+本地开发分支为 codex/miku-stage-windows-skin。origin 指向只读上游 Fei-Away/Codex-Dream-Skin；发布时只向已认证用户的 fork 推送同名功能分支，并从 fork 创建 Draft PR，禁止直接推送 main。
 
-## 7. 赞助（Passion8）
-
-- 注册链：`https://passion8.cc/register?aff=TuPe`
-- README 调性：更智能的连接 / 满血 AI 中转 / 官方模型、无降智无套壳 / 一行接 Codex·Claude Code·Grok  
-- 固定声明：换肤与 API 配置互相独立  
-
-Logo 资源：`docs/images/sponsor-passion8.png`（及 svg）。
-
----
-
-## 8. 常用维护动作
-
-| 动作 | 说明 |
-|------|------|
-| 换图库图 | 替换 `docs/images/gallery/skin-XX.jpg`，同步改 README 两份 caption |
-| 改赞助文案 | 同时改 `README.md` 与 `README.en.md` |
-| 发版推送 | 在本仓库目录 `git add` → `commit` → `push origin main` |
-| Mac 本机主题 | 改 `~/.codex/codex-dream-skin-studio` 的 CSS/inject；与 GitHub 源码可不同步，属本机实验位 |
-
----
-
-## 9. 本地路径变迁
-
-| 时间 | 路径 |
-|------|------|
-| 初开源整理 | `~/Desktop/中转站/New-api/Codex-Dream-Skin` |
-| 归档位置 | `~/Desktop/Personal_Developer/Codex-Dream-Skin` |
-
-（若再次移动，在本表追加一行即可。）
-
----
-
-## 10. 相关但不在本仓
-
-| 项 | 说明 |
-|----|------|
-| 本机已装引擎 | `~/.codex/codex-dream-skin-studio` |
-| Passion8 主站 / NewAPI | 独立业务；本仓只做赞助致谢与配置隔离说明 |
-| 中转站其它项目 | 勿与本仓混目录；本仓可独立于 New-api 工作区存在 |
-
----
-
-*最后更新：随仓库提交维护。有架构变更时优先改本文件与 `platforms.md`。*
+最后更新：2026-07-16。

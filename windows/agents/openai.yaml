@@ -1,4 +1,4 @@
 interface:
-  display_name: "Codex Dream Skin"
-  short_description: "Apply and safely restore the full pink-purple Codex skin"
-  default_prompt: "Use $codex-dream-skin to apply, verify, update, or restore the full Codex desktop skin."
+  display_name: "Codex Miku Stage"
+  short_description: "Install, verify, or restore the 14-component Windows Miku skin"
+  default_prompt: "Use $codex-miku-stage to apply, verify, repair, or restore the reversible Windows Codex Miku Stage skin."
