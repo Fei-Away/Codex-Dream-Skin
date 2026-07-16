@@ -17,12 +17,14 @@ PORT_EXPLICIT="false"
 RESTART_EXISTING="false"
 PROMPT_RESTART="false"
 FOREGROUND_INJECTOR="false"
+DETACHED_RESTART_HELPER="false"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --port) PORT="${2:-}"; PORT_EXPLICIT="true"; shift 2 ;;
     --restart-existing) RESTART_EXISTING="true"; shift ;;
     --prompt-restart) PROMPT_RESTART="true"; shift ;;
     --foreground-injector) FOREGROUND_INJECTOR="true"; shift ;;
+    --detached-restart-helper) DETACHED_RESTART_HELPER="true"; shift ;;
     *) fail "Unknown start argument: $1" ;;
   esac
 done
@@ -48,6 +50,11 @@ if codex_is_running && [ "$DEBUG_READY" = "false" ]; then
     RESTART_EXISTING="true"
   fi
   [ "$RESTART_EXISTING" = "true" ] || fail "Codex is already running without the verified skin CDP endpoint. Close it first or pass --restart-existing."
+  if should_handoff_codex_restart "$DEBUG_READY" "$RESTART_EXISTING" "$DETACHED_RESTART_HELPER"; then
+    HANDOFF_PID="$(handoff_dream_skin_restart "$PORT" "$FOREGROUND_INJECTOR")"
+    printf 'Codex Dream Skin Studio restart was handed off to detached process %s.\n' "$HANDOFF_PID"
+    exit 0
+  fi
   stop_codex true
 fi
 

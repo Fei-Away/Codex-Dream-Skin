@@ -23,10 +23,12 @@ INJECTOR_ERROR_LOG="$STATE_ROOT/injector-error.log"
 APP_LOG="$STATE_ROOT/codex-launch.log"
 APP_ERROR_LOG="$STATE_ROOT/codex-launch-error.log"
 START_ERROR_LOG="$STATE_ROOT/start-error.log"
+START_HANDOFF_LOG="$STATE_ROOT/start-handoff.log"
+START_HANDOFF_ERROR_LOG="$STATE_ROOT/start-handoff-error.log"
 CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
 EXPECTED_CODEX_TEAM_ID="${CODEX_EXPECTED_TEAM_ID:-2DC432GLL2}"
-SKIN_VERSION="1.1.2"
+SKIN_VERSION="1.1.3"
 
 fail() {
   local message="$*"
@@ -183,6 +185,52 @@ pid_is_codex_descendant() {
     depth=$((depth + 1))
   done
   return 1
+}
+
+should_handoff_codex_restart() {
+  local debug_ready="$1"
+  local restart_existing="$2"
+  local handoff_child="$3"
+  local current_pid="${4:-$$}"
+  [ "$debug_ready" = "false" ] || return 1
+  [ "$restart_existing" = "true" ] || return 1
+  [ "$handoff_child" = "false" ] || return 1
+  pid_is_codex_descendant "$current_pid"
+}
+
+launch_detached_process() {
+  local stdout_path="$1"
+  local stderr_path="$2"
+  shift 2
+  [ "$#" -gt 0 ] || fail "A command is required for detached launch."
+  "$NODE" -e '
+    const fs = require("node:fs");
+    const { spawn } = require("node:child_process");
+    const [stdoutPath, stderrPath, command, ...args] = process.argv.slice(1);
+    const stdout = fs.openSync(stdoutPath, "a");
+    const stderr = fs.openSync(stderrPath, "a");
+    const child = spawn(command, args, {
+      detached: true,
+      env: process.env,
+      stdio: ["ignore", stdout, stderr]
+    });
+    fs.closeSync(stdout);
+    fs.closeSync(stderr);
+    child.unref();
+    process.stdout.write(String(child.pid));
+  ' "$stdout_path" "$stderr_path" "$@"
+}
+
+handoff_dream_skin_restart() {
+  local port="$1"
+  local foreground_injector="${2:-false}"
+  local args=("$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$port" --restart-existing --detached-restart-helper)
+  [ "$foreground_injector" = "true" ] && args+=(--foreground-injector)
+  ensure_state_root
+  : > "$START_HANDOFF_LOG"
+  : > "$START_HANDOFF_ERROR_LOG"
+  launch_detached_process "$START_HANDOFF_LOG" "$START_HANDOFF_ERROR_LOG" \
+    /bin/bash -c 'sleep 1; exec "$@"' _ "${args[@]}"
 }
 
 port_belongs_to_codex() {

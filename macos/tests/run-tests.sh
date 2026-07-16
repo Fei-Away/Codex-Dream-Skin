@@ -68,7 +68,36 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$NO_DESKTOP_CONFIG" "$NO_DESKTOP_BACKUP" >/dev/null
 /usr/bin/cmp -s "$NO_DESKTOP_CONFIG" "$TMP/original-without-desktop.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.2" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.3" ]' _ "$ROOT"
+
+. "$ROOT/scripts/common-macos.sh"
+pid_is_codex_descendant() { [ "$1" = "4242" ]; }
+should_handoff_codex_restart false true false 4242
+! should_handoff_codex_restart true true false 4242
+! should_handoff_codex_restart false false false 4242
+! should_handoff_codex_restart false true true 4242
+! should_handoff_codex_restart false true false 4243
+
+SCRIPT_DIR="$TMP/fake-scripts"
+STATE_ROOT="$TMP/handoff-state"
+START_HANDOFF_LOG="$STATE_ROOT/start-handoff.log"
+START_HANDOFF_ERROR_LOG="$STATE_ROOT/start-handoff-error.log"
+HANDOFF_TEST_MARKER="$TMP/handoff-args"
+export HANDOFF_TEST_MARKER
+/bin/mkdir -p "$SCRIPT_DIR"
+/usr/bin/printf '%s\n' \
+  '#!/bin/bash' \
+  '/usr/bin/printf "%s\n" "$@" > "$HANDOFF_TEST_MARKER"' \
+  > "$SCRIPT_DIR/start-dream-skin-macos.sh"
+/bin/chmod 700 "$SCRIPT_DIR/start-dream-skin-macos.sh"
+HANDOFF_PID="$(handoff_dream_skin_restart 9450 true)"
+case "$HANDOFF_PID" in ''|*[!0-9]*) printf 'Restart handoff did not return a PID.\n' >&2; exit 1 ;; esac
+deadline=$((SECONDS + 5))
+while [ ! -f "$HANDOFF_TEST_MARKER" ] && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.05; done
+EXPECTED_HANDOFF_ARGS="$(/usr/bin/printf '%s\n' \
+  --port 9450 --restart-existing --detached-restart-helper --foreground-injector)"
+[ "$(/bin/cat "$HANDOFF_TEST_MARKER" 2>/dev/null || true)" = "$EXPECTED_HANDOFF_ARGS" ] \
+  || { printf 'Restart handoff did not preserve its arguments.\n' >&2; exit 1; }
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
-printf 'PASS: syntax, payload, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
+printf 'PASS: syntax, payload, custom-theme, config round-trips, HOME recovery, detached restart, signature, and doctor checks.\n'
