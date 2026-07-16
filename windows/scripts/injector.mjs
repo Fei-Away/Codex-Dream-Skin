@@ -364,11 +364,17 @@ async function verifySession(session) {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
-      return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+      const style = getComputedStyle(node);
+      return {
+        x: Math.round(r.x), y: Math.round(r.y),
+        width: Math.round(r.width), height: Math.round(r.height),
+        visible: r.width > 0 && r.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
+      };
     };
     const home = document.querySelector('.dream-home');
     const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
     const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
+    const visibleCards = cards.filter((item) => item?.visible);
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
       version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
@@ -380,6 +386,7 @@ async function verifySession(session) {
       suggestionsPresent: Boolean(suggestions),
       hero: box(home?.firstElementChild?.firstElementChild?.firstElementChild),
       cards,
+      visibleCardCount: visibleCards.length,
       composer: box(document.querySelector('.composer-surface-chrome')),
       sidebar: box(document.querySelector('aside.app-shell-left-panel')),
       viewport: { width: innerWidth, height: innerHeight },
@@ -390,9 +397,10 @@ async function verifySession(session) {
     };
     result.pass = result.installed && result.version === result.expectedVersion &&
       result.stylePresent && result.chromePresent &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
-      (!result.homePresent || (Boolean(result.hero) &&
-        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
+      result.chromePointerEvents === 'none' && Boolean(result.composer?.visible) &&
+      Boolean(result.sidebar?.visible) && !result.documentOverflow.x &&
+      (!result.homePresent || (Boolean(result.hero?.visible) &&
+        (!result.suggestionsPresent || (result.visibleCardCount >= 2 && result.visibleCardCount <= 4))));
     return result;
   })()`);
 }
