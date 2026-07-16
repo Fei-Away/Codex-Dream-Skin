@@ -575,22 +575,41 @@ try {
   }
 
   $node = Get-DreamSkinNodeRuntime
-  & $node.Path (Join-Path $Root 'scripts\injector.mjs') --self-test *> $null
-  if ($LASTEXITCODE -ne 0) { throw 'Injector CDP self-test failed.' }
-  & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload *> $null
-  if ($LASTEXITCODE -ne 0) { throw 'Injector self-test failed.' }
-  & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload --theme-dir $themePaths.Active *> $null
-  if ($LASTEXITCODE -ne 0) { throw 'Managed theme payload validation failed.' }
-  & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload --theme-dir $oversizedTheme *> $null
-  if ($LASTEXITCODE -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }
-  & $node.Path (Join-Path $PSScriptRoot 'renderer-inject.test.mjs')
-  if ($LASTEXITCODE -ne 0) { throw 'Renderer auxiliary-window regression test failed.' }
-  & $node.Path (Join-Path $PSScriptRoot 'injector-bootstrap.test.mjs')
-  if ($LASTEXITCODE -ne 0) { throw 'Injector early-bootstrap regression test failed.' }
-  & $node.Path (Join-Path $PSScriptRoot 'injector-one-shot.test.mjs')
-  if ($LASTEXITCODE -ne 0) { throw 'Injector one-shot Browser ID regression test failed.' }
-  & $node.Path (Join-Path $PSScriptRoot 'image-metadata.test.mjs')
-  if ($LASTEXITCODE -ne 0) { throw 'Image metadata regression test failed.' }
+  $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    '-e', 'process.stderr.write("dream-skin-stderr-probe\n"); process.exit(7)')
+  if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
+    throw 'Native stderr was not captured with its real exit code under Stop preference.'
+  }
+  $discardedProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    '-e', 'process.stderr.write("ignored-warning\n"); process.stdout.write("kept-output")') -DiscardStderr
+  if ($discardedProbe.ExitCode -ne 0 -or ($discardedProbe.Output -join '') -cne 'kept-output') {
+    throw 'Native stderr discard changed stdout or the real exit code.'
+  }
+
+  $selfTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--self-test')
+  if ($selfTest.ExitCode -ne 0) { throw 'Injector CDP self-test failed.' }
+  $payloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--check-payload')
+  if ($payloadTest.ExitCode -ne 0) { throw 'Injector self-test failed.' }
+  $managedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
+  if ($managedPayloadTest.ExitCode -ne 0) { throw 'Managed theme payload validation failed.' }
+  $oversizedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $oversizedTheme)
+  if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }
+  $rendererTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'renderer-inject.test.mjs'))
+  if ($rendererTest.ExitCode -ne 0) { throw 'Renderer auxiliary-window regression test failed.' }
+  $bootstrapTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'injector-bootstrap.test.mjs'))
+  if ($bootstrapTest.ExitCode -ne 0) { throw 'Injector early-bootstrap regression test failed.' }
+  $oneShotTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'injector-one-shot.test.mjs'))
+  if ($oneShotTest.ExitCode -ne 0) { throw 'Injector one-shot Browser ID regression test failed.' }
+  $imageMetadataTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'image-metadata.test.mjs'))
+  if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }
 
   Write-Host 'PASS: config transactions, restore scoping, state safety, argument quoting, and loopback CDP validation.'
 } finally {

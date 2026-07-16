@@ -225,11 +225,11 @@ try {
     }
     Write-DreamSkinState -Path $StatePath -State $state
 
-    $verifyOutput = @(& $node.Path $Injector --verify --port $Port --browser-id $cdpIdentity.BrowserId `
-      --timeout-ms 30000 2>&1)
-    $verifyExitCode = $LASTEXITCODE
-    Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verifyOutput -join "`r`n") + "`r`n")
-    if ($verifyExitCode -ne 0) { throw "Dream Skin verification failed. See $VerifyPath" }
+    $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+      $Injector, '--verify', '--port', "$Port",
+      '--browser-id', $cdpIdentity.BrowserId, '--timeout-ms', '30000')
+    Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
+    if ($verify.ExitCode -ne 0) { throw "Dream Skin verification failed. See $VerifyPath" }
   } catch {
     $startupError = $_
     $injectorStopped = $true
@@ -254,9 +254,10 @@ try {
       try {
         $rollbackIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
         if ($null -ne $rollbackIdentity -and $rollbackIdentity.BrowserId -ceq $cdpIdentity.BrowserId) {
-          & $node.Path $Injector --remove --port $Port --browser-id $cdpIdentity.BrowserId `
-            --timeout-ms 5000 *> $null
-          if ($LASTEXITCODE -ne 0) { throw 'Injector removal returned a failure status.' }
+          $removal = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+            $Injector, '--remove', '--port', "$Port",
+            '--browser-id', $cdpIdentity.BrowserId, '--timeout-ms', '5000') -DiscardStderr
+          if ($removal.ExitCode -ne 0) { throw 'Injector removal returned a failure status.' }
         }
       } catch {
         Write-Warning 'Startup rollback could not remove the partially applied live skin; reload or close Codex to clear it.'
