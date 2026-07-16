@@ -27,6 +27,10 @@ if /usr/bin/grep -n -E '/usr/bin/python3|(^|[[:space:]])eval([[:space:]]|$)' \
   printf 'The shared macOS runtime must parse state with the bundled Node.js, without python3 or eval.\n' >&2
   exit 1
 fi
+if /usr/bin/grep -R -n '/usr/bin/python3' "$ROOT/scripts" "$ROOT/menubar" >/dev/null; then
+  printf 'macOS runtime and menu bar scripts must not require a system Python installation.\n' >&2
+  exit 1
+fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 

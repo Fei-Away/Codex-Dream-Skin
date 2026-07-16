@@ -86,7 +86,7 @@ if [ -d "$THEMES_ROOT" ]; then
     [ -d "$dir" ] || continue
     [ -f "$dir/theme.json" ] || continue
     tid="$(/usr/bin/basename "$dir")"
-    tname="$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("name") or sys.argv[2])' "$dir/theme.json" "$tid" 2>/dev/null)"
+    tname="$(/usr/bin/plutil -extract name raw -o - "$dir/theme.json" 2>/dev/null || true)"
     [ -n "$tname" ] || tname="$tid"
     mark=""
     [ "$tname" = "$THEME_LINE" ] && mark=" ✓"

@@ -29,17 +29,7 @@ THEME_NAME=""
 CODEX_RUNNING="false"
 
 read_json_field() {
-  /usr/bin/python3 - "$1" "$2" 2>/dev/null <<'PY' || true
-import json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        data = json.load(f)
-    v = data.get(sys.argv[2])
-    if v is not None:
-        print(v, end="")
-except Exception:
-    pass
-PY
+  /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null || true
 }
 
 # Codex process: cheap name match only
@@ -89,17 +79,20 @@ if [ "$SHORT" = "true" ]; then
 fi
 
 if [ "$JSON" = "true" ]; then
-  /usr/bin/python3 - "$SESSION" "$PORT" "$INJECTOR_ALIVE" "$CDP_OK" "$CODEX_RUNNING" "$THEME_NAME" <<'PY'
-import json, sys
-print(json.dumps({
-    "session": sys.argv[1],
-    "port": int(sys.argv[2]) if str(sys.argv[2]).isdigit() else sys.argv[2],
-    "injectorAlive": sys.argv[3] == "true",
-    "cdpOk": sys.argv[4] == "true",
-    "codexRunning": sys.argv[5] == "true",
-    "themeName": sys.argv[6] or "",
-}))
-PY
+  /usr/bin/osascript -l JavaScript - "$SESSION" "$PORT" "$INJECTOR_ALIVE" \
+    "$CDP_OK" "$CODEX_RUNNING" "$THEME_NAME" <<'JXA'
+function run(argv) {
+  const numericPort = Number(argv[1]);
+  return JSON.stringify({
+    session: argv[0],
+    port: Number.isInteger(numericPort) ? numericPort : argv[1],
+    injectorAlive: argv[2] === "true",
+    cdpOk: argv[3] === "true",
+    codexRunning: argv[4] === "true",
+    themeName: argv[5] || "",
+  });
+}
+JXA
   exit 0
 fi
 
