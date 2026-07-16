@@ -47,6 +47,10 @@ if [ -d "$INSTALL_ROOT" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
       /bin/chmod 755 "$INSTALL_ROOT/scripts/$name"
     fi
   done
+  [ -f "$PROJECT_ROOT/scripts/ui-macos.applescript" ] \
+    || fail "AppleScript UI helper missing: $PROJECT_ROOT/scripts/ui-macos.applescript"
+  /bin/cp -f "$PROJECT_ROOT/scripts/ui-macos.applescript" "$INSTALL_ROOT/scripts/ui-macos.applescript"
+  /bin/chmod 644 "$INSTALL_ROOT/scripts/ui-macos.applescript"
 fi
 
 /bin/chmod 755 \

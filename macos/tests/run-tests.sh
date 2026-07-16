@@ -60,6 +60,31 @@ EXPECTED_TEAM_ID="TEAM'ID"
   exit 1
 }
 
+UI_SCRIPT="$ROOT/scripts/ui-macos.applescript"
+/usr/bin/osacompile -o "$TMP/ui-macos.scpt" "$UI_SCRIPT" >/dev/null
+INJECTION_MARKER="$TMP/applescript-injection-marker"
+INJECTION_TEXT="theme\" & (do shell script \"touch $INJECTION_MARKER\") & \""
+UI_ECHO="$(/usr/bin/osascript "$UI_SCRIPT" echo-args "$INJECTION_TEXT" "继续")"
+[ "$UI_ECHO" = "$INJECTION_TEXT"$'\n'"继续" ]
+[ ! -e "$INJECTION_MARKER" ]
+
+for file in \
+  "$ROOT/scripts/load-image-theme-macos.sh" \
+  "$ROOT/scripts/switch-theme-macos.sh" \
+  "$ROOT/scripts/apply-from-menubar-macos.sh"; do
+  /usr/bin/grep -q 'ui-macos\.applescript' "$file"
+  if /usr/bin/grep -n -E '/usr/bin/osascript[[:space:]]+(-e|<<)' "$file"; then
+    printf 'Dynamic AppleScript source remains in %s.\n' "$file" >&2
+    exit 1
+  fi
+done
+if ! /usr/bin/grep -Fq \
+  '/bin/cp -f "$PROJECT_ROOT/scripts/ui-macos.applescript" "$INSTALL_ROOT/scripts/ui-macos.applescript"' \
+  "$ROOT/scripts/install-menubar-macos.sh"; then
+  printf 'Menu-bar engine sync omits ui-macos.applescript.\n' >&2
+  exit 1
+fi
+
 /bin/mkdir -p "$TMP/theme"
 /bin/cp "$ROOT/assets/portal-hero.png" "$TMP/theme/background.png"
 "$NODE" "$ROOT/scripts/write-theme.mjs" custom --output-dir "$TMP/theme" \
@@ -113,4 +138,4 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 /usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.2" ]' _ "$ROOT"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
-printf 'PASS: syntax, payload, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
+printf 'PASS: syntax, AppleScript argv safety, payload, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

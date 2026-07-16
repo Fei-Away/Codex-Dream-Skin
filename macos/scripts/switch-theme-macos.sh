@@ -4,6 +4,7 @@
 
 set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-macos.sh"
+UI_SCRIPT="$SCRIPT_DIR/ui-macos.applescript"
 
 THEME_ID=""
 APPLY_NOW="true"
@@ -25,7 +26,7 @@ SRC="$THEMES_ROOT/$THEME_ID"
 
 progress() {
   printf '%s\n' "$*" >&2
-  /usr/bin/osascript -e "display notification \"$*\" with title \"Codex Dream Skin\"" >/dev/null 2>&1 || true
+  /usr/bin/osascript "$UI_SCRIPT" notify "$*" >/dev/null 2>&1 || true
 }
 
 progress "Switching..."
@@ -63,5 +64,5 @@ if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing; th
   exit 0
 fi
 
-/usr/bin/osascript -e 'display alert "Codex Dream Skin" message "Theme switched but inject failed. Click Apply Skin."' >/dev/null 2>&1 || true
+/usr/bin/osascript "$UI_SCRIPT" alert "Theme switched but inject failed. Click Apply Skin." >/dev/null 2>&1 || true
 exit 1

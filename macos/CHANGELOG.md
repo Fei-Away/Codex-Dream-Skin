@@ -9,6 +9,7 @@
 - 恢复原本没有 `[desktop]` 配置段的用户设置时，不再额外写入空段
 - 热切换读取运行状态时复用 Codex 内置 Node.js，不再依赖系统 `python3` 或执行 `eval`
 - 显式传入的 `--theme-dir` 缺少 `theme.json` 时立即报错，不再静默回退到内置 demo 主题
+- AppleScript 通知与弹窗改用 `argv` 传递动态文本，避免主题名或日志内容被解析为脚本
 
 ---
 
