@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
@@ -650,7 +650,7 @@ try {
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     '-e', 'process.stderr.write("dream-skin-stderr-probe\n"); process.exit(7)')
   if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
-    throw 'Native stderr was not captured with its real exit code under Stop preference.'
+    throw "Native stderr was not captured with its real exit code under Stop preference: exit=$($stderrProbe.ExitCode); output=$($stderrProbe.Output -join '<NL>')"
   }
   $discardedProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     '-e', 'process.stderr.write("ignored-warning\n"); process.stdout.write("kept-output")') -DiscardStderr
