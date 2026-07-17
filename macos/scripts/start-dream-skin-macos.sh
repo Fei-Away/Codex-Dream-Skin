@@ -58,6 +58,9 @@ if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   saved_port="$(state_field port)" || fail "Could not read the existing state port."
   [ -n "$saved_port" ] && PORT="$saved_port"
 fi
+if [ -x "$SCRIPT_DIR/theme-preview-macos.sh" ]; then
+  "$SCRIPT_DIR/theme-preview-macos.sh" --action recover-stale --no-apply
+fi
 
 DEBUG_READY="false"
 if verified_cdp_endpoint "$PORT"; then DEBUG_READY="true"; fi

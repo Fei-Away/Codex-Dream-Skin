@@ -123,12 +123,56 @@ try {
       foreach ($saved in $savedThemes) {
         $savedPath = $saved.Path
         $savedName = $saved.Name
+        $previewReady = $false
+        if (-not $paused -and $null -ne $state -and
+          $state.injectorPid -and $state.injectorStartedAt) {
+          $previewReady = (
+            Get-DreamSkinProcessStartedAt -ProcessId ([int]$state.injectorPid)
+          ) -ceq "$($state.injectorStartedAt)"
+        }
         $savedAction = {
-          $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedPath -StateRoot $StateRoot
-          Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已应用：$savedName", [System.Windows.Forms.ToolTipIcon]::Info)
+          if (-not $previewReady) {
+            throw '请先选择【应用或重新应用】，并确保皮肤未暂停，再安全试穿主题。'
+          }
+          $resolved = $false
+          try {
+            $null = Start-DreamSkinThemePreview `
+              -ThemeDirectory $savedPath -StateRoot $StateRoot
+            Start-Sleep -Milliseconds 350
+            $decision = [System.Windows.Forms.MessageBox]::Show(
+              "正在安全试穿：$savedName`r`n`r`n选择【是】保留主题；选择【否】立即恢复原主题。",
+              'Codex Dream Skin · 安全试穿',
+              [System.Windows.Forms.MessageBoxButtons]::YesNo,
+              [System.Windows.Forms.MessageBoxIcon]::Question,
+              [System.Windows.Forms.MessageBoxDefaultButton]::Button2
+            )
+            if ($decision -eq [System.Windows.Forms.DialogResult]::Yes) {
+              $null = Complete-DreamSkinThemePreview -StateRoot $StateRoot
+              $resolved = $true
+              $notify.ShowBalloonTip(
+                1800,
+                'Codex Dream Skin',
+                "已保留：$savedName",
+                [System.Windows.Forms.ToolTipIcon]::Info
+              )
+            } else {
+              $null = Undo-DreamSkinThemePreview -StateRoot $StateRoot
+              $resolved = $true
+              $notify.ShowBalloonTip(
+                1800,
+                'Codex Dream Skin',
+                '已恢复原主题。',
+                [System.Windows.Forms.ToolTipIcon]::Info
+              )
+            }
+          } finally {
+            if (-not $resolved -and (Test-Path -LiteralPath $paths.Preview)) {
+              try { $null = Undo-DreamSkinThemePreview -StateRoot $StateRoot } catch {}
+            }
+          }
         }.GetNewClosure()
-        $null = Add-DreamSkinTrayItem -Items $savedMenu.DropDownItems -Text $savedName -Action $savedAction
+        $null = Add-DreamSkinTrayItem `
+          -Items $savedMenu.DropDownItems -Text "安全试穿：$savedName" -Action $savedAction
       }
     }
     [void]$menu.Items.Add($savedMenu)

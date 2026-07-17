@@ -1,11 +1,7 @@
 import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import path from "node:path";
-
-const [sourceDirArg, stageDirArg] = process.argv.slice(2);
-if (!sourceDirArg || !stageDirArg) {
-  throw new Error("Usage: stage-theme.mjs <source-theme-dir> <stage-dir>");
-}
+import { pathToFileURL } from "node:url";
 
 const MAX_CONFIG_BYTES = 1024 * 1024;
 const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
@@ -73,7 +69,10 @@ async function writeExclusive(filePath, bytes) {
   }
 }
 
-async function main() {
+export async function stageTheme(sourceDirArg, stageDirArg) {
+  if (!sourceDirArg || !stageDirArg) {
+    throw new Error("Theme source and stage directories are required");
+  }
   const sourceRoot = await fs.realpath(sourceDirArg);
   const sourceStat = await fs.stat(sourceRoot);
   if (!sourceStat.isDirectory()) throw new Error("Theme source must be a directory");
@@ -110,7 +109,20 @@ async function main() {
   // observes a complete pair; subsequent source edits cannot race the copy.
   await writeExclusive(path.join(stageRoot, theme.image), image.bytes);
   await writeExclusive(path.join(stageRoot, "theme.json"), config.bytes);
-  process.stdout.write(theme.image);
+  return theme.image;
 }
 
-await main();
+async function runCli() {
+  const [sourceDirArg, stageDirArg] = process.argv.slice(2);
+  if (!sourceDirArg || !stageDirArg) {
+    throw new Error("Usage: stage-theme.mjs <source-theme-dir> <stage-dir>");
+  }
+  process.stdout.write(await stageTheme(sourceDirArg, stageDirArg));
+}
+
+if (
+  process.argv[1]
+  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+) {
+  await runCli();
+}

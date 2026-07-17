@@ -56,6 +56,12 @@ fi
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
+"$NODE" "$ROOT/tests/theme-preview.test.mjs"
+if [ "${CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS:-0}" = "1" ]; then
+  printf 'SKIP: preview wrapper integration requires an installed, signed Codex app.\n'
+else
+  NODE="$NODE" "$ROOT/tests/theme-preview-shell.test.sh"
+fi
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do

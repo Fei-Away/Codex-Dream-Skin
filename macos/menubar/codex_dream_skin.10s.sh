@@ -45,7 +45,7 @@ PAUSE="$SCRIPTS/pause-dream-skin-macos.sh"
 CUSTOMIZE="$SCRIPTS/customize-theme-macos.sh"
 RESTORE="$SCRIPTS/restore-dream-skin-macos.sh"
 STATUS="$SCRIPTS/status-dream-skin-macos.sh"
-SWITCH="$SCRIPTS/switch-theme-macos.sh"
+PREVIEW="$SCRIPTS/theme-preview-macos.sh"
 LOAD_IMG="$SCRIPTS/load-image-theme-macos.sh"
 [ -x "$APPLY" ] || APPLY="$START"
 
@@ -59,6 +59,9 @@ if [ ! -x "$START" ] && [ ! -x "$APPLY" ]; then
   echo "---"
   echo "Engine missing"
   exit 0
+fi
+if [ -d "$STATE_ROOT/theme-preview" ] && [ -x "$PREVIEW" ]; then
+  "$PREVIEW" --action recover-stale --no-apply >/dev/null 2>&1
 fi
 
 TITLE="Skin 异常"
@@ -166,7 +169,7 @@ if [ -d "$THEMES_ROOT" ]; then
       /usr/bin/printf '%s\n' "-- $tname$mark | color=#98a2b3"
     else
       /usr/bin/printf '%s\n' \
-        "-- $tname$mark | bash=\"$SWITCH\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
+        "-- 安全试穿：$tname$mark | bash=\"$PREVIEW\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
     fi
     theme_count=$((theme_count + 1))
   done

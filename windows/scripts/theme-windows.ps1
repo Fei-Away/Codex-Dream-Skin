@@ -97,6 +97,7 @@ function Get-DreamSkinThemePaths {
     Active = Join-Path $fullRoot 'active-theme'
     Saved = Join-Path $fullRoot 'themes'
     Images = Join-Path $fullRoot 'images'
+    Preview = Join-Path $fullRoot 'theme-preview'
     PauseFile = Join-Path $fullRoot 'paused'
     State = Join-Path $fullRoot 'state.json'
   }
@@ -192,6 +193,7 @@ function Initialize-DreamSkinThemeStore {
   foreach ($directory in @($paths.Root, $paths.Active, $paths.Saved, $paths.Images)) {
     Ensure-DreamSkinManagedDirectory -Path $directory -Root $paths.Root
   }
+  Restore-DreamSkinStaleThemePreview -StateRoot $StateRoot | Out-Null
   $assetRoot = Join-Path $SkillRoot 'assets'
   $assetImage = Join-Path $assetRoot 'dream-reference.jpg'
   Assert-DreamSkinImageFile -Path $assetImage
@@ -378,6 +380,285 @@ function Use-DreamSkinSavedTheme {
   $saved = Read-DreamSkinTheme -ThemeDirectory $directory
   $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
   return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme -StateRoot $StateRoot
+}
+
+function Write-DreamSkinPreviewBytesAtomically {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$Bytes
+  )
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  Assert-DreamSkinNoReparseComponents -Path $fullPath
+  $directory = [System.IO.Path]::GetDirectoryName($fullPath)
+  New-Item -ItemType Directory -Force -Path $directory | Out-Null
+  Assert-DreamSkinNoReparseComponents -Path $directory
+  $fileName = [System.IO.Path]::GetFileName($fullPath)
+  $temporary = Join-Path $directory ".$fileName.$PID.$([guid]::NewGuid().ToString('N')).tmp"
+  $replacementBackup = Join-Path $directory ".$fileName.$PID.$([guid]::NewGuid().ToString('N')).replace-backup"
+  try {
+    [System.IO.File]::WriteAllBytes($temporary, $Bytes)
+    if ([System.IO.File]::Exists($fullPath)) {
+      [System.IO.File]::Replace($temporary, $fullPath, $replacementBackup)
+    } else {
+      [System.IO.File]::Move($temporary, $fullPath)
+    }
+  } finally {
+    if ([System.IO.File]::Exists($temporary)) { [System.IO.File]::Delete($temporary) }
+    if ([System.IO.File]::Exists($replacementBackup)) { [System.IO.File]::Delete($replacementBackup) }
+  }
+}
+
+function Copy-DreamSkinThemeSnapshot {
+  param(
+    [Parameter(Mandatory = $true)][string]$SourceDirectory,
+    [Parameter(Mandatory = $true)][string]$DestinationDirectory,
+    [Parameter(Mandatory = $true)][string]$StateRoot
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $sourceThemePath = Join-Path ([System.IO.Path]::GetFullPath($SourceDirectory)) 'theme.json'
+  Assert-DreamSkinNoReparseComponents -Path $sourceThemePath
+  $themeBytes = [System.IO.File]::ReadAllBytes($sourceThemePath)
+  $source = Read-DreamSkinTheme -ThemeDirectory $SourceDirectory
+  $imageBytes = [System.IO.File]::ReadAllBytes($source.ImagePath)
+  Assert-DreamSkinFileUnchanged -Path $source.ThemePath -ExpectedBytes $themeBytes
+  Assert-DreamSkinFileUnchanged -Path $source.ImagePath -ExpectedBytes $imageBytes
+
+  Ensure-DreamSkinManagedDirectory -Path $DestinationDirectory -Root $paths.Root
+  $destinationRoot = [System.IO.Path]::GetFullPath($DestinationDirectory).TrimEnd('\')
+  $destinationImage = [System.IO.Path]::GetFullPath(
+    (Join-Path $destinationRoot "$($source.Theme.image)")
+  )
+  if (-not $destinationImage.StartsWith(
+      $destinationRoot + '\',
+      [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'Theme snapshot image escaped its transaction directory.'
+  }
+  Write-DreamSkinPreviewBytesAtomically -Path $destinationImage -Bytes $imageBytes
+  Write-DreamSkinPreviewBytesAtomically `
+    -Path (Join-Path $destinationRoot 'theme.json') -Bytes $themeBytes
+  return Read-DreamSkinTheme -ThemeDirectory $destinationRoot
+}
+
+function Assert-DreamSkinThemePayload {
+  param([Parameter(Mandatory = $true)][string]$ThemeDirectory)
+  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue)) {
+    throw 'Node.js runtime validation is unavailable for theme previews.'
+  }
+  $node = Get-DreamSkinNodeRuntime
+  $injector = Join-Path $PSScriptRoot 'injector.mjs'
+  $output = @(& $node.Path $injector '--check-payload' '--theme-dir' `
+    ([System.IO.Path]::GetFullPath($ThemeDirectory)) 2>&1)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Theme preview payload failed validation: $($output -join ' ')"
+  }
+}
+
+function Publish-DreamSkinThemeSnapshot {
+  param(
+    [Parameter(Mandatory = $true)][string]$SourceDirectory,
+    [Parameter(Mandatory = $true)][string]$StateRoot
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  Ensure-DreamSkinManagedDirectory -Path $paths.Active -Root $paths.Root
+  $source = Read-DreamSkinTheme -ThemeDirectory $SourceDirectory
+  $imageBytes = [System.IO.File]::ReadAllBytes($source.ImagePath)
+  Assert-DreamSkinFileUnchanged -Path $source.ImagePath -ExpectedBytes $imageBytes
+  $oldImage = $null
+  try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
+
+  $extension = [System.IO.Path]::GetExtension($source.ImagePath).ToLowerInvariant()
+  $imageName = New-DreamSkinThemeImageName -Extension $extension
+  $targetImage = Join-Path $paths.Active $imageName
+  Write-DreamSkinPreviewBytesAtomically -Path $targetImage -Bytes $imageBytes
+  Assert-DreamSkinImageFile -Path $targetImage
+
+  $theme = $source.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  $theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
+  $json = ($theme | ConvertTo-Json -Depth 8) + "`r`n"
+  $jsonBytes = [System.Text.UTF8Encoding]::new($false, $true).GetBytes($json)
+  Write-DreamSkinPreviewBytesAtomically `
+    -Path (Join-Path $paths.Active 'theme.json') -Bytes $jsonBytes
+  $published = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+
+  if ($oldImage -and
+    -not ([System.IO.Path]::GetFullPath($oldImage) -ieq [System.IO.Path]::GetFullPath($targetImage)) -and
+    (Test-DreamSkinThemePathWithin -Path $oldImage -Root $paths.Active)) {
+    Remove-Item -LiteralPath $oldImage -Force -ErrorAction SilentlyContinue
+  }
+  return $published
+}
+
+function Get-DreamSkinThemePreviewState {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  if (-not (Test-Path -LiteralPath $paths.Preview)) { return $null }
+  Assert-DreamSkinNoReparseComponents -Path $paths.Preview
+  if (-not (Test-Path -LiteralPath $paths.Preview -PathType Container)) {
+    throw 'Theme preview marker is not a directory.'
+  }
+  $statePath = Join-Path $paths.Preview 'preview.json'
+  Assert-DreamSkinNoReparseComponents -Path $statePath
+  if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) {
+    throw 'Theme preview state is incomplete; its backup was preserved.'
+  }
+  try {
+    $state = (Read-DreamSkinUtf8File -Path $statePath) | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw 'Theme preview state is invalid; its backup was preserved.'
+  }
+  if ($null -eq $state -or $state.schemaVersion -ne 1 -or
+    $null -eq $state.ownerPid -or -not $state.ownerStartedAt) {
+    throw 'Theme preview state has an unsupported schema; its backup was preserved.'
+  }
+  $backup = Join-Path $paths.Preview 'backup'
+  $candidate = Join-Path $paths.Preview 'candidate'
+  $null = Read-DreamSkinTheme -ThemeDirectory $backup
+  return [pscustomobject]@{
+    Paths = $paths
+    Directory = $paths.Preview
+    Backup = $backup
+    Candidate = $candidate
+    State = $state
+  }
+}
+
+function Test-DreamSkinThemePreviewOwnerAlive {
+  param([Parameter(Mandatory = $true)][object]$Preview)
+  try {
+    $ownerPid = [int]$Preview.State.ownerPid
+    if ($ownerPid -lt 1) { return $false }
+    $process = Get-Process -Id $ownerPid -ErrorAction Stop
+    $startedAt = $process.StartTime.ToUniversalTime().ToString('o')
+    $expectedStartedAt = if ($Preview.State.ownerStartedAt -is [datetime]) {
+      $Preview.State.ownerStartedAt.ToUniversalTime().ToString('o')
+    } else {
+      "$($Preview.State.ownerStartedAt)"
+    }
+    return $startedAt -ceq $expectedStartedAt
+  } catch {
+    return $false
+  }
+}
+
+function Remove-DreamSkinThemePreviewTransaction {
+  param([Parameter(Mandatory = $true)][object]$Preview)
+  $cleanup = Join-Path $Preview.Paths.Root (
+    '.theme-preview.cleanup.' + [guid]::NewGuid().ToString('N')
+  )
+  Assert-DreamSkinNoReparseComponents -Path $Preview.Directory
+  Assert-DreamSkinNoReparseComponents -Path $cleanup
+  Move-Item -LiteralPath $Preview.Directory -Destination $cleanup -ErrorAction Stop
+  try {
+    Assert-DreamSkinNoReparseComponents -Path $cleanup
+    Remove-Item -LiteralPath $cleanup -Recurse -Force -ErrorAction Stop
+  } catch {
+    Write-Warning "Theme preview completed, but temporary cleanup remains at $cleanup"
+  }
+}
+
+function Start-DreamSkinThemePreview {
+  param(
+    [Parameter(Mandatory = $true)][string]$ThemeDirectory,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  foreach ($directory in @($paths.Root, $paths.Active, $paths.Saved)) {
+    Ensure-DreamSkinManagedDirectory -Path $directory -Root $paths.Root
+  }
+  Restore-DreamSkinStaleThemePreview -StateRoot $StateRoot | Out-Null
+  if (Test-Path -LiteralPath $paths.Preview) {
+    throw 'Another theme preview is still in progress.'
+  }
+
+  $sourceDirectory = [System.IO.Path]::GetFullPath($ThemeDirectory)
+  if (-not (Test-DreamSkinThemePathWithin -Path $sourceDirectory -Root $paths.Saved)) {
+    throw 'Previewed theme must remain inside the Dream Skin themes folder.'
+  }
+  $null = Read-DreamSkinTheme -ThemeDirectory $sourceDirectory
+  $preparation = Join-Path $paths.Root (
+    '.theme-preview.prepare.' + [guid]::NewGuid().ToString('N')
+  )
+  $published = $false
+  try {
+    Ensure-DreamSkinManagedDirectory -Path $preparation -Root $paths.Root
+    $null = Copy-DreamSkinThemeSnapshot -SourceDirectory $paths.Active `
+      -DestinationDirectory (Join-Path $preparation 'backup') -StateRoot $StateRoot
+    $null = Copy-DreamSkinThemeSnapshot -SourceDirectory $sourceDirectory `
+      -DestinationDirectory (Join-Path $preparation 'candidate') -StateRoot $StateRoot
+    Assert-DreamSkinThemePayload -ThemeDirectory (Join-Path $preparation 'backup')
+    Assert-DreamSkinThemePayload -ThemeDirectory (Join-Path $preparation 'candidate')
+    $previewState = [pscustomobject]@{
+      schemaVersion = 1
+      ownerPid = $PID
+      ownerStartedAt = (Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')
+      createdAt = (Get-Date).ToUniversalTime().ToString('o')
+    }
+    $previewJson = ($previewState | ConvertTo-Json -Depth 4) + "`r`n"
+    Write-DreamSkinPreviewBytesAtomically `
+      -Path (Join-Path $preparation 'preview.json') `
+      -Bytes ([System.Text.UTF8Encoding]::new($false, $true).GetBytes($previewJson))
+    Move-Item -LiteralPath $preparation -Destination $paths.Preview -ErrorAction Stop
+    $published = $true
+    $preview = Get-DreamSkinThemePreviewState -StateRoot $StateRoot
+    try {
+      return Publish-DreamSkinThemeSnapshot `
+        -SourceDirectory $preview.Candidate -StateRoot $StateRoot
+    } catch {
+      $applyError = $_
+      try { $null = Undo-DreamSkinThemePreview -StateRoot $StateRoot } catch {
+        Write-Warning 'Theme preview failed and its original theme could not be restored automatically.'
+      }
+      throw $applyError
+    }
+  } finally {
+    if (-not $published -and (Test-Path -LiteralPath $preparation)) {
+      Assert-DreamSkinNoReparseComponents -Path $preparation
+      Remove-Item -LiteralPath $preparation -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
+function Complete-DreamSkinThemePreview {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $preview = Get-DreamSkinThemePreviewState -StateRoot $StateRoot
+  if ($null -eq $preview) { throw 'No theme preview is in progress.' }
+  if (-not (Test-DreamSkinThemePreviewOwnerAlive -Preview $preview) -or
+    [int]$preview.State.ownerPid -ne $PID) {
+    throw 'Only the process that started this preview can keep it.'
+  }
+  $active = Read-DreamSkinTheme -ThemeDirectory $preview.Paths.Active
+  Remove-DreamSkinThemePreviewTransaction -Preview $preview
+  return $active
+}
+
+function Undo-DreamSkinThemePreview {
+  param(
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'),
+    [switch]$AllowStaleOwner
+  )
+  $preview = Get-DreamSkinThemePreviewState -StateRoot $StateRoot
+  if ($null -eq $preview) { throw 'No theme preview is in progress.' }
+  if (-not $AllowStaleOwner -and (
+      -not (Test-DreamSkinThemePreviewOwnerAlive -Preview $preview) -or
+      [int]$preview.State.ownerPid -ne $PID
+    )) {
+    throw 'Only the process that started this preview can cancel it.'
+  }
+  $restored = Publish-DreamSkinThemeSnapshot `
+    -SourceDirectory $preview.Backup -StateRoot $StateRoot
+  Remove-DreamSkinThemePreviewTransaction -Preview $preview
+  return $restored
+}
+
+function Restore-DreamSkinStaleThemePreview {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $preview = Get-DreamSkinThemePreviewState -StateRoot $StateRoot
+  if ($null -eq $preview -or (Test-DreamSkinThemePreviewOwnerAlive -Preview $preview)) {
+    return $false
+  }
+  $null = Undo-DreamSkinThemePreview -StateRoot $StateRoot -AllowStaleOwner
+  return $true
 }
 
 function Set-DreamSkinPaused {

@@ -6,6 +6,8 @@ $Root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $Root 'scripts\common-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
 
+& (Join-Path $PSScriptRoot 'theme-preview.test.ps1')
+
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-tests-$PID-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
