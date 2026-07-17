@@ -61,45 +61,91 @@ if [ ! -x "$START" ] && [ ! -x "$APPLY" ]; then
   exit 0
 fi
 
-TITLE="Skin 关"
+TITLE="Skin 异常"
 THEME_LINE=""
+APPLIED_THEME_LINE=""
 CODEX_LINE="false"
-SESSION_LINE="off"
+SESSION_LINE="unknown"
+OPERATION_LINE=""
+OPERATION_MESSAGE_LINE=""
 
 if [ -x "$STATUS" ]; then
   while IFS= read -r line; do
     case "$line" in
       session=*) SESSION_LINE="${line#session=}" ;;
+      label=*) TITLE="${line#label=}" ;;
+      operation=*) OPERATION_LINE="${line#operation=}" ;;
+      operation_message=*) OPERATION_MESSAGE_LINE="${line#operation_message=}" ;;
       codex=*) CODEX_LINE="${line#codex=}" ;;
       theme=*) THEME_LINE="${line#theme=}" ;;
+      applied_theme=*) APPLIED_THEME_LINE="${line#applied_theme=}" ;;
     esac
   done < <("$STATUS" 2>/dev/null)
-  case "$SESSION_LINE" in
-    active) TITLE="Skin ON" ;;
-    paused) TITLE="Skin 暂停" ;;
-    stale|unknown) TITLE="Skin ?" ;;
-    *) TITLE="Skin 关" ;;
-  esac
 fi
 THEME_MENU_LINE="$(menu_text "$THEME_LINE")"
+APPLIED_THEME_MENU_LINE="$(menu_text "$APPLIED_THEME_LINE")"
+OPERATION_MESSAGE_MENU_LINE="$(menu_text "$OPERATION_MESSAGE_LINE")"
+BUSY="false"
+case "$OPERATION_LINE" in applying|pausing) BUSY="true" ;; esac
 
 echo "$TITLE | sfimage=paintpalette.fill"
 echo "---"
-if [ -n "$THEME_MENU_LINE" ]; then
-  /usr/bin/printf '%s\n' "当前: $THEME_MENU_LINE | color=#888888"
+if [ "$OPERATION_LINE" = "applying" ]; then
+  /usr/bin/printf '%s\n' "正在应用: ${THEME_MENU_LINE:-(未设置)} | color=#3568a8"
 else
-  echo "当前: (未设置) | color=#888888"
+  case "$SESSION_LINE" in
+    active)
+      [ -n "$APPLIED_THEME_MENU_LINE" ] || APPLIED_THEME_MENU_LINE="$THEME_MENU_LINE"
+      /usr/bin/printf '%s\n' "已应用: ${APPLIED_THEME_MENU_LINE:-(未设置)} | color=#667085"
+      if [ -n "$THEME_MENU_LINE" ] && [ "$THEME_MENU_LINE" != "$APPLIED_THEME_MENU_LINE" ]; then
+        /usr/bin/printf '%s\n' "已选主题: $THEME_MENU_LINE（待应用） | color=#667085"
+      fi
+      ;;
+    *)
+      /usr/bin/printf '%s\n' "已选主题: ${THEME_MENU_LINE:-(未设置)}（未应用） | color=#667085"
+      ;;
+  esac
+fi
+if [ -n "$OPERATION_MESSAGE_MENU_LINE" ]; then
+  case "$OPERATION_LINE" in
+    failed) OPERATION_COLOR="#b4233a" ;;
+    applying|pausing) OPERATION_COLOR="#3568a8" ;;
+    success|paused) OPERATION_COLOR="#287a4b" ;;
+    *) OPERATION_COLOR="#667085" ;;
+  esac
+  /usr/bin/printf '%s\n' "$OPERATION_MESSAGE_MENU_LINE | color=$OPERATION_COLOR"
 fi
 if [ "$CODEX_LINE" = "true" ]; then
-  echo "Codex: 已打开 | color=#888888"
+  echo "ChatGPT: 已打开 | color=#667085"
 else
-  echo "Codex: 未打开 | color=#c45c26"
+  echo "ChatGPT: 未打开 | color=#b54708"
 fi
 
 echo "---"
-echo "应用皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
-echo "暂停皮肤 | bash=\"$PAUSE\" terminal=false refresh=true"
-echo "换一张图… | bash=\"$CUSTOMIZE\" terminal=false refresh=true"
+case "$OPERATION_LINE" in
+  applying|pausing)
+    echo "正在处理… | color=#98a2b3"
+    ;;
+  *)
+    case "$SESSION_LINE" in
+      active)
+        echo "重新应用皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
+        echo "暂停皮肤 | bash=\"$PAUSE\" terminal=false refresh=true"
+        ;;
+      stale|unknown)
+        echo "修复并应用 | bash=\"$APPLY\" terminal=false refresh=true"
+        ;;
+      *)
+        echo "应用皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
+        ;;
+    esac
+    ;;
+esac
+if [ "$BUSY" = "true" ]; then
+  echo "换一张图… | color=#98a2b3"
+else
+  echo "换一张图… | bash=\"$CUSTOMIZE\" terminal=false refresh=true"
+fi
 
 # Dynamic: saved theme packs
 echo "已保存的主题"
@@ -116,8 +162,12 @@ if [ -d "$THEMES_ROOT" ]; then
     mark=""
     [ "$tname" = "$THEME_LINE" ] && mark=" ✓"
     tname="$(menu_text "$tname")"
-    /usr/bin/printf '%s\n' \
-      "-- $tname$mark | bash=\"$SWITCH\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
+    if [ "$BUSY" = "true" ]; then
+      /usr/bin/printf '%s\n' "-- $tname$mark | color=#98a2b3"
+    else
+      /usr/bin/printf '%s\n' \
+        "-- $tname$mark | bash=\"$SWITCH\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
+    fi
     theme_count=$((theme_count + 1))
   done
 fi
@@ -139,8 +189,12 @@ if [ -d "$IMAGES_DIR" ]; then
     base="$(/usr/bin/basename "$img")"
     swiftbar_attribute_path_safe "$base" || continue
     display_base="$(menu_text "$base")"
-    /usr/bin/printf '%s\n' \
-      "-- $display_base | bash=\"$LOAD_IMG\" param1=\"--from-library\" param2=\"$base\" terminal=false refresh=true"
+    if [ "$BUSY" = "true" ]; then
+      /usr/bin/printf '%s\n' "-- $display_base | color=#98a2b3"
+    else
+      /usr/bin/printf '%s\n' \
+        "-- $display_base | bash=\"$LOAD_IMG\" param1=\"--from-library\" param2=\"$base\" terminal=false refresh=true"
+    fi
     img_count=$((img_count + 1))
   done
 fi
@@ -150,6 +204,10 @@ fi
 echo "-- 打开图片文件夹 | bash=\"/usr/bin/open\" param1=\"$IMAGES_DIR\" terminal=false"
 
 echo "---"
-echo "完全恢复 | bash=\"$RESTORE\" param1=\"--restore-base-theme\" param2=\"--restart-codex\" terminal=false refresh=true"
+if [ "$BUSY" = "true" ]; then
+  echo "完全恢复 | color=#98a2b3"
+else
+  echo "完全恢复 | bash=\"$RESTORE\" param1=\"--restore-base-theme\" param2=\"--restart-codex\" terminal=false refresh=true"
+fi
 echo "---"
 echo "刷新 | refresh=true"

@@ -29,7 +29,7 @@ if [ -f "$STATE_PATH" ]; then
   stop_recorded_injector \
     || fail "Could not stop the recorded injector; restore state was preserved."
 fi
-# Always remove the themed Codex launchd babysitter so quitting Codex stays quit.
+# Always remove the themed ChatGPT launchd job so quitting ChatGPT stays quit.
 release_codex_launchd_job || true
 CODEX_RUNNING="false"
 codex_is_running && CODEX_RUNNING="true"
@@ -40,13 +40,13 @@ if [ "$DEBUG_READY" = "true" ]; then
   "$NODE" "$INJECTOR" --remove --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 8000 >/dev/null \
     || fail "The live skin could not be removed and verified; restore stopped safely."
 elif [ "$CODEX_RUNNING" = "true" ] && [ "$RESTART_CODEX" = "false" ]; then
-  fail "Codex is still running but its saved CDP endpoint cannot be verified. Pass --restart-codex for a full restore."
+  fail "ChatGPT is still running but its saved CDP endpoint cannot be verified. Pass --restart-codex for a full restore."
 fi
 
 if [ "$RESTORE_BASE_THEME" = "true" ]; then
   if [ "$CODEX_RUNNING" = "true" ]; then
     [ "$RESTART_CODEX" = "true" ] \
-      || fail "Close Codex or pass --restart-codex before restoring config.toml."
+      || fail "Close ChatGPT or pass --restart-codex before restoring config.toml."
     stop_codex true
     CODEX_RUNNING="false"
   fi
@@ -59,6 +59,8 @@ if [ "$RESTART_CODEX" = "true" ]; then
 fi
 
 /bin/rm -f "$STATE_PATH"
+clear_operation_state
+/bin/rm -f "$OPERATION_ACK_PATH"
 if [ "$UNINSTALL" = "true" ]; then
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin.command"
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Customize.command"
@@ -66,4 +68,4 @@ if [ "$UNINSTALL" = "true" ]; then
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Restore.command"
 fi
 
-printf 'Codex Dream Skin Studio was removed and the requested macOS restore actions completed successfully.\n'
+printf 'ChatGPT Dream Skin was removed and the requested macOS restore actions completed successfully.\n'

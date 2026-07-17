@@ -19,6 +19,7 @@ done
 
 STATE_ROOT="${HOME}/Library/Application Support/CodexDreamSkinStudio"
 STATE_PATH="${STATE_ROOT}/state.json"
+OPERATION_STATE_PATH="${STATE_ROOT}/operation-state.plist"
 THEME_DIR="${STATE_ROOT}/theme"
 
 PORT="9341"
@@ -26,16 +27,30 @@ SESSION="off"
 INJECTOR_ALIVE="false"
 CDP_OK="false"
 THEME_NAME=""
+APPLIED_THEME_NAME=""
 CODEX_RUNNING="false"
+OPERATION_STATUS=""
+OPERATION_MESSAGE=""
 
-read_json_field() {
+read_json_text_field() {
   # Parse machine-written JSON (one key per line) without python3, which macOS
   # 12.3+ no longer preinstalls. Handles "key": "string" and "key": number.
-  [ -f "$1" ] || return 0
+  local text="$1"
+  local key="$2"
+  [ -n "$text" ] || return 0
+  LC_ALL=C /usr/bin/printf '%s\n' "$text" |
   /usr/bin/sed -n \
-    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
-    "$1" 2>/dev/null | /usr/bin/head -n1
+    -e 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    -e 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
+    2>/dev/null | /usr/bin/head -n1
+}
+
+read_plist_snapshot_field() {
+  local snapshot="$1"
+  local key="$2"
+  [ -n "$snapshot" ] || return 0
+  LC_ALL=C /usr/bin/printf '%s' "$snapshot" \
+    | /usr/bin/plutil -extract "$key" raw -o - - 2>/dev/null
 }
 
 # Keep this check deliberately shell/ps-only: SwiftBar invokes status every
@@ -77,28 +92,72 @@ if /usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 || /usr/bin/pgrep -x Codex >/dev/nu
 fi
 
 if [ -f "$STATE_PATH" ]; then
-  saved_port="$(read_json_field "$STATE_PATH" port)"
+  STATE_SNAPSHOT="$(/bin/cat "$STATE_PATH" 2>/dev/null)"
+  saved_port="$(read_json_text_field "$STATE_SNAPSHOT" port)"
   [ -n "${saved_port:-}" ] && PORT="$saved_port"
-  SESSION="$(read_json_field "$STATE_PATH" session)"
-  pid="$(read_json_field "$STATE_PATH" injectorPid)"
-  saved_start="$(read_json_field "$STATE_PATH" injectorStartedAt)"
-  saved_node="$(read_json_field "$STATE_PATH" nodePath)"
-  saved_injector="$(read_json_field "$STATE_PATH" injectorPath)"
+  SESSION="$(read_json_text_field "$STATE_SNAPSHOT" session)"
+  pid="$(read_json_text_field "$STATE_SNAPSHOT" injectorPid)"
+  saved_start="$(read_json_text_field "$STATE_SNAPSHOT" injectorStartedAt)"
+  saved_node="$(read_json_text_field "$STATE_SNAPSHOT" nodePath)"
+  saved_injector="$(read_json_text_field "$STATE_SNAPSHOT" injectorPath)"
+  APPLIED_THEME_NAME="$(read_json_text_field "$STATE_SNAPSHOT" appliedThemeName)"
   if injector_identity_matches "${pid:-}" "$saved_start" "$saved_node" "$saved_injector" "$PORT"; then
     INJECTOR_ALIVE="true"
-    SESSION="active"
-  elif [ "${SESSION:-}" = "paused" ] && [ "${pid:-}" = "0" ]; then
+    case "${SESSION:-}" in
+      applying) SESSION="applying" ;;
+      active|'') SESSION="active" ;;
+      paused) SESSION="paused" ;;
+      stale) SESSION="stale" ;;
+      *) SESSION="unknown" ;;
+    esac
+  elif [ "${SESSION:-}" = "paused" ]; then
     SESSION="paused"
-  elif [ -n "${pid:-}" ] && [ "$pid" != "0" ]; then
-    SESSION="stale"
-  elif [ -z "${SESSION:-}" ]; then
-    SESSION="unknown"
+  else
+    case "${SESSION:-}" in
+      active|stale) SESSION="stale" ;;
+      applying) SESSION="applying" ;;
+      off) SESSION="off" ;;
+      '') [ -n "${pid:-}" ] && [ "$pid" != "0" ] && SESSION="stale" || SESSION="off" ;;
+      *) SESSION="unknown" ;;
+    esac
   fi
 fi
 
 if [ -f "$THEME_DIR/theme.json" ]; then
-  THEME_NAME="$(read_json_field "$THEME_DIR/theme.json" name)"
-  [ -n "$THEME_NAME" ] || THEME_NAME="$(read_json_field "$THEME_DIR/theme.json" id)"
+  THEME_SNAPSHOT="$(/bin/cat "$THEME_DIR/theme.json" 2>/dev/null)"
+  THEME_NAME="$(read_json_text_field "$THEME_SNAPSHOT" name)"
+  [ -n "$THEME_NAME" ] || THEME_NAME="$(read_json_text_field "$THEME_SNAPSHOT" id)"
+fi
+[ -n "$APPLIED_THEME_NAME" ] || { [ "$SESSION" = "active" ] && APPLIED_THEME_NAME="$THEME_NAME"; }
+
+if [ -f "$OPERATION_STATE_PATH" ]; then
+  OPERATION_SNAPSHOT="$(/bin/cat "$OPERATION_STATE_PATH" 2>/dev/null)"
+  operation_status="$(read_plist_snapshot_field "$OPERATION_SNAPSHOT" status)"
+  operation_message="$(read_plist_snapshot_field "$OPERATION_SNAPSHOT" message)"
+  operation_updated_at="$(read_plist_snapshot_field "$OPERATION_SNAPSHOT" updatedAt)"
+  now="$(/bin/date +%s)"
+  case "$operation_updated_at" in ''|*[!0-9]*) operation_updated_at="0" ;; esac
+  age=$((now - operation_updated_at))
+  ttl=0
+  case "$operation_status" in
+    applying) ttl=180 ;;
+    pausing) ttl=90 ;;
+    failed) ttl=120 ;;
+    cancelled) ttl=20 ;;
+    success|paused) ttl=12 ;;
+  esac
+  if [ "$age" -ge 0 ] && [ "$ttl" -gt 0 ] && [ "$age" -le "$ttl" ]; then
+    OPERATION_STATUS="$operation_status"
+    OPERATION_MESSAGE="$operation_message"
+  elif { [ "$operation_status" = "applying" ] || [ "$operation_status" = "pausing" ]; } \
+    && [ "$age" -ge 0 ] && [ "$age" -le $((ttl + 120)) ]; then
+    OPERATION_STATUS="failed"
+    OPERATION_MESSAGE="操作超时，请重试"
+  fi
+fi
+
+if [ "$SESSION" = "applying" ] && [ "$OPERATION_STATUS" != "applying" ]; then
+  if [ "$INJECTOR_ALIVE" = "true" ]; then SESSION="stale"; else SESSION="unknown"; fi
 fi
 
 if [ "$DEEP" = "true" ]; then
@@ -110,9 +169,22 @@ fi
 label="Skin"
 case "$SESSION" in
   active) label="Skin ON" ;;
-  paused) label="Skin 暂停" ;;
-  stale|unknown) label="Skin ?" ;;
-  *) label="Skin 关" ;;
+  applying) label="Skin 应用中" ;;
+  paused|off) label="Skin OFF" ;;
+  stale|unknown) label="Skin 异常" ;;
+  *) label="Skin 异常" ;;
+esac
+case "$OPERATION_STATUS" in
+  applying) label="Skin 应用中" ;;
+  pausing) label="Skin 暂停中" ;;
+  failed)
+    case "$SESSION" in
+      active) label="Skin ON · 操作失败" ;;
+      paused|off) label="Skin OFF · 操作失败" ;;
+      *) label="Skin 异常 · 操作失败" ;;
+    esac
+    ;;
+  cancelled) label="$label · 已取消" ;;
 esac
 
 if [ "$SHORT" = "true" ]; then
@@ -125,15 +197,20 @@ if [ "$JSON" = "true" ]; then
   json_escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; printf '%s' "$s"; }
   bool() { [ "$1" = "true" ] && printf 'true' || printf 'false'; }
   case "$PORT" in ''|*[!0-9]*) port_json="\"$(json_escape "$PORT")\"" ;; *) port_json="$PORT" ;; esac
-  printf '{"session":"%s","port":%s,"injectorAlive":%s,"cdpOk":%s,"codexRunning":%s,"themeName":"%s"}\n' \
-    "$(json_escape "$SESSION")" "$port_json" "$(bool "$INJECTOR_ALIVE")" \
-    "$(bool "$CDP_OK")" "$(bool "$CODEX_RUNNING")" "$(json_escape "$THEME_NAME")"
+  printf '{"session":"%s","operation":"%s","operationMessage":"%s","port":%s,"injectorAlive":%s,"cdpOk":%s,"codexRunning":%s,"themeName":"%s","appliedThemeName":"%s"}\n' \
+    "$(json_escape "$SESSION")" "$(json_escape "$OPERATION_STATUS")" "$(json_escape "$OPERATION_MESSAGE")" \
+    "$port_json" "$(bool "$INJECTOR_ALIVE")" "$(bool "$CDP_OK")" "$(bool "$CODEX_RUNNING")" \
+    "$(json_escape "$THEME_NAME")" "$(json_escape "$APPLIED_THEME_NAME")"
   exit 0
 fi
 
 printf 'session=%s\n' "$SESSION"
+printf 'label=%s\n' "$label"
+printf 'operation=%s\n' "$OPERATION_STATUS"
+printf 'operation_message=%s\n' "$OPERATION_MESSAGE"
 printf 'port=%s\n' "$PORT"
 printf 'injector=%s\n' "$INJECTOR_ALIVE"
 printf 'cdp=%s\n' "$CDP_OK"
 printf 'codex=%s\n' "$CODEX_RUNNING"
 printf 'theme=%s\n' "${THEME_NAME:-}"
+printf 'applied_theme=%s\n' "${APPLIED_THEME_NAME:-}"
