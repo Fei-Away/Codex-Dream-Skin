@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
@@ -648,12 +648,12 @@ try {
 
   $node = Get-DreamSkinNodeRuntime
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
-    '-e', 'process.stderr.write("dream-skin-stderr-probe\n"); process.exit(7)')
+    '-e', "process.stderr.write('dream-skin-stderr-probe\n'); process.exit(7)")
   if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
-    throw 'Native stderr was not captured with its real exit code under Stop preference.'
+    throw "Native stderr was not captured with its real exit code under Stop preference: exit=$($stderrProbe.ExitCode); output=$($stderrProbe.Output -join '<NL>')"
   }
   $discardedProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
-    '-e', 'process.stderr.write("ignored-warning\n"); process.stdout.write("kept-output")') -DiscardStderr
+    '-e', "process.stderr.write('ignored-warning\n'); process.stdout.write('kept-output')") -DiscardStderr
   if ($discardedProbe.ExitCode -ne 0 -or ($discardedProbe.Output -join '') -cne 'kept-output') {
     throw 'Native stderr discard changed stdout or the real exit code.'
   }
