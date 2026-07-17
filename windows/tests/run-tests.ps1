@@ -32,7 +32,8 @@ try {
   if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
     -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
+    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot) -or
+    -not (Test-DreamSkinPathWithin -Path $engine.SupportSnapshot -Root $runtimeStateRoot)) {
     throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
   }
   foreach ($sourceFile in $runtimeSourceFiles) {
@@ -149,8 +150,9 @@ try {
   }
   if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
-    throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
+    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.SupportSnapshot -PathType Leaf)) {
+    throw 'Installed launch, restore, tray, or support-snapshot entry point disappeared with the source checkout.'
   }
   Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
 
@@ -620,6 +622,41 @@ try {
     [System.IO.Path]::GetExtension($initialTheme.ImagePath) -cne '.jpg') {
     throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
   }
+
+  $snapshotStatePath = Join-Path $themeStateRoot 'state.json'
+  $snapshotConfigPath = Join-Path $temporaryRoot 'support-snapshot-config.toml'
+  [System.IO.File]::WriteAllText($snapshotStatePath,
+    (@{ session = 'active'; port = 9911; injectorPid = 123; browserId = 'support-private-browser' } | ConvertTo-Json -Compress),
+    $utf8NoBom)
+  [System.IO.File]::WriteAllText($snapshotConfigPath, 'config-secret=do-not-share', $utf8NoBom)
+  $snapshotScript = Join-Path $Root 'scripts\support-snapshot-windows.ps1'
+  $supportSnapshot = ((@(& $snapshotScript -StateRoot $themeStateRoot -ConfigPath $snapshotConfigPath) -join "`n") |
+    ConvertFrom-Json -ErrorAction Stop)
+  $requiredRedactions = @(
+    'paths', 'ports', 'processIds', 'browserIds', 'logs', 'screenshots',
+    'themeMetadata', 'configContents', 'environment', 'credentials', 'chatAndTaskContent'
+  )
+  if ($supportSnapshot.schemaVersion -ne 1 -or
+    "$($supportSnapshot.kind)" -cne 'codex-dream-skin-support-snapshot' -or
+    "$($supportSnapshot.platform)" -cne 'windows' -or
+    "$($supportSnapshot.liveVerification)" -cne 'notChecked' -or
+    $supportSnapshot.collection.networkAccessed -or $supportSnapshot.collection.cdpAccessed -or
+    $supportSnapshot.collection.writesPerformed -or -not $supportSnapshot.privacy.manualSharingRequired -or
+    @($requiredRedactions | Where-Object { $supportSnapshot.privacy.redacted -notcontains $_ }).Count -ne 0) {
+    throw 'Support Snapshot did not preserve the required privacy-safe schema.'
+  }
+  $serializedSnapshot = $supportSnapshot | ConvertTo-Json -Depth 8 -Compress
+  foreach ($forbiddenProperty in @('path', 'paths', 'port', 'ports', 'pid', 'pids', 'browserId', 'browserIds', 'log', 'logs', 'screenshot', 'screenshots', 'themeName', 'configContents', 'token', 'key', 'chat')) {
+    if ($serializedSnapshot -match ('(?i)"' + [regex]::Escape($forbiddenProperty) + '"\s*:')) {
+      throw "Support Snapshot exposed forbidden property: $forbiddenProperty"
+    }
+  }
+  foreach ($privateMarker in @($themeStateRoot, '9911', 'support-private-browser', 'config-secret')) {
+    if ($serializedSnapshot.Contains($privateMarker)) {
+      throw "Support Snapshot exposed private fixture data: $privateMarker"
+    }
+  }
+
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
   if ($preseededThemes.Count -ne 1 -or
     $preseededThemes[0].Id -cne 'preset-romantic-rose' -or

@@ -15,6 +15,16 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 4. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
 5. Run `scripts/restore-dream-skin.ps1` to remove the live skin, close the saved CDP session, and reopen Codex normally. Add `-RestoreBaseTheme` to restore only saved appearance keys, `-RecoverConfigBackup` for explicit byte-for-byte recovery of a damaged config, or `-Uninstall` to delete shortcuts. A completed config restore archives that install's backup so a later install captures a fresh baseline.
 
+## Privacy-safe support snapshot
+
+Before filing a support issue, run:
+
+```powershell
+powershell -NoProfile -File scripts\support-snapshot-windows.ps1
+```
+
+The command emits a read-only JSON summary and does not connect to CDP, access the network, write files, take screenshots, or upload anything. Review the JSON before choosing whether to attach it: it intentionally excludes paths, ports, process and Browser IDs, logs, screenshots, theme metadata, configuration contents, environment values, credentials, and all chat/task content. Use the existing Verify flow when live-session evidence is needed.
+
 ## Guardrails
 
 - Preserve the official executable, package signature, user threads, pets, plugins, and authentication state.
