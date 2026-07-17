@@ -34,6 +34,9 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535) {
     throw new Error("Invalid port: " + options.port);
   }
+  if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 250 || options.timeoutMs > 120000) {
+    throw new Error("Invalid timeout: " + options.timeoutMs + ". Expected 250-120000ms.");
+  }
   if (!["dark", "light"].includes(options.tone)) {
     throw new Error("Invalid tone: " + options.tone + ". Expected dark or light.");
   }
@@ -70,8 +73,9 @@ function validateManifest(manifest) {
 }
 
 class CdpSession {
-  constructor(target) {
+  constructor(target, timeoutMs = 30000) {
     this.target = target;
+    this.timeoutMs = timeoutMs;
     this.ws = new WebSocket(target.webSocketDebuggerUrl);
     this.nextId = 1;
     this.pending = new Map();
@@ -81,8 +85,34 @@ class CdpSession {
 
   async open() {
     await new Promise((resolve, reject) => {
-      this.ws.addEventListener("open", resolve, { once: true });
-      this.ws.addEventListener("error", reject, { once: true });
+      let settled = false;
+      let timer;
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.ws.removeEventListener("open", onOpen);
+        this.ws.removeEventListener("error", onError);
+      };
+      const onOpen = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const onError = (event) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(event?.error ?? new Error("CDP socket failed to open"));
+      };
+      timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        try { this.ws.close(); } catch {}
+        reject(new Error("CDP socket open timed out after " + this.timeoutMs + "ms"));
+      }, this.timeoutMs);
+      this.ws.addEventListener("open", onOpen, { once: true });
+      this.ws.addEventListener("error", onError, { once: true });
     });
     this.ws.addEventListener("message", (event) => this.onMessage(event));
     this.ws.addEventListener("close", () => {
@@ -125,8 +155,25 @@ class CdpSession {
     if (this.closed) return Promise.reject(new Error("CDP session is closed"));
     return new Promise((resolve, reject) => {
       const id = this.nextId++;
-      this.pending.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      const timer = setTimeout(() => {
+        if (!this.pending.delete(id)) return;
+        reject(new Error("CDP " + method + " timed out after " + this.timeoutMs + "ms"));
+      }, this.timeoutMs);
+      const settle = (callback) => (value) => {
+        clearTimeout(timer);
+        callback(value);
+      };
+      const waiter = {
+        resolve: settle(resolve),
+        reject: settle(reject)
+      };
+      this.pending.set(id, waiter);
+      try {
+        this.ws.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        this.pending.delete(id);
+        waiter.reject(error);
+      }
     });
   }
 
@@ -154,8 +201,13 @@ async function waitForTargets(port, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
+    const requestController = new AbortController();
+    const requestTimeoutMs = Math.max(1, Math.min(1000, deadline - Date.now()));
+    const requestTimer = setTimeout(() => requestController.abort(), requestTimeoutMs);
     try {
-      const response = await fetch("http://127.0.0.1:" + port + "/json/list");
+      const response = await fetch("http://127.0.0.1:" + port + "/json/list", {
+        signal: requestController.signal
+      });
       if (!response.ok) throw new Error("HTTP " + response.status);
       const targets = await response.json();
       const pages = targets.filter((item) => (
@@ -173,8 +225,13 @@ async function waitForTargets(port, timeoutMs) {
       if (pages.length) return pages;
     } catch (error) {
       lastError = error;
+    } finally {
+      clearTimeout(requestTimer);
     }
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    const retryDelayMs = Math.min(350, Math.max(0, deadline - Date.now()));
+    if (retryDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    }
   }
   throw new Error(
     "No Codex renderer target on 127.0.0.1:" + port + ": " +
@@ -208,8 +265,8 @@ async function loadPayload(tone) {
   return payload;
 }
 
-async function connectTarget(target) {
-  return new CdpSession(target).open();
+async function connectTarget(target, timeoutMs) {
+  return new CdpSession(target, timeoutMs).open();
 }
 
 async function removeFromSession(session) {
@@ -378,7 +435,7 @@ async function runOneShot(options) {
   const payload = shouldLoadPayload ? await loadPayload(options.tone) : null;
   const results = [];
   for (const target of targets) {
-    const session = await connectTarget(target);
+    const session = await connectTarget(target, options.timeoutMs);
     try {
       if (options.mode === "remove") {
         await removeFromSession(session);
@@ -446,7 +503,7 @@ async function runWatch(options) {
     for (const target of targets) {
       if (sessions.has(target.id)) continue;
       try {
-        const session = await connectTarget(target);
+        const session = await connectTarget(target, options.timeoutMs);
         session.on("Page.loadEventFired", () => {
           setTimeout(() => session.evaluate(payload).catch((error) => {
             console.error("[miku-skin] reinject failed: " + error.message);

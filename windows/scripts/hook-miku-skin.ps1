@@ -14,6 +14,7 @@ $ErrorActionPreference = 'Stop'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexMikuSkin'
 $HookStatePath = Join-Path $StateRoot 'hook-state.json'
 $RuntimeStatePath = Join-Path $StateRoot 'state.json'
+$HookPausePath = Join-Path $StateRoot 'hook-pause.json'
 $LogPath = Join-Path $StateRoot 'auto-hook.log'
 $StartScript = Join-Path $PSScriptRoot 'start-miku-skin.ps1'
 $ProcessIdentity = Join-Path $PSScriptRoot 'process-identity.ps1'
@@ -144,8 +145,35 @@ $lastAttempt = [DateTime]::MinValue
 try {
   while ($true) {
     try {
-      $processes = @(Get-CodexMainProcesses $CodexExe)
-      $currentIds = @($processes | ForEach-Object { [int]$_.Id })
+      $pauseActive = $false
+      $pauseTransition = Enter-MikuRuntimeTransition
+      try {
+        $processes = @(Get-CodexMainProcesses $CodexExe)
+        $currentIds = @($processes | ForEach-Object { [int]$_.Id })
+        if (Test-Path -LiteralPath $HookPausePath) {
+          $pausedProcessIds = @()
+          try {
+            $pauseState = Get-Content -LiteralPath $HookPausePath -Raw | ConvertFrom-Json
+            $pausedProcessIds = @($pauseState.processIds | ForEach-Object { [int]$_ })
+          } catch {
+            Write-HookLog 'pause-state-invalid action=clear'
+          }
+          $activePausedIds = @($pausedProcessIds | Where-Object { $_ -in $currentIds })
+          if ($activePausedIds.Count -gt 0) {
+            $pauseActive = $true
+          } else {
+            Remove-Item -LiteralPath $HookPausePath -Force -ErrorAction SilentlyContinue
+            Write-HookLog 'pause-complete action=resume-next-launch'
+          }
+        }
+      } finally {
+        Exit-MikuRuntimeTransition -Mutex $pauseTransition
+      }
+      if ($pauseActive) {
+        Start-Sleep -Milliseconds $PollMilliseconds
+        continue
+      }
+
       foreach ($ignoredId in @($ignoredPids)) {
         if ($ignoredId -notin $currentIds) {
           [void]$ignoredPids.Remove($ignoredId)
@@ -157,7 +185,7 @@ try {
           if (((Get-Date) - $lastAttempt).TotalSeconds -ge 10) {
             $lastAttempt = Get-Date
             Write-HookLog 'cdp-ready injector-missing action=start-injector'
-            & $StartScript -Port $Port -Tone $Tone
+            & $StartScript -Port $Port -Tone $Tone -HookInvocation
           }
         }
       } else {
@@ -169,7 +197,7 @@ try {
           $ids = @($unskinned | ForEach-Object { $_.Id }) -join ','
           Write-HookLog "unskinned-codex detected=$ids action=controlled-restart"
           $targetPid = [int]$unskinned[0].Id
-          & $StartScript -Port $Port -Tone $Tone -RestartProcessId $targetPid
+          & $StartScript -Port $Port -Tone $Tone -RestartProcessId $targetPid -HookInvocation
         }
       }
     } catch {

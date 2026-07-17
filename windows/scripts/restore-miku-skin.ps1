@@ -4,15 +4,20 @@ param(
   [int]$Port = 9347,
   [switch]$Uninstall,
   [switch]$RestoreBaseTheme,
-  [switch]$KeepAutoHook
+  [switch]$KeepAutoHook,
+  [switch]$DisableAutoHook
 )
 
 $ErrorActionPreference = 'Stop'
 if ($Uninstall -and $KeepAutoHook) {
   throw 'Cannot combine -Uninstall with -KeepAutoHook because the scheduled task would point to a removed engine.'
 }
+if ($DisableAutoHook -and $KeepAutoHook) {
+  throw 'Cannot combine -DisableAutoHook with -KeepAutoHook.'
+}
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexMikuSkin'
 $StatePath = Join-Path $StateRoot 'state.json'
+$HookPausePath = Join-Path $StateRoot 'hook-pause.json'
 $InstallStatePath = Join-Path $StateRoot 'install-state.json'
 $InstallRoot = Join-Path $StateRoot 'engine'
 $localInjector = Join-Path $PSScriptRoot 'injector.mjs'
@@ -32,7 +37,40 @@ if (-not (Test-Path -LiteralPath $ProcessIdentity)) {
 }
 . $ProcessIdentity
 
-if (-not $KeepAutoHook -and (Test-Path -LiteralPath $unregisterHook)) {
+$runtimeTransition = Enter-MikuRuntimeTransition
+try {
+$pauseProcessIds = @()
+if (-not $DisableAutoHook -and -not $Uninstall) {
+  $package = Get-AppxPackage OpenAI.Codex | Sort-Object Version -Descending | Select-Object -First 1
+  if ($package) {
+    $codexExecutable = Join-Path $package.InstallLocation 'app\ChatGPT.exe'
+    $pauseProcessIds = @(Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object {
+      if ($_.MainWindowHandle -eq 0) { return $false }
+      try {
+        return [string]::Equals(
+          $_.Path,
+          $codexExecutable,
+          [System.StringComparison]::OrdinalIgnoreCase
+        )
+      } catch {
+        return $false
+      }
+    } | ForEach-Object { [int]$_.Id })
+  }
+  if ($pauseProcessIds.Count -gt 0) {
+    @{
+      processIds = @($pauseProcessIds)
+      createdAt = (Get-Date).ToString('o')
+      reason = 'restore-current-session'
+    } | ConvertTo-Json | Set-Content -LiteralPath $HookPausePath -Encoding utf8
+  } else {
+    Remove-Item -LiteralPath $HookPausePath -Force -ErrorAction SilentlyContinue
+  }
+} else {
+  Remove-Item -LiteralPath $HookPausePath -Force -ErrorAction SilentlyContinue
+}
+
+if (($DisableAutoHook -or $Uninstall) -and (Test-Path -LiteralPath $unregisterHook)) {
   & $unregisterHook
 }
 
@@ -224,5 +262,12 @@ if ($Uninstall) {
 }
 
 Write-Host 'The live Codex Miku Stage skin was removed.'
+if ($pauseProcessIds.Count -gt 0) {
+  Write-Host 'The current Codex session will remain native; the automatic hook resumes after this process exits.'
+}
+if ($DisableAutoHook) { Write-Host 'The automatic hook was explicitly disabled.' }
 if ($RestoreBaseTheme) { Write-Host 'The pre-install appearance settings were restored.' }
 if ($Uninstall) { Write-Host 'Shortcuts and the installed engine were removed.' }
+} finally {
+  Exit-MikuRuntimeTransition -Mutex $runtimeTransition
+}

@@ -1,3 +1,39 @@
+function Enter-MikuRuntimeTransition {
+  param(
+    [ValidateRange(1000, 120000)]
+    [int]$TimeoutMilliseconds = 90000
+  )
+
+  $mutex = [System.Threading.Mutex]::new(
+    $false,
+    'Local\CodexMikuSkinRuntimeTransition'
+  )
+  $acquired = $false
+  try {
+    try {
+      $acquired = $mutex.WaitOne($TimeoutMilliseconds)
+    } catch [System.Threading.AbandonedMutexException] {
+      $acquired = $true
+    }
+    if (-not $acquired) {
+      throw "Timed out waiting for the Codex Miku Stage runtime transition lock after $TimeoutMilliseconds ms."
+    }
+    return $mutex
+  } catch {
+    if (-not $acquired) { $mutex.Dispose() }
+    throw
+  }
+}
+
+function Exit-MikuRuntimeTransition {
+  param(
+    [Parameter(Mandatory)]
+    [System.Threading.Mutex]$Mutex
+  )
+
+  try { $Mutex.ReleaseMutex() } finally { $Mutex.Dispose() }
+}
+
 function Get-MikuProcessRecord {
   param(
     [ValidateRange(1, 2147483647)]

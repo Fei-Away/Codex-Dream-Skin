@@ -81,7 +81,7 @@ if (-not $NoShortcuts) {
     '-NoProfile -ExecutionPolicy Bypass -File "' + $restoreScript + '" -Port ' + $Port
   $restore.WorkingDirectory = $InstallRoot
   $restore.IconLocation = $iconPath
-  $restore.Description = 'Remove the live Codex Miku Stage skin'
+  $restore.Description = 'Remove Miku from the current session; the auto hook resumes on the next launch'
   $restore.Save()
 }
 

@@ -8,7 +8,8 @@ param(
   [ValidateRange(0, 2147483647)]
   [int]$RestartProcessId = 0,
   [string]$ProfilePath,
-  [switch]$ForegroundInjector
+  [switch]$ForegroundInjector,
+  [switch]$HookInvocation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,12 +20,17 @@ $StatePath = Join-Path $StateRoot 'state.json'
 $StdoutPath = Join-Path $StateRoot 'injector.log'
 $StderrPath = Join-Path $StateRoot 'injector-error.log'
 $ProcessIdentity = Join-Path $PSScriptRoot 'process-identity.ps1'
-New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
+$StoreLaunch = Join-Path $PSScriptRoot 'codex-store-launch.ps1'
+$HookPausePath = Join-Path $StateRoot 'hook-pause.json'
 
 if (-not (Test-Path -LiteralPath $ProcessIdentity)) {
   throw "Miku process identity helper not found: $ProcessIdentity"
 }
+if (-not (Test-Path -LiteralPath $StoreLaunch)) {
+  throw "Miku Store activation helper not found: $StoreLaunch"
+}
 . $ProcessIdentity
+. $StoreLaunch
 
 function Test-CodexDebugPort([int]$CandidatePort) {
   try {
@@ -64,6 +70,15 @@ if (-not $package) { throw 'The OpenAI.Codex Store package is not installed.' }
 $exe = Join-Path $package.InstallLocation 'app\ChatGPT.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw "Codex executable not found: $exe" }
 
+$runtimeTransition = Enter-MikuRuntimeTransition
+$transitionHeld = $true
+try {
+if ($HookInvocation -and (Test-Path -LiteralPath $HookPausePath)) {
+  Write-Host 'Codex Miku Stage start skipped because Restore paused the current session.'
+  return
+}
+New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
+
 $debugReady = Test-CodexDebugPort $Port
 if (-not $debugReady -and (Test-LoopbackPort $Port)) {
   throw "Port $Port is already occupied by a non-Codex process. Choose another -Port value."
@@ -93,6 +108,7 @@ if (-not $debugReady -and -not $ProfilePath -and $mainProcesses.Count -gt 0) {
   if ($RestartProcessId -gt 0 -and $restartTargets.Count -ne 1) {
     throw "RestartProcessId $RestartProcessId is not a main window of the official OpenAI.Codex Store package."
   }
+  $restartTargetIds = @($restartTargets | ForEach-Object { [int]$_.Id })
   foreach ($process in $restartTargets) {
     [void]$process.CloseMainWindow()
   }
@@ -100,7 +116,17 @@ if (-not $debugReady -and -not $ProfilePath -and $mainProcesses.Count -gt 0) {
   foreach ($process in $restartTargets) {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
   }
-  Start-Sleep -Milliseconds 600
+  $exitDeadline = (Get-Date).AddSeconds(8)
+  do {
+    $remainingTargetIds = @($restartTargetIds | Where-Object {
+      $null -ne (Get-MikuProcessRecord -ProcessId $_)
+    })
+    if ($remainingTargetIds.Count -eq 0) { break }
+    Start-Sleep -Milliseconds 150
+  } while ((Get-Date) -lt $exitDeadline)
+  if ($remainingTargetIds.Count -gt 0) {
+    throw "Codex restart target did not exit: $($remainingTargetIds -join ',')."
+  }
 }
 
 $appProcess = $null
@@ -115,7 +141,10 @@ if (-not (Test-CodexDebugPort $Port)) {
     $arguments += "--user-data-dir=$resolvedProfile"
     $ProfilePath = $resolvedProfile
   }
-  $appProcess = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru
+  $appProcess = Start-CodexStoreApp `
+    -Package $package `
+    -ExecutablePath $exe `
+    -Arguments $arguments
 }
 
 $deadline = (Get-Date).AddSeconds(35)
@@ -152,11 +181,6 @@ if (Test-Path -LiteralPath $StatePath) {
 
 $toneArgument = $Tone.ToLowerInvariant()
 $instanceToken = [Guid]::NewGuid().ToString('N')
-if ($ForegroundInjector) {
-  & $node $Injector --watch --port $Port --tone $toneArgument --instance-token $instanceToken
-  exit $LASTEXITCODE
-}
-
 $injectorArgs = @(
   '"' + $Injector + '"',
   '--watch',
@@ -170,10 +194,14 @@ $injectorArgs = @(
 $startInjector = @{
   FilePath = $node
   ArgumentList = $injectorArgs
-  WindowStyle = 'Hidden'
   PassThru = $true
-  RedirectStandardOutput = $StdoutPath
-  RedirectStandardError = $StderrPath
+}
+if ($ForegroundInjector) {
+  $startInjector.NoNewWindow = $true
+} else {
+  $startInjector.WindowStyle = 'Hidden'
+  $startInjector.RedirectStandardOutput = $StdoutPath
+  $startInjector.RedirectStandardError = $StderrPath
 }
 $daemon = Start-Process @startInjector
 $injectorStartedAt = $daemon.StartTime.ToUniversalTime().ToString('o')
@@ -193,17 +221,79 @@ $injectorStartedAt = $daemon.StartTime.ToUniversalTime().ToString('o')
   loopbackOnly = $true
 } | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding utf8
 
+# State ownership is now durable. Verification is intentionally outside the
+# transition lock so Restore can always pause and clean up a stalled renderer.
+Exit-MikuRuntimeTransition -Mutex $runtimeTransition
+$transitionHeld = $false
+} finally {
+  if ($transitionHeld) {
+    Exit-MikuRuntimeTransition -Mutex $runtimeTransition
+  }
+}
+
+if ($ForegroundInjector) {
+  $foregroundExitCode = 1
+  try {
+    $daemon.WaitForExit()
+    $foregroundExitCode = $daemon.ExitCode
+  } finally {
+    $foregroundTransition = Enter-MikuRuntimeTransition
+    try {
+      $foregroundExited = $daemon.HasExited
+      if (-not $foregroundExited) {
+        $foregroundStopAccepted = Stop-MikuInjectorProcess `
+          -ProcessId $daemon.Id `
+          -InjectorPath $Injector `
+          -ExecutablePath $node `
+          -Port $Port `
+          -InstanceToken $instanceToken `
+          -StartedAt $injectorStartedAt
+        if ($foregroundStopAccepted) {
+          $foregroundExited = $daemon.WaitForExit(5000)
+        }
+        if (-not $foregroundExited) {
+          try { $foregroundExited = $daemon.HasExited } catch {}
+        }
+      }
+      if (Test-Path -LiteralPath $StatePath) {
+        try {
+          $foregroundState = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
+          if ([int]$foregroundState.injectorPid -eq $daemon.Id -and
+              [string]$foregroundState.instanceToken -eq $instanceToken) {
+            if ($foregroundExited) {
+              Remove-Item -LiteralPath $StatePath -Force
+            }
+          }
+        } catch {}
+      }
+      if (-not $foregroundExited) {
+        throw "Foreground Miku watcher $($daemon.Id) could not be confirmed stopped; recovery state was retained."
+      }
+    } finally {
+      Exit-MikuRuntimeTransition -Mutex $foregroundTransition
+    }
+  }
+  exit $foregroundExitCode
+}
+
 $verified = $false
-for ($attempt = 0; $attempt -lt 45; $attempt++) {
+$verifyDeadline = (Get-Date).AddSeconds(35)
+do {
   Start-Sleep -Milliseconds 700
-  & $node $Injector --verify --port $Port --tone $toneArgument *> $null
+  & $node $Injector --verify --port $Port --tone $toneArgument --timeout-ms 3000 *> $null
   if ($LASTEXITCODE -eq 0) {
     $verified = $true
     break
   }
-}
+} while ((Get-Date) -lt $verifyDeadline)
 if (-not $verified) {
-  Stop-Process -Id $daemon.Id -Force -ErrorAction SilentlyContinue
+  [void](Stop-MikuInjectorProcess `
+    -ProcessId $daemon.Id `
+    -InjectorPath $Injector `
+    -ExecutablePath $node `
+    -Port $Port `
+    -InstanceToken $instanceToken `
+    -StartedAt $injectorStartedAt)
   throw "Miku Stage launched but verification failed. Inspect $StderrPath and $StdoutPath."
 }
 Write-Host "Codex Miku Stage is active in $Tone mode on loopback port $Port."

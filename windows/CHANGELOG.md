@@ -1,5 +1,13 @@
 # Windows changelog
 
+## 2.0.4 - 2026-07-17
+
+- Fixed Windows Store launch failures by activating the current OpenAI.Codex package through its dynamically discovered AUMID and `IApplicationActivationManager`, while still passing the loopback-only CDP flags. The launcher no longer attempts to execute the access-controlled WindowsApps binary directly.
+- Made Restore current-session safe: it removes the live skin and pauses the current official Codex process, keeps the limited AtLogOn Hook registered, and automatically resumes skinning after that process exits. A shared runtime-transition mutex and an internal Hook invocation guard prevent a polling race from reinjecting immediately after cleanup. Permanent Hook removal now requires `-DisableAutoHook`, `-Uninstall`, or the dedicated unregister script.
+- Kept recovery responsive when a renderer is half-disconnected: target discovery HTTP is abortable, every CDP socket open/command has a bounded timeout, and the transition mutex is released after daemon state is committed, before foreground wait or verification. Foreground diagnostic watchers now persist the same recoverable identity as hidden daemons; their state is removed only after exit is confirmed, while cleanup and verification failures stop only the process whose full identity still matches.
+- Clarified the Restore shortcut copy so it no longer implies that a current-session cleanup silently disables future automatic launches.
+- Added regression contracts for Store activation, AUMID discovery, direct-WindowsApps launch rejection, pause lifecycle, and explicit Hook disablement.
+
 ## 2.0.3 - 2026-07-16
 
 - Fixed installer safety: installation no longer writes Codex Appearance, code-theme, Diff, or custom chrome-theme keys. An existing config may be backed up once, but current settings remain untouched.

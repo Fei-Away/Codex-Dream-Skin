@@ -1,6 +1,6 @@
 # 平台对照
 
-## Windows：Miku Stage 2.0.3
+## Windows：Miku Stage 2.0.4
 
 | 用途 | 路径 / 状态 |
 | --- | --- |
@@ -18,7 +18,7 @@
 | 静态门禁 | windows/tests/test-windows-skin.ps1 |
 | 实机验证 | verify-miku-skin.ps1 + qa-inventory.md |
 
-Windows 实现不修改官方安装目录、app.asar 或签名。启动器每次通过 Get-AppxPackage 动态发现 Store 包。
+Windows 实现不修改官方安装目录、app.asar 或签名。启动器每次通过 Get-AppxPackage 和当前 manifest 动态发现 Store AUMID，再使用 Windows 应用激活 API 传入 loopback CDP 参数；Dark 路由视觉基线仍为 2.0.3。
 
 ## macOS：上游遗留
 

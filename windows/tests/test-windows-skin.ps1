@@ -191,6 +191,45 @@ $injector = Get-Content -LiteralPath $injectorPath -Raw
 Assert-True (-not [regex]::IsMatch($injector, '\[data-testid\*="diff" i\]|\[class\*="diff-view" i\]')) 'Verifier must not infer a Diff surface from broad class or test-id fragments.'
 Assert-Contains $injector 'http://127\.0\.0\.1:' 'CDP discovery must use IPv4 loopback.'
 Assert-Contains $injector 'ws://127\.0\.0\.1:' 'CDP WebSocket verification must enforce IPv4 loopback.'
+Assert-Contains $injector 'constructor\(target,\s*timeoutMs\s*=\s*\d+\)[\s\S]{0,180}this\.timeoutMs\s*=\s*timeoutMs' 'Each CDP session must retain its caller-supplied finite timeout.'
+Assert-Contains $injector 'Number\.isInteger\(options\.timeoutMs\)[\s\S]{0,100}options\.timeoutMs\s*<\s*250[\s\S]{0,100}options\.timeoutMs\s*>\s*120000' 'Injector timeout arguments must be finite integers within 250-120000ms.'
+$waitForTargets = [regex]::Match(
+  $injector,
+  '(?s)async function waitForTargets\(port,\s*timeoutMs\)\s*\{(?<body>.*?)\r?\n\}\s*\r?\n\s*async function loadPayload'
+)
+Assert-True $waitForTargets.Success 'Could not locate bounded CDP target discovery.'
+$waitForTargetsBody = $waitForTargets.Groups['body'].Value
+Assert-Contains $waitForTargetsBody 'const deadline\s*=\s*Date\.now\(\)\s*\+\s*timeoutMs' 'Target discovery must retain one overall deadline.'
+Assert-Contains $waitForTargetsBody 'new AbortController\(\)' 'Each /json/list request must have an AbortController.'
+Assert-Contains $waitForTargetsBody 'Math\.max\(1,\s*Math\.min\(1000,\s*deadline\s*-\s*Date\.now\(\)\)\)' 'Each /json/list request timeout must be at most 1000ms and never exceed the remaining overall timeout.'
+Assert-Contains $waitForTargetsBody 'setTimeout\(\(\)\s*=>\s*requestController\.abort\(\),\s*requestTimeoutMs\)' 'Target discovery must actively abort a stalled /json/list request.'
+Assert-Contains $waitForTargetsBody 'fetch\([^)]*/json/list[^)]*,\s*\{\s*signal:\s*requestController\.signal\s*\}\s*\)' 'The /json/list fetch must receive the AbortController signal.'
+Assert-Contains $waitForTargetsBody '(?s)finally\s*\{\s*clearTimeout\(requestTimer\);?\s*\}' 'Target discovery must clear every per-request abort timer in a finalizer.'
+Assert-Contains $waitForTargetsBody 'const retryDelayMs\s*=\s*Math\.min\(350,\s*Math\.max\(0,\s*deadline\s*-\s*Date\.now\(\)\)\)' 'Target retry delay must be capped at 350ms and the remaining overall deadline.'
+Assert-Contains $waitForTargetsBody '(?s)if\s*\(retryDelayMs\s*>\s*0\)\s*\{\s*await new Promise\(\(resolve\)\s*=>\s*setTimeout\(resolve,\s*retryDelayMs\)\);?\s*\}' 'Target discovery may sleep only for a positive remaining retry delay.'
+Assert-True (-not [regex]::IsMatch(
+  $waitForTargetsBody,
+  'setTimeout\(resolve,\s*350\)'
+)) 'Target discovery must not use a fixed retry sleep that can exceed the overall deadline.'
+$cdpOpenMethod = [regex]::Match(
+  $injector,
+  '(?s)async open\(\)\s*\{(?<body>.*?)\r?\n\s*onMessage\(event\)'
+)
+Assert-True $cdpOpenMethod.Success 'Could not locate the CDP WebSocket open method.'
+Assert-Contains $cdpOpenMethod.Groups['body'].Value 'setTimeout\([\s\S]{0,360}\},\s*this\.timeoutMs\)' 'CDP WebSocket open must reject after the session timeout.'
+Assert-Contains $cdpOpenMethod.Groups['body'].Value 'clearTimeout\(timer\)' 'CDP WebSocket open must clear its timeout when the socket settles.'
+$cdpSendMethod = [regex]::Match(
+  $injector,
+  '(?s)send\(method,\s*params\s*=\s*\{\}\)\s*\{(?<body>.*?)\r?\n\s*async evaluate\(expression\)'
+)
+Assert-True $cdpSendMethod.Success 'Could not locate the CDP command send method.'
+Assert-Contains $cdpSendMethod.Groups['body'].Value 'setTimeout\([\s\S]{0,280}\},\s*this\.timeoutMs\)' 'Every pending CDP command must reject after the session timeout.'
+Assert-Contains $cdpSendMethod.Groups['body'].Value 'pending\.delete\(id\)' 'Timed-out CDP commands must be removed from the pending map.'
+Assert-Contains $injector 'async function connectTarget\(target,\s*timeoutMs\)\s*\{\s*return new CdpSession\(target,\s*timeoutMs\)\.open\(\);\s*\}' 'connectTarget must construct each CDP session with the requested timeout.'
+Assert-True ([regex]::Matches(
+  $injector,
+  'await connectTarget\(target,\s*options\.timeoutMs\)'
+).Count -eq 2) 'One-shot and watch connection paths must both pass options.timeoutMs to connectTarget.'
 Assert-Contains $injector 'Runtime\.evaluate' 'CDP Runtime.evaluate integration is missing.'
 Assert-Contains $injector 'Page\.loadEventFired' 'Renderer reload reinjection is missing.'
 Assert-Contains $injector 'Page\.captureScreenshot' 'CDP screenshot verification is missing.'
@@ -219,6 +258,207 @@ $start = Get-Content -LiteralPath $startPath -Raw
 Assert-Contains $start '--remote-debugging-address=127\.0\.0\.1' 'Launcher must explicitly bind CDP to loopback.'
 Assert-Contains $start 'Port is already occupied by a non-Codex process' 'Launcher does not reject occupied non-Codex ports.'
 Assert-Contains $start '\$_\.Path' 'Launcher must scope restart handling to the official Codex executable path.'
+$storeLaunchPath = Join-Path $ScriptsRoot 'codex-store-launch.ps1'
+Assert-True (Test-Path -LiteralPath $storeLaunchPath) 'The packaged Codex activation helper is missing.'
+$storeLaunch = Get-Content -LiteralPath $storeLaunchPath -Raw
+$storeLaunchHelper = Get-PowerShellFunctionText $storeLaunch 'Start-CodexStoreApp'
+Assert-Contains ($start + [Environment]::NewLine + $storeLaunch) 'Get-AppxPackage(?:\s+-Name)?\s+OpenAI\.Codex' 'Packaged Codex activation must resolve the installed OpenAI.Codex package.'
+foreach ($activationSignal in @(
+  'Get-AppxPackageManifest',
+  'PackageFamilyName',
+  'Applications\.Application',
+  'application(?:\[[^\]]+\])?\.Id',
+  'IApplicationActivationManager',
+  'ActivateApplication'
+)) {
+  Assert-Contains $storeLaunch $activationSignal "Packaged Codex activation is missing $activationSignal."
+}
+Assert-Contains $storeLaunch '(?:\+\s*''!''\s*\+|\$\([^)]+\)!\$\([^)]+\)|[''"]\{0\}!\{1\}[''"]\s*-f)' 'The Codex AUMID must be composed from the installed package family and manifest application ID.'
+Assert-Contains $storeLaunchHelper 'Arguments' 'The packaged Codex activation helper must accept the CDP argument list.'
+Assert-True (-not [regex]::IsMatch($storeLaunch, '(?i)shell:AppsFolder')) 'shell:AppsFolder cannot carry the required CDP arguments and must not be used as the launch strategy.'
+$storeLaunchAssignment = [regex]::Match(
+  $start,
+  '(?m)^\s*\$(?<name>[A-Za-z][A-Za-z0-9_]*)\s*=\s*Join-Path\s+\$PSScriptRoot\s+''codex-store-launch\.ps1''\s*$'
+)
+Assert-True $storeLaunchAssignment.Success 'Launcher must resolve codex-store-launch.ps1 relative to its scripts directory.'
+Assert-Contains $start ('(?m)^\s*\.\s+\$' + [regex]::Escape($storeLaunchAssignment.Groups['name'].Value) + '\s*$') 'Launcher must dot-source the packaged Codex activation helper it resolved.'
+Assert-Contains $start 'Start-CodexStoreApp[\s\S]{0,260}-Arguments\s+\$arguments' 'Launcher must pass the loopback CDP argument list through Start-CodexStoreApp.'
+Assert-True (-not [regex]::IsMatch($start, '(?im)\bStart-Process\b[^\r\n]*-FilePath\s+\$exe\b')) 'Launcher must not directly Start-Process the access-controlled WindowsApps ChatGPT.exe.'
+Assert-Contains $start '\[switch\]\$HookInvocation' 'Launcher must expose an internal-only hook invocation guard.'
+$hookInvocationPauseGuard = [regex]::Match(
+  $start,
+  '(?s)\$runtimeTransition\s*=\s*Enter-MikuRuntimeTransition\s*\r?\n\s*\$transitionHeld\s*=\s*\$true\s*\r?\n\s*try\s*\{\s*(?<guard>if\s*\(\s*\$HookInvocation\s+-and\s+\(\s*Test-Path\s+-LiteralPath\s+\$HookPausePath\s*\)\s*\)\s*\{(?<body>.*?)\})'
+)
+Assert-True $hookInvocationPauseGuard.Success 'Hook pause must be checked as the first operation after acquiring the shared runtime transition lock.'
+$hookInvocationPauseBody = $hookInvocationPauseGuard.Groups['body'].Value
+Assert-Contains $hookInvocationPauseBody '(?m)^\s*return\s*$' 'A hook invocation must return immediately while Restore owns a current-session pause.'
+Assert-True (-not [regex]::IsMatch(
+  $hookInvocationPauseBody,
+  '(?i)Start-Process|Stop-Process|Start-CodexStoreApp|CloseMainWindow|Remove-Item|Set-Content'
+)) 'The locked hook-pause guard must return without changing processes or runtime state.'
+$startBeforeHookInvocationGuard = $start.Substring(
+  0,
+  $hookInvocationPauseGuard.Groups['guard'].Index
+)
+Assert-True (-not [regex]::IsMatch(
+  $startBeforeHookInvocationGuard,
+  '(?im)^\s*New-Item\b[^\r\n]*-Path\s+\$StateRoot\b'
+)) 'A paused hook invocation must be able to return before the launcher creates or mutates StateRoot.'
+$stateRootCreationIndex = $start.IndexOf(
+  'New-Item -ItemType Directory -Force -Path $StateRoot',
+  [System.StringComparison]::Ordinal
+)
+Assert-True (
+  $stateRootCreationIndex -gt (
+    $hookInvocationPauseGuard.Groups['guard'].Index +
+    $hookInvocationPauseGuard.Groups['guard'].Length
+  )
+) 'StateRoot creation must occur only after the locked HookInvocation pause guard completes.'
+$transitionAcquireIndex = $start.IndexOf(
+  'Enter-MikuRuntimeTransition',
+  [System.StringComparison]::Ordinal
+)
+$packagedLaunchIndex = $start.IndexOf(
+  'Start-CodexStoreApp',
+  [System.StringComparison]::Ordinal
+)
+$daemonStartIndex = $start.IndexOf(
+  '$daemon = Start-Process',
+  [System.StringComparison]::Ordinal
+)
+$stateWriteIndex = $start.IndexOf(
+  'Set-Content -LiteralPath $StatePath',
+  [System.StringComparison]::Ordinal
+)
+$normalTransitionReleaseIndex = $start.IndexOf(
+  'Exit-MikuRuntimeTransition -Mutex $runtimeTransition',
+  $stateWriteIndex,
+  [System.StringComparison]::Ordinal
+)
+$verifyInvocationIndex = $start.IndexOf(
+  '& $node $Injector --verify',
+  [System.StringComparison]::Ordinal
+)
+Assert-True (
+  $transitionAcquireIndex -ge 0 -and
+  $transitionAcquireIndex -lt $hookInvocationPauseGuard.Groups['guard'].Index -and
+  $hookInvocationPauseGuard.Groups['guard'].Index -lt $packagedLaunchIndex -and
+  $packagedLaunchIndex -lt $daemonStartIndex -and
+  $daemonStartIndex -lt $stateWriteIndex -and
+  $stateWriteIndex -lt $normalTransitionReleaseIndex -and
+  $normalTransitionReleaseIndex -lt $verifyInvocationIndex
+) 'The transition lock must cover launch, daemon startup, and state persistence, then release before verification.'
+Assert-True ([regex]::Matches($start, '\$runtimeTransition\s*=\s*Enter-MikuRuntimeTransition').Count -eq 1) 'Launcher must acquire its initial shared runtime transition lock exactly once.'
+Assert-Contains $start '\$runtimeTransition\s*=\s*Enter-MikuRuntimeTransition\s*\r?\n\s*\$transitionHeld\s*=\s*\$true' 'Launcher must track ownership immediately after acquiring the runtime transition lock.'
+Assert-Contains $start 'Set-Content\s+-LiteralPath\s+\$StatePath[\s\S]{0,360}Exit-MikuRuntimeTransition\s+-Mutex\s+\$runtimeTransition\s*\r?\n\s*\$transitionHeld\s*=\s*\$false' 'Launcher must release transition ownership immediately after durable state persistence.'
+Assert-Contains $start '(?s)finally\s*\{\s*if\s*\(\s*\$transitionHeld\s*\)\s*\{\s*Exit-MikuRuntimeTransition\s+-Mutex\s+\$runtimeTransition\s*\}\s*\}' 'Launcher finalization must release the transition lock only while it is still held.'
+$runtimeStateWrite = [regex]::Match(
+  $start,
+  '(?s)@\{(?<body>[^{}]*?injectorPid\s*=\s*\$daemon\.Id.*?)\}\s*\|\s*ConvertTo-Json\s*\|\s*Set-Content\s+-LiteralPath\s+\$StatePath'
+)
+Assert-True $runtimeStateWrite.Success 'Launcher must persist the managed watcher state before releasing the transition lock.'
+$runtimeStateWriteBody = $runtimeStateWrite.Groups['body'].Value
+foreach ($runtimeIdentitySignal in @(
+  'injectorPid\s*=\s*\$daemon\.Id',
+  'injectorStartedAt\s*=\s*\$injectorStartedAt',
+  'instanceToken\s*=\s*\$instanceToken',
+  'injectorPath\s*=\s*\$Injector',
+  'nodeExecutable\s*=\s*\$node'
+)) {
+  Assert-Contains $runtimeStateWriteBody $runtimeIdentitySignal "Managed watcher state is missing $runtimeIdentitySignal."
+}
+Assert-True (-not [regex]::IsMatch($start, '(?m)^\s*&\s+\$node\s+\$Injector\s+--watch\b')) 'Foreground mode must not regress to an unmanaged direct node --watch invocation.'
+Assert-Contains $start '\$daemon\s*=\s*Start-Process\s+@startInjector' 'Foreground and background modes must both obtain a managed watcher PID through Start-Process.'
+Assert-Contains $start '(?s)\$startInjector\s*=\s*@\{.*?PassThru\s*=\s*\$true.*?\}' 'Managed watcher startup must request a process object containing the watcher PID.'
+$foregroundLifecycle = [regex]::Match(
+  $start,
+  '(?s)if\s*\(\s*\$ForegroundInjector\s*\)\s*\{\s*\$foregroundExitCode\s*=\s*1(?<body>.*?)\r?\n\s*exit\s+\$foregroundExitCode\s*\r?\n\s*\}'
+)
+Assert-True $foregroundLifecycle.Success 'Could not locate the managed foreground watcher lifecycle.'
+$foregroundLifecycleBody = $foregroundLifecycle.Groups['body'].Value
+$foregroundWaitAndCleanup = [regex]::Match(
+  $foregroundLifecycleBody,
+  '(?s)try\s*\{(?<waitBody>.*?)\}\s*finally\s*\{(?<cleanupBody>.*)\}\s*$'
+)
+Assert-True $foregroundWaitAndCleanup.Success 'Foreground watcher wait must have a dedicated cleanup finalizer.'
+$foregroundWaitBody = $foregroundWaitAndCleanup.Groups['waitBody'].Value
+$foregroundCleanupBody = $foregroundWaitAndCleanup.Groups['cleanupBody'].Value
+Assert-Contains $foregroundWaitBody '\$daemon\.WaitForExit\(\)' 'Foreground mode must wait on the managed watcher process only after startup state is durable.'
+$foregroundWaitIndex = $start.IndexOf(
+  '$daemon.WaitForExit()',
+  [System.StringComparison]::Ordinal
+)
+Assert-True (
+  $daemonStartIndex -lt $stateWriteIndex -and
+  $stateWriteIndex -lt $normalTransitionReleaseIndex -and
+  $normalTransitionReleaseIndex -lt $foregroundWaitIndex
+) 'Foreground mode must start the watcher, persist state, release the transition lock, and only then wait for exit.'
+Assert-Contains $foregroundCleanupBody '\$foregroundTransition\s*=\s*Enter-MikuRuntimeTransition[\s\S]{0,160}try\s*\{' 'Foreground cleanup must reacquire the runtime transition lock from its finalizer.'
+$foregroundStopBlock = [regex]::Match(
+  $foregroundCleanupBody,
+  '(?s)if\s*\(\s*-not\s+\$foregroundExited\s*\)\s*\{(?<body>.*?)\r?\n\s*\}'
+)
+Assert-True $foregroundStopBlock.Success 'Foreground cleanup must check watcher liveness before attempting a stop.'
+Assert-Contains $foregroundCleanupBody '\$foregroundExited\s*=\s*\$daemon\.HasExited' 'Foreground cleanup must snapshot whether the watcher already exited.'
+Assert-Contains $foregroundStopBlock.Groups['body'].Value '\$foregroundStopAccepted\s*=\s*Stop-MikuInjectorProcess[\s\S]{0,360}-ProcessId\s+\$daemon\.Id[\s\S]{0,120}-InjectorPath\s+\$Injector[\s\S]{0,120}-ExecutablePath\s+\$node[\s\S]{0,120}-Port\s+\$Port[\s\S]{0,120}-InstanceToken\s+\$instanceToken[\s\S]{0,120}-StartedAt\s+\$injectorStartedAt' 'Foreground cleanup must save the identity-validated stop result for the complete watcher identity.'
+Assert-Contains $foregroundStopBlock.Groups['body'].Value '(?s)if\s*\(\s*\$foregroundStopAccepted\s*\)\s*\{\s*\$foregroundExited\s*=\s*\$daemon\.WaitForExit\(5000\)' 'Foreground cleanup must wait up to 5000ms for an accepted watcher stop to complete.'
+Assert-True (-not [regex]::IsMatch($foregroundStopBlock.Groups['body'].Value, '\bStop-Process\b')) 'Foreground cleanup must not stop the watcher PID without identity validation.'
+Assert-Contains $foregroundCleanupBody '(?s)if\s*\(\s*\[int\]\$foregroundState\.injectorPid\s+-eq\s+\$daemon\.Id\s+-and\s*\[string\]\$foregroundState\.instanceToken\s+-eq\s+\$instanceToken\s*\)\s*\{\s*if\s*\(\s*\$foregroundExited\s*\)\s*\{\s*Remove-Item\s+-LiteralPath\s+\$StatePath' 'Foreground cleanup may delete state.json only after confirmed exit and matching watcher PID plus instance token.'
+Assert-True ([regex]::Matches(
+  $foregroundCleanupBody,
+  'Remove-Item\s+-LiteralPath\s+\$StatePath'
+).Count -eq 1) 'Foreground cleanup must have no unguarded secondary state.json deletion path.'
+Assert-Contains $foregroundCleanupBody '(?s)if\s*\(\s*-not\s+\$foregroundExited\s*\)\s*\{\s*throw\s+"[^"\r\n]*(?:retained|retain)[^"\r\n]*"' 'Unconfirmed foreground watcher exit must throw while retaining recovery state.'
+Assert-Contains $foregroundCleanupBody '(?s)finally\s*\{\s*Exit-MikuRuntimeTransition\s+-Mutex\s+\$foregroundTransition\s*\}' 'Foreground cleanup must always release its cleanup transition lock.'
+
+$verifyCommand = [regex]::Match(
+  $start,
+  '(?m)^\s*&\s+\$node\s+\$Injector\s+--verify\b[^\r\n]*--timeout-ms\s+(?<timeout>\d+)\b[^\r\n]*$'
+)
+Assert-True $verifyCommand.Success 'Launcher verification must pass an explicit finite --timeout-ms value.'
+$verifyTimeout = [int]$verifyCommand.Groups['timeout'].Value
+Assert-True ($verifyTimeout -ge 250 -and $verifyTimeout -le 5000) 'Launcher verification timeout must remain within the bounded 250-5000ms retry window.'
+$verifyFailureBlock = [regex]::Match(
+  $start,
+  '(?s)if\s*\(\s*-not\s+\$verified\s*\)\s*\{(?<body>.*?)\r?\n\s*\}'
+)
+Assert-True $verifyFailureBlock.Success 'Could not locate the launcher verification failure branch.'
+$verifyFailureBody = $verifyFailureBlock.Groups['body'].Value
+Assert-True (-not [regex]::IsMatch($verifyFailureBody, '\bStop-Process\b')) 'Verification failure must not stop the daemon PID without identity validation.'
+Assert-Contains $verifyFailureBody 'Stop-MikuInjectorProcess[\s\S]{0,360}-ProcessId\s+\$daemon\.Id[\s\S]{0,120}-InjectorPath\s+\$Injector[\s\S]{0,120}-ExecutablePath\s+\$node[\s\S]{0,120}-Port\s+\$Port[\s\S]{0,120}-InstanceToken\s+\$instanceToken[\s\S]{0,120}-StartedAt\s+\$injectorStartedAt' 'Verification failure must retire only the daemon matching its complete persisted identity.'
+
+. $storeLaunchPath
+$argumentQuote = [string][char]34
+$argumentSlash = [string][char]92
+$plainArgument = '--remote-debugging-port=9347'
+Assert-True (
+  (ConvertTo-CodexWindowsArgument -Argument $plainArgument) -ceq $plainArgument
+) 'Windows argument quoting must leave an ordinary CDP flag unchanged.'
+$spaceArgument = '--user-data-dir=C:\Miku Stage\Profile'
+$expectedSpaceArgument = $argumentQuote + $spaceArgument + $argumentQuote
+Assert-True (
+  (ConvertTo-CodexWindowsArgument -Argument $spaceArgument) -ceq $expectedSpaceArgument
+) 'Windows argument quoting must wrap a user-data path containing spaces.'
+$quotedArgument = 'say "miku"'
+$expectedQuotedArgument =
+  $argumentQuote +
+  'say ' +
+  $argumentSlash + $argumentQuote +
+  'miku' +
+  $argumentSlash + $argumentQuote +
+  $argumentQuote
+Assert-True (
+  (ConvertTo-CodexWindowsArgument -Argument $quotedArgument) -ceq $expectedQuotedArgument
+) 'Windows argument quoting must backslash-escape embedded quotes.'
+$trailingSlashArgument = 'C:\Miku Stage\'
+$expectedTrailingSlashArgument =
+  $argumentQuote +
+  'C:\Miku Stage' +
+  $argumentSlash + $argumentSlash +
+  $argumentQuote
+Assert-True (
+  (ConvertTo-CodexWindowsArgument -Argument $trailingSlashArgument) -ceq $expectedTrailingSlashArgument
+) 'Windows argument quoting must double a trailing backslash before the closing quote.'
 $installerPath = Join-Path $ScriptsRoot 'install-miku-skin.ps1'
 $installer = Get-Content -LiteralPath $installerPath -Raw
 Assert-True (-not [regex]::IsMatch($installer, 'Arguments[\s\S]{0,240}-RestartExisting')) 'Default shortcut must not force-restart an existing Codex process.'
@@ -237,12 +477,66 @@ Assert-True (-not [regex]::IsMatch($installer, 'Get-Content\s+-LiteralPath\s+\$C
 Assert-True (-not [regex]::IsMatch($installer, 'Set-Content\s+-LiteralPath\s+\$ConfigPath')) 'Installer must not write config.toml.'
 Assert-Contains $installer '(?s)if\s*\([^)]*Test-Path\s+-LiteralPath\s+\$ConfigPath[^)]*\)[\s\S]{0,360}Copy-Item\s+-LiteralPath\s+\$ConfigPath\s+-Destination\s+\$BackupPath' 'Installer may back up config.toml only after confirming it exists.'
 Assert-Contains $installer 'configModified\s*=\s*\$false' 'Install state must declare that config.toml was not modified.'
+$restoreShortcut = [regex]::Match(
+  $installer,
+  '(?s)\$restore\s*=\s*\$shell\.CreateShortcut\(.*?\)+\s*(?<body>.*?)\$restore\.Save\(\)'
+)
+Assert-True $restoreShortcut.Success 'Installer must keep a separately described current-session Restore shortcut.'
+$restoreShortcutBody = $restoreShortcut.Groups['body'].Value
+Assert-True (-not [regex]::IsMatch($restoreShortcutBody, '-DisableAutoHook')) 'The ordinary Restore shortcut must not permanently disable the automatic hook.'
+Assert-Contains $restoreShortcutBody '(?i)Description\s*=\s*''[^'']*(?:current|this) session[^'']*next[^'']*(?:launch|start)[^'']*''' 'Restore shortcut copy must state that removal lasts only for the current session and the skin returns on the next launch.'
 
 $restorePath = Join-Path $ScriptsRoot 'restore-miku-skin.ps1'
 $restore = Get-Content -LiteralPath $restorePath -Raw
-Assert-Contains $restore 'unregister-miku-hook\.ps1' 'Restore does not disable the automatic hook.'
+Assert-Contains $restore '\[switch\]\$DisableAutoHook' 'Restore must require an explicit switch before permanently disabling the automatic hook.'
+Assert-Contains $restore 'unregister-miku-hook\.ps1' 'Restore does not expose explicit automatic-hook disablement.'
 Assert-Contains $restore 'if\s*\(\$Uninstall\s+-and\s+\$KeepAutoHook\)\s*\{\s*throw' 'Restore must reject -Uninstall combined with -KeepAutoHook.'
-
+Assert-Contains $restore 'if\s*\(\s*(?:\$DisableAutoHook\s+-and\s+\$KeepAutoHook|\$KeepAutoHook\s+-and\s+\$DisableAutoHook)\s*\)\s*\{\s*throw' 'Restore must reject contradictory -DisableAutoHook and -KeepAutoHook switches.'
+Assert-Contains $restore 'hook-pause\.json' 'Ordinary Restore must persist a current-session hook pause marker.'
+Assert-Contains $restore 'Set-Content\s+-LiteralPath\s+\$HookPausePath' 'Ordinary Restore must write the hook pause marker instead of unregistering the hook.'
+Assert-Contains $restore 'Get-AppxPackage(?:\s+-Name)?\s+OpenAI\.Codex' 'Restore must resolve the official Codex Store package before recording paused processes.'
+Assert-Contains $restore '\$_\.Path' 'Restore must scope paused process IDs to the official Codex executable path.'
+Assert-Contains $restore '(?m)^\s*processIds\s*=\s*@?\(' 'The hook pause marker must persist the current official Codex main process IDs as an array.'
+Assert-Contains $restore '\$runtimeTransition\s*=\s*Enter-MikuRuntimeTransition' 'Restore must acquire the shared runtime transition lock before writing pause state or cleaning up the injector.'
+Assert-Contains $restore '(?s)\}\s*finally\s*\{\s*Exit-MikuRuntimeTransition\s+-Mutex\s+\$runtimeTransition\s*\}\s*$' 'Restore must always release the runtime transition lock from a finalizer.'
+$restoreTransitionOrder = @(
+  $restore.IndexOf('Enter-MikuRuntimeTransition', [System.StringComparison]::Ordinal),
+  $restore.IndexOf('Set-Content -LiteralPath $HookPausePath', [System.StringComparison]::Ordinal),
+  $restore.IndexOf('Stop-MikuInjectorProcess', [System.StringComparison]::Ordinal),
+  $restore.LastIndexOf('Exit-MikuRuntimeTransition', [System.StringComparison]::Ordinal)
+)
+Assert-True (
+  $restoreTransitionOrder[0] -ge 0 -and
+  $restoreTransitionOrder[0] -lt $restoreTransitionOrder[1] -and
+  $restoreTransitionOrder[1] -lt $restoreTransitionOrder[2] -and
+  $restoreTransitionOrder[2] -lt $restoreTransitionOrder[3]
+) 'Restore must hold the shared runtime transition lock across pause persistence and injector cleanup.'
+Assert-True ([regex]::Matches($restore, '\bEnter-MikuRuntimeTransition\b').Count -eq 1) 'Restore must acquire the shared runtime transition lock exactly once.'
+Assert-True ([regex]::Matches($restore, '\bExit-MikuRuntimeTransition\b').Count -eq 1) 'Restore must release the shared runtime transition lock exactly once.'
+$restoreTokens = $null
+$restoreErrors = $null
+$restoreAst = [System.Management.Automation.Language.Parser]::ParseInput(
+  $restore,
+  [ref]$restoreTokens,
+  [ref]$restoreErrors
+)
+Assert-True ($restoreErrors.Count -eq 0) 'Restore script does not parse while checking the hook-disable guard.'
+$unregisterCalls = @($restoreAst.FindAll({
+  param($node)
+  $node -is [System.Management.Automation.Language.CommandAst] -and
+    [regex]::IsMatch($node.Extent.Text, '^&\s+\$unregisterHook\b')
+}, $true))
+Assert-True ($unregisterCalls.Count -eq 1) 'Restore must have exactly one guarded automatic-hook unregister call.'
+$unregisterOwner = $unregisterCalls[0].Parent
+while ($null -ne $unregisterOwner -and
+       $unregisterOwner -isnot [System.Management.Automation.Language.IfStatementAst]) {
+  $unregisterOwner = $unregisterOwner.Parent
+}
+Assert-True ($null -ne $unregisterOwner) 'Automatic-hook unregister must be owned by an explicit guard.'
+$unregisterGuard = $unregisterOwner.Extent.Text
+Assert-Contains $unregisterGuard '\$DisableAutoHook' 'Automatic-hook unregister must require -DisableAutoHook.'
+Assert-Contains $unregisterGuard '\$Uninstall' 'Uninstall must continue to unregister the automatic hook.'
+Assert-Contains $unregisterGuard '-or' 'Only -DisableAutoHook or -Uninstall may enter the automatic-hook unregister path.'
 $hookPath = Join-Path $ScriptsRoot 'hook-miku-skin.ps1'
 $hook = Get-Content -LiteralPath $hookPath -Raw
 Assert-Contains $hook 'IgnoreExisting' 'Live hook registration cannot protect the currently running Codex process.'
@@ -251,12 +545,65 @@ Assert-Contains $hook '-RestartProcessId' 'Hook must restart only the newly dete
 Assert-Contains $hook 'CodexMikuSkinAutoHook' 'Hook is missing its single-instance mutex.'
 Assert-Contains $hook '\$_\.Path' 'Hook must identify the official Codex executable path.'
 Assert-Contains $start 'RestartProcessId' 'Launcher does not support a PID-scoped automatic restart.'
+Assert-Contains $hook 'hook-pause\.json' 'Automatic hook must observe the current-session pause marker.'
+Assert-Contains $hook '\.processIds' 'Automatic hook must read the paused Codex process ID array.'
+Assert-Contains $hook 'Remove-Item\s+-LiteralPath\s+\$HookPausePath' 'Automatic hook must clear a pause marker after its Codex process exits.'
+Assert-Contains $hook '(?s)\.processIds[\s\S]{0,520}(?:-in|-contains)[\s\S]{0,420}Count\s+-gt\s+0' 'Automatic hook must derive pause activity from the recorded Codex process IDs.'
+$hookPauseTransition = [regex]::Match(
+  $hook,
+  '(?s)\$pauseActive\s*=\s*\$false\s*\r?\n\s*\$pauseTransition\s*=\s*Enter-MikuRuntimeTransition\s*\r?\n\s*try\s*\{(?<body>.*?)\}\s*finally\s*\{\s*Exit-MikuRuntimeTransition\s+-Mutex\s+\$pauseTransition\s*\}(?<after>\s*if\s*\(\s*\$pauseActive\s*\)\s*\{(?<activeBody>.*?)\})'
+)
+Assert-True $hookPauseTransition.Success 'Hook pause reconciliation must use a paired runtime transition try/finally before acting on pauseActive.'
+$hookPauseTransitionBody = $hookPauseTransition.Groups['body'].Value
+$hookProcessSnapshot = [regex]::Match(
+  $hookPauseTransitionBody,
+  '(?m)^\s*\$processes\s*=\s*@\(Get-CodexMainProcesses\s+\$CodexExe\)\s*$'
+)
+$hookCurrentIdsSnapshot = [regex]::Match(
+  $hookPauseTransitionBody,
+  '(?m)^\s*\$currentIds\s*=\s*@\(\$processes\s*\|\s*ForEach-Object\s*\{\s*\[int\]\$_\.Id\s*\}\)\s*$'
+)
+$hookPauseRead = [regex]::Match(
+  $hookPauseTransitionBody,
+  'Get-Content\s+-LiteralPath\s+\$HookPausePath'
+)
+Assert-True (
+  $hookProcessSnapshot.Success -and
+  $hookCurrentIdsSnapshot.Success -and
+  $hookPauseRead.Success -and
+  $hookProcessSnapshot.Index -lt $hookCurrentIdsSnapshot.Index -and
+  $hookCurrentIdsSnapshot.Index -lt $hookPauseRead.Index
+) 'Hook must capture processes and currentIds inside the transition lock before reading the pause marker.'
+Assert-Contains $hookPauseTransitionBody 'Get-Content\s+-LiteralPath\s+\$HookPausePath' 'Hook must read the pause marker while holding the runtime transition lock.'
+Assert-Contains $hookPauseTransitionBody 'Remove-Item\s+-LiteralPath\s+\$HookPausePath' 'Hook must remove a stale pause marker while holding the same runtime transition lock.'
+Assert-Contains $hookPauseTransitionBody '\$pauseActive\s*=\s*\$true' 'Hook must compute pause activity while holding the runtime transition lock.'
+Assert-True (-not [regex]::IsMatch(
+  $hookPauseTransitionBody,
+  '(?i)\bcontinue\b|Start-Sleep|Start-CodexStoreApp|&\s+\$StartScript'
+)) 'Hook must release the runtime transition lock before sleeping, continuing, or launching Codex.'
+$hookPauseActiveBody = $hookPauseTransition.Groups['activeBody'].Value
+Assert-Contains $hookPauseActiveBody 'Start-Sleep\s+-Milliseconds\s+\$PollMilliseconds' 'An active pause must wait only after releasing the runtime transition lock.'
+Assert-Contains $hookPauseActiveBody '(?m)^\s*continue\s*$' 'An active pause must continue the hook loop only after releasing the runtime transition lock.'
+Assert-True ([regex]::Matches($hook, '\bEnter-MikuRuntimeTransition\b').Count -eq 1) 'Hook pause reconciliation must acquire the runtime transition lock exactly once.'
+Assert-True ([regex]::Matches($hook, '\bExit-MikuRuntimeTransition\b').Count -eq 1) 'Hook pause reconciliation must release the runtime transition lock exactly once.'
+$hookStartCalls = @([regex]::Matches($hook, '(?m)^\s*&\s+\$StartScript\b[^\r\n]*$'))
+Assert-True ($hookStartCalls.Count -eq 2) 'Automatic hook must retain exactly its injector-start and controlled-restart launcher calls.'
+foreach ($hookStartCall in $hookStartCalls) {
+  Assert-Contains $hookStartCall.Value '-HookInvocation\b' 'Every launcher call originating from the hook must carry the internal -HookInvocation flag.'
+}
 
 $unregisterHookPath = Join-Path $ScriptsRoot 'unregister-miku-hook.ps1'
 $unregisterHook = Get-Content -LiteralPath $unregisterHookPath -Raw
 $processIdentityPath = Join-Path $ScriptsRoot 'process-identity.ps1'
 Assert-True (Test-Path -LiteralPath $processIdentityPath) 'Shared persisted-PID identity helper is missing.'
 $processIdentity = Get-Content -LiteralPath $processIdentityPath -Raw
+$enterRuntimeTransition = Get-PowerShellFunctionText $processIdentity 'Enter-MikuRuntimeTransition'
+Assert-Contains $enterRuntimeTransition 'Local\\CodexMikuSkinRuntimeTransition' 'Runtime transitions must share the exact named local mutex.'
+Assert-Contains $enterRuntimeTransition '\.WaitOne\(\$TimeoutMilliseconds\)' 'Runtime transition acquisition must wait with a bounded timeout.'
+Assert-Contains $enterRuntimeTransition 'AbandonedMutexException' 'Runtime transition acquisition must recover a mutex abandoned by a crashed process.'
+$exitRuntimeTransition = Get-PowerShellFunctionText $processIdentity 'Exit-MikuRuntimeTransition'
+Assert-Contains $exitRuntimeTransition '\.ReleaseMutex\(\)' 'Runtime transition release must relinquish the named mutex.'
+Assert-Contains $exitRuntimeTransition '\.Dispose\(\)' 'Runtime transition release must dispose the mutex handle.'
 $processRecordHelper = Get-PowerShellFunctionText $processIdentity 'Get-MikuProcessRecord'
 Assert-Contains $processRecordHelper 'Get-CimInstance\s+Win32_Process' 'Persisted PID lookup must read the Win32 process record, not trust Get-Process by PID.'
 $commandLineHelper = Get-PowerShellFunctionText $processIdentity 'Test-MikuCommandLineArgument'
@@ -402,6 +749,7 @@ $canonicalFiles = @(
   $rendererPath,
   $injectorPath,
   $startPath,
+  $storeLaunchPath,
   $installerPath,
   $restorePath,
   (Join-Path $ScriptsRoot 'verify-miku-skin.ps1'),
@@ -516,5 +864,11 @@ $result = [ordered]@{
   powershellSyntax = 'passed'
   loopbackGuard = 'passed'
   officialPackageMutationGuard = 'passed'
+  runtimeTransitionGuard = 'passed'
+  verificationCleanupGuard = 'passed'
+  cdpTimeoutGuard = 'passed'
+  targetDiscoveryAbortGuard = 'passed'
+  foregroundWatcherLifecycle = 'passed'
+  windowsArgumentQuoting = 'passed'
 }
 $result | ConvertTo-Json

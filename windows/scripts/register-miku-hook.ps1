@@ -14,6 +14,7 @@ $EngineRoot = Join-Path $StateRoot 'engine'
 $HookScript = Join-Path $EngineRoot 'scripts\hook-miku-skin.ps1'
 $HookStatePath = Join-Path $StateRoot 'hook-state.json'
 $RegistrationPath = Join-Path $StateRoot 'hook-registration.json'
+$HookPausePath = Join-Path $StateRoot 'hook-pause.json'
 $ProcessIdentity = Join-Path $PSScriptRoot 'process-identity.ps1'
 if (-not (Test-Path -LiteralPath $HookScript)) {
   throw "Installed hook not found: $HookScript. Run install-miku-skin.ps1 first."
@@ -22,6 +23,8 @@ if (-not (Test-Path -LiteralPath $ProcessIdentity)) {
   throw "Miku process identity helper not found: $ProcessIdentity"
 }
 . $ProcessIdentity
+
+Remove-Item -LiteralPath $HookPausePath -Force -ErrorAction SilentlyContinue
 
 if (Test-Path -LiteralPath $HookStatePath) {
   try {

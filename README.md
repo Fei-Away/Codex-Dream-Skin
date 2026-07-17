@@ -44,6 +44,10 @@ Windows Codex 的可逆初音未来主题皮肤。它复用 Codex Dream Skin 的
     powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\verify-miku-skin.ps1 -ScreenshotPath C:\Temp\miku-stage.png
     powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\restore-miku-skin.ps1
 
+普通 Restore 只移除当前 Codex 会话的皮肤，并暂停 Hook 对这个进程的重注入；当前进程退出后，下一次普通启动会自动恢复皮肤。若要同时永久关闭自动 Hook，请显式添加 `-DisableAutoHook`：
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\restore-miku-skin.ps1 -DisableAutoHook
+
 若曾安装过会改写外观配置的旧测试版，可显式恢复那次备份：
 
     powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\restore-miku-skin.ps1 -RestoreBaseTheme
@@ -54,7 +58,7 @@ Windows Codex 的可逆初音未来主题皮肤。它复用 Codex Dream Skin 的
 
 ## CDP 是怎么工作的
 
-    官方 Codex ChatGPT.exe
+    官方 Codex Store 包（动态 AUMID 激活）
       └─ 用户登录 Hook 监听下一次普通启动
            └─ 未带 CDP 时受控重启一次
                 └─ --remote-debugging-address=127.0.0.1 --remote-debugging-port=9347

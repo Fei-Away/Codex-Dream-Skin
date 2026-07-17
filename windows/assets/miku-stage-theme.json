@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Codex Miku Stage",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "defaultTone": "dark",
   "art": "miku-stage-hero.png",
   "stylesheet": "miku-stage.css",

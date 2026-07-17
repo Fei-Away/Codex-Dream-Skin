@@ -25,9 +25,13 @@ Live removal:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\restore-miku-skin.ps1
 
+Ordinary Restore removes the skin only from the current Codex session and pauses reinjection for that official process. After it exits, the next normal launch is skinned automatically. To remove the automatic Hook as well, opt in explicitly:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\restore-miku-skin.ps1 -DisableAutoHook
+
 ## Architecture and safety
 
-The launcher starts the official Store package with a loopback-only Chromium remote-debugging endpoint. The Node injector discovers app:// renderer targets, sends CDP messages over WebSocket, uses Runtime.evaluate to install the CSS/DOM layer, listens for Page.loadEventFired to reapply it, and can use Page.captureScreenshot for verification.
+The launcher activates the current official Store package by its dynamically discovered AUMID and passes a loopback-only Chromium remote-debugging endpoint through the Windows application activation API. The Node injector discovers app:// renderer targets, sends CDP messages over WebSocket, uses Runtime.evaluate to install the CSS/DOM layer, listens for Page.loadEventFired to reapply it, and can use Page.captureScreenshot for verification.
 
 CDP flags must exist at Chromium process creation time, so a Codex instance started from the stock icon cannot be attached in place; the hook must restart that new instance once.
 

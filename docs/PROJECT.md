@@ -10,7 +10,7 @@
 
 ## 2. 当前状态
 
-Windows manifest 当前版本为 **2.0.3**。
+Windows manifest 当前版本为 **2.0.4**。
 
 ### 已实现
 
@@ -21,6 +21,8 @@ Windows manifest 当前版本为 **2.0.3**。
 - 安装到 %LOCALAPPDATA%\CodexMikuSkin\engine，创建安全快捷方式；配置存在时只保存一次备份，不写入外观、代码主题或 Diff 设置。
 - 恢复、配置回滚、卸载。
 - 可选的用户级 AtLogOn Auto Hook；注册时忽略当前进程，未来普通启动时只重启官方 Store Codex 一次以补齐 CDP 参数。
+- Store 启动通过当前包 family 与 manifest application ID 动态组成 AUMID，并使用 Windows `IApplicationActivationManager` 传递 CDP 参数；不直接执行受保护的 WindowsApps 二进制。
+- 普通 Restore 只暂停并清理当前官方 Codex 会话，Hook 保持注册并在该进程退出后的下一次启动自动恢复；永久关闭必须显式使用 `-DisableAutoHook` 或 unregister 脚本。
 - 14 项设计契约、PNG、Node/PowerShell 语法、loopback 和官方包不变性静态测试。这些测试不声明当前 DOM selector 已命中或真实控件已通过交互验收。
 - 2.0.3 保留并复验了 Dark 路由基线：home、task/output、Diff、terminal、popover、Settings、Plugins、Scheduled tasks、Quick Chat、Profile、Appearance 和 Pets，对应组件 01–13。
 
@@ -45,6 +47,7 @@ Windows manifest 当前版本为 **2.0.3**。
 
     start-miku-skin.ps1
       ├─ Get-AppxPackage 动态发现官方 Codex
+      ├─ manifest application ID → AUMID → Store package activation
       ├─ 只在 127.0.0.1 打开 CDP
       ├─ 启动 injector daemon
       └─ 等待 Runtime.verify 通过
@@ -53,6 +56,7 @@ Windows manifest 当前版本为 **2.0.3**。
       ├─ Limited 用户计划任务 AtLogOn 启动
       ├─ 精确匹配 Store Codex ChatGPT.exe 路径
       ├─ 注册当下忽略现有 PID
+      ├─ Restore pause 只忽略当前官方 PID，退出后自动清理
       └─ 新的无 CDP 启动 → 按 PID 受控重启一次 → start
 
     injector.mjs
@@ -72,7 +76,7 @@ Windows manifest 当前版本为 **2.0.3**。
 ## 4. 关键契约
 
 - assets/miku-stage-theme.json 必须有 14 个唯一的 01–14 component、dark/light token、CSS 与 art 路径。
-- 当前 manifest 版本必须为 2.0.3，安装后引擎与工作树版本一致。
+- 当前 manifest 版本必须为 2.0.4，安装后引擎与工作树版本一致。
 - assets/miku-stage.css 必须有 14 个顺序一致的 section marker。
 - Home 的组件 03 owner 是包含 `home-icon` 的内层 `[role="main"]`；Diff 的组件 04 owner 优先使用右侧 `data-tab-id="diff"` tabpanel，不依赖易变的宽泛容器。
 - Settings General 必须命中真实的 `.miku-settings-card`；2.0.3 基线为 5 个原生卡片。
@@ -80,7 +84,8 @@ Windows manifest 当前版本为 **2.0.3**。
 - 远程调试 HTTP 与 WebSocket URL 必须都是 127.0.0.1。
 - 默认快捷方式不得使用 -RestartExisting。
 - 自动 Hook 不得使用 IFEO、管理员权限或通用 ChatGPT.exe 劫持；只能匹配当前 OpenAI.Codex Store 包路径。
-- 运行时必须保持单 Hook + 单 injector daemon；停止持久化 PID 前必须核对可执行文件、脚本路径、端口、命令行、启动时间和实例 token，Hook 另用单实例互斥。
+- Store 启动必须使用当前 manifest AUMID 与 `IApplicationActivationManager`，不得直接 Start-Process WindowsApps 下的 exe；普通 Restore 不得静默永久注销 Hook。
+- 运行时必须保持单 Hook + 单 injector daemon；停止持久化 PID 前必须核对可执行文件、脚本路径、端口、命令行、启动时间和实例 token。Hook 使用单实例互斥，start/restore 使用独立转换互斥保证 pause 与注入不会交错；隐藏 daemon 与前台诊断 watcher 都必须先持久化可恢复身份，再在验证或长期等待前释放转换锁。Target HTTP、CDP socket/command 必须有超时，确保半断连时 Restore 仍可接管。
 - installer 不得写入 appearance key；`-RestoreBaseTheme` 只用于旧测试版的显式兼容恢复。
 - 不写 WindowsApps，不读取或改写凭证，不改 provider、API Key 或 Base URL。
 
@@ -104,4 +109,4 @@ Windows manifest 当前版本为 **2.0.3**。
 
 本地开发分支为 codex/miku-stage-windows-skin。origin 指向只读上游 Fei-Away/Codex-Dream-Skin；发布时只向已认证用户的 fork 推送同名功能分支，并从 fork 创建 Draft PR，禁止直接推送 main。
 
-最后更新：2026-07-16。
+最后更新：2026-07-17。

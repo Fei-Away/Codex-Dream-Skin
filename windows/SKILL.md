@@ -10,9 +10,9 @@ Apply the 14-component Miku Stage visual system through loopback Chromium DevToo
 ## Workflow
 
 1. Run scripts/install-miku-skin.ps1 to copy the runtime into %LOCALAPPDATA%\CodexMikuSkin\engine and create safe shortcuts. If config.toml exists the installer may preserve one read-only backup, but it must not change Codex Appearance, code-theme, or Diff settings. Add -EnableAutoHook only when the user wants ordinary future Codex launches intercepted and restarted once with CDP.
-2. Close an already-running Codex window, then run scripts/start-miku-skin.ps1. Use -RestartExisting only after explicit authorization.
+2. Close an already-running Codex window, then run scripts/start-miku-skin.ps1. The launcher must activate the current Store package by its manifest AUMID through `IApplicationActivationManager`; never execute the WindowsApps binary directly. Use -RestartExisting only after explicit authorization.
 3. Run scripts/verify-miku-skin.ps1 -ScreenshotPath <absolute-path> and inspect references/qa-inventory.md for the relevant routes.
-4. Run scripts/restore-miku-skin.ps1 for live removal. Add -RestoreBaseTheme only to recover from an older build that changed appearance keys, or -Uninstall to remove the installed engine and shortcuts. Never combine -Uninstall with -KeepAutoHook.
+4. Run scripts/restore-miku-skin.ps1 for current-session live removal. It pauses reinjection for the current official Codex process and resumes the Hook after that process exits. Add -DisableAutoHook only for explicit permanent Hook removal, -RestoreBaseTheme only to recover from an older build that changed appearance keys, or -Uninstall to remove the installed engine and shortcuts. Never combine -Uninstall or -DisableAutoHook with -KeepAutoHook.
 
 ## Required checks
 

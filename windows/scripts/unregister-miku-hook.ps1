@@ -6,6 +6,7 @@ $TaskName = 'Codex Miku Stage Auto Hook'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexMikuSkin'
 $HookStatePath = Join-Path $StateRoot 'hook-state.json'
 $RegistrationPath = Join-Path $StateRoot 'hook-registration.json'
+$HookPausePath = Join-Path $StateRoot 'hook-pause.json'
 $ProcessIdentity = Join-Path $PSScriptRoot 'process-identity.ps1'
 
 if (-not (Test-Path -LiteralPath $ProcessIdentity)) {
@@ -62,4 +63,5 @@ if ($task) {
   Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
 }
 Remove-Item -LiteralPath $RegistrationPath -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $HookPausePath -Force -ErrorAction SilentlyContinue
 Write-Host 'Codex Miku Stage auto hook was unregistered.'
