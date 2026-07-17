@@ -112,6 +112,57 @@ remove_reopen_recovery() {
   /bin/rm -f "$RECOVERY_PLIST_PATH"
 }
 
+install_reopen_recovery_agent() {
+  ensure_state_root
+  [ -x "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" ] \
+    || fail "Recovery watcher is missing or not executable: $PROJECT_ROOT/scripts/watch-dream-skin-macos.sh"
+  /bin/mkdir -p "$RECOVERY_LAUNCH_AGENTS_DIR"
+  /usr/bin/python3 - \
+    "$RECOVERY_PLIST_PATH" \
+    "$RECOVERY_JOB_LABEL" \
+    "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" \
+    "$HOME" \
+    "$RECOVERY_LOG" \
+    "$RECOVERY_ERROR_LOG" <<'PY'
+import os
+import plistlib
+import sys
+import tempfile
+
+path, label, watcher, home, stdout, stderr = sys.argv[1:]
+payload = {
+    "Label": label,
+    "ProgramArguments": ["/bin/bash", watcher, "--watch"],
+    "EnvironmentVariables": {"HOME": home},
+    "RunAtLoad": True,
+    "KeepAlive": True,
+    "ThrottleInterval": 5,
+    "StandardOutPath": stdout,
+    "StandardErrorPath": stderr,
+}
+fd, temporary = tempfile.mkstemp(
+    prefix=f".{os.path.basename(path)}.",
+    dir=os.path.dirname(path),
+)
+try:
+    with os.fdopen(fd, "wb") as stream:
+        plistlib.dump(payload, stream, sort_keys=True)
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+finally:
+    try:
+        os.unlink(temporary)
+    except FileNotFoundError:
+        pass
+PY
+  enable_reopen_recovery
+  local launchctl_bin="${DREAM_SKIN_LAUNCHCTL:-/bin/launchctl}"
+  "$launchctl_bin" bootout "gui/$(/usr/bin/id -u)/$RECOVERY_JOB_LABEL" >/dev/null 2>&1 || true
+  "$launchctl_bin" bootstrap "gui/$(/usr/bin/id -u)" "$RECOVERY_PLIST_PATH" >/dev/null 2>&1 \
+    || fail "Could not install the Codex reopen recovery LaunchAgent."
+  "$launchctl_bin" kickstart -k "gui/$(/usr/bin/id -u)/$RECOVERY_JOB_LABEL" >/dev/null 2>&1 || true
+}
+
 discover_codex_app() {
   local candidate=""
   local identifier=""

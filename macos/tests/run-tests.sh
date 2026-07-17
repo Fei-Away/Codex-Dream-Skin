@@ -684,6 +684,27 @@ HOME="$RECOVERY_HOME" \
   "$ROOT/scripts/watch-dream-skin-macos.sh" --once
 [ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "1" ]
 
+RECOVERY_AGENT_HOME="$TMP/recovery-agent-home"
+RECOVERY_AGENT_DIR="$TMP/launch-agents"
+/bin/mkdir -p "$RECOVERY_AGENT_HOME" "$RECOVERY_AGENT_DIR"
+DREAM_SKIN_LAUNCH_AGENTS_DIR="$RECOVERY_AGENT_DIR" \
+DREAM_SKIN_LAUNCHCTL=/usr/bin/true \
+HOME="$RECOVERY_AGENT_HOME" \
+  /bin/bash -c '. "$1/scripts/common-macos.sh"; ensure_state_root; install_reopen_recovery_agent' _ "$ROOT"
+RECOVERY_PLIST="$RECOVERY_AGENT_DIR/com.openai.codex-dream-skin-studio.reopen-recovery.plist"
+[ -f "$RECOVERY_PLIST" ]
+[ "$(/usr/bin/plutil -extract Label raw -o - "$RECOVERY_PLIST")" = "com.openai.codex-dream-skin-studio.reopen-recovery" ]
+/usr/bin/plutil -extract ProgramArguments json -o - "$RECOVERY_PLIST" | /usr/bin/grep -q 'watch-dream-skin-macos.sh'
+if /usr/bin/plutil -extract ProgramArguments json -o - "$RECOVERY_PLIST" | /usr/bin/grep -Eq 'ChatGPT|Codex.app|remote-debugging'; then
+  printf 'Recovery LaunchAgent must not launch or babysit Codex.\n' >&2
+  exit 1
+fi
+[ -f "$RECOVERY_AGENT_HOME/Library/Application Support/CodexDreamSkinStudio/reopen-recovery.enabled" ]
+/usr/bin/grep -q 'install_reopen_recovery_agent' "$ROOT/scripts/install-dream-skin-macos.sh"
+/usr/bin/grep -q 'enable_reopen_recovery' "$ROOT/scripts/start-dream-skin-macos.sh"
+/usr/bin/grep -q 'disable_reopen_recovery' "$ROOT/scripts/pause-dream-skin-macos.sh"
+/usr/bin/grep -q 'remove_reopen_recovery' "$ROOT/scripts/restore-dream-skin-macos.sh"
+
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
 /usr/bin/printf '%s\n' \

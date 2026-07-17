@@ -18,6 +18,7 @@ done
 discover_codex_app
 require_macos_runtime
 ensure_state_root
+disable_reopen_recovery
 
 if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   saved_port="$(state_field port 2>/dev/null || true)"

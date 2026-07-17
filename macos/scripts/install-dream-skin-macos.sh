@@ -99,3 +99,5 @@ printf 'Bundled presets are ready in your theme library — pick one from the me
 if [ "$LAUNCH_AFTER_INSTALL" = "true" ]; then
   "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --prompt-restart
 fi
+
+install_reopen_recovery_agent

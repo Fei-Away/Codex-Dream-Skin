@@ -32,6 +32,7 @@ case "$PORT" in ''|*[!0-9]*) fail "Invalid port: $PORT" ;; esac
 discover_codex_app
 require_macos_runtime
 ensure_state_root
+enable_reopen_recovery
 
 if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   saved_port="$(state_field port)" || fail "Could not read the existing state port."
