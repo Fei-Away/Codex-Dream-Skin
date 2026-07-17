@@ -69,6 +69,12 @@ try {
     await assert.rejects(validateSource(fixture.directory), (error) => error.code === fixtureCase.code);
   }
 
+  const uppercaseHttp = await sourceFixture("uppercase-http", (manifest) => {
+    manifest.author.url = "HTTP://example.com/theme";
+  });
+  assert.deepEqual(jsonSchemaErrors(sourceSchema, uppercaseHttp.manifest), []);
+  assert.equal((await validateSource(uppercaseHttp.directory)).pass, true);
+
   const goldenBytes = await fs.readFile(path.join(root, "examples", "theme-package", "kimi-sakura-dawn.dreamskin"));
   const entries = readStrictZip(goldenBytes);
   const packagedManifest = JSON.parse(entries.get("manifest.json").toString("utf8"));

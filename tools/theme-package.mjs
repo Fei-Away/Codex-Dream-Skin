@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import path from "node:path";
-import { validateSource, ThemePackageError } from "../lib/theme-package/validate-source.mjs";
+import { ThemePackageError } from "../lib/theme-package/errors.mjs";
+import { validateSource } from "../lib/theme-package/validate-source.mjs";
 import { inspectPackage, packSource, publicReport } from "../lib/theme-package/package-operations.mjs";
 
 function usage() {

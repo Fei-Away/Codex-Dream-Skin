@@ -54,7 +54,7 @@
         "url": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://(?![^/?#]*@)",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://(?![^/?#]*@)",
           "maxLength": 2048
         }
       }
