@@ -75,16 +75,42 @@ function Get-DreamSkinProcessExecutablePath {
   }
 }
 
+# Windows PowerShell 5.1 promotes redirected native-command stderr lines to
+# ErrorRecords; while $ErrorActionPreference is 'Stop' the first stderr line
+# becomes a terminating NativeCommandError before the exit code can be read.
+# Run the command with the preference relaxed and report output + exit code.
+function Invoke-DreamSkinNative {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [string[]]$ArgumentList = @(),
+    [switch]$DiscardStderr
+  )
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    if ($DiscardStderr) {
+      $output = @(& $FilePath @ArgumentList 2>$null | ForEach-Object { "$_" })
+    } else {
+      $output = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" })
+    }
+    return [pscustomobject]@{ Output = $output; ExitCode = $LASTEXITCODE }
+  } finally {
+    $ErrorActionPreference = $previousPreference
+  }
+}
+
 function Get-DreamSkinNodeRuntime {
   param([int]$MinimumMajor = 22)
 
   $command = Get-Command node.exe -ErrorAction SilentlyContinue
   if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
   if (-not $command) { throw "Node.js $MinimumMajor or newer is required and was not found in PATH." }
-  $version = "$(& $command.Source -p 'process.versions.node' 2>$null)".Trim()
-  if ($LASTEXITCODE -ne 0 -or -not $version) { throw 'The Node.js runtime could not be validated.' }
-  $runtimePath = "$(& $command.Source -p 'process.execPath' 2>$null)".Trim()
-  if ($LASTEXITCODE -ne 0 -or -not $runtimePath -or -not (Test-Path -LiteralPath $runtimePath)) {
+  $versionProbe = Invoke-DreamSkinNative -FilePath $command.Source -ArgumentList @('-p', 'process.versions.node') -DiscardStderr
+  $version = ($versionProbe.Output -join '').Trim()
+  if ($versionProbe.ExitCode -ne 0 -or -not $version) { throw 'The Node.js runtime could not be validated.' }
+  $pathProbe = Invoke-DreamSkinNative -FilePath $command.Source -ArgumentList @('-p', 'process.execPath') -DiscardStderr
+  $runtimePath = ($pathProbe.Output -join '').Trim()
+  if ($pathProbe.ExitCode -ne 0 -or -not $runtimePath -or -not (Test-Path -LiteralPath $runtimePath)) {
     throw 'The Node.js executable path could not be validated.'
   }
   $major = 0
