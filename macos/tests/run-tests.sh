@@ -295,6 +295,17 @@ TRUSTED_NODE="$TMP/trusted-node"
 /usr/bin/grep -F -q -- '--test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$CODEX_BUNDLE"' "$ROOT/scripts/common-macos.sh"
 /usr/bin/grep -F -q -- '--test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$RUNTIME_NODE"' "$ROOT/scripts/common-macos.sh"
 
+# The menu-bar entrypoint must validate the official runtime before reading
+# state through state_field, which executes the selected bundled Node binary.
+MENUBAR_APPLY="$ROOT/scripts/apply-from-menubar-macos.sh"
+MENUBAR_RUNTIME_LINE="$(/usr/bin/grep -n -F 'if ! require_macos_runtime' "$MENUBAR_APPLY" | /usr/bin/head -n 1 | /usr/bin/cut -d: -f1)"
+MENUBAR_STATE_LINE="$(/usr/bin/grep -n -F 'saved_port="$(state_field port' "$MENUBAR_APPLY" | /usr/bin/head -n 1 | /usr/bin/cut -d: -f1)"
+[ -n "$MENUBAR_RUNTIME_LINE" ] && [ -n "$MENUBAR_STATE_LINE" ] \
+  && [ "$MENUBAR_RUNTIME_LINE" -lt "$MENUBAR_STATE_LINE" ] || {
+  printf 'Menu-bar state reads must follow official runtime validation.\n' >&2
+  exit 1
+}
+
 # A reused live PID must never be killed or treated as a successfully stopped
 # injector when its command identity does not match the recorded watcher.
 STOP_HOME="$TMP/stop-home"

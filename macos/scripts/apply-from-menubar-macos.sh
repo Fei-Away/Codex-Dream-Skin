@@ -51,12 +51,6 @@ progress "已收到点击…"
   exit 1
 }
 
-PORT=9341
-if [ -f "$STATE_PATH" ]; then
-  saved_port="$(state_field port 2>/dev/null || true)"
-  [ -n "${saved_port:-}" ] && PORT="$saved_port"
-fi
-
 CHEAP_RUNNING="false"
 /usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 && CHEAP_RUNNING="true"
 
@@ -82,6 +76,14 @@ fi
 if ! require_macos_runtime >>"$LOG_OUT" 2>&1; then
   alert "Codex 运行时校验失败。"
   exit 1
+fi
+
+# state_field runs the bundled Node runtime, so do not inspect saved state
+# until the official runtime has been selected and validated.
+PORT=9341
+if [ -f "$STATE_PATH" ]; then
+  saved_port="$(state_field port 2>/dev/null || true)"
+  [ -n "${saved_port:-}" ] && PORT="$saved_port"
 fi
 
 ensure_state_root
