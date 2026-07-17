@@ -119,6 +119,12 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
   <sub>舞台黑金</sub>
 </p>
 
+## 外部主题作者套件（开发中）
+
+Kimi、其他 AI Agent 或人工开发者现在可以按 [`.dreamskin` v1 契约](./docs/THEME_PACKAGE.md)制作零代码主题源目录，并用仓库提供的 `validate / pack / inspect` 工具生成、检查单文件主题包。可直接使用 [Kimi 提示词](./docs/KIMI_THEME_AUTHORING_PROMPT.md)和[示例源目录](./examples/theme-package/kimi-sakura-dawn/)。
+
+> 作者工具与 golden 包已经可测试；macOS/Windows 的最终用户导入入口仍在本功能分支后续模块中实现。当前正式版本请继续使用各平台已有的选图与本地主题切换入口。
+
 ## 它能做什么
 
 - **真·可交互**：侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去

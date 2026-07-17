@@ -7,8 +7,8 @@
 - 判断：完成关键事项后实施。
 - 当前依据：`PRD.md`、`BUSINESS.md`、`TECHNICAL.md` 与当前 macOS/Windows 主题代码。
 - 核心事实源与验证入口：现有 injector `--check-payload`、macOS `stage-theme.mjs`/`switch-theme-macos.sh`、Windows `theme-windows.ps1` 与两端测试套件。
-- 关键外部能力与目标环境验证状态：不依赖 AI/API；macOS ZIP 安全读取方式待验证。
-- 阻塞进入完整实施的问题：v1 字段/能力契约、ZIP 适配器、安全恶意夹具、PR #123 或等价载荷加固。
+- 关键外部能力与目标环境验证状态：不依赖 AI/API 或第三方归档库；作者工具的纯 Node ZIP 路线已经 hostile fixtures 验证，平台流式 importer 留在模块二。
+- 原候选阻塞的处理：v1 字段/能力契约、作者 ZIP 适配器、安全恶意夹具和 PR #123 等价载荷加固已经被正式 Plan 的模块一采纳。
 - 不阻塞但需要跟踪的问题：macOS 确认页的图形预览形式；主题素材许可信息如何展示。
 
 ## 2. Goal 候选
@@ -38,7 +38,7 @@
 - scope：验证 ZIP 技术路线；定义 `THEME_PACKAGE.md`、manifest/theme Schema、能力矩阵、错误码；提供示例源目录、Kimi/通用 Agent 提示词、`validate/pack/inspect` CLI 和 golden fixtures。
 - 非目标：写入用户主题库、菜单/托盘入口、自动应用。
 - 主要交付物：公开契约、Schema、作者文档、示例、包工具、合法与恶意容器夹具。
-- 前置依赖：确定 PR #123 集成方式；macOS ZIP 读取最小验证。
+- 前置依赖：已选择性带入 PR #123 核心修复；纯 Node ZIP 作者工具已完成最小验证。
 - 可验证 DoD：合法示例可重复打包并通过 inspect；所有 invalid fixtures 返回稳定错误码；Node 22 CI 通过；工具不联网且不写用户状态。
 - QA 边界与方法：只验证包层与作者体验，不以平台 importer fallback 代替契约测试。
 - 后续候选模块：共享导入核心与主题库事务。

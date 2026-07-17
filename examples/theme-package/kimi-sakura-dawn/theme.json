@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "name": "Kimi Sakura Dawn",
+  "background": "background",
+  "appearance": "auto",
+  "text": {
+    "tagline": "让樱花晨光落进 Codex 工作台。",
+    "quote": "MAKE SOMETHING WONDERFUL"
+  },
+  "art": {
+    "focusX": 0.72,
+    "focusY": 0.45,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "palette": {
+    "accent": "#e25563",
+    "accentAlt": "#f07a86",
+    "secondary": "#f3a8af",
+    "highlight": "#c93d4c"
+  }
+}

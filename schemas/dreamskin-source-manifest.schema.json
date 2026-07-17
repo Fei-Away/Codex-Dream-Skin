@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Fei-Away/Codex-Dream-Skin/schemas/dreamskin-source-manifest.schema.json",
+  "title": "Dream Skin v1 author source manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "packageId",
+    "packageVersion",
+    "name",
+    "author",
+    "targets",
+    "minimumDreamSkinVersion",
+    "resources"
+  ],
+  "properties": {
+    "formatVersion": { "const": 1 },
+    "packageId": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"
+    },
+    "packageVersion": { "$ref": "#/$defs/semver" },
+    "name": { "$ref": "#/$defs/name" },
+    "author": { "$ref": "#/$defs/author" },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "enum": ["macos", "windows"] }
+    },
+    "minimumDreamSkinVersion": { "$ref": "#/$defs/semver" },
+    "resources": { "$ref": "#/$defs/resources" }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "url": { "type": "string", "format": "uri", "maxLength": 2048 }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "mediaType"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^assets/[a-z0-9][a-z0-9._-]*$", "maxLength": 180 },
+        "mediaType": { "enum": ["image/png", "image/jpeg", "image/webp"] }
+      },
+      "oneOf": [
+        { "properties": { "path": { "pattern": "\\.png$" }, "mediaType": { "const": "image/png" } } },
+        { "properties": { "path": { "pattern": "\\.jpe?g$" }, "mediaType": { "const": "image/jpeg" } } },
+        { "properties": { "path": { "pattern": "\\.webp$" }, "mediaType": { "const": "image/webp" } } }
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background"],
+      "properties": {
+        "background": { "$ref": "#/$defs/resource" },
+        "preview": { "$ref": "#/$defs/resource" }
+      }
+    }
+  }
+}

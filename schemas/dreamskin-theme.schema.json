@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Fei-Away/Codex-Dream-Skin/schemas/dreamskin-theme.schema.json",
+  "title": "Dream Skin v1 portable theme",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "background", "appearance", "text", "art", "palette"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "name": { "$ref": "#/$defs/singleLine80" },
+    "background": { "const": "background" },
+    "appearance": { "enum": ["auto", "light", "dark"] },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tagline", "quote"],
+      "properties": {
+        "tagline": { "$ref": "#/$defs/singleLine160" },
+        "quote": { "$ref": "#/$defs/singleLine80" }
+      }
+    },
+    "art": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["focusX", "focusY", "safeArea", "taskMode"],
+      "properties": {
+        "focusX": { "type": "number", "minimum": 0, "maximum": 1 },
+        "focusY": { "type": "number", "minimum": 0, "maximum": 1 },
+        "safeArea": { "enum": ["auto", "left", "right", "center", "none"] },
+        "taskMode": { "enum": ["auto", "ambient", "banner", "off"] }
+      }
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accent", "accentAlt", "secondary", "highlight"],
+      "properties": {
+        "accent": { "$ref": "#/$defs/color" },
+        "accentAlt": { "$ref": "#/$defs/color" },
+        "secondary": { "$ref": "#/$defs/color" },
+        "highlight": { "$ref": "#/$defs/color" }
+      }
+    }
+  },
+  "$defs": {
+    "singleLine80": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]+$"
+    },
+    "singleLine160": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]+$"
+    },
+    "color": { "type": "string", "pattern": "^#[0-9a-f]{6}$" }
+  }
+}

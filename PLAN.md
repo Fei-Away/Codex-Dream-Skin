@@ -106,6 +106,6 @@ QA boundary: macOS PowerShell parsing is not evidence of Windows behavior; final
 
 ## Known external evidence gates
 
-- macOS archive handling is decided by the module-one hostile-fixture spike, not by the mere presence of a system ZIP tool.
+- Module-one hostile fixtures selected a repository-owned pure Node ZIP route; module two must still prove file-handle streaming and bounded abort behavior before platform import.
 - Windows behavior is not declared complete without native PowerShell 5.1/7 evidence.
 - If a third-party archive dependency is introduced, add `docs/CAPABILITIES.md` with version, license, supply-chain, and release-bundling evidence before adoption.

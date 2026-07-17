@@ -1,0 +1,21 @@
+{
+  "formatVersion": 1,
+  "packageId": "dev.codex-dream-skin.kimi-sakura-dawn",
+  "packageVersion": "1.0.0",
+  "name": "Kimi Sakura Dawn",
+  "author": {
+    "name": "Dream Skin Example Authors",
+    "url": "https://github.com/Fei-Away/Codex-Dream-Skin"
+  },
+  "targets": [
+    "macos",
+    "windows"
+  ],
+  "minimumDreamSkinVersion": "1.2.0",
+  "resources": {
+    "background": {
+      "path": "assets/background.jpg",
+      "mediaType": "image/jpeg"
+    }
+  }
+}

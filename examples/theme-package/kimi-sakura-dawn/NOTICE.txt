@@ -1,0 +1,2 @@
+This example reuses the repository's generated Sakura Dawn preset artwork.
+See macos/references/asset-provenance.md for provenance and generation notes.
