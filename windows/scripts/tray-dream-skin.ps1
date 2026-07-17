@@ -15,6 +15,7 @@ $paths = Initialize-DreamSkinThemeStore -SkillRoot $SkillRoot -StateRoot $StateR
 $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
 $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
 $restoreScript = Join-Path $PSScriptRoot 'restore-dream-skin.ps1'
+$studioScript = Join-Path $PSScriptRoot 'theme-studio-windows.ps1'
 
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
@@ -41,9 +42,14 @@ try {
   }
 
   function Start-DreamSkinPowerShell {
-    param([Parameter(Mandatory = $true)][string]$Script, [string[]]$Arguments = @())
+    param(
+      [Parameter(Mandatory = $true)][string]$Script,
+      [string[]]$Arguments = @(),
+      [switch]$Sta
+    )
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
-    $argumentLine = '-NoProfile -ExecutionPolicy Bypass -File ' + $scriptToken
+    $staArgument = if ($Sta) { ' -STA' } else { '' }
+    $argumentLine = '-NoProfile' + $staArgument + ' -ExecutionPolicy Bypass -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
     Start-Process -FilePath $powershell -ArgumentList $argumentLine | Out-Null
   }
@@ -90,20 +96,8 @@ try {
       Set-DreamSkinPaused -Paused $nextPaused -StateRoot $StateRoot | Out-Null
     }.GetNewClosure()
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text $pauseText -Action $pauseAction
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '更换背景图' -Action {
-      $dialog = [System.Windows.Forms.OpenFileDialog]::new()
-      $dialog.Title = '选择 Codex Dream Skin 背景图'
-      $dialog.Filter = 'Image files|*.png;*.jpg;*.jpeg;*.webp|All files|*.*'
-      $dialog.Multiselect = $false
-      try {
-        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-          $null = Set-DreamSkinActiveTheme -ImagePath $dialog.FileName -Theme $null -StateRoot $StateRoot
-          Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '背景图已更新。', [System.Windows.Forms.ToolTipIcon]::Info)
-        }
-      } finally {
-        $dialog.Dispose()
-      }
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '更换背景图 / 主题工作室' -Action {
+      Start-DreamSkinPowerShell -Script $studioScript -Sta
     }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Action {
       $name = [Microsoft.VisualBasic.Interaction]::InputBox('输入主题名称：', '保存 Codex Dream Skin 主题', '')

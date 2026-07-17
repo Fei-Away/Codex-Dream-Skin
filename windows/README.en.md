@@ -25,6 +25,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
 
 - `Codex Dream Skin`: launch or reapply the skin.
+- `Codex Dream Skin - Theme Studio`: separately drag, preview, apply, and save sidebar and workspace art.
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
@@ -63,14 +64,21 @@ Next, use the generated screenshot to check horizontal overflow and text contras
 
 ## Change and save themes
 
-Open `Codex Dream Skin - Tray` to:
+Open `Codex Dream Skin - Theme Studio` to drop separate images into the **Sidebar** and **Workspace** zones, inspect their previews, dimensions, and sizes, then name and apply the result. Select **Save to saved themes** to preserve both images as one preset. Workspace art is required; sidebar art is optional, and omitting it preserves the compatible single-image layout. Images are copied only to `%LOCALAPPDATA%\CodexDreamSkin`; nothing is uploaded to the network.
 
-- Import a PNG, JPEG, or WebP background.
+You can also choose **Change background / Theme Studio** from the system tray. The tray continues to provide these actions:
+
 - Save the active theme and switch through saved themes.
 - Pause or resume the skin.
 - Reapply the theme or fully restore Codex.
 
-Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
+Open Theme Studio directly from the source tree:
+
+```powershell
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\scripts\theme-studio-windows.ps1
+```
+
+Import UI-free artwork rather than previews containing a window, sidebar, composer, text, or buttons. Each image may be at most 16384 pixels on either side and 50 million total pixels; both images in a split theme may use at most 16 MB combined.
 
 ## Restore and remove shortcuts
 

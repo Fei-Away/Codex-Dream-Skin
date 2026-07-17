@@ -58,6 +58,7 @@ function Get-DreamSkinRuntimeEnginePaths {
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
+    Studio = Join-Path $scripts 'theme-studio-windows.ps1'
   }
 }
 
@@ -137,6 +138,7 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\install-dream-skin.ps1',
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
+    'scripts\theme-studio-windows.ps1',
     'scripts\theme-windows.ps1',
     'scripts\tray-dream-skin.ps1',
     'scripts\verify-dream-skin.ps1'

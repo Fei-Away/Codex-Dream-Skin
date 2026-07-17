@@ -32,7 +32,8 @@ try {
   if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
     -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
+    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot) -or
+    -not (Test-DreamSkinPathWithin -Path $engine.Studio -Root $runtimeStateRoot)) {
     throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
   }
   foreach ($sourceFile in $runtimeSourceFiles) {
@@ -127,9 +128,11 @@ try {
     '$startScript = $engine.Start',
     '$restoreScript = $engine.Restore',
     '$trayScript = $engine.Tray',
+    '$studioScript = $engine.Studio',
     '$shortcut.WorkingDirectory = $engine.Root',
     '$restore.WorkingDirectory = $engine.Root',
-    '$tray.WorkingDirectory = $engine.Root'
+    '$tray.WorkingDirectory = $engine.Root',
+    '$studio.WorkingDirectory = $engine.Root'
   )) {
     if (-not $installSource.Contains($requiredShortcutBinding)) {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
@@ -149,8 +152,9 @@ try {
   }
   if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
-    throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
+    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.Studio -PathType Leaf)) {
+    throw 'Installed launch, restore, tray, or Theme Studio entry point disappeared with the source checkout.'
   }
   Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
 
@@ -647,6 +651,47 @@ try {
   }
   $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot
 
+  $dualTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -SidebarImagePath (Join-Path $Root 'assets\dream-reference.jpg') -Theme $null `
+    -Name '双分区主题' -StateRoot $themeStateRoot
+  if ($dualTheme.Theme.name -cne '双分区主题' -or -not $dualTheme.Theme.sidebarImage -or
+    -not $dualTheme.SidebarImagePath -or
+    -not (Test-DreamSkinThemePathWithin -Path $dualTheme.ImagePath -Root $themePaths.Active) -or
+    -not (Test-DreamSkinThemePathWithin -Path $dualTheme.SidebarImagePath -Root $themePaths.Active)) {
+    throw 'Split-theme import did not publish independently managed workspace and sidebar images.'
+  }
+  $savedDualTheme = Save-DreamSkinCurrentTheme -Name '已保存双分区主题' -StateRoot $themeStateRoot
+  if (-not $savedDualTheme.SidebarImagePath -or
+    @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 3) {
+    throw 'Saved split theme did not preserve both managed images.'
+  }
+  $restoredDualTheme = Use-DreamSkinSavedTheme -ThemeDirectory $savedDualTheme.Directory `
+    -StateRoot $themeStateRoot
+  if (-not $restoredDualTheme.SidebarImagePath -or -not $restoredDualTheme.Theme.sidebarImage) {
+    throw 'Switching to a saved split theme dropped its sidebar image.'
+  }
+
+  $combinedWorkspace = Join-Path $temporaryRoot 'combined-workspace.jpg'
+  $combinedSidebar = Join-Path $temporaryRoot 'combined-sidebar.jpg'
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') -Destination $combinedWorkspace
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') -Destination $combinedSidebar
+  foreach ($combinedImage in @($combinedWorkspace, $combinedSidebar)) {
+    $combinedStream = [System.IO.File]::Open(
+      $combinedImage, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write
+    )
+    try { $combinedStream.SetLength(9MB) } finally { $combinedStream.Dispose() }
+  }
+  $combinedRejected = $false
+  try {
+    $null = Set-DreamSkinActiveTheme -ImagePath $combinedWorkspace `
+      -SidebarImagePath $combinedSidebar -Theme $null -StateRoot $themeStateRoot
+  } catch { $combinedRejected = $true }
+  $afterCombinedRejection = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
+  if (-not $combinedRejected -or -not $afterCombinedRejection.SidebarImagePath -or
+    $afterCombinedRejection.Theme.name -cne '已保存双分区主题') {
+    throw 'Combined split-theme size validation changed the active theme on rejection.'
+  }
+
   $outsideTheme = Join-Path $temporaryRoot 'outside-theme'
   New-Item -ItemType Directory -Path $outsideTheme | Out-Null
   Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
@@ -710,6 +755,8 @@ try {
   $css = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\dream-skin.css')
   foreach ($requiredCss in @(
     'background-image: var(--dream-art)',
+    'var(--dream-sidebar-art)',
+    'dream-art-split',
     'main.main-surface > header.app-header-tint',
     '[class~="group/application-menu-top-bar"]',
     '.app-shell-main-content-top-fade',
@@ -732,6 +779,37 @@ try {
   if (-not $traySource.Contains('Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata') -or
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
+  }
+  $studioSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-studio-windows.ps1')
+  foreach ($requiredStudioBehavior in @(
+    'System.Windows.Forms.OpenFileDialog',
+    'AllowDrop = $true',
+    'Get-DreamSkinStudioImageInfo',
+    'Set-DreamSkinActiveTheme',
+    'Save-DreamSkinCurrentTheme',
+    'Enter-DreamSkinOperationLock',
+    '不会上传到网络'
+  )) {
+    if (-not $studioSource.Contains($requiredStudioBehavior)) {
+      throw "Theme Studio behavior is missing: $requiredStudioBehavior"
+    }
+  }
+  $studioValidationState = Join-Path $temporaryRoot 'studio-validation-state'
+  $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
+  $studioValidation = Invoke-DreamSkinNative -FilePath $powershell -ArgumentList @(
+    '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File',
+    (Join-Path $Root 'scripts\theme-studio-windows.ps1'), '-ValidateOnly', '-ImagePath',
+    (Join-Path $Root 'assets\dream-reference.jpg'), '-StateRoot', $studioValidationState
+  )
+  if ($studioValidation.ExitCode -ne 0) {
+    throw "Theme Studio validation mode failed: $($studioValidation.Output -join ' ')"
+  }
+  try { $studioInfo = ($studioValidation.Output -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch {
+    throw 'Theme Studio validation mode returned invalid JSON.'
+  }
+  if ($studioInfo.Width -ne 2560 -or $studioInfo.Height -ne 1440 -or
+    $studioInfo.Extension -cne '.jpg' -or $studioInfo.Bytes -lt 1) {
+    throw 'Theme Studio validation did not report the bundled image metadata.'
   }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
@@ -772,6 +850,7 @@ try {
   $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
   foreach ($requiredInjectorBehavior in @(
     'MAX_ART_BYTES', 'createHash', 'readImageMetadata', '50MP safety limit', 'STRONG_THEME_AUDIT_MS',
+    'sidebarImage', 'Combined theme images exceed',
     'Page.addScriptToEvaluateOnNewDocument', 'Page.removeScriptToEvaluateOnNewDocument', 'earlyPayloadFor'
   )) {
     if (-not $injectorSource.Contains($requiredInjectorBehavior)) {
@@ -784,6 +863,7 @@ try {
     'Ensure-DreamSkinManagedDirectory',
     'Get-DreamSkinValidatedImageMetadata',
     '16384px / 50MP safety limit',
+    'Combined theme images exceed the 16 MB limit',
     'Assert-DreamSkinImageFile -Path $temporary',
     'Assert-DreamSkinImageFile -Path $imageArchive'
   )) {
@@ -817,6 +897,13 @@ try {
   $managedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
   if ($managedPayloadTest.ExitCode -ne 0) { throw 'Managed theme payload validation failed.' }
+  try { $managedPayload = ($managedPayloadTest.Output -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch {
+    throw 'Managed split-theme payload validation returned invalid JSON.'
+  }
+  if (-not $managedPayload.sidebarImage -or $managedPayload.sidebarArtMetadata.width -ne 2560 -or
+    $managedPayload.sidebarArtMetadata.height -ne 1440) {
+    throw 'Managed payload did not include validated sidebar image metadata.'
+  }
   $oversizedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $oversizedTheme)
   if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }
@@ -832,6 +919,9 @@ try {
   $imageMetadataTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'image-metadata.test.mjs'))
   if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }
+  $splitThemeTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'split-theme.test.mjs'))
+  if ($splitThemeTest.ExitCode -ne 0) { throw 'Split-theme payload regression test failed.' }
 
   Write-Host 'PASS: config transactions, restore scoping, state safety, argument quoting, and loopback CDP validation.'
 } finally {

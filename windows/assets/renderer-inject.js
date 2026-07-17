@@ -1,4 +1,4 @@
-((cssText, artDataUrl, rawConfig) => {
+((cssText, artDataUrl, sidebarArtDataUrl, rawConfig) => {
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
@@ -8,6 +8,7 @@
     "dream-theme-dark",
     "dream-art-wide",
     "dream-art-standard",
+    "dream-art-split",
     "dream-focus-left",
     "dream-focus-center",
     "dream-focus-right",
@@ -22,6 +23,8 @@
   const ROOT_PROPERTIES = [
     "--dream-art",
     "--dream-art-position",
+    "--dream-sidebar-art",
+    "--dream-sidebar-art-position",
     "--dream-focus-x",
     "--dream-focus-y",
     "--dream-accent",
@@ -90,14 +93,19 @@
   if (previous?.timer) clearInterval(previous.timer);
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
   if (previous?.artUrl) URL.revokeObjectURL(previous.artUrl);
-  const artUrl = (() => {
-    const comma = artDataUrl.indexOf(",");
-    const binary = atob(artDataUrl.slice(comma + 1));
+  if (previous?.sidebarArtUrl) URL.revokeObjectURL(previous.sidebarArtUrl);
+  const createArtUrl = (dataUrl) => {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) return null;
+    const comma = dataUrl.indexOf(",");
+    if (comma < 0) return null;
+    const binary = atob(dataUrl.slice(comma + 1));
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    const mime = /^data:([^;,]+)/.exec(artDataUrl)?.[1] || "image/png";
+    const mime = /^data:([^;,]+)/.exec(dataUrl)?.[1] || "image/png";
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
-  })();
+  };
+  const artUrl = createArtUrl(artDataUrl);
+  const sidebarArtUrl = createArtUrl(sidebarArtDataUrl);
   const config = normalizeConfig(rawConfig);
   let profile = {
     ...defaultProfile,
@@ -301,8 +309,11 @@
     const accentInk = luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
     root.classList.toggle("dream-theme-light", appearance === "light");
     root.classList.toggle("dream-theme-dark", appearance === "dark");
-    root.classList.toggle("dream-art-wide", profile.aspect >= 1.75);
-    root.classList.toggle("dream-art-standard", profile.aspect < 1.75);
+    const splitArt = Boolean(sidebarArtUrl);
+    const immersiveArt = splitArt || profile.aspect >= 1.75;
+    root.classList.toggle("dream-art-wide", immersiveArt);
+    root.classList.toggle("dream-art-standard", !immersiveArt);
+    root.classList.toggle("dream-art-split", splitArt);
     for (const value of ["left", "center", "right"]) {
       root.classList.toggle(`dream-focus-${value}`, focus === value);
     }
@@ -314,6 +325,13 @@
     }
     root.style.setProperty("--dream-art", `url("${artUrl}")`);
     root.style.setProperty("--dream-art-position", `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`);
+    if (sidebarArtUrl) {
+      root.style.setProperty("--dream-sidebar-art", `url("${sidebarArtUrl}")`);
+      root.style.setProperty("--dream-sidebar-art-position", "50% 50%");
+    } else {
+      root.style.removeProperty("--dream-sidebar-art");
+      root.style.removeProperty("--dream-sidebar-art-position");
+    }
     root.style.setProperty("--dream-focus-x", String(focusX));
     root.style.setProperty("--dream-focus-y", String(focusY));
     root.style.setProperty("--dream-accent", accent);
@@ -379,6 +397,7 @@
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
+    if (state?.sidebarArtUrl) URL.revokeObjectURL(state.sidebarArtUrl);
     delete window[STATE_KEY];
     return true;
   };
@@ -403,7 +422,8 @@
   });
   const timer = setInterval(ensure, 5000);
   window[STATE_KEY] = {
-    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
+    ensure, cleanup, observer, timer, scheduler, artUrl, sidebarArtUrl,
+    profile, config, installToken, version: "1.2.0",
   };
   ensure();
   analyzeArt().then((result) => {
@@ -414,4 +434,4 @@
     ensure();
   });
   return { installed: true, version: "1.2.0", adaptive: true };
-})(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__)
+})(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_SIDEBAR_ART_JSON__, __DREAM_THEME_JSON__)

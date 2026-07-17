@@ -304,6 +304,39 @@ function normalizedText(value, name, fallback, maxLength = 120) {
   return value;
 }
 
+async function loadThemeImage(realThemeDir, image, label) {
+  if (!image || path.isAbsolute(image)) throw new Error(`${label} must be a relative path`);
+  const imagePath = path.resolve(realThemeDir, image);
+  const relativeImage = path.relative(realThemeDir, imagePath);
+  if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
+    throw new Error(`${label} must remain inside the selected theme directory`);
+  }
+  const extension = path.extname(imagePath).toLowerCase();
+  if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) {
+    throw new Error(`Unsupported ${label.toLowerCase()} format: ${extension || "missing"}`);
+  }
+  const realImagePath = await fs.realpath(imagePath);
+  const realRelativeImage = path.relative(realThemeDir, realImagePath);
+  if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
+    throw new Error(`${label} cannot escape through a link or junction`);
+  }
+  const imageStat = await fs.stat(realImagePath);
+  if (!imageStat.isFile()) throw new Error(`${label} is not a file`);
+  if (imageStat.size < 1) throw new Error(`${label} cannot be empty`);
+  if (imageStat.size > MAX_ART_BYTES) {
+    throw new Error(`${label} exceeds the ${MAX_ART_BYTES / 1024 / 1024} MB limit`);
+  }
+  const imageBytes = await fs.readFile(realImagePath);
+  if (imageBytes.length < 1 || imageBytes.length > MAX_ART_BYTES) {
+    throw new Error(`${label} must be between 1 byte and ${MAX_ART_BYTES / 1024 / 1024} MB`);
+  }
+  const metadata = readImageMetadata(imageBytes, extension);
+  if (!metadata) {
+    throw new Error(`${label} metadata is invalid or exceeds the 16384px / 50MP safety limit`);
+  }
+  return { image, imagePath: realImagePath, imageBytes, imageStat, metadata, extension };
+}
+
 async function loadTheme(themeDir) {
   const realThemeDir = await fs.realpath(themeDir);
   const themePath = path.join(realThemeDir, "theme.json");
@@ -313,20 +346,19 @@ async function loadTheme(themeDir) {
     throw new Error("Theme root must be an object");
   }
   const image = normalizedText(raw.image, "image", null, 240);
-  if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
-  const imagePath = path.resolve(realThemeDir, image);
-  const relativeImage = path.relative(realThemeDir, imagePath);
-  if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
-    throw new Error("Theme image must remain inside the selected theme directory");
-  }
-  const extension = path.extname(imagePath).toLowerCase();
-  if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) {
-    throw new Error(`Unsupported theme image format: ${extension || "missing"}`);
-  }
-  const realImagePath = await fs.realpath(imagePath);
-  const realRelativeImage = path.relative(realThemeDir, realImagePath);
-  if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
-    throw new Error("Theme image cannot escape through a link or junction");
+  const sidebarImage = normalizedText(raw.sidebarImage, "sidebarImage", null, 240);
+  const primary = await loadThemeImage(realThemeDir, image, "Theme image");
+  const sidebar = sidebarImage
+    ? await loadThemeImage(realThemeDir, sidebarImage, "Sidebar image")
+    : null;
+  const sameImage = sidebar && (process.platform === "win32"
+    ? sidebar.imagePath.toLowerCase() === primary.imagePath.toLowerCase()
+    : sidebar.imagePath === primary.imagePath);
+  const combinedBytes = primary.imageBytes.length + (
+    sidebar && !sameImage ? sidebar.imageBytes.length : 0
+  );
+  if (combinedBytes > MAX_ART_BYTES) {
+    throw new Error(`Combined theme images exceed the ${MAX_ART_BYTES / 1024 / 1024} MB limit`);
   }
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
@@ -344,6 +376,7 @@ async function loadTheme(themeDir) {
     },
     palette: {},
   };
+  if (sidebarImage) theme.sidebarImage = sidebarImage;
   if (typeof palette.accent === "string" && palette.accent.trim()) {
     const accent = palette.accent.trim();
     if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(accent)) {
@@ -351,33 +384,30 @@ async function loadTheme(themeDir) {
     }
     theme.palette.accent = accent;
   }
-  const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
-  if (!imageStat.isFile()) throw new Error("Theme image is not a file");
-  if (imageStat.size < 1) throw new Error("Theme image cannot be empty");
-  if (imageStat.size > MAX_ART_BYTES) {
-    throw new Error(`Theme image exceeds the ${MAX_ART_BYTES / 1024 / 1024} MB limit`);
-  }
-  const imageBytes = await fs.readFile(realImagePath);
-  if (imageBytes.length < 1 || imageBytes.length > MAX_ART_BYTES) {
-    throw new Error(`Theme image must be between 1 byte and ${MAX_ART_BYTES / 1024 / 1024} MB`);
-  }
-  const artMetadata = readImageMetadata(imageBytes, extension);
-  if (!artMetadata) {
-    throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
-  }
-  theme.artMetadata = artMetadata;
+  const themeStat = await fs.stat(themePath);
+  theme.artMetadata = primary.metadata;
+  if (sidebar) theme.sidebarArtMetadata = sidebar.metadata;
   const fingerprint = createHash("sha256")
     .update(themeText, "utf8")
     .update("\0")
-    .update(imageBytes)
+    .update(primary.imageBytes)
+    .update("\0")
+    .update(sidebar?.imageBytes ?? Buffer.alloc(0))
     .digest("hex");
+  const sourceStamp = [
+    `${themeStat.size}:${themeStat.mtimeMs}`,
+    `${primary.imageStat.size}:${primary.imageStat.mtimeMs}`,
+    sidebar ? `${sidebar.imageStat.size}:${sidebar.imageStat.mtimeMs}` : "single",
+  ].join(":");
   return {
     theme,
     themePath,
-    imagePath: realImagePath,
-    imageBytes,
+    imagePath: primary.imagePath,
+    imageBytes: primary.imageBytes,
+    sidebarImagePath: sidebar?.imagePath ?? null,
+    sidebarImageBytes: sidebar?.imageBytes ?? null,
     fingerprint,
-    sourceStamp: `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`,
+    sourceStamp,
   };
 }
 
@@ -391,11 +421,24 @@ async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme 
   const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
     : extension === ".webp" ? "image/webp" : "image/png";
   const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
+  const sidebarExtension = loadedTheme.sidebarImagePath
+    ? path.extname(loadedTheme.sidebarImagePath).toLowerCase()
+    : null;
+  const sidebarMime = sidebarExtension === ".jpg" || sidebarExtension === ".jpeg" ? "image/jpeg"
+    : sidebarExtension === ".webp" ? "image/webp" : "image/png";
+  const sidebarArtDataUrl = loadedTheme.sidebarImageBytes
+    ? `data:${sidebarMime};base64,${loadedTheme.sidebarImageBytes.toString("base64")}`
+    : null;
   const payload = template
     .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
     .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
+    .replace("__DREAM_SIDEBAR_ART_JSON__", JSON.stringify(sidebarArtDataUrl))
     .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme));
-  const { imageBytes: _imageBytes, ...themeState } = loadedTheme;
+  const {
+    imageBytes: _imageBytes,
+    sidebarImageBytes: _sidebarImageBytes,
+    ...themeState
+  } = loadedTheme;
   return { ...themeState, payload };
 }
 
@@ -410,11 +453,16 @@ async function fileExists(filePath) {
 }
 
 async function readThemeSourceStamp(loadedTheme) {
-  const [themeStat, imageStat] = await Promise.all([
+  const [themeStat, imageStat, sidebarImageStat] = await Promise.all([
     fs.stat(loadedTheme.themePath),
     fs.stat(loadedTheme.imagePath),
+    loadedTheme.sidebarImagePath ? fs.stat(loadedTheme.sidebarImagePath) : Promise.resolve(null),
   ]);
-  return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`;
+  return [
+    `${themeStat.size}:${themeStat.mtimeMs}`,
+    `${imageStat.size}:${imageStat.mtimeMs}`,
+    sidebarImageStat ? `${sidebarImageStat.size}:${sidebarImageStat.mtimeMs}` : "single",
+  ].join(":");
 }
 
 async function probeSession(session) {
@@ -539,13 +587,14 @@ async function removeFromSession(session) {
     if (state?.cleanup) return state.cleanup();
     document.documentElement?.classList.remove(
       'codex-dream-skin', 'dream-theme-light', 'dream-theme-dark',
-      'dream-art-wide', 'dream-art-standard', 'dream-focus-left',
+      'dream-art-wide', 'dream-art-standard', 'dream-art-split', 'dream-focus-left',
       'dream-focus-center', 'dream-focus-right', 'dream-safe-left',
       'dream-safe-center', 'dream-safe-right', 'dream-safe-none',
       'dream-task-ambient', 'dream-task-banner', 'dream-task-off'
     );
     for (const property of [
-      '--dream-art', '--dream-art-position', '--dream-focus-x', '--dream-focus-y',
+      '--dream-art', '--dream-art-position', '--dream-sidebar-art', '--dream-sidebar-art-position',
+      '--dream-focus-x', '--dream-focus-y',
       '--dream-accent', '--dream-accent-ink', '--dream-image-luma'
     ]) document.documentElement?.style.removeProperty(property);
     document.querySelectorAll('.dream-home').forEach((node) => node.classList.remove('dream-home'));
@@ -974,7 +1023,10 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
   } else if (options.mode === "check-payload") {
     const loaded = await loadPayload(options.themeDir);
-    const unresolved = ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_THEME_JSON__"]
+    const unresolved = [
+      "__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_SIDEBAR_ART_JSON__",
+      "__DREAM_THEME_JSON__",
+    ]
       .some((placeholder) => loaded.payload.includes(placeholder));
     if (unresolved) {
       throw new Error("Payload placeholders were not fully replaced");
@@ -987,6 +1039,8 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
+      sidebarImage: loaded.theme.sidebarImage ?? null,
+      sidebarArtMetadata: loaded.theme.sidebarArtMetadata ?? null,
     }));
   } else if (options.mode === "watch") await runWatch(options);
   else await runOneShot(options);

@@ -133,6 +133,46 @@ function Test-DreamSkinThemePathWithin {
   }
 }
 
+function Resolve-DreamSkinThemeImagePath {
+  param(
+    [Parameter(Mandatory = $true)][string]$ThemeDirectory,
+    [Parameter(Mandatory = $true)][string]$Image,
+    [Parameter(Mandatory = $true)][string]$Label,
+    [switch]$SkipImageMetadata
+  )
+  if ([System.IO.Path]::IsPathRooted($Image)) { throw "$Label path must be relative." }
+  $imagePath = [System.IO.Path]::GetFullPath((Join-Path $ThemeDirectory $Image))
+  if (-not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $ThemeDirectory) -or
+    -not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
+    throw "$Label must remain inside its theme directory and exist."
+  }
+  Assert-DreamSkinImageFile -Path $imagePath -SkipImageMetadata:$SkipImageMetadata
+  return $imagePath
+}
+
+function Assert-DreamSkinThemeImageBudget {
+  param(
+    [Parameter(Mandatory = $true)]
+    [AllowEmptyCollection()]
+    [AllowEmptyString()]
+    [string[]]$Paths
+  )
+  $seen = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  $total = [long]0
+  foreach ($path in $Paths) {
+    if (-not $path) { continue }
+    $fullPath = [System.IO.Path]::GetFullPath($path)
+    if ($seen.Add($fullPath)) {
+      $total += (Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Length
+    }
+  }
+  if ($total -gt $script:DreamSkinMaxImageBytes) {
+    throw 'Combined theme images exceed the 16 MB limit.'
+  }
+}
+
 function Read-DreamSkinTheme {
   param(
     [Parameter(Mandatory = $true)][string]$ThemeDirectory,
@@ -154,17 +194,21 @@ function Read-DreamSkinTheme {
     throw "Theme metadata must be an object with a relative image path: $themePath"
   }
   $image = "$($theme.image)"
-  if ([System.IO.Path]::IsPathRooted($image)) { throw 'Theme image path must be relative.' }
-  $imagePath = [System.IO.Path]::GetFullPath((Join-Path $directory $image))
-  if (-not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $directory) -or
-    -not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
-    throw 'Theme image must remain inside its theme directory and exist.'
+  $imagePath = Resolve-DreamSkinThemeImagePath -ThemeDirectory $directory -Image $image `
+    -Label 'Theme image' -SkipImageMetadata:$SkipImageMetadata
+  $sidebarImage = $null
+  $sidebarImagePath = $null
+  if ($theme.PSObject.Properties.Name -contains 'sidebarImage' -and $theme.sidebarImage) {
+    $sidebarImage = "$($theme.sidebarImage)"
+    $sidebarImagePath = Resolve-DreamSkinThemeImagePath -ThemeDirectory $directory `
+      -Image $sidebarImage -Label 'Sidebar image' -SkipImageMetadata:$SkipImageMetadata
   }
-  Assert-DreamSkinImageFile -Path $imagePath -SkipImageMetadata:$SkipImageMetadata
+  Assert-DreamSkinThemeImageBudget -Paths @($imagePath, $sidebarImagePath)
   return [pscustomobject]@{
     Directory = $directory
     ThemePath = $themePath
     ImagePath = $imagePath
+    SidebarImagePath = $sidebarImagePath
     Theme = $theme
   }
 }
@@ -242,6 +286,7 @@ function New-DreamSkinThemeImageName {
 function Set-DreamSkinActiveTheme {
   param(
     [Parameter(Mandatory = $true)][string]$ImagePath,
+    [AllowNull()][string]$SidebarImagePath,
     [AllowNull()][object]$Theme,
     [string]$Name,
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
@@ -252,9 +297,18 @@ function Set-DreamSkinActiveTheme {
   Ensure-DreamSkinManagedDirectory -Path $paths.Images -Root $paths.Root
   $source = [System.IO.Path]::GetFullPath($ImagePath)
   Assert-DreamSkinImageFile -Path $source
+  $sidebarSource = $null
+  if ($SidebarImagePath) {
+    $sidebarSource = [System.IO.Path]::GetFullPath($SidebarImagePath)
+    Assert-DreamSkinImageFile -Path $sidebarSource
+  }
+  Assert-DreamSkinThemeImageBudget -Paths @($source, $sidebarSource)
   $extension = [System.IO.Path]::GetExtension($source).ToLowerInvariant()
-  $oldImage = $null
-  try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
+  $oldImages = @()
+  try {
+    $oldTheme = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+    $oldImages = @($oldTheme.ImagePath, $oldTheme.SidebarImagePath) | Where-Object { $_ }
+  } catch {}
   if ($null -eq $Theme) {
     $Theme = [pscustomobject]@{
       id = 'custom'
@@ -267,6 +321,17 @@ function Set-DreamSkinActiveTheme {
   $imageName = New-DreamSkinThemeImageName -Extension $extension
   $target = Join-Path $paths.Active $imageName
   $temporary = Join-Path $paths.Active ('.dream-tmp-' + [guid]::NewGuid().ToString('N') + $extension)
+  $sidebarImageName = $null
+  $sidebarTarget = $null
+  $sidebarTemporary = $null
+  if ($sidebarSource) {
+    $sidebarExtension = [System.IO.Path]::GetExtension($sidebarSource).ToLowerInvariant()
+    $sidebarImageName = New-DreamSkinThemeImageName -Extension $sidebarExtension
+    $sidebarTarget = Join-Path $paths.Active $sidebarImageName
+    $sidebarTemporary = Join-Path $paths.Active `
+      ('.dream-tmp-' + [guid]::NewGuid().ToString('N') + $sidebarExtension)
+  }
+  $committed = $false
   try {
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinNoReparseComponents -Path $temporary
@@ -276,7 +341,23 @@ function Set-DreamSkinActiveTheme {
     Move-Item -LiteralPath $temporary -Destination $target -Force
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinImageFile -Path $target
+    if ($sidebarSource) {
+      Assert-DreamSkinNoReparseComponents -Path $sidebarTarget
+      Assert-DreamSkinNoReparseComponents -Path $sidebarTemporary
+      Copy-Item -LiteralPath $sidebarSource -Destination $sidebarTemporary -Force
+      Assert-DreamSkinNoReparseComponents -Path $sidebarTemporary
+      Assert-DreamSkinImageFile -Path $sidebarTemporary
+      Move-Item -LiteralPath $sidebarTemporary -Destination $sidebarTarget -Force
+      Assert-DreamSkinNoReparseComponents -Path $sidebarTarget
+      Assert-DreamSkinImageFile -Path $sidebarTarget
+      Assert-DreamSkinThemeImageBudget -Paths @($target, $sidebarTarget)
+    }
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
+    if ($sidebarImageName) {
+      $Theme | Add-Member -NotePropertyName sidebarImage -NotePropertyValue $sidebarImageName -Force
+    } elseif ($Theme.PSObject.Properties.Name -contains 'sidebarImage') {
+      $Theme.PSObject.Properties.Remove('sidebarImage')
+    }
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
     if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
     if (-not $Theme.appearance) { $Theme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force }
@@ -288,19 +369,37 @@ function Set-DreamSkinActiveTheme {
       $Theme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
     }
     Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $Theme
+    $committed = $true
   } finally {
     Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+    if ($sidebarTemporary) {
+      Remove-Item -LiteralPath $sidebarTemporary -Force -ErrorAction SilentlyContinue
+    }
+    if (-not $committed) {
+      Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+      if ($sidebarTarget) { Remove-Item -LiteralPath $sidebarTarget -Force -ErrorAction SilentlyContinue }
+    }
   }
-  $sameImage = $oldImage -and ([System.IO.Path]::GetFullPath($oldImage) -ieq [System.IO.Path]::GetFullPath($target))
-  if ($oldImage -and -not $sameImage -and
-    (Test-DreamSkinThemePathWithin -Path $oldImage -Root $paths.Active)) {
-    Remove-Item -LiteralPath $oldImage -Force -ErrorAction SilentlyContinue
+  $newImages = @($target, $sidebarTarget) | Where-Object { $_ }
+  foreach ($oldImage in $oldImages | Select-Object -Unique) {
+    $stillActive = @($newImages | Where-Object {
+      [System.IO.Path]::GetFullPath($_) -ieq [System.IO.Path]::GetFullPath($oldImage)
+    }).Count -gt 0
+    if (-not $stillActive -and (Test-DreamSkinThemePathWithin -Path $oldImage -Root $paths.Active)) {
+      Remove-Item -LiteralPath $oldImage -Force -ErrorAction SilentlyContinue
+    }
   }
-  $imageArchive = Join-Path $paths.Images $imageName
-  Assert-DreamSkinNoReparseComponents -Path $imageArchive
-  Copy-Item -LiteralPath $target -Destination $imageArchive -Force
-  Assert-DreamSkinNoReparseComponents -Path $imageArchive
-  Assert-DreamSkinImageFile -Path $imageArchive
+  foreach ($entry in @(
+    [pscustomobject]@{ Path = $target; Name = $imageName },
+    [pscustomobject]@{ Path = $sidebarTarget; Name = $sidebarImageName }
+  )) {
+    if (-not $entry.Path) { continue }
+    $imageArchive = Join-Path $paths.Images $entry.Name
+    Assert-DreamSkinNoReparseComponents -Path $imageArchive
+    Copy-Item -LiteralPath $entry.Path -Destination $imageArchive -Force
+    Assert-DreamSkinNoReparseComponents -Path $imageArchive
+    Assert-DreamSkinImageFile -Path $imageArchive
+  }
   return Read-DreamSkinTheme -ThemeDirectory $paths.Active
 }
 
@@ -327,10 +426,27 @@ function Save-DreamSkinCurrentTheme {
   Copy-Item -LiteralPath $active.ImagePath -Destination $destinationImage -Force
   Assert-DreamSkinNoReparseComponents -Path $destinationImage
   Assert-DreamSkinImageFile -Path $destinationImage
+  $sidebarImageName = $null
+  $destinationSidebarImage = $null
+  if ($active.SidebarImagePath) {
+    $sidebarExtension = [System.IO.Path]::GetExtension($active.SidebarImagePath).ToLowerInvariant()
+    $sidebarImageName = 'sidebar-art' + $sidebarExtension
+    $destinationSidebarImage = Join-Path $destination $sidebarImageName
+    Assert-DreamSkinNoReparseComponents -Path $destinationSidebarImage
+    Copy-Item -LiteralPath $active.SidebarImagePath -Destination $destinationSidebarImage -Force
+    Assert-DreamSkinNoReparseComponents -Path $destinationSidebarImage
+    Assert-DreamSkinImageFile -Path $destinationSidebarImage
+  }
+  Assert-DreamSkinThemeImageBudget -Paths @($destinationImage, $destinationSidebarImage)
   $theme = $active.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
   $theme.id = $id
   $theme.name = $trimmed
   $theme.image = $imageName
+  if ($sidebarImageName) {
+    $theme | Add-Member -NotePropertyName sidebarImage -NotePropertyValue $sidebarImageName -Force
+  } elseif ($theme.PSObject.Properties.Name -contains 'sidebarImage') {
+    $theme.PSObject.Properties.Remove('sidebarImage')
+  }
   Write-DreamSkinTheme -ThemeDirectory $destination -Theme $theme
   return Read-DreamSkinTheme -ThemeDirectory $destination
 }
@@ -372,7 +488,8 @@ function Use-DreamSkinSavedTheme {
   }
   $saved = Read-DreamSkinTheme -ThemeDirectory $directory
   $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme -StateRoot $StateRoot
+  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath `
+    -SidebarImagePath $saved.SidebarImagePath -Theme $theme -StateRoot $StateRoot
 }
 
 function Set-DreamSkinPaused {

@@ -8,9 +8,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const windowsRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(windowsRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(windowsRoot, "assets", "dream-skin.css"), "utf8");
-const buildPayload = (config = {}) => template
+const buildPayload = (config = {}, sidebarArtDataUrl = null) => template
   .replace("__DREAM_CSS_JSON__", JSON.stringify(".fixture { color: blue; }"))
   .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
+  .replace("__DREAM_SIDEBAR_ART_JSON__", JSON.stringify(sidebarArtDataUrl))
   .replace("__DREAM_THEME_JSON__", JSON.stringify(config));
 const payload = buildPayload();
 
@@ -234,6 +235,7 @@ const mainResult = vm.runInNewContext(payload, main.context);
 assert.equal(mainResult.installed, true);
 assert.equal(main.rootClasses.has("codex-dream-skin"), true);
 assert.equal(main.rootStyles.get("--dream-art"), 'url("blob:fixture-1")');
+assert.equal(main.rootStyles.has("--dream-sidebar-art"), false);
 assert.equal(main.nodes.has("codex-dream-skin-style"), true);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), true);
 assert.equal(main.rootClasses.has("dream-theme-dark"), true);
@@ -246,6 +248,20 @@ assert.equal(main.rootClasses.has("dream-theme-dark"), false);
 assert.equal(main.nodes.has("codex-dream-skin-style"), false);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), false);
 assert.deepEqual(main.revokedUrls, ["blob:fixture-1"]);
+
+const split = createFixture({ shellPresent: true });
+vm.runInNewContext(
+  buildPayload({}, "data:image/png;base64,AQ=="),
+  split.context,
+);
+assert.equal(split.rootClasses.has("dream-art-split"), true);
+assert.equal(split.rootClasses.has("dream-art-wide"), true);
+assert.equal(split.rootClasses.has("dream-art-standard"), false);
+assert.equal(split.rootStyles.get("--dream-art"), 'url("blob:fixture-1")');
+assert.equal(split.rootStyles.get("--dream-sidebar-art"), 'url("blob:fixture-2")');
+assert.equal(split.rootStyles.get("--dream-sidebar-art-position"), "50% 50%");
+assert.equal(split.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+assert.deepEqual(split.revokedUrls, ["blob:fixture-1", "blob:fixture-2"]);
 
 const reinjected = createFixture({ shellPresent: true });
 vm.runInNewContext(payload, reinjected.context);

@@ -3,6 +3,7 @@
   --dream-accent: oklch(0.66 0.15 18);
   --dream-accent-ink: oklch(0.98 0.006 20);
   --dream-art-position: 72% 45%;
+  --dream-sidebar-art-position: 50% 50%;
   --dream-canvas: color-mix(in oklab, oklch(0.975 0.006 35) 96%, var(--dream-accent));
   --dream-surface: color-mix(in oklab, oklch(0.988 0.004 35) 97%, var(--dream-accent));
   --dream-surface-raised: color-mix(in oklab, oklch(0.995 0.003 35) 98%, var(--dream-accent));
@@ -446,6 +447,57 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
     var(--dream-task-immersive-edge),
     var(--dream-task-immersive-mid) 64%,
     var(--dream-task-immersive-far)) !important;
+}
+
+/* Split themes keep the workspace image inside the native main surface and
+   paint a separately validated image inside the native sidebar. Themes that
+   omit sidebarImage retain the continuous single-image layout above. */
+html.codex-dream-skin.dream-art-wide.dream-art-split:has(main.main-surface.dream-home-shell) body,
+html.codex-dream-skin.dream-art-wide.dream-art-split:is(.dream-task-ambient, .dream-task-banner, .dream-task-off):has(main.main-surface:not(.dream-home-shell)) body {
+  background-color: var(--dream-canvas) !important;
+  background-image: none !important;
+}
+
+html.codex-dream-skin.dream-art-wide.dream-art-split:has(main.main-surface.dream-home-shell)
+  aside.app-shell-left-panel,
+html.codex-dream-skin.dream-art-wide.dream-art-split:is(.dream-task-ambient, .dream-task-banner, .dream-task-off):has(main.main-surface:not(.dream-home-shell))
+  aside.app-shell-left-panel {
+  background-color: var(--dream-sidebar) !important;
+  background-image:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--dream-sidebar) 54%, transparent),
+      color-mix(in oklab, var(--dream-sidebar) 76%, transparent)),
+    var(--dream-sidebar-art) !important;
+  background-position: center, var(--dream-sidebar-art-position) !important;
+  background-size: 100% 100%, cover !important;
+  background-repeat: no-repeat !important;
+}
+
+html.codex-dream-skin.dream-art-wide.dream-art-split main.main-surface.dream-home-shell {
+  background-color: var(--dream-surface) !important;
+  background-image:
+    linear-gradient(90deg,
+      var(--dream-immersive-edge),
+      var(--dream-immersive-mid) 64%,
+      var(--dream-immersive-far)),
+    var(--dream-art) !important;
+  background-position: center, var(--dream-art-position) !important;
+  background-size: 100% 100%, cover !important;
+  background-repeat: no-repeat !important;
+}
+
+html.codex-dream-skin.dream-art-wide.dream-art-split:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) {
+  background-color: var(--dream-surface) !important;
+  background-image:
+    linear-gradient(90deg,
+      var(--dream-task-immersive-edge),
+      var(--dream-task-immersive-mid) 64%,
+      var(--dream-task-immersive-far)),
+    var(--dream-art) !important;
+  background-position: center, var(--dream-art-position) !important;
+  background-size: 100% 100%, cover !important;
+  background-repeat: no-repeat !important;
 }
 
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner) .dream-task {

@@ -25,6 +25,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 安装器会校验官方 Codex Store 包和 Node.js，保存可恢复的外观配置，并初始化本地主题仓库。默认还会创建这些快捷方式：
 
 - `Codex Dream Skin`：启动或重新应用皮肤。
+- `Codex Dream Skin - Theme Studio`：分别拖放、预览、应用和保存左侧任务栏与右侧工作区图片。
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
@@ -63,14 +64,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 ## 更换和保存主题
 
-打开 `Codex Dream Skin - Tray` 后可以：
+打开 `Codex Dream Skin - Theme Studio`，可以分别把图片拖入「左侧任务栏」和「右侧工作区」区域，先查看预览、分辨率和体积，再命名并应用；也可以勾选「同时保存到已保存主题」。右侧图片必选，左侧图片可选；省略左侧图片时继续使用兼容的单图整窗模式。图片只会复制到 `%LOCALAPPDATA%\CodexDreamSkin`，不会上传到网络。
 
-- 更换 PNG、JPEG 或 WebP 背景图。
+也可以在系统托盘中选择「更换背景图 / 主题工作室」。托盘还可以：
+
 - 保存当前主题并从「已保存主题」切换。
 - 暂停或继续显示皮肤。
 - 重新应用主题，或完整恢复 Codex。
 
-导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。图片上限为 16 MB；宽或高不能超过 16384 像素，总像素不能超过 5000 万。
+从源码直接打开主题工作室：
+
+```powershell
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\scripts\theme-studio-windows.ps1
+```
+
+导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。每张图的宽或高不能超过 16384 像素、总像素不能超过 5000 万；一个双分区主题的两张图片合计不能超过 16 MB。
 
 ## 恢复与卸载快捷方式
 

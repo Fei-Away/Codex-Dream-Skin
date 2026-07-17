@@ -52,6 +52,7 @@ try {
     $startScript = $engine.Start
     $restoreScript = $engine.Restore
     $trayScript = $engine.Tray
+    $studioScript = $engine.Studio
     $portArgument = if ($PortExplicit) { " -Port $Port" } else { '' }
 
     foreach ($folder in @($desktop, $startMenu)) {
@@ -77,6 +78,13 @@ try {
       $tray.WorkingDirectory = $engine.Root
       $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
       $tray.Save()
+
+      $studio = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Theme Studio.lnk'))
+      $studio.TargetPath = $powershell
+      $studio.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$studioScript`""
+      $studio.WorkingDirectory = $engine.Root
+      $studio.Description = 'Drag, preview, apply, and save a local Codex Dream Skin background'
+      $studio.Save()
     }
     Start-Process -FilePath $powershell -ArgumentList `
       "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$trayScript`"$portArgument" `
@@ -86,7 +94,7 @@ try {
   if ($NoShortcuts) {
     Write-Host "Codex Dream Skin base theme installed at $($engine.Root). Run $($engine.Start) to launch it."
   } else {
-    Write-Host 'Codex Dream Skin installed. The launch shortcut asks before restarting an open Codex window.'
+    Write-Host 'Codex Dream Skin installed. Use Theme Studio to drag, preview, apply, and save backgrounds.'
   }
 } finally {
   Exit-DreamSkinOperationLock -Mutex $operationLock
