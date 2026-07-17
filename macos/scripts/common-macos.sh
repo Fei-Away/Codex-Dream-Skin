@@ -268,9 +268,17 @@ codesign_team_id() {
     | /usr/bin/awk -F= '/^TeamIdentifier=/{print $2; exit}'
 }
 
+remember_validated_runtime_identity() {
+  DREAM_SKIN_VALIDATED_RUNTIME_PID="$$"
+  DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE="$CODEX_BUNDLE"
+  DREAM_SKIN_VALIDATED_RUNTIME_EXE="$CODEX_EXE"
+  DREAM_SKIN_VALIDATED_RUNTIME_NODE="$NODE"
+}
+
 require_signed_node_runtime() {
   [ "$(/usr/bin/uname -s)" = "Darwin" ] || fail "This launcher requires macOS."
-  [ -n "${CODEX_BUNDLE:-}" ] || fail "Discover the ChatGPT app before validating its runtime."
+  [ -n "${CODEX_BUNDLE:-}" ] && [ -n "${CODEX_EXE:-}" ] \
+    || fail "Discover the ChatGPT app before validating its runtime."
 
   RUNTIME_NODE="$CODEX_BUNDLE/Contents/Resources/cua_node/bin/node"
   [ -x "$RUNTIME_NODE" ] || fail "The signed Node.js runtime bundled with ChatGPT was not found: $RUNTIME_NODE"
@@ -298,6 +306,7 @@ require_signed_node_runtime() {
 
   NODE="$RUNTIME_NODE"
   export NODE RUNTIME_NODE NODE_VERSION CODEX_TEAM_ID NODE_TEAM_ID
+  remember_validated_runtime_identity
 }
 
 verify_macos_app_signature() {
@@ -513,6 +522,7 @@ wait_for_cdp() {
 
 state_field() {
   local key="$1"
+  ensure_node_runtime
   "$NODE" -e '
     const fs = require("node:fs");
     const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))[process.argv[2]];
@@ -741,10 +751,6 @@ ensure_node_runtime() {
   fi
   discover_codex_app
   require_signed_node_runtime
-  DREAM_SKIN_VALIDATED_RUNTIME_PID="$$"
-  DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE="$CODEX_BUNDLE"
-  DREAM_SKIN_VALIDATED_RUNTIME_EXE="$CODEX_EXE"
-  DREAM_SKIN_VALIDATED_RUNTIME_NODE="$NODE"
 }
 
 # Fast path when CDP is already open: restart injector + one-shot inject.

@@ -39,6 +39,7 @@
 
 - CDP 端点必须由已验证的官方 Codex 可执行文件或其子进程监听；WebSocket 还会校验 loopback、page ID、路径、无重定向，并安全处理畸形消息和发送异常。
 - App 与 bundled Node 必须满足固定的 OpenAI Team ID 和 Apple signing requirement；热应用不再信任外部 `NODE` 或 `state.json` 中缓存的运行时身份，CDP 祖先还会核对进程的真实 executable path。
+- 运行状态读取会在执行 Node 前自行确认已验证的 bundled runtime，避免调用顺序变化重新引入未验证执行；感谢 @guiguili520 报告 #12，以及 @rwang23 提供原始修复实现。
 - 主题配置与图片使用真实路径 containment，拒绝 symlink 越界、空文件、超过 16 MB、单边超过 16384 px 或超过 50 MP 的图片；主题展示文本拒绝换行和控制字符。
 - AppleScript 动态内容全部通过 argv 传递；SwiftBar 过滤主题 ID、文件名和菜单文本，避免主题元数据改变菜单属性或命令参数。
 - `config.toml` 只按严格 UTF-8 读取，拒绝 NUL、歧义多行 TOML、重复 `[desktop]`，通过用户级锁、原始字节核验和同目录原子替换保护中文配置与并发写入。

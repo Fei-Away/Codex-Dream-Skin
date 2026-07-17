@@ -225,19 +225,21 @@ RUNTIME_HOME="$TMP/runtime-home"
 RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
 RUNTIME_STATE="$RUNTIME_STATE_ROOT/state.json"
 STATE_EVAL_MARKER="$TMP/state-eval-marker"
+UNTRUSTED_NODE_MARKER="$TMP/untrusted-node-executed"
 UNTRUSTED_BUNDLE="$TMP/evil-root/Codex \"Skin\".app"
 UNTRUSTED_EXE="$UNTRUSTED_BUNDLE/Contents/MacOS/ChatGPT"
 UNTRUSTED_VERSION="1.1.2 \$(touch \"$STATE_EVAL_MARKER\") ; echo pwned"
 UNTRUSTED_TEAM_ID="TEAM'ID"
 /bin/mkdir -p "$RUNTIME_STATE_ROOT" "$UNTRUSTED_BUNDLE/Contents/MacOS"
-/usr/bin/printf '#!/bin/bash\ntrue\n' > "$UNTRUSTED_EXE"
+/usr/bin/printf '#!/bin/bash\n/usr/bin/touch "${UNTRUSTED_NODE_MARKER:?}"\nexit 97\n' > "$UNTRUSTED_EXE"
 /bin/chmod +x "$UNTRUSTED_EXE"
 "$NODE" -e '
   const fs = require("node:fs");
   const [file, codexBundle, codexExe, codexVersion, codexTeamId] = process.argv.slice(1);
   fs.writeFileSync(file, `${JSON.stringify({ codexBundle, codexExe, codexVersion, codexTeamId })}\n`);
 ' "$RUNTIME_STATE" "$UNTRUSTED_BUNDLE" "$UNTRUSTED_EXE" "$UNTRUSTED_VERSION" "$UNTRUSTED_TEAM_ID"
-/usr/bin/env HOME="$RUNTIME_HOME" NODE="$UNTRUSTED_EXE" NODE_VERSION="untrusted" /bin/bash -c '
+/usr/bin/env HOME="$RUNTIME_HOME" NODE="$UNTRUSTED_EXE" NODE_VERSION="untrusted" \
+  UNTRUSTED_NODE_MARKER="$UNTRUSTED_NODE_MARKER" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
   TRUSTED_BUNDLE="$2"
   TRUSTED_EXE="$3"
@@ -255,7 +257,9 @@ UNTRUSTED_TEAM_ID="TEAM'ID"
     NODE="$TRUSTED_NODE"
     NODE_VERSION="v22.0.0"
     CODEX_TEAM_ID="2DC432GLL2"
+    remember_validated_runtime_identity
   }
+  state_field codexVersion >/dev/null
   ensure_node_runtime
   ensure_node_runtime
   [ "$DISCOVER_CALLS" -eq 1 ]
@@ -265,6 +269,10 @@ UNTRUSTED_TEAM_ID="TEAM'ID"
   [ "$CODEX_EXE" = "$TRUSTED_EXE" ]
   [ "$CODEX_TEAM_ID" = "2DC432GLL2" ]
 ' _ "$ROOT" "/trusted/ChatGPT.app" "/trusted/ChatGPT.app/Contents/MacOS/ChatGPT" "$NODE"
+[ ! -e "$UNTRUSTED_NODE_MARKER" ] || {
+  printf 'state_field executed an inherited, unvalidated Node runtime.\n' >&2
+  exit 1
+}
 [ ! -e "$STATE_EVAL_MARKER" ] || {
   printf 'Runtime state values were evaluated as shell code.\n' >&2
   exit 1
