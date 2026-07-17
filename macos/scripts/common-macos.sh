@@ -25,6 +25,14 @@ APP_ERROR_LOG="$STATE_ROOT/codex-launch-error.log"
 START_ERROR_LOG="$STATE_ROOT/start-error.log"
 CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
+RECOVERY_ENABLED_PATH="$STATE_ROOT/reopen-recovery.enabled"
+RECOVERY_ATTEMPT_PATH="$STATE_ROOT/reopen-recovery.attempt"
+RECOVERY_LOCK_DIR="$STATE_ROOT/reopen-recovery.lock"
+RECOVERY_LOG="$STATE_ROOT/reopen-recovery.log"
+RECOVERY_ERROR_LOG="$STATE_ROOT/reopen-recovery-error.log"
+RECOVERY_JOB_LABEL="com.openai.codex-dream-skin-studio.reopen-recovery"
+RECOVERY_LAUNCH_AGENTS_DIR="${DREAM_SKIN_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+RECOVERY_PLIST_PATH="$RECOVERY_LAUNCH_AGENTS_DIR/$RECOVERY_JOB_LABEL.plist"
 EXPECTED_CODEX_TEAM_ID="${CODEX_EXPECTED_TEAM_ID:-2DC432GLL2}"
 SKIN_VERSION="1.2.0"
 
@@ -84,6 +92,24 @@ seed_bundled_presets() {
     done
     /bin/chmod 600 "$dest"/* 2>/dev/null || true
   done
+}
+
+enable_reopen_recovery() {
+  ensure_state_root
+  /usr/bin/touch "$RECOVERY_ENABLED_PATH"
+  /bin/chmod 600 "$RECOVERY_ENABLED_PATH"
+}
+
+disable_reopen_recovery() {
+  /bin/rm -f "$RECOVERY_ENABLED_PATH" "$RECOVERY_ATTEMPT_PATH"
+  /bin/rm -rf "$RECOVERY_LOCK_DIR"
+}
+
+remove_reopen_recovery() {
+  disable_reopen_recovery
+  local launchctl_bin="${DREAM_SKIN_LAUNCHCTL:-/bin/launchctl}"
+  "$launchctl_bin" bootout "gui/$(/usr/bin/id -u)/$RECOVERY_JOB_LABEL" >/dev/null 2>&1 || true
+  /bin/rm -f "$RECOVERY_PLIST_PATH"
 }
 
 discover_codex_app() {

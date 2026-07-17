@@ -634,6 +634,56 @@ fi
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
 [ ! -e "$TMP/theme" ]
 
+RECOVERY_HOME="$TMP/recovery-home"
+RECOVERY_STATE_ROOT="$RECOVERY_HOME/Library/Application Support/CodexDreamSkinStudio"
+RECOVERY_START_LOG="$TMP/recovery-starts.log"
+/bin/mkdir -p "$RECOVERY_STATE_ROOT"
+/usr/bin/touch "$RECOVERY_STATE_ROOT/reopen-recovery.enabled"
+/usr/bin/printf '%s\n' \
+  '#!/bin/bash' \
+  '/usr/bin/printf "%s\n" "$*" >> "$DREAM_SKIN_TEST_START_LOG"' \
+  > "$TMP/fake-recovery-start"
+/bin/chmod 700 "$TMP/fake-recovery-start"
+
+DREAM_SKIN_TEST_CODEX_PID=0 \
+DREAM_SKIN_TEST_CDP_READY=false \
+DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
+DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
+DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
+HOME="$RECOVERY_HOME" \
+  "$ROOT/scripts/watch-dream-skin-macos.sh" --once
+[ ! -e "$RECOVERY_START_LOG" ]
+
+DREAM_SKIN_TEST_CODEX_PID=4242 \
+DREAM_SKIN_TEST_CDP_READY=true \
+DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
+DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
+DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
+HOME="$RECOVERY_HOME" \
+  "$ROOT/scripts/watch-dream-skin-macos.sh" --once
+[ ! -e "$RECOVERY_START_LOG" ]
+
+DREAM_SKIN_TEST_CODEX_PID=4242 \
+DREAM_SKIN_TEST_CDP_READY=false \
+DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
+DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
+DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
+DREAM_SKIN_TEST_NOW=1000 \
+HOME="$RECOVERY_HOME" \
+  "$ROOT/scripts/watch-dream-skin-macos.sh" --once
+[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "1" ]
+/usr/bin/grep -q -- '--restart-existing' "$RECOVERY_START_LOG"
+
+DREAM_SKIN_TEST_CODEX_PID=4242 \
+DREAM_SKIN_TEST_CDP_READY=false \
+DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
+DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
+DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
+DREAM_SKIN_TEST_NOW=1000 \
+HOME="$RECOVERY_HOME" \
+  "$ROOT/scripts/watch-dream-skin-macos.sh" --once
+[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "1" ]
+
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
 /usr/bin/printf '%s\n' \
