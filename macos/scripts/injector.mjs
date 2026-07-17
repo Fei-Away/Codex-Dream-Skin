@@ -355,7 +355,7 @@ async function loadTheme(themeDir) {
   };
   const theme = {
     schemaVersion: 1,
-    id: text(raw.id, "custom", 80, "id"),
+    id: text(raw.id, "custom", 128, "id"),
     name: text(raw.name, "Codex Dream Skin", 80, "name"),
     brandSubtitle: text(raw.brandSubtitle, "CODEX DREAM SKIN", 80, "brandSubtitle"),
     tagline: text(raw.tagline, "Make something wonderful.", 160, "tagline"),

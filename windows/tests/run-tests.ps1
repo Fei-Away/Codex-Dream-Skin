@@ -45,6 +45,15 @@ try {
     -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
     throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
   }
+  foreach ($relative in @(
+    'theme-package\tools\theme-package.mjs',
+    'theme-package\lib\theme-package\import-core.mjs',
+    'scripts\import-theme-package.ps1'
+  )) {
+    if (-not (Test-Path -LiteralPath (Join-Path $engine.Root $relative) -PathType Leaf)) {
+      throw "Installed runtime is missing external theme import support: $relative"
+    }
+  }
   foreach ($sourceFile in $runtimeSourceFiles) {
     $relative = $sourceFile.FullName.Substring($sourcePrefix.Length)
     $installedFile = Join-Path $engine.Root $relative
@@ -733,7 +742,7 @@ try {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '导入 .dreamskin 主题', '已保存主题', '完全恢复 Codex')) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
@@ -847,12 +856,30 @@ try {
   if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }
 
   $packagePath = Join-Path $repositoryRoot 'examples\theme-package\kimi-sakura-dawn.dreamskin'
-  $importOutput = @(& (Join-Path $Root 'scripts\import-theme-package.ps1') `
+  $installedImportScript = Join-Path $engine.Root 'scripts\import-theme-package.ps1'
+  $importState = Join-Path $temporaryRoot 'import-state'
+  $importOutput = @(& $installedImportScript `
     -File $packagePath -DryRun -NoPrompt -StateRoot (Join-Path $temporaryRoot 'import-state'))
   $importReport = ($importOutput -join "`n") | ConvertFrom-Json -ErrorAction Stop
   if (-not $importReport.pass -or $importReport.platform -cne 'windows' -or
-    $importReport.packageId -cne 'dev.codex-dream-skin.kimi-sakura-dawn') {
+    $importReport.packageId -cne 'dev.codex-dream-skin.kimi-sakura-dawn' -or
+    @($importReport.warnings).Count -lt 1) {
     throw 'Windows .dreamskin dry-run did not return the shared package identity.'
+  }
+  $installOutput = @(& $installedImportScript -File $packagePath -NoPrompt -StateRoot $importState)
+  $installReport = ($installOutput -join "`n") | ConvertFrom-Json -ErrorAction Stop
+  if ($installReport.install.status -cne 'installed' -or $installReport.apply.status -cne 'not-requested') {
+    throw 'Windows .dreamskin install did not publish a complete saved theme.'
+  }
+  $repeatOutput = @(& $installedImportScript -File $packagePath -NoPrompt -Apply -StateRoot $importState)
+  $repeatReport = ($repeatOutput -join "`n") | ConvertFrom-Json -ErrorAction Stop
+  if ($repeatReport.install.status -cne 'already-installed' -or
+    $repeatReport.apply.status -cne 'selected-awaiting-runtime') {
+    throw 'Windows .dreamskin repeat/apply did not preserve idempotency and separate live status.'
+  }
+  $selected = Read-DreamSkinTheme -ThemeDirectory (Join-Path $importState 'theme')
+  if ($selected.Theme.id -cne 'dev.codex-dream-skin.kimi-sakura-dawn') {
+    throw 'Windows .dreamskin apply did not select the installed saved theme.'
   }
 
   Write-Host 'PASS: config transactions, theme-package import, restore scoping, state safety, argument quoting, and loopback CDP validation.'

@@ -44,7 +44,7 @@ fi
 [ -f "$THEME_PACKAGE_TOOL" ] || fail "Theme package runtime is missing. Reinstall Dream Skin."
 
 run_import() {
-  DREAM_SKIN_PLATFORM_ROOT="$PROJECT_ROOT" "$NODE" "$THEME_PACKAGE_TOOL" import "$PACKAGE_FILE" \
+  "$NODE" "$THEME_PACKAGE_TOOL" import "$PACKAGE_FILE" \
     --platform macos --dream-skin-version "$SKIN_VERSION" "$@"
 }
 
@@ -75,11 +75,28 @@ THEME_NAME="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
   let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
   process.stdin.on("end", () => { try { process.stdout.write(JSON.parse(text).runtimeTheme.name || ""); } catch {} });
 ')"
+AUTHOR_NAME="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
+  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
+  process.stdin.on("end", () => { try { process.stdout.write(JSON.parse(text).author?.name || ""); } catch {} });
+')"
+TARGETS="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
+  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
+  process.stdin.on("end", () => { try { process.stdout.write((JSON.parse(text).targets || []).join(", ")); } catch {} });
+')"
+PREVIEW_STATUS="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
+  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
+  process.stdin.on("end", () => { try { process.stdout.write(JSON.parse(text).preview?.available ? "已提供" : "未提供"); } catch {} });
+')"
+WARNING_TEXT="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
+  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
+  process.stdin.on("end", () => { try { process.stdout.write((JSON.parse(text).warnings || []).map(w => w.message || String(w)).join("\n")); } catch {} });
+')"
 
 if [ "$NO_PROMPT" = "false" ]; then
-  CHOICE="$(/usr/bin/osascript - "$THEME_NAME" "$PACKAGE_ID" "$PACKAGE_VERSION" <<'APPLESCRIPT' 2>/dev/null || true
+  CHOICE="$(/usr/bin/osascript - "$THEME_NAME" "$PACKAGE_ID" "$PACKAGE_VERSION" "$AUTHOR_NAME" "$TARGETS" "$PREVIEW_STATUS" "$WARNING_TEXT" <<'APPLESCRIPT' 2>/dev/null || true
 on run argv
-  set summary to "名称：" & item 1 of argv & return & "包 ID：" & item 2 of argv & return & "版本：" & item 3 of argv
+  set summary to "名称：" & item 1 of argv & return & "包 ID：" & item 2 of argv & return & "版本：" & item 3 of argv & return & "作者：" & item 4 of argv & return & "目标：" & item 5 of argv & return & "预览图：" & item 6 of argv
+  if item 7 of argv is not "" then set summary to summary & return & return & "兼容性提示：" & return & item 7 of argv
   return button returned of (display dialog summary with title "导入 Codex Dream Skin" buttons {"取消", "仅安装", "安装并应用"} default button "安装并应用" cancel button "取消")
 end run
 APPLESCRIPT
@@ -118,10 +135,28 @@ APPLESCRIPT
   fi
 fi
 
+report_with_apply() {
+  /usr/bin/printf '%s' "$1" | "$NODE" -e '
+    let text = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => { text += chunk; });
+    process.stdin.on("end", () => {
+      const report = JSON.parse(text);
+      report.apply = { status: process.argv[1] };
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    });
+  ' "$2"
+}
+
 if [ "$APPLY_NOW" = "true" ]; then
-  "$SCRIPT_DIR/switch-theme-macos.sh" --id "$PACKAGE_ID"
-  notify_user "已安装并应用：$THEME_NAME"
+  if ! "$SCRIPT_DIR/switch-theme-macos.sh" --id "$PACKAGE_ID"; then
+    report_with_apply "$INSTALL_REPORT" "failed-after-install"
+    alert_user "主题已安装，但未能应用：${THEME_NAME}"
+    exit 1
+  fi
+  notify_user "已安装并应用：${THEME_NAME}"
+  report_with_apply "$INSTALL_REPORT" "applied"
 else
-  notify_user "已安装：$THEME_NAME（可稍后从已保存主题应用）"
+  notify_user "已安装：${THEME_NAME}（可稍后从已保存主题应用）"
+  report_with_apply "$INSTALL_REPORT" "not-requested"
 fi
-/usr/bin/printf '%s\n' "$INSTALL_REPORT"

@@ -778,6 +778,13 @@ DOCTOR_THEME="$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/them
 /bin/cp "$ROOT/assets/theme.json" "$ROOT/assets/portal-hero.png" "$DOCTOR_THEME/"
 HOME="$DOCTOR_HOME" "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
+BUNDLE_ROOT="$TMP/theme-package-bundle"
+"$ROOT/scripts/bundle-theme-package-runtime.sh" "$ROOT/.." "$BUNDLE_ROOT"
+[ -f "$BUNDLE_ROOT/tools/theme-package.mjs" ]
+[ -f "$BUNDLE_ROOT/lib/theme-package/import-core.mjs" ]
+[ -f "$BUNDLE_ROOT/docs/KIMI_THEME_AUTHORING_PROMPT.md" ]
+/usr/bin/grep -F -q 'bundle-theme-package-runtime.sh' "$ROOT/scripts/build-client-release.sh"
+
 IMPORT_HOME="$TMP/import-home"
 /bin/mkdir -p "$IMPORT_HOME"
 IMPORT_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
@@ -794,5 +801,21 @@ IMPORT_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
       || report.packageId !== "dev.codex-dream-skin.kimi-sakura-dawn") process.exit(1);
   });
 '
+IMPORT_INSTALL_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
+  "$ROOT/scripts/import-theme-package-macos.sh" \
+  --file "$ROOT/../examples/theme-package/kimi-sakura-dawn.dreamskin" \
+  --yes --no-apply)"
+/usr/bin/printf '%s' "$IMPORT_INSTALL_REPORT" | "$NODE" -e '
+  let text = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk) => { text += chunk; });
+  process.stdin.on("end", () => {
+    const report = JSON.parse(text);
+    if (report.install?.status !== "installed" || report.apply?.status !== "not-requested") process.exit(1);
+  });
+'
+HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
+  --id dev.codex-dream-skin.kimi-sakura-dawn --no-apply >/dev/null
+[ -f "$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/theme/theme.json" ]
 
 printf 'PASS: syntax, payload, theme-package import, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

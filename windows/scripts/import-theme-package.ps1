@@ -5,6 +5,7 @@ param(
   [switch]$Replace,
   [switch]$Apply,
   [switch]$NoPrompt,
+  [int]$Port = 9335,
   [string]$StateRoot
 )
 
@@ -48,13 +49,7 @@ function Invoke-DreamSkinThemePackageImport {
     '--platform', 'windows',
     '--dream-skin-version', '1.3.0'
   ) + $ModeArguments
-  $previousPlatformRoot = [Environment]::GetEnvironmentVariable('DREAM_SKIN_PLATFORM_ROOT', 'Process')
-  try {
-    [Environment]::SetEnvironmentVariable('DREAM_SKIN_PLATFORM_ROOT', $SkillRoot, 'Process')
-    $native = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList $arguments
-  } finally {
-    [Environment]::SetEnvironmentVariable('DREAM_SKIN_PLATFORM_ROOT', $previousPlatformRoot, 'Process')
-  }
+  $native = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList $arguments
   $text = ($native.Output -join "`n")
   try { $json = $text | ConvertFrom-Json -ErrorAction Stop } catch {
     throw 'Theme package runtime returned invalid JSON.'
@@ -89,7 +84,12 @@ if ($DryRun) {
 $applyAfterInstall = [bool]$Apply
 if (-not $NoPrompt) {
   Add-Type -AssemblyName System.Windows.Forms
-  $summary = "名称：$($inspection.Json.runtimeTheme.name)`r`n包 ID：$($inspection.Json.packageId)`r`n版本：$($inspection.Json.packageVersion)`r`n`r`n选择是：安装并应用；选择否：仅安装。"
+  $targetText = @($inspection.Json.targets) -join ', '
+  $previewText = if ($inspection.Json.preview.available) { '已提供' } else { '未提供' }
+  $warningText = @($inspection.Json.warnings | ForEach-Object { "$($_.message)" }) -join "`r`n"
+  $summary = "名称：$($inspection.Json.runtimeTheme.name)`r`n包 ID：$($inspection.Json.packageId)`r`n版本：$($inspection.Json.packageVersion)`r`n作者：$($inspection.Json.author.name)`r`n目标：$targetText`r`n预览图：$previewText"
+  if ($warningText) { $summary += "`r`n`r`n兼容性提示：`r`n$warningText" }
+  $summary += "`r`n`r`n选择是：安装并应用；选择否：仅安装。"
   $choice = [System.Windows.Forms.MessageBox]::Show(
     $summary,
     '导入 Codex Dream Skin',
@@ -100,34 +100,84 @@ if (-not $NoPrompt) {
   $applyAfterInstall = $choice -eq [System.Windows.Forms.DialogResult]::Yes
 }
 
-$installArguments = @('--install', '--state-root', [System.IO.Path]::GetFullPath($StateRoot))
-if ($Replace) { $installArguments += '--replace' }
-$installed = Invoke-DreamSkinThemePackageImport -ModeArguments $installArguments
-if ($installed.ExitCode -ne 0 -and $installed.Json.code -eq 'CONFLICT_CONFIRMATION_REQUIRED' -and
-  -not $Replace -and -not $NoPrompt) {
-  $replaceChoice = [System.Windows.Forms.MessageBox]::Show(
-    '同一包 ID 已安装其他版本。是否替换？',
-    '替换 Codex Dream Skin 主题',
-    [System.Windows.Forms.MessageBoxButtons]::YesNo,
-    [System.Windows.Forms.MessageBoxIcon]::Warning
-  )
-  if ($replaceChoice -ne [System.Windows.Forms.DialogResult]::Yes) { return }
-  $installed = Invoke-DreamSkinThemePackageImport -ModeArguments @(
-    '--install', '--state-root', [System.IO.Path]::GetFullPath($StateRoot), '--replace'
-  )
-}
-if ($installed.ExitCode -ne 0) {
-  Show-DreamSkinImportError -Result $installed
-  exit 1
+$fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
+Assert-DreamSkinNoReparseComponents -Path $fullStateRoot
+$operationLock = Enter-DreamSkinOperationLock
+try {
+  $installArguments = @('--install', '--state-root', $fullStateRoot)
+  if ($Replace) { $installArguments += '--replace' }
+  $installed = Invoke-DreamSkinThemePackageImport -ModeArguments $installArguments
+  if ($installed.ExitCode -ne 0 -and $installed.Json.code -eq 'CONFLICT_CONFIRMATION_REQUIRED' -and
+    -not $Replace -and -not $NoPrompt) {
+    $replaceChoice = [System.Windows.Forms.MessageBox]::Show(
+      '同一包 ID 已安装其他版本。是否替换？',
+      '替换 Codex Dream Skin 主题',
+      [System.Windows.Forms.MessageBoxButtons]::YesNo,
+      [System.Windows.Forms.MessageBoxIcon]::Warning
+    )
+    if ($replaceChoice -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+    $installed = Invoke-DreamSkinThemePackageImport -ModeArguments @(
+      '--install', '--state-root', $fullStateRoot, '--replace'
+    )
+  }
+  if ($installed.ExitCode -ne 0) {
+    Show-DreamSkinImportError -Result $installed
+    exit 1
+  }
+
+  $applyStatus = 'not-requested'
+  if ($applyAfterInstall) {
+    $themeDirectory = Join-Path (Join-Path $fullStateRoot 'themes') "$($installed.Json.packageId)"
+    $null = Use-DreamSkinSavedTheme -ThemeDirectory $themeDirectory -StateRoot $fullStateRoot
+    $applyStatus = 'selected-awaiting-runtime'
+  }
+} finally {
+  Exit-DreamSkinOperationLock -Mutex $operationLock
 }
 
 if ($applyAfterInstall) {
-  $themeDirectory = Join-Path (Join-Path ([System.IO.Path]::GetFullPath($StateRoot)) 'themes') "$($installed.Json.packageId)"
-  $null = Use-DreamSkinSavedTheme -ThemeDirectory $themeDirectory -StateRoot $StateRoot
-  Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
+  $defaultStateRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  if (Test-DreamSkinPathEqual -Left $fullStateRoot -Right $defaultStateRoot) {
+    $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
+    $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
+    $verifyScript = Join-Path $PSScriptRoot 'verify-dream-skin.ps1'
+    $startArguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $startScript, '-Port', "$Port")
+    if (-not $NoPrompt) { $startArguments += '-PromptRestart' }
+    $startResult = Invoke-DreamSkinNative -FilePath $powershell -ArgumentList $startArguments
+    $verifyResult = if ($startResult.ExitCode -eq 0) {
+      Invoke-DreamSkinNative -FilePath $powershell -ArgumentList @(
+        '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $verifyScript, '-Port', "$Port"
+      )
+    } else {
+      [pscustomobject]@{ ExitCode = $startResult.ExitCode; Output = $startResult.Output }
+    }
+    if ($verifyResult.ExitCode -eq 0) {
+      $applyStatus = 'applied'
+    } else {
+      $applyStatus = 'failed-after-install'
+    }
+  }
+}
+
+$installed.Json | Add-Member -NotePropertyName apply -NotePropertyValue ([pscustomobject]@{
+  status = $applyStatus
+}) -Force
+$finalReport = $installed.Json | ConvertTo-Json -Depth 12
+
+if ($applyStatus -eq 'failed-after-install') {
+  if (-not $NoPrompt) {
+    [void][System.Windows.Forms.MessageBox]::Show(
+      '主题已安装并选中，但当前未能通过 Codex 实时应用验证。可稍后从托盘重新应用。',
+      'Codex Dream Skin',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Warning
+    )
+  }
+  Write-Output $finalReport
+  exit 1
 }
 if (-not $NoPrompt) {
-  $message = if ($applyAfterInstall) { '主题已安装并应用。' } else { '主题已安装，可稍后从“已保存主题”应用。' }
+  $message = if ($applyStatus -eq 'applied') { '主题已安装并通过实时应用验证。' } else { '主题已安装，可稍后从已保存主题应用。' }
   [void][System.Windows.Forms.MessageBox]::Show(
     $message,
     'Codex Dream Skin',
@@ -135,4 +185,4 @@ if (-not $NoPrompt) {
     [System.Windows.Forms.MessageBoxIcon]::Information
   )
 }
-Write-Output $installed.Text
+Write-Output $finalReport

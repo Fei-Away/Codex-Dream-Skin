@@ -34,14 +34,7 @@ deploy_project() {
     && [ -f "$PROJECT_ROOT/../tools/theme-package.mjs" ]; then
     local repository_root
     repository_root="$(cd "$PROJECT_ROOT/.." && pwd -P)"
-    /bin/mkdir -p "$temporary/lib" "$temporary/tools" "$temporary/schemas" \
-      "$temporary/docs" "$temporary/examples"
-    /usr/bin/rsync -a "$repository_root/lib/theme-package" "$temporary/lib/"
-    /bin/cp "$repository_root/tools/theme-package.mjs" "$temporary/tools/"
-    /usr/bin/rsync -a "$repository_root/schemas/" "$temporary/schemas/"
-    /usr/bin/rsync -a "$repository_root/examples/theme-package" "$temporary/examples/"
-    /bin/cp "$repository_root/docs/THEME_PACKAGE.md" \
-      "$repository_root/docs/KIMI_THEME_AUTHORING_PROMPT.md" "$temporary/docs/"
+    "$SCRIPT_DIR/bundle-theme-package-runtime.sh" "$repository_root" "$temporary"
   fi
   /bin/chmod 700 "$temporary"/*.command "$temporary"/scripts/*.sh 2>/dev/null || true
   if [ -e "$INSTALL_ROOT" ]; then /bin/mv "$INSTALL_ROOT" "$previous"; fi

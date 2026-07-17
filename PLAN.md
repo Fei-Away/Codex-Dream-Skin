@@ -66,7 +66,7 @@ QA boundary: isolated temporary state roots and fault injection; do not read or 
 
 ## Module 3 — macOS entry point and apply flow
 
-Status: implemented; final macOS regression gate is part of this branch handoff.
+Status: implemented; isolated import/apply selection, full macOS regression, standalone ZIP, and customer ZIP gates pass locally.
 
 Scope:
 
@@ -114,6 +114,6 @@ QA boundary: macOS PowerShell parsing is not evidence of Windows behavior; final
 
 ## Known external evidence gates
 
-- Module-one hostile fixtures selected a repository-owned pure Node ZIP route; module two must still prove file-handle streaming and bounded abort behavior before platform import.
+- File-handle streaming, bounded Store/Deflate reads, source replacement rejection, and atomic rollback are covered by shared tests.
 - Windows behavior is not declared complete without native PowerShell 5.1/7 evidence.
 - If a third-party archive dependency is introduced, add `docs/CAPABILITIES.md` with version, license, supply-chain, and release-bundling evidence before adoption.

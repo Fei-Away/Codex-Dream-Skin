@@ -333,7 +333,7 @@ async function loadTheme(themeDir) {
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
   const theme = {
-    id: normalizedText(raw.id, "id", "custom", 80),
+    id: normalizedText(raw.id, "id", "custom", 128),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
     image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),

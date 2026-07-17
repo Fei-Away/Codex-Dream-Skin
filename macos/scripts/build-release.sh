@@ -21,16 +21,8 @@ if [ "${1:-}" != "--skip-tests" ]; then "$ROOT/tests/run-tests.sh"; fi
 # does not depend on a repository checkout after installation.
 REPOSITORY_ROOT="$(cd "$ROOT/.." && pwd -P)"
 if [ -f "$REPOSITORY_ROOT/tools/theme-package.mjs" ]; then
-  /bin/mkdir -p "$TMP/codex-dream-skin-studio/lib" \
-    "$TMP/codex-dream-skin-studio/tools" "$TMP/codex-dream-skin-studio/schemas" \
-    "$TMP/codex-dream-skin-studio/docs" "$TMP/codex-dream-skin-studio/examples"
-  /usr/bin/rsync -a "$REPOSITORY_ROOT/lib/theme-package" "$TMP/codex-dream-skin-studio/lib/"
-  /bin/cp "$REPOSITORY_ROOT/tools/theme-package.mjs" "$TMP/codex-dream-skin-studio/tools/"
-  /usr/bin/rsync -a "$REPOSITORY_ROOT/schemas/" "$TMP/codex-dream-skin-studio/schemas/"
-  /usr/bin/rsync -a "$REPOSITORY_ROOT/examples/theme-package" "$TMP/codex-dream-skin-studio/examples/"
-  /bin/cp "$REPOSITORY_ROOT/docs/THEME_PACKAGE.md" \
-    "$REPOSITORY_ROOT/docs/KIMI_THEME_AUTHORING_PROMPT.md" \
-    "$TMP/codex-dream-skin-studio/docs/"
+  "$ROOT/scripts/bundle-theme-package-runtime.sh" \
+    "$REPOSITORY_ROOT" "$TMP/codex-dream-skin-studio"
 fi
 
 # The macOS tree is also published as a standalone ZIP. Bundle prompt guides

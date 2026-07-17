@@ -92,10 +92,14 @@ jobs:
           common="$(sed -n 's/^SKIN_VERSION="\([^"]*\)"$/\1/p' macos/scripts/common-macos.sh)"
           macos_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' macos/scripts/injector.mjs)"
           windows_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' windows/scripts/injector.mjs)"
+          windows_importer="$(sed -n "s/^[[:space:]]*'--dream-skin-version', '\([^']*\)'$/\1/p" windows/scripts/import-theme-package.ps1)"
+          package_version="$(node -p 'require("./macos/package.json").version')"
           test -n "$expected"
           test "$common" = "$expected"
           test "$macos_injector" = "$expected"
           test "$windows_injector" = "$expected"
+          test "$windows_importer" = "$expected"
+          test "$package_version" = "$expected"
 
       - name: Run portable Node.js regressions
         shell: bash
@@ -125,4 +129,6 @@ jobs:
 
       - name: Run Windows regression suite
         shell: cmd
-        run: ${{ matrix.executable }} -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\run-tests.ps1
+        run: |
+          node --test tests/theme-import-core.test.mjs tests/theme-package-zip-file.test.mjs
+          ${{ matrix.executable }} -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\run-tests.ps1

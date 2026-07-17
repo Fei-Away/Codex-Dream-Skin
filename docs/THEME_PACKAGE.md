@@ -87,15 +87,15 @@ v1 只开放两端能够明确承接的字段：
 | `name` | 单行 1–80 字符 | 支持 | 支持 |
 | `background` | 固定为 `background` | 支持 | 支持 |
 | `appearance` | `auto` / `light` / `dark` | 支持 | 支持 |
-| `text.tagline` | 单行 1–160 字符 | 支持 | 支持 |
-| `text.quote` | 单行 1–80 字符 | 支持 | 支持 |
+| `text.tagline` | 单行 1–160 字符 | 支持 | 保留，当前不渲染并警告 |
+| `text.quote` | 单行 1–80 字符 | 支持 | 保留，当前不渲染并警告 |
 | `art.focusX/Y` | `0..1` | 支持 | 支持 |
 | `art.safeArea` | `auto/left/right/center/none` | 支持 | 支持 |
 | `art.taskMode` | `auto/ambient/banner/off` | 支持 | 支持 |
 | `palette.accent` | 小写六位 Hex | 支持 | 支持 |
-| `palette.accentAlt` | 小写六位 Hex | 支持 | 支持 |
-| `palette.secondary` | 小写六位 Hex | 支持 | 支持 |
-| `palette.highlight` | 小写六位 Hex | 支持 | 支持 |
+| `palette.accentAlt` | 小写六位 Hex | 支持 | 保留，当前不渲染并警告 |
+| `palette.secondary` | 小写六位 Hex | 支持 | 保留，当前不渲染并警告 |
+| `palette.highlight` | 小写六位 Hex | 支持 | 保留，当前不渲染并警告 |
 
 `brandSubtitle`、项目按钮文案、状态文案和赞助链接不开放给 v1 外部包。平台编译器会使用项目维护的安全默认值，避免第三方主题伪装系统或植入任意链接。
 

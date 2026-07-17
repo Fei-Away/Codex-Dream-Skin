@@ -10,8 +10,8 @@
 | 平台编译 | `theme-import-core` + 两端 injector `--check-payload` | 同一 golden 包产生相同身份，并通过 macOS/Windows 运行时主题校验 |
 | 原子事务 | `theme-import-core` 故障注入 | 新装完整发布；重复导入幂等；默认冲突不变；显式替换失败恢复旧主题 |
 | 活动主题隔离 | `theme-import-core` | install 只写 `themes/<packageId>`，活动 `theme/` 字节不变 |
-| macOS 入口 | `macos/tests/run-tests.sh` | 平台脚本 dry-run 通过，菜单/发行内容引用自包含 importer |
-| Windows 入口 | `windows/tests/run-tests.ps1` | PowerShell 5.1 与 7 原生运行 dry-run、runtime 自包含、托盘入口测试 |
+| macOS 入口 | `macos/tests/run-tests.sh` | dry-run、安装、点号包 ID 选择通过；菜单、standalone ZIP 与客户 ZIP 自包含 importer |
+| Windows 入口 | `windows/tests/run-tests.ps1` | PowerShell 5.1 与 7 原生运行 dry-run、安装、幂等选择、runtime 自包含、托盘入口；共享故障注入在 Windows runner 同时执行 |
 
 本机 macOS 完整门禁：
 

@@ -86,6 +86,10 @@ try {
     image: "background.jpg",
     appearance: "auto",
   });
+  assert.equal(dryRun.author.name, "Dream Skin Example Authors");
+  assert.deepEqual(dryRun.targets, ["macos", "windows"]);
+  assert.deepEqual(dryRun.preview, { available: false });
+  assert.deepEqual(dryRun.warnings, []);
   assert.equal(await fs.lstat(unusedStateRoot).catch(() => null), null);
 
   const windowsDryRun = reportFor(runCli(
@@ -101,6 +105,10 @@ try {
   assert.equal(windowsDryRun.packageVersion, dryRun.packageVersion);
   assert.equal(windowsDryRun.contentHash, dryRun.contentHash);
   assert.equal(windowsDryRun.platform, "windows");
+  assert.deepEqual(windowsDryRun.warnings.map((warning) => warning.code), [
+    "WINDOWS_TEXT_FIELDS_NOT_RENDERED",
+    "WINDOWS_EXTENDED_PALETTE_NOT_RENDERED",
+  ]);
 
   const source = path.join(temporaryRoot, "changed-source");
   const changedPackage = path.join(temporaryRoot, "changed.dreamskin");
@@ -264,6 +272,26 @@ try {
   ), 1);
   assert.equal(symlinkFailure.code, "INSTALL_STORE_INVALID");
   assert.deepEqual(await fileSnapshot(outside), {});
+
+  if (process.platform === "win32") {
+    const ancestorTarget = path.join(temporaryRoot, "ancestor-target");
+    const ancestorLink = path.join(temporaryRoot, "ancestor-link");
+    await fs.mkdir(ancestorTarget);
+    await fs.symlink(ancestorTarget, ancestorLink, "junction");
+    const ancestorFailure = reportFor(runCli(
+      "import",
+      golden,
+      "--platform",
+      "windows",
+      "--dream-skin-version",
+      "1.3.0",
+      "--install",
+      "--state-root",
+      path.join(ancestorLink, "state"),
+    ), 1);
+    assert.equal(ancestorFailure.code, "INSTALL_STORE_INVALID");
+    assert.deepEqual(await fileSnapshot(ancestorTarget), {});
+  }
 } finally {
   await fs.rm(temporaryRoot, { recursive: true, force: true });
 }
