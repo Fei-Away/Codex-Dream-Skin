@@ -634,9 +634,18 @@ try {
   }
 
   $themeStateRoot = Join-Path $temporaryRoot 'theme-state'
+  $legacyPresetDirectory = Join-Path $themeStateRoot 'themes\preset-romantic-rose'
+  $customThemeDirectory = Join-Path $themeStateRoot 'themes\custom-keepme'
+  New-Item -ItemType Directory -Force -Path $legacyPresetDirectory, $customThemeDirectory | Out-Null
+  [System.IO.File]::WriteAllText((Join-Path $legacyPresetDirectory 'retired-marker'), 'retired', $utf8NoBom)
+  [System.IO.File]::WriteAllText((Join-Path $customThemeDirectory 'keep-marker'), 'keep', $utf8NoBom)
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
+  if ((Test-Path -LiteralPath $legacyPresetDirectory) -or
+    -not (Test-Path -LiteralPath (Join-Path $customThemeDirectory 'keep-marker'))) {
+    throw 'Theme-store migration did not retire the old preset ID while preserving custom themes.'
+  }
   $initialTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($initialTheme.Theme.id -cne 'preset-romantic-rose' -or
+  if ($initialTheme.Theme.id -cne 'preset-arina-hashimoto' -or
     $initialTheme.Theme.name -cne '桥本有菜' -or
     $initialTheme.Theme.appearance -cne 'auto' -or
     $initialTheme.Theme.art.safeArea -cne 'left' -or
@@ -646,7 +655,7 @@ try {
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
   if ($preseededThemes.Count -ne 1 -or
-    $preseededThemes[0].Id -cne 'preset-romantic-rose' -or
+    $preseededThemes[0].Id -cne 'preset-arina-hashimoto' -or
     $preseededThemes[0].Name -cne '桥本有菜') {
     throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
   }

@@ -7,13 +7,13 @@
 - 自适应图像主题引擎：通过本地 Canvas 分析亮度、主色、视觉焦点、左右安全区和图像比例，为任意背景图生成协调的浅色/深色外观；图片不会上传到外部服务。
 - 主题新增 `appearance: auto | light | dark` 与 `art.focusX/focusY`（`0..1`）、`art.safeArea: auto | left | right | center | none`、`art.taskMode: auto | ambient | banner | off` 配置；显式值优先于自动分析。
 - 首页与任务页按图像比例采用不同呈现：超宽图在任务页使用横幅和纵向渐隐，普通比例图使用低噪环境背景，也可用 `taskMode=off` 关闭任务页图像。
-- 内置「桥本有菜」实测精选预设与 5 套可复现的程序化抽象预设；安装后幂等播种到主题库，菜单栏或 `switch-theme-macos.sh` 可直接切换，且绝不覆盖 `custom-*` 用户主题。
+- 内置 Gothic Void Crusade 与「桥本有菜」两套实测预设；安装后幂等播种到主题库，菜单栏或 `switch-theme-macos.sh` 可直接切换，且绝不覆盖 `custom-*` 用户主题。
 - 新增中英文参考图生图指南：明确 `2560 × 1440`、Image 1/2/3 职责、裁切安全区、原创/已授权成年身份两套流程，以及“文案和小照片不烘焙进背景”的约束。
 
 ### 改进
 
 - watcher 在文档壳层出现后立即注入，按 CSS/主题/图片内容哈希热刷新并复用静态 payload；同一主题切换不再重复启动守护进程，减少原生界面闪现和后台轮询。
-- 主题切换先完整暂存图片，最后原子发布 `theme.json`；全新安装在没有活动主题时先启用通用的「午夜极光」，已有活动主题保持不变。
+- 主题切换先完整暂存图片，最后原子发布 `theme.json`；全新安装在没有活动主题时先启用 Gothic Void Crusade，已有活动主题保持不变。
 - `load-image-theme-macos.sh` 可通过 `--appearance`、`--focus-x`、`--focus-y`、`--safe-area`、`--task-mode` 精确调节构图；旧主题缺省时使用安全自适应值。
 - 客户端发行包的说明版本改为读取 `VERSION`，避免发布文案与实际版本漂移。
 

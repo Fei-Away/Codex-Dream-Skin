@@ -4,17 +4,18 @@
 
 > This folder holds the bundled preset themes. Install seeds each `preset-*/` into the user theme library, so a fresh install ships with ready-to-use skins.
 
-## 置顶：实测精选预设
+## 内置实测预设
 
-`preset-romantic-rose/`（桥本有菜 / Arina Hashimoto）是当前置顶的实机验证主题。它使用一张
+当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）与
+`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）两套实机验证主题。
+前者是社区作者提供的原创哥特科幻背景；后者使用一张
 `2560 × 1440`（16:9）纯背景：左侧低信息留白承载 Codex 原生标题，人物和花卉主视觉集中在右侧。浅色与暗色截图均来自真实 Codex 注入，不是 AI 绘制的整窗 UI。
 
 来源尺寸必须如实区分：归档的用户源图（不随 preset 播种）是 `1672 × 941` PNG；preset 内的 `background.jpg` 保持其近 16:9 构图，标准化导出为 `2560 × 1440` JPEG，并不代表补回或新增了源图细节。派生文件使用 `sips -z 1440 2560 -s format jpeg -s formatOptions 90` 生成。
 
-- 可导入/可播种的主题素材只有 [`background.jpg`](./preset-romantic-rose/background.jpg) 与 [`theme.json`](./preset-romantic-rose/theme.json)。
-- 用户提供的 byte-identical 源 PNG 单独归档在 [`docs/images/presets/romantic-rose-source.png`](../../docs/images/presets/romantic-rose-source.png)，不放进 preset pack，因此不会被安装脚本播种为多余文件。
+- 可导入/可播种的主题素材只有 [`background.jpg`](./preset-arina-hashimoto/background.jpg) 与 [`theme.json`](./preset-arina-hashimoto/theme.json)。
+- 用户提供的 byte-identical 源 PNG 单独归档在 [`docs/images/presets/arina-hashimoto-source.png`](../../docs/images/presets/arina-hashimoto-source.png)，不放进 preset pack，因此不会被安装脚本播种为多余文件。
 - 当前浅色、暗色实测文档截图均为 `2308 × 1572` Retina JPEG（CSS viewport `1154 × 786`），来自同一真实 Codex 首页；为保护未发送草稿，截图时仅用临时本地样式隐藏输入文字并收起编辑区，没有修改草稿内容或伪造皮肤效果。它们包含真实侧栏、项目工具栏和输入框，**只作预览，绝不能当背景导入**。
-- 这套精选图与下面五套程序化抽象预设来源不同；重新运行 `generate-presets.mjs` 不会覆盖它。
 - 背景是用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；公开分发前仍需确认人物、模型输出与素材使用权。
 - 该维护者提供的精选预设是单独记录的发行例外，不纳入 MIT 软件许可；文件清单和限制见 [`../NOTICE.md`](../NOTICE.md)。这不表示以后可以提交其他可识别真人素材。
 
@@ -22,7 +23,7 @@
 
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
-  --id preset-romantic-rose
+  --id preset-arina-hashimoto
 ```
 
 ## 一套预设的结构
@@ -43,7 +44,7 @@ preset-<slug>/
 
 - ✅ **原创**或你**拥有授权**的图像；
 - ✅ 明确 **CC0 / 公有领域 / 允许再分发**的素材；
-- ✅ 纯程序化生成的抽象 / 渐变 / 几何背景（见下）。
+- ✅ 纯程序化生成的抽象 / 渐变 / 几何背景。
 - ✅ 原创虚构的成年人物形象，且能说明生成/授权来源、没有模仿可识别真人。
 
 除非维护者事先完成独立权利审核并在 `NOTICE.md` 逐项记录，否则**不接受**（PR 会被拒绝）：
@@ -54,22 +55,7 @@ preset-<slug>/
 
 提交预设即视为你声明：对该素材拥有分发与再授权的权利。
 
-## 两种贡献方式
-
-### A. 程序化生成（推荐，零版权）
-
-`generate-presets.mjs` 是一个**纯 Node + 内置 zlib** 的确定性生成器（无第三方依赖），用多层渐变 + 光晕 + 暗角画出五套抽象背景，再用 macOS `sips` 压成 JPEG。同样的输入永远产出同样的字节，所以提交的资产 diff 稳定。它只管理脚本 `PRESETS` 数组中的程序化主题，不会处理或覆盖实测精选主题。
-
-加一套：在 `PRESETS` 数组追加一项（`slug` / `name` / `bg` / `lights` / `colors` …），然后：
-
-```bash
-node macos/presets/generate-presets.mjs
-```
-
-- 深色底用默认 `screen` 混合；浅色底请设 `blend: "tint"`（`screen` 在亮底上几乎不显光晕）。
-- 用 Quick Look 或直接打开 `background.jpg` 核对观感；左侧留一片相对干净的区域给原生首页标题。
-
-### B. 直接提供图片
+## 贡献方式
 
 没有 mac 或想用自制原图，也可以直接放 `preset-<slug>/background.jpg` + 手写 `theme.json`（照抄任一现有预设改配色即可）。
 

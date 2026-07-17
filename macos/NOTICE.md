@@ -21,13 +21,13 @@ It does **not** grant rights to:
 
 The following user/maintainer-supplied files are excluded from the MIT software license:
 
-- `presets/preset-romantic-rose/background.jpg`
+- `presets/preset-arina-hashimoto/background.jpg`
 - `../windows/assets/dream-reference.jpg`
-- `../docs/images/presets/romantic-rose-source.png`
-- `../docs/images/presets/romantic-rose-light.jpg`
-- `../docs/images/presets/romantic-rose-dark.jpg`
+- `../docs/images/presets/arina-hashimoto-source.png`
+- `../docs/images/presets/arina-hashimoto-light.jpg`
+- `../docs/images/presets/arina-hashimoto-dark.jpg`
 
-They are included at the maintainer's direction as a local theme preset, source archive, and real runtime previews. They are not official OpenAI/Codex artwork. Their inclusion does not certify or grant third-party likeness, model-output, or redistribution rights. Downstream redistribution and commercial use require an independent rights review; the two runtime screenshots are documentation previews and must never be imported as wallpapers.
+They are included at the maintainer's direction as a local theme preset, source archive, and real runtime previews. They are not official OpenAI/Codex artwork. The preset name is a maintainer label and does not imply the named person's participation, approval, or endorsement. Their inclusion does not certify or grant third-party likeness, model-output, or redistribution rights. Downstream redistribution and commercial use require an independent rights review; the two runtime screenshots are documentation previews and must never be imported as wallpapers.
 
 ## Runtime
 
