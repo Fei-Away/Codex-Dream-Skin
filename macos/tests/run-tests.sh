@@ -657,6 +657,7 @@ HOME="$RECOVERY_HOME" \
 
 DREAM_SKIN_TEST_CODEX_PID=4242 \
 DREAM_SKIN_TEST_CDP_READY=true \
+DREAM_SKIN_TEST_INJECTOR_READY=true \
 DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
 DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
 DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
@@ -665,25 +666,38 @@ HOME="$RECOVERY_HOME" \
 [ ! -e "$RECOVERY_START_LOG" ]
 
 DREAM_SKIN_TEST_CODEX_PID=4242 \
+DREAM_SKIN_TEST_CDP_READY=true \
+DREAM_SKIN_TEST_INJECTOR_READY=false \
+DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
+DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
+DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
+DREAM_SKIN_TEST_NOW=900 \
+HOME="$RECOVERY_HOME" \
+  "$ROOT/scripts/watch-dream-skin-macos.sh" --once
+[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "1" ]
+
+DREAM_SKIN_TEST_CODEX_PID=4243 \
 DREAM_SKIN_TEST_CDP_READY=false \
+DREAM_SKIN_TEST_INJECTOR_READY=false \
 DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
 DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
 DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
 DREAM_SKIN_TEST_NOW=1000 \
 HOME="$RECOVERY_HOME" \
   "$ROOT/scripts/watch-dream-skin-macos.sh" --once
-[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "1" ]
+[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "2" ]
 /usr/bin/grep -q -- '--restart-existing' "$RECOVERY_START_LOG"
 
-DREAM_SKIN_TEST_CODEX_PID=4242 \
+DREAM_SKIN_TEST_CODEX_PID=4243 \
 DREAM_SKIN_TEST_CDP_READY=false \
+DREAM_SKIN_TEST_INJECTOR_READY=false \
 DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
 DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
 DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
 DREAM_SKIN_TEST_NOW=1000 \
 HOME="$RECOVERY_HOME" \
   "$ROOT/scripts/watch-dream-skin-macos.sh" --once
-[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "1" ]
+[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "2" ]
 
 RECOVERY_AGENT_HOME="$TMP/recovery-agent-home"
 RECOVERY_AGENT_DIR="$TMP/launch-agents"
@@ -705,6 +719,17 @@ fi
 /usr/bin/grep -q 'enable_reopen_recovery' "$ROOT/scripts/start-dream-skin-macos.sh"
 /usr/bin/grep -q 'disable_reopen_recovery' "$ROOT/scripts/pause-dream-skin-macos.sh"
 /usr/bin/grep -q 'remove_reopen_recovery' "$ROOT/scripts/restore-dream-skin-macos.sh"
+
+STATUS_JSON="$(
+  DREAM_SKIN_STATUS_PROCESS_LIST='/Applications/ChatGPT.app/Contents/MacOS/ChatGPT' \
+  HOME="$RECOVERY_HOME" \
+    "$ROOT/scripts/status-dream-skin-macos.sh" --json
+)"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (!value.codexRunning) throw new Error("status must recognize the current Codex executable path");
+  if (value.themeName !== "终焉星海") throw new Error("status must fall back to the bundled theme");
+' "$STATUS_JSON"
 
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"

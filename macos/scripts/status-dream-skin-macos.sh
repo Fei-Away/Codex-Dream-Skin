@@ -20,6 +20,8 @@ done
 STATE_ROOT="${HOME}/Library/Application Support/CodexDreamSkinStudio"
 STATE_PATH="${STATE_ROOT}/state.json"
 THEME_DIR="${STATE_ROOT}/theme"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+BUNDLED_THEME_PATH="$PROJECT_ROOT/assets/theme.json"
 RECOVERY_ENABLED_PATH="${STATE_ROOT}/reopen-recovery.enabled"
 RECOVERY_JOB_LABEL="com.openai.codex-dream-skin-studio.reopen-recovery"
 
@@ -74,9 +76,21 @@ injector_identity_matches() {
   [ -n "$actual_start" ] && [ "$actual_start" = "$expected_start" ]
 }
 
-# Codex process: cheap name match only.  26.707 renamed Codex.app to
-# ChatGPT.app, while older installs still expose the former process name.
-if /usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 || /usr/bin/pgrep -x Codex >/dev/null 2>&1; then
+# Codex upgrades can expose either the executable path or a truncated process
+# name, so match the stable signed bundle paths instead of pgrep -x.
+process_list() {
+  if [ -n "${DREAM_SKIN_STATUS_PROCESS_LIST:-}" ]; then
+    printf '%s\n' "$DREAM_SKIN_STATUS_PROCESS_LIST"
+  else
+    /bin/ps -axo command=
+  fi
+}
+
+if process_list | /usr/bin/awk -v home="$HOME" '
+  index($0, "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT") == 1 ||
+  index($0, home "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT") == 1 { found = 1 }
+  END { exit(found ? 0 : 1) }
+'; then
   CODEX_RUNNING="true"
 fi
 
@@ -107,9 +121,11 @@ if [ -f "$STATE_PATH" ]; then
   fi
 fi
 
-if [ -f "$THEME_DIR/theme.json" ]; then
-  THEME_NAME="$(read_json_field "$THEME_DIR/theme.json" name)"
-  [ -n "$THEME_NAME" ] || THEME_NAME="$(read_json_field "$THEME_DIR/theme.json" id)"
+THEME_CONFIG_PATH="$THEME_DIR/theme.json"
+[ -f "$THEME_CONFIG_PATH" ] || THEME_CONFIG_PATH="$BUNDLED_THEME_PATH"
+if [ -f "$THEME_CONFIG_PATH" ]; then
+  THEME_NAME="$(read_json_field "$THEME_CONFIG_PATH" name)"
+  [ -n "$THEME_NAME" ] || THEME_NAME="$(read_json_field "$THEME_CONFIG_PATH" id)"
 fi
 
 if [ "$DEEP" = "true" ]; then

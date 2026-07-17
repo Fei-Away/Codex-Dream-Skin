@@ -47,6 +47,28 @@ recovery_cdp_ready() {
   verified_cdp_endpoint "$(recovery_port)"
 }
 
+recovery_injector_ready() {
+  case "${DREAM_SKIN_TEST_INJECTOR_READY:-}" in
+    true) return 0 ;;
+    false) return 1 ;;
+  esac
+  [ -f "$STATE_PATH" ] || return 1
+  local pid
+  local command_line
+  pid="$(state_field injectorPid 2>/dev/null || true)"
+  case "$pid" in ''|0|*[!0-9]*) return 1 ;; esac
+  /bin/kill -0 "$pid" 2>/dev/null || return 1
+  command_line="$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)"
+  case "$command_line" in
+    *injector.mjs*--watch*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+recovery_session_ready() {
+  recovery_cdp_ready && recovery_injector_ready
+}
+
 attempt_is_cooling_down() {
   local pid="$1"
   local now="$2"
@@ -66,11 +88,11 @@ recover_once() {
   local pid
   pid="$(current_codex_pid)"
   [ -n "$pid" ] && [ "$pid" != "0" ] || return 0
-  recovery_cdp_ready && return 0
+  recovery_session_ready && return 0
 
   /bin/sleep "$SETTLE_SECONDS"
   [ "$(current_codex_pid)" = "$pid" ] || return 0
-  recovery_cdp_ready && return 0
+  recovery_session_ready && return 0
 
   local now="${DREAM_SKIN_TEST_NOW:-$(/bin/date +%s)}"
   case "$now" in ''|*[!0-9]*) fail "Watcher time must be an integer epoch." ;; esac
