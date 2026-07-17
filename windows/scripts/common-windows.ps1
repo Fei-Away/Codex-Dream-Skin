@@ -95,11 +95,13 @@ function Invoke-DreamSkinNative {
   $ErrorActionPreference = 'Continue'
   try {
     if ($DiscardStderr) {
-      $output = @(& $FilePath @ArgumentList 2>$null | ForEach-Object { "$_" })
+      $nativeOutput = @(& $FilePath @ArgumentList 2>$null)
     } else {
-      $output = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" })
+      $nativeOutput = @(& $FilePath @ArgumentList 2>&1)
     }
-    return [pscustomobject]@{ Output = $output; ExitCode = $LASTEXITCODE }
+    $exitCode = $LASTEXITCODE
+    $output = @($nativeOutput | ForEach-Object { "$_" })
+    return [pscustomobject]@{ Output = $output; ExitCode = $exitCode }
   } finally {
     $ErrorActionPreference = $previousPreference
   }
