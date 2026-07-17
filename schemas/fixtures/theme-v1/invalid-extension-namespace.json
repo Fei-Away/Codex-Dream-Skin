@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "image": "background.jpg",
+  "extensions": {
+    "__proto__": { "enabled": true }
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Fei-Away/Codex-Dream-Skin/schemas/theme-v1.schema.json",
+  "title": "Codex Dream Skin portable theme v1",
+  "description": "Portable core fields shared by the macOS and Windows theme loaders. Unknown top-level fields are accepted for forward compatibility and may be ignored by loaders that do not understand them.",
+  "type": "object",
+  "required": ["schemaVersion", "image"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "Portable theme contract version. Loaders reject explicitly unsupported versions."
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))[^\\u0000-\\u001F\\u007F]+\\.(?:png|jpe?g|webp)$",
+      "description": "A relative image path inside the theme pack. Forward slashes are portable across platforms; nested asset folders are supported."
+    },
+    "appearance": {
+      "anyOf": [
+        { "enum": ["auto", "light", "dark"] },
+        { "type": "null" }
+      ],
+      "default": "auto"
+    },
+    "art": {
+      "type": "object",
+      "properties": {
+        "focusX": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "focusY": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "safeArea": {
+          "anyOf": [
+            { "enum": ["auto", "left", "right", "center", "none"] },
+            { "type": "null" }
+          ],
+          "default": "auto"
+        },
+        "taskMode": {
+          "anyOf": [
+            { "enum": ["auto", "ambient", "banner", "off"] },
+            { "type": "null" }
+          ],
+          "default": "auto"
+        }
+      },
+      "additionalProperties": true
+    },
+    "palette": {
+      "type": "object",
+      "description": "Portable color tokens. Platform-native color fields may override these aliases.",
+      "properties": {
+        "accent": { "$ref": "#/$defs/cssColor" },
+        "background": { "$ref": "#/$defs/cssColor" },
+        "surface": { "$ref": "#/$defs/cssColor" },
+        "surfaceAlt": { "$ref": "#/$defs/cssColor" },
+        "text": { "$ref": "#/$defs/cssColor" },
+        "muted": { "$ref": "#/$defs/cssColor" },
+        "line": { "$ref": "#/$defs/cssColor" }
+      },
+      "additionalProperties": true
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Optional data-only extension namespaces. Keys use reverse-DNS style and values are exposed to renderer integrations as JSON data; they are never executed as code.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+){1,7}$"
+      },
+      "maxProperties": 64,
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "cssColor": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 104,
+      "pattern": "^(?:#[0-9A-Fa-f]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|oklab)\\([^;{}]{1,96}\\))$"
+    }
+  },
+  "additionalProperties": true
+}

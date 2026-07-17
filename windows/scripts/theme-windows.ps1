@@ -257,6 +257,7 @@ function Set-DreamSkinActiveTheme {
   try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
   if ($null -eq $Theme) {
     $Theme = [pscustomobject]@{
+      schemaVersion = 1
       id = 'custom'
       name = '自定义主题'
       appearance = 'auto'
@@ -277,6 +278,7 @@ function Set-DreamSkinActiveTheme {
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinImageFile -Path $target
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
+    $Theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1 -Force
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
     if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
     if (-not $Theme.appearance) { $Theme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force }
@@ -328,6 +330,7 @@ function Save-DreamSkinCurrentTheme {
   Assert-DreamSkinNoReparseComponents -Path $destinationImage
   Assert-DreamSkinImageFile -Path $destinationImage
   $theme = $active.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  $theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1 -Force
   $theme.id = $id
   $theme.name = $trimmed
   $theme.image = $imageName

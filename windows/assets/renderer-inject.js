@@ -26,6 +26,12 @@
     "--dream-focus-y",
     "--dream-accent",
     "--dream-accent-ink",
+    "--dream-canvas",
+    "--dream-surface",
+    "--dream-surface-raised",
+    "--dream-text",
+    "--dream-text-muted",
+    "--dream-line",
     "--dream-image-luma",
   ];
   const HOME_UTILITY_CLASS = "dream-home-utility";
@@ -41,6 +47,15 @@
       return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
     });
     return .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
+  };
+  const colorChannels = (value) => {
+    const hex = String(value || "").trim().match(/^#([\da-f]{6})$/i);
+    if (hex) {
+      const number = Number.parseInt(hex[1], 16);
+      return [number >> 16, (number >> 8) & 255, number & 255];
+    }
+    const rgb = String(value || "").match(/rgba?\(\s*([\d.]+)[, ]+\s*([\d.]+)[, ]+\s*([\d.]+)/i);
+    return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
   };
   const defaultProfile = {
     appearance: "dark",
@@ -58,12 +73,18 @@
     const hasNumber = (candidate) =>
       (typeof candidate === "number" || (typeof candidate === "string" && candidate.trim() !== "")) &&
       Number.isFinite(Number(candidate));
-    const requestedAccent = typeof config?.palette?.accent === "string"
-      ? config.palette.accent.trim()
-      : "";
-    const safeAccent = /^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(requestedAccent)
-      ? requestedAccent
-      : null;
+    const colorPattern = /^(?:#[\da-f]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|oklab)\([^;{}]{1,96}\))$/i;
+    const requestedPalette = config.palette && typeof config.palette === "object" &&
+      !Array.isArray(config.palette) ? config.palette : {};
+    const palette = {};
+    for (const key of ["accent", "background", "surface", "surfaceAlt", "text", "muted", "line"]) {
+      const candidate = typeof requestedPalette[key] === "string" ? requestedPalette[key].trim() : "";
+      if (colorPattern.test(candidate)) palette[key] = candidate;
+    }
+    const rawExtensions = config.extensions && typeof config.extensions === "object" &&
+      !Array.isArray(config.extensions) ? config.extensions : {};
+    const extensions = Object.fromEntries(Object.entries(rawExtensions).filter(([namespace]) =>
+      /^[a-z0-9]+(?:[.-][a-z0-9]+){1,7}$/.test(namespace)));
     const appearance = ["auto", "light", "dark"].includes(config.appearance)
       ? config.appearance
       : "auto";
@@ -80,7 +101,9 @@
       taskMode,
       focusX: hasNumber(art.focusX) ? clamp(art.focusX) : null,
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
-      accent: safeAccent,
+      accent: palette.accent || null,
+      palette,
+      extensions,
       initialAspect: Number.isFinite(metadataRatio) && metadataRatio > 0 ? metadataRatio : null,
     };
   };
@@ -298,7 +321,8 @@
       ? profile.aspect >= 2.25 ? "banner" : "ambient"
       : config.taskMode;
     const accent = config.accent || `rgb(${profile.accent.join(" ")})`;
-    const accentInk = luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
+    const accentChannels = colorChannels(config.accent) || profile.accent;
+    const accentInk = luminance(...accentChannels) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
     root.classList.toggle("dream-theme-light", appearance === "light");
     root.classList.toggle("dream-theme-dark", appearance === "dark");
     root.classList.toggle("dream-art-wide", profile.aspect >= 1.75);
@@ -318,6 +342,16 @@
     root.style.setProperty("--dream-focus-y", String(focusY));
     root.style.setProperty("--dream-accent", accent);
     root.style.setProperty("--dream-accent-ink", accentInk);
+    for (const [token, property] of Object.entries({
+      background: "--dream-canvas",
+      surface: "--dream-surface",
+      surfaceAlt: "--dream-surface-raised",
+      text: "--dream-text",
+      muted: "--dream-text-muted",
+      line: "--dream-line",
+    })) {
+      if (config.palette[token]) root.style.setProperty(property, config.palette[token]);
+    }
     root.style.setProperty("--dream-image-luma", profile.luma.toFixed(3));
   };
 
@@ -403,7 +437,8 @@
   });
   const timer = setInterval(ensure, 5000);
   window[STATE_KEY] = {
-    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
+    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config,
+    extensions: config.extensions, installToken, version: "1.2.0",
   };
   ensure();
   analyzeArt().then((result) => {

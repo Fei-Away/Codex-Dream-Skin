@@ -142,6 +142,8 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 - Mac：[`macos/README.md`](./macos/README.md)
 - Windows：[`windows/SKILL.md`](./windows/SKILL.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
+- 开放式跨平台主题包制作：[`docs/portable-theme-authoring.md`](./docs/portable-theme-authoring.md)
+- 机器可读主题规范：[`schemas/theme-v1.schema.json`](./schemas/theme-v1.schema.json)
 - 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
 - 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - 项目记录：[`docs/PROJECT.md`](./docs/PROJECT.md)

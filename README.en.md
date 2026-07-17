@@ -155,6 +155,8 @@ More detail:
 - Mac: [`macos/README.md`](./macos/README.md)
 - Windows: [`windows/SKILL.md`](./windows/SKILL.md)
 - Paths: [`docs/platforms.md`](./docs/platforms.md)
+- Portable, extensible theme authoring: [`docs/portable-theme-authoring.md`](./docs/portable-theme-authoring.md)
+- Machine-readable theme schema: [`schemas/theme-v1.schema.json`](./schemas/theme-v1.schema.json)
 - Copy-ready reference prompt guide: [`docs/reference-background-prompt-guide.en.md`](./docs/reference-background-prompt-guide.en.md)
 - Eight concept prompt breakdowns: [`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - Project notes: [`docs/PROJECT.md`](./docs/PROJECT.md)

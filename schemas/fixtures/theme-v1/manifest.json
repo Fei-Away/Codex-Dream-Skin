@@ -1,0 +1,20 @@
+[
+  { "file": "valid-minimal.json", "accepted": true },
+  { "file": "valid-full-palette.json", "accepted": true, "palette": true },
+  { "file": "valid-nested-image.json", "accepted": true },
+  { "file": "valid-extensions-unknown.json", "accepted": true, "extensions": ["org.example.theme"] },
+  { "file": "valid-legacy-unversioned.json", "accepted": true, "legacy": true },
+  { "file": "invalid-future-version.json", "accepted": false },
+  { "file": "invalid-string-version.json", "accepted": false },
+  { "file": "invalid-traversal.json", "accepted": false },
+  { "file": "invalid-appearance.json", "accepted": false },
+  { "file": "invalid-focus-range.json", "accepted": false },
+  { "file": "invalid-focus-string.json", "accepted": false },
+  { "file": "invalid-safe-area.json", "accepted": false },
+  { "file": "invalid-task-mode.json", "accepted": false },
+  { "file": "invalid-art-array.json", "accepted": false },
+  { "file": "invalid-root-array.json", "accepted": false },
+  { "file": "invalid-overlong-name.json", "accepted": false },
+  { "file": "invalid-palette-color.json", "accepted": false },
+  { "file": "invalid-extension-namespace.json", "accepted": false }
+]

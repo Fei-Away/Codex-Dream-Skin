@@ -9,6 +9,12 @@ const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
 const SKIN_VERSION = "1.2.0";
 const MAX_ART_BYTES = 16 * 1024 * 1024;
+const MAX_THEME_EXTENSIONS_BYTES = 32 * 1024;
+const EXTENSION_NAMESPACE_PATTERN = /^[a-z0-9]+(?:[.-][a-z0-9]+){1,7}$/;
+const PORTABLE_COLOR_PATTERN = /^(?:#[\da-f]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|oklab)\([^;{}]{1,96}\))$/i;
+const PORTABLE_PALETTE_KEYS = [
+  "accent", "background", "surface", "surfaceAlt", "text", "muted", "line",
+];
 const STRONG_THEME_AUDIT_MS = 30000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
@@ -281,17 +287,53 @@ const THEME_CHOICES = {
   taskMode: new Set(["auto", "ambient", "banner", "off"]),
 };
 
+function normalizeThemeExtensions(value) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("extensions must be an object");
+  }
+  const namespaces = Object.keys(value);
+  if (namespaces.length > 64) {
+    throw new Error("extensions exceed the 64 namespace limit");
+  }
+  for (const namespace of namespaces) {
+    if (!EXTENSION_NAMESPACE_PATTERN.test(namespace)) {
+      throw new Error(`extensions has an invalid namespace: ${namespace}`);
+    }
+  }
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized, "utf8") > MAX_THEME_EXTENSIONS_BYTES) {
+    throw new Error("extensions exceed the 32 KB limit");
+  }
+  return JSON.parse(serialized);
+}
+
+function normalizePortablePalette(value) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("palette must be an object");
+  }
+  const palette = {};
+  for (const key of PORTABLE_PALETTE_KEYS) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (typeof value[key] !== "string" || !PORTABLE_COLOR_PATTERN.test(value[key].trim())) {
+      throw new Error(`palette.${key} is not a supported CSS color`);
+    }
+    palette[key] = value[key].trim();
+  }
+  return palette;
+}
+
 function normalizedUnit(value, name) {
-  if (value === null || value === undefined || value === "") return null;
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < 0 || number > 1) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(`${name} must be null or a number between 0 and 1`);
   }
-  return number;
+  return value;
 }
 
 function normalizedChoice(value, name, choices, fallback) {
-  if (value === null || value === undefined || value === "") return fallback;
+  if (value === null || value === undefined) return fallback;
   if (!choices.has(value)) throw new Error(`${name} has an unsupported value: ${value}`);
   return value;
 }
@@ -312,6 +354,10 @@ async function loadTheme(themeDir) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("Theme root must be an object");
   }
+  const schemaVersion = raw.schemaVersion ?? 1;
+  if (schemaVersion !== 1) {
+    throw new Error(`Theme schemaVersion is unsupported: ${raw.schemaVersion}`);
+  }
   const image = normalizedText(raw.image, "image", null, 240);
   if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
   const imagePath = path.resolve(realThemeDir, image);
@@ -328,10 +374,14 @@ async function loadTheme(themeDir) {
   if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
-  const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
-  const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
-    ? raw.palette : {};
+  if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
+    throw new Error("art must be an object");
+  }
+  const art = raw.art || {};
+  const palette = normalizePortablePalette(raw.palette);
+  const extensions = normalizeThemeExtensions(raw.extensions);
   const theme = {
+    schemaVersion,
     id: normalizedText(raw.id, "id", "custom", 80),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
     image,
@@ -342,15 +392,9 @@ async function loadTheme(themeDir) {
       safeArea: normalizedChoice(art.safeArea, "art.safeArea", THEME_CHOICES.safeArea, "auto"),
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
-    palette: {},
+    palette,
+    extensions,
   };
-  if (typeof palette.accent === "string" && palette.accent.trim()) {
-    const accent = palette.accent.trim();
-    if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(accent)) {
-      throw new Error("palette.accent is not a supported CSS color");
-    }
-    theme.palette.accent = accent;
-  }
   const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
   if (!imageStat.isFile()) throw new Error("Theme image is not a file");
   if (imageStat.size < 1) throw new Error("Theme image cannot be empty");
@@ -982,10 +1026,14 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
     console.log(JSON.stringify({
       pass: true,
       version: SKIN_VERSION,
+      schemaVersion: loaded.theme.schemaVersion,
       payloadBytes: Buffer.byteLength(loaded.payload),
       themeId: loaded.theme.id,
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,
+      palette: loaded.theme.palette,
+      resolvedPalette: loaded.theme.palette,
+      extensionNamespaces: Object.keys(loaded.theme.extensions || {}),
       artMetadata: loaded.theme.artMetadata ?? null,
     }));
   } else if (options.mode === "watch") await runWatch(options);

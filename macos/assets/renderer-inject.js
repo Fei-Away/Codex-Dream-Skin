@@ -736,6 +736,7 @@
     metrics,
     version: VERSION,
     themeId: THEME.id || "custom",
+    extensions: THEME.extensions || {},
     detectShellMode,
   };
   const firstEnsureStartedAt = now();

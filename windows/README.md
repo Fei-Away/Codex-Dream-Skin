@@ -72,6 +72,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。图片上限为 16 MB；宽或高不能超过 16384 像素，总像素不能超过 5000 万。
 
+需要制作可在 macOS 与 Windows 之间复制、带自定义调色板或第三方扩展数据的完整主题包时，请参考 [`docs/portable-theme-authoring.md`](../docs/portable-theme-authoring.md) 和 [`schemas/theme-v1.schema.json`](../schemas/theme-v1.schema.json)。
+
 ## 恢复与卸载快捷方式
 
 恢复官方外观；如果 Codex 正在运行，确认后关闭并重新打开：

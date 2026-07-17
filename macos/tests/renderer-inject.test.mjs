@@ -344,6 +344,7 @@ const defaults = createFixture({
   id: "default-contract",
   appearance: "auto",
   art: { safeArea: "auto", taskMode: "auto" },
+  extensions: { "org.example.theme": { density: "compact" } },
 });
 const defaultResult = vm.runInNewContext(defaults.payload, defaults.context);
 assert.equal(defaultResult.installed, true);
@@ -353,6 +354,10 @@ assert.equal(defaults.attributes.get("data-dream-art-task-mode"), "ambient");
 assert.equal(defaults.attributes.get("data-dream-art-ready"), "false");
 assert.equal(defaults.rootStyle.values.get("--dream-art-position"), "50.00% 50.00%");
 const defaultMetrics = defaults.window.__CODEX_DREAM_SKIN_STATE__.metrics;
+assert.equal(
+  defaults.window.__CODEX_DREAM_SKIN_STATE__.extensions["org.example.theme"].density,
+  "compact",
+);
 assert.equal(defaultMetrics.rootPasses, 1);
 assert.equal(defaultMetrics.routePasses, 1);
 assert.equal(defaultMetrics.layoutReads, 1);

@@ -12,6 +12,12 @@ const SKIN_VERSION = "1.2.0";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
+const MAX_THEME_EXTENSIONS_BYTES = 32 * 1024;
+const EXTENSION_NAMESPACE_PATTERN = /^[a-z0-9]+(?:[.-][a-z0-9]+){1,7}$/;
+const PORTABLE_COLOR_PATTERN = /^(?:#[\da-f]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|oklab)\([^;{}]{1,96}\))$/i;
+const PORTABLE_PALETTE_KEYS = [
+  "accent", "background", "surface", "surfaceAlt", "text", "muted", "line",
+];
 let staticPayloadAssets = null;
 
 function parseArgs(argv) {
@@ -273,6 +279,43 @@ function assertContainedPath(rootPath, candidatePath, label) {
   throw new Error(`${label} must stay inside its theme directory`);
 }
 
+function normalizeThemeExtensions(value, configPath) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${configPath} has an invalid extensions field`);
+  }
+  const namespaces = Object.keys(value);
+  if (namespaces.length > 64) {
+    throw new Error(`${configPath} extensions exceed the 64 namespace limit`);
+  }
+  for (const namespace of namespaces) {
+    if (!EXTENSION_NAMESPACE_PATTERN.test(namespace)) {
+      throw new Error(`${configPath} has an invalid extension namespace: ${namespace}`);
+    }
+  }
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized, "utf8") > MAX_THEME_EXTENSIONS_BYTES) {
+    throw new Error(`${configPath} extensions exceed the 32 KB limit`);
+  }
+  return JSON.parse(serialized);
+}
+
+function normalizePortablePalette(value, configPath) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${configPath} has an invalid palette field`);
+  }
+  const palette = {};
+  for (const key of PORTABLE_PALETTE_KEYS) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (typeof value[key] !== "string" || !PORTABLE_COLOR_PATTERN.test(value[key].trim())) {
+      throw new Error(`${configPath} has an invalid palette.${key} field`);
+    }
+    palette[key] = value[key].trim();
+  }
+  return palette;
+}
+
 async function loadTheme(themeDir) {
   const requestedRoot = themeDir ?? path.join(root, "assets");
   const configPath = path.join(requestedRoot, "theme.json");
@@ -300,19 +343,28 @@ async function loadTheme(themeDir) {
     throw error;
   }
   const raw = JSON.parse(config);
-  if (raw.schemaVersion !== 1 || typeof raw.image !== "string" || !raw.image) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`${configPath} must contain a theme object`);
+  }
+  const schemaVersion = raw.schemaVersion ?? 1;
+  if (schemaVersion !== 1 || typeof raw.image !== "string" || !raw.image) {
     throw new Error(`${configPath} has an unsupported schema or image field`);
   }
   if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(raw.image)) {
     throw new Error(`${configPath} has an invalid image field`);
   }
-  if (path.basename(raw.image) !== raw.image) throw new Error("Theme image must stay inside its theme directory");
-  const text = (value, fallback, max, name) => {
+  const text = (value, fallback, max, name, strictLength = false) => {
     if (value === undefined) return fallback;
     if (typeof value !== "string" || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) {
       throw new Error(`${configPath} has an invalid ${name} field`);
     }
-    return value.trim() ? Array.from(value.trim()).slice(0, max).join("") : fallback;
+    const trimmed = value.trim();
+    if (!trimmed) return fallback;
+    const characters = Array.from(trimmed);
+    if (strictLength && characters.length > max) {
+      throw new Error(`${configPath} has an overlong ${name} field`);
+    }
+    return characters.slice(0, max).join("");
   };
   const color = (value, fallback) => {
     if (typeof value !== "string") return fallback;
@@ -321,27 +373,38 @@ async function loadTheme(themeDir) {
       ? normalized
       : fallback;
   };
-  const choice = (value, name, choices) => {
-    if (value === undefined) return undefined;
+  const choice = (value, name, choices, fallback) => {
+    if (value === undefined || value === null) return fallback;
     if (typeof value !== "string" || !choices.includes(value)) {
       throw new Error(`${configPath} has an invalid ${name} field`);
     }
     return value;
   };
   const unit = (value, name) => {
-    if (value === undefined) return undefined;
+    if (value === undefined || value === null) return null;
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
       throw new Error(`${configPath} has an invalid ${name} field`);
     }
     return value;
   };
+  const palette = normalizePortablePalette(raw.palette, configPath);
+  const extensions = normalizeThemeExtensions(raw.extensions, configPath);
   const rawColors = raw.colors && typeof raw.colors === "object" && !Array.isArray(raw.colors)
     ? raw.colors : null;
   const colorKeys = [
     "background", "panel", "panelAlt", "accent", "accentAlt", "secondary",
     "highlight", "text", "muted", "line",
   ];
-  const appearance = choice(raw.appearance, "appearance", ["auto", "light", "dark"]);
+  const paletteAliases = {
+    background: palette.background,
+    panel: palette.surface,
+    panelAlt: palette.surfaceAlt,
+    accent: palette.accent,
+    text: palette.text,
+    muted: palette.muted,
+    line: palette.line,
+  };
+  const appearance = choice(raw.appearance, "appearance", ["auto", "light", "dark"], undefined);
   if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
     throw new Error(`${configPath} has an invalid art field`);
   }
@@ -349,13 +412,18 @@ async function loadTheme(themeDir) {
   const art = {
     focusX: unit(rawArt.focusX, "art.focusX"),
     focusY: unit(rawArt.focusY, "art.focusY"),
-    safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"]),
-    taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "off"]),
+    safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"], "auto"),
+    taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "off"], "auto"),
   };
+  const explicitColorKeys = new Set([
+    ...Object.entries(paletteAliases).filter(([, value]) => value).map(([key]) => key),
+    ...(rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : []),
+  ]);
+  const resolvedColor = (key, fallback) => color(rawColors?.[key], paletteAliases[key] ?? fallback);
   const theme = {
-    schemaVersion: 1,
-    id: text(raw.id, "custom", 80, "id"),
-    name: text(raw.name, "Codex Dream Skin", 80, "name"),
+    schemaVersion,
+    id: text(raw.id, "custom", 80, "id", true),
+    name: text(raw.name, "Codex Dream Skin", 120, "name", true),
     brandSubtitle: text(raw.brandSubtitle, "CODEX DREAM SKIN", 80, "brandSubtitle"),
     tagline: text(raw.tagline, "Make something wonderful.", 160, "tagline"),
     projectPrefix: text(raw.projectPrefix, "选择项目 · ", 80, "projectPrefix"),
@@ -363,25 +431,25 @@ async function loadTheme(themeDir) {
     statusText: text(raw.statusText, "DREAM SKIN ONLINE", 80, "statusText"),
     quote: text(raw.quote, "MAKE SOMETHING WONDERFUL", 80, "quote"),
     image: raw.image,
-    colorMode: rawColors ? "explicit" : "auto",
-    explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
+    colorMode: explicitColorKeys.size ? "explicit" : "auto",
+    explicitColorKeys: [...explicitColorKeys],
+    palette,
+    extensions,
     colors: {
-      background: color(rawColors?.background, "#071116"),
-      panel: color(rawColors?.panel, "#0b1a20"),
-      panelAlt: color(rawColors?.panelAlt, "#10272c"),
-      accent: color(rawColors?.accent, "#7cff46"),
+      background: resolvedColor("background", "#071116"),
+      panel: resolvedColor("panel", "#0b1a20"),
+      panelAlt: resolvedColor("panelAlt", "#10272c"),
+      accent: resolvedColor("accent", "#7cff46"),
       accentAlt: color(rawColors?.accentAlt, "#b8ff3d"),
       secondary: color(rawColors?.secondary, "#36d7e8"),
       highlight: color(rawColors?.highlight, "#642a8c"),
-      text: color(rawColors?.text, "#e9fff1"),
-      muted: color(rawColors?.muted, "#9ebdb3"),
-      line: color(rawColors?.line, "rgba(124, 255, 70, .28)"),
+      text: resolvedColor("text", "#e9fff1"),
+      muted: resolvedColor("muted", "#9ebdb3"),
+      line: resolvedColor("line", "rgba(124, 255, 70, .28)"),
     },
   };
   if (appearance !== undefined) theme.appearance = appearance;
-  if (Object.values(art).some((value) => value !== undefined)) {
-    theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
-  }
+  theme.art = art;
   const requestedImagePath = path.join(assetsRoot, theme.image);
   let imagePath;
   try {
@@ -875,8 +943,20 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       console.log(JSON.stringify({
         pass: true,
         version: SKIN_VERSION,
+        schemaVersion: loaded.theme.schemaVersion,
         themeId: loaded.theme.id,
         themeName: loaded.theme.name,
+        palette: loaded.theme.palette,
+        resolvedPalette: {
+          accent: loaded.theme.colors.accent,
+          background: loaded.theme.colors.background,
+          surface: loaded.theme.colors.panel,
+          surfaceAlt: loaded.theme.colors.panelAlt,
+          text: loaded.theme.colors.text,
+          muted: loaded.theme.colors.muted,
+          line: loaded.theme.colors.line,
+        },
+        extensionNamespaces: Object.keys(loaded.theme.extensions || {}),
         imageBytes: loaded.imageBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
         artMetadata: loaded.theme.artMetadata ?? null,

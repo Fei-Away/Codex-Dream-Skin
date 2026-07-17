@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "image": "background.jpg",
+  "extensions": {
+    "org.example.theme": {
+      "density": "compact",
+      "motion": "reduced",
+      "componentManifest": "components.json"
+    }
+  },
+  "communityMetadata": {
+    "author": "Example Author"
+  }
+}

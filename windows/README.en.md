@@ -72,6 +72,8 @@ Open `Codex Dream Skin - Tray` to:
 
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
 
+To build a complete theme pack that can move between macOS and Windows, carry a custom portable palette, or expose namespaced data to third-party tools, see [`docs/portable-theme-authoring.md`](../docs/portable-theme-authoring.md) and [`schemas/theme-v1.schema.json`](../schemas/theme-v1.schema.json).
+
 ## Restore and remove shortcuts
 
 Restore the stock appearance. If Codex is running, confirm its closure and relaunch:

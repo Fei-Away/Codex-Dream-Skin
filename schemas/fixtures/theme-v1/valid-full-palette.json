@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "portable-full",
+  "name": "Portable Full Theme",
+  "image": "background.jpg",
+  "appearance": "dark",
+  "art": {
+    "focusX": 0.72,
+    "focusY": 0.45,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "palette": {
+    "accent": "#E25563",
+    "background": "#171316",
+    "surface": "#211A1E",
+    "surfaceAlt": "#2B2227",
+    "text": "#FFF7F9",
+    "muted": "#C7AFB6",
+    "line": "#6E4B55"
+  }
+}
