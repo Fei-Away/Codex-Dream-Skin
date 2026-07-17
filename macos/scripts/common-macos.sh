@@ -25,7 +25,8 @@ APP_ERROR_LOG="$STATE_ROOT/codex-launch-error.log"
 START_ERROR_LOG="$STATE_ROOT/start-error.log"
 CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
-EXPECTED_CODEX_TEAM_ID="${CODEX_EXPECTED_TEAM_ID:-2DC432GLL2}"
+EXPECTED_CODEX_TEAM_ID="2DC432GLL2"
+EXPECTED_CODEX_REQUIREMENT="anchor apple generic and certificate leaf[subject.OU] = \"$EXPECTED_CODEX_TEAM_ID\""
 SKIN_VERSION="1.2.0"
 
 fail() {
@@ -92,6 +93,10 @@ discover_codex_app() {
   local executable_name=""
   local configured="${CODEX_APP_BUNDLE:-}"
 
+  CODEX_BUNDLE=""
+  CODEX_EXE=""
+  CODEX_VERSION=""
+
   for candidate in "$configured" \
     "/Applications/ChatGPT.app" "$HOME/Applications/ChatGPT.app" \
     "/Applications/Codex.app" "$HOME/Applications/Codex.app"; do
@@ -125,23 +130,25 @@ codesign_team_id() {
     | /usr/bin/awk -F= '/^TeamIdentifier=/{print $2; exit}'
 }
 
-require_macos_runtime() {
+require_macos_node_runtime() {
   [ "$(/usr/bin/uname -s)" = "Darwin" ] || fail "This launcher requires macOS."
   [ -n "${CODEX_BUNDLE:-}" ] || fail "Discover the Codex app before validating its runtime."
 
   RUNTIME_NODE="$CODEX_BUNDLE/Contents/Resources/cua_node/bin/node"
   [ -x "$RUNTIME_NODE" ] || fail "The signed Node.js runtime bundled with Codex was not found: $RUNTIME_NODE"
-  /usr/bin/codesign --verify --deep --strict "$CODEX_BUNDLE" >/dev/null 2>&1 \
+  /usr/bin/codesign --verify --strict \
+    --test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$CODEX_BUNDLE" >/dev/null 2>&1 \
     || fail "The Codex app signature is not valid. Restore or reinstall the official app before continuing."
-  /usr/bin/codesign --verify --strict "$RUNTIME_NODE" >/dev/null 2>&1 \
+  /usr/bin/codesign --verify --strict \
+    --test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$RUNTIME_NODE" >/dev/null 2>&1 \
     || fail "The Node.js runtime bundled with Codex failed code-signature validation."
 
   CODEX_TEAM_ID="$(codesign_team_id "$CODEX_BUNDLE")"
   NODE_TEAM_ID="$(codesign_team_id "$RUNTIME_NODE")"
   [ "$CODEX_TEAM_ID" = "$EXPECTED_CODEX_TEAM_ID" ] \
     || fail "Unexpected Codex signing team: ${CODEX_TEAM_ID:-missing}."
-  [ "$NODE_TEAM_ID" = "$CODEX_TEAM_ID" ] \
-    || fail "The bundled Node.js signer does not match the Codex app signer."
+  [ "$NODE_TEAM_ID" = "$EXPECTED_CODEX_TEAM_ID" ] \
+    || fail "Unexpected bundled Node.js signing team: ${NODE_TEAM_ID:-missing}."
 
   local machine_arch
   local node_major
@@ -156,6 +163,14 @@ require_macos_runtime() {
 
   NODE="$RUNTIME_NODE"
   export NODE RUNTIME_NODE NODE_VERSION CODEX_TEAM_ID NODE_TEAM_ID
+}
+
+require_macos_runtime() {
+  [ "$(/usr/bin/uname -s)" = "Darwin" ] || fail "This launcher requires macOS."
+  [ -n "${CODEX_BUNDLE:-}" ] || fail "Discover the Codex app before validating its runtime."
+  /usr/bin/codesign --verify --deep --strict "$CODEX_BUNDLE" >/dev/null 2>&1 \
+    || fail "The Codex app signature is not valid. Restore or reinstall the official app before continuing."
+  require_macos_node_runtime
 }
 
 codex_main_pids() {
@@ -514,44 +529,11 @@ launch_injector_daemon() {
   fail "The injector did not start. See $INJECTOR_ERROR_LOG and $INJECTOR_LOG"
 }
 
-# Resolve Node quickly: prefer known Codex path, else full runtime check.
+# Resolve Node through the official Codex bundle before it can run the injector.
 ensure_node_runtime() {
-  if [ -n "${NODE:-}" ] && [ -x "${NODE:-}" ]; then
-    if [ -z "${NODE_VERSION:-}" ]; then
-      NODE_VERSION="$("$NODE" --version 2>/dev/null || echo unknown)"
-      export NODE_VERSION
-    fi
-    # Fill CODEX_* if missing so write_state does not explode under set -u
-    : "${CODEX_BUNDLE:=}"
-    : "${CODEX_EXE:=}"
-    : "${CODEX_VERSION:=}"
-    : "${CODEX_TEAM_ID:=}"
-    return 0
-  fi
-  local candidate cand_bundle
-  for candidate in \
-    "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node" \
-    "/Applications/Codex.app/Contents/Resources/cua_node/bin/node" \
-    "$HOME/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node" \
-    "$HOME/Applications/Codex.app/Contents/Resources/cua_node/bin/node"
-  do
-    if [ -x "$candidate" ]; then
-      NODE="$candidate"
-      NODE_VERSION="$("$NODE" --version 2>/dev/null || echo unknown)"
-      export NODE NODE_VERSION
-      # Derive the bundle from the chosen node so CODEX_* matches the app that
-      # actually exists on disk (Codex.app vs renamed ChatGPT.app).
-      cand_bundle="${candidate%/Contents/Resources/cua_node/bin/node}"
-      : "${CODEX_BUNDLE:=$cand_bundle}"
-      : "${CODEX_EXE:=$cand_bundle/Contents/MacOS/ChatGPT}"
-      : "${CODEX_VERSION:=}"
-      : "${CODEX_TEAM_ID:=}"
-      restore_runtime_context_from_state
-      return 0
-    fi
-  done
+  unset CODEX_BUNDLE CODEX_EXE CODEX_VERSION CODEX_TEAM_ID
   discover_codex_app
-  require_macos_runtime
+  require_macos_node_runtime
 }
 
 # Fast path when CDP is already open: restart injector + one-shot inject.

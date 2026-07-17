@@ -231,9 +231,9 @@ EXPECTED_TEAM_ID="TEAM'ID"
   const [file, codexBundle, codexExe, codexVersion, codexTeamId] = process.argv.slice(1);
   fs.writeFileSync(file, `${JSON.stringify({ codexBundle, codexExe, codexVersion, codexTeamId })}\n`);
 ' "$RUNTIME_STATE" "$EXPECTED_BUNDLE" "$EXPECTED_EXE" "$EXPECTED_VERSION" "$EXPECTED_TEAM_ID"
-/usr/bin/env -u NODE -u NODE_VERSION HOME="$RUNTIME_HOME" /bin/bash -c '
+/usr/bin/env NODE="$NODE" HOME="$RUNTIME_HOME" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
-  ensure_node_runtime
+  restore_runtime_context_from_state
   [ "$CODEX_BUNDLE" = "$2" ]
   [ "$CODEX_EXE" = "$3" ]
   [ "$CODEX_VERSION" = "$4" ]
@@ -243,6 +243,57 @@ EXPECTED_TEAM_ID="TEAM'ID"
   printf 'Runtime state values were evaluated as shell code.\n' >&2
   exit 1
 }
+
+# The hot path must ignore an inherited NODE and call the trusted bundled-node
+# validation after discovering the official Codex bundle.
+FAST_RUNTIME_MARKER="$TMP/runtime-fast-path.log"
+UNTRUSTED_NODE="$TMP/untrusted-node"
+UNTRUSTED_NODE_MARKER="$TMP/untrusted-node-executed"
+INHERITED_BUNDLE="$TMP/inherited-Codex.app"
+TRUSTED_NODE="$TMP/trusted-node"
+/usr/bin/printf '%s\n' \
+  '#!/bin/bash' \
+  'printf "untrusted\\n" >> "$UNTRUSTED_NODE_MARKER"' \
+  'exit 0' > "$UNTRUSTED_NODE"
+/usr/bin/printf '#!/bin/bash\nexit 0\n' > "$TRUSTED_NODE"
+/bin/chmod +x "$UNTRUSTED_NODE" "$TRUSTED_NODE"
+/usr/bin/env HOME="$RUNTIME_HOME" NODE="$UNTRUSTED_NODE" CODEX_EXPECTED_TEAM_ID="UNTRUSTED" \
+  CODEX_BUNDLE="$INHERITED_BUNDLE" CODEX_EXE="/tmp/untrusted-codex" CODEX_VERSION="untrusted" \
+  CODEX_TEAM_ID="UNTRUSTED" UNTRUSTED_NODE_MARKER="$UNTRUSTED_NODE_MARKER" /bin/bash -c '
+  . "$1/scripts/common-macos.sh"
+  [ "$EXPECTED_CODEX_TEAM_ID" = "2DC432GLL2" ]
+  test_bundle="$2"
+  test_trusted_node="$3"
+  test_marker="$4"
+  discover_codex_app() {
+    [ -z "${CODEX_BUNDLE:-}" ]
+    [ -z "${CODEX_EXE:-}" ]
+    [ -z "${CODEX_VERSION:-}" ]
+    [ -z "${CODEX_TEAM_ID:-}" ]
+    CODEX_BUNDLE="$test_bundle"
+    CODEX_EXE="$test_bundle/Contents/MacOS/ChatGPT"
+    CODEX_VERSION="test"
+    export CODEX_BUNDLE CODEX_EXE CODEX_VERSION
+    printf "discover\\n" >> "$test_marker"
+  }
+  require_macos_node_runtime() {
+    NODE="$test_trusted_node"
+    RUNTIME_NODE="$test_trusted_node"
+    NODE_VERSION="v22.0.0"
+    CODEX_TEAM_ID="2DC432GLL2"
+    NODE_TEAM_ID="2DC432GLL2"
+    export NODE RUNTIME_NODE NODE_VERSION CODEX_TEAM_ID NODE_TEAM_ID
+    printf "validate\\n" >> "$test_marker"
+  }
+  ensure_node_runtime
+  [ "$NODE" = "$test_trusted_node" ]
+  [ ! -e "$UNTRUSTED_NODE_MARKER" ]
+' _ "$ROOT" "$EXPECTED_BUNDLE" "$TRUSTED_NODE" "$FAST_RUNTIME_MARKER"
+/usr/bin/grep -Fx -q 'discover' "$FAST_RUNTIME_MARKER"
+/usr/bin/grep -Fx -q 'validate' "$FAST_RUNTIME_MARKER"
+/usr/bin/grep -F -q 'EXPECTED_CODEX_REQUIREMENT="anchor apple generic' "$ROOT/scripts/common-macos.sh"
+/usr/bin/grep -F -q -- '--test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$CODEX_BUNDLE"' "$ROOT/scripts/common-macos.sh"
+/usr/bin/grep -F -q -- '--test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$RUNTIME_NODE"' "$ROOT/scripts/common-macos.sh"
 
 # A reused live PID must never be killed or treated as a successfully stopped
 # injector when its command identity does not match the recorded watcher.

@@ -33,6 +33,7 @@
 
 ### 安全
 
+- 热切换现在会重新发现并校验官方 Codex bundle，在执行注入器前按 Apple 信任链、固定 OpenAI Team ID、架构和最低版本校验内置 Node；不再信任继承的 `NODE` 或 bundle 路径。
 - CDP 端点必须由已验证的官方 Codex 可执行文件或其子进程监听；WebSocket 还会校验 loopback、page ID、路径、无重定向，并安全处理畸形消息和发送异常。
 - 主题配置与图片使用真实路径 containment，拒绝 symlink 越界、空文件、超过 16 MB、单边超过 16384 px 或超过 50 MP 的图片；主题展示文本拒绝换行和控制字符。
 - AppleScript 动态内容全部通过 argv 传递；SwiftBar 过滤主题 ID、文件名和菜单文本，避免主题元数据改变菜单属性或命令参数。
