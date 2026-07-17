@@ -211,6 +211,12 @@ seed_bundled_presets() {
   [ -d "$presets_root" ] || return 0
   local themes_root="$STATE_ROOT/themes"
   /bin/mkdir -p "$themes_root"
+  local retired
+  for retired in \
+    preset-midnight-aurora preset-sakura-dawn preset-amber-dusk \
+    preset-forest-mist preset-cyber-neon preset-romantic-rose; do
+    /bin/rm -rf "$themes_root/$retired"
+  done
   local src id dest entry
   for src in "$presets_root"/preset-*/; do
     [ -d "$src" ] || continue

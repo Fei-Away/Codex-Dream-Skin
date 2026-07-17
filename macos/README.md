@@ -24,7 +24,7 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 ./scripts/install-dream-skin-macos.sh --no-launch
 
 # 3) Switch to the tested featured preset, or import your own pure background
-~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-romantic-rose
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-arina-hashimoto
 # ~/.codex/codex-dream-skin-studio/scripts/customize-theme-macos.sh
 
 # 4) Start/re-apply, verify, or restore via Desktop:
@@ -74,38 +74,28 @@ CDP is powerful and unauthenticated on loopback. Prefer Restore when you are don
 
 ## Bundled presets
 
-A fresh install seeds one tested featured preset plus five procedural abstract
-presets into your theme library. **桥本有菜 / Arina Hashimoto** is highlighted
-first here:
+A fresh install seeds two tested presets into your theme library:
+**Gothic Void Crusade** and **桥本有菜 / Arina Hashimoto**. Gothic Void Crusade
+is the default when no active theme exists. Switch to Arina Hashimoto with:
 
 ```bash
-~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-romantic-rose
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-arina-hashimoto
 ```
 
 The user-provided source PNG is `1672 × 941`. Its pack contains a standardized
 derived `2560 × 1440` JPEG plus theme metadata; the derived export does not add
 source detail. The byte-identical source PNG is archived at
-[`docs/images/presets/romantic-rose-source.png`](../docs/images/presets/romantic-rose-source.png).
-The [light](../docs/images/presets/romantic-rose-light.jpg) and
-[dark](../docs/images/presets/romantic-rose-dark.jpg) images are real injected
+[`docs/images/presets/arina-hashimoto-source.png`](../docs/images/presets/arina-hashimoto-source.png).
+The [light](../docs/images/presets/arina-hashimoto-light.jpg) and
+[dark](../docs/images/presets/arina-hashimoto-dark.jpg) images are real injected
 Codex screenshots for preview only — never import either screenshot as a
 background. The artwork is a user-provided AI-generated example, not an
 official OpenAI/Codex visual or endorsement; confirm likeness and asset rights
 before redistributing it.
 
-The other five presets — **午夜极光 / 樱粉晨曦 / 琥珀黄昏 / 森野薄雾 /
-赛博霓虹** — are generated procedurally (pure Node + zlib, no photos, no
-third-party art or likeness) by `presets/generate-presets.mjs`. Apply one
-directly, for example:
-
-```bash
-~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-midnight-aurora
-```
-
-Seeding is idempotent and only manages `preset-*` packs — your own `custom-*`
-themes from “换一张图” are never touched. If no active theme exists yet, install
-starts from the neutral **Midnight Aurora** preset; it never overwrites an
-existing active theme.
+Seeding is idempotent. Upgrades remove only retired bundled preset IDs; your
+own `custom-*` themes from “换一张图” and the currently active theme copy are
+never touched.
 
 To contribute a preset, see [`presets/README.md`](./presets/README.md).
 
