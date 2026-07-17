@@ -42,6 +42,42 @@
     });
     return .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
   };
+  const resolvedColorChannels = new Map();
+  const resolveColorChannels = (value) => {
+    const color = String(value || "").trim();
+    if (!color) return null;
+    if (resolvedColorChannels.has(color)) return resolvedColorChannels.get(color);
+    let channels = null;
+    const hex = color.match(/^#([\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i);
+    if (hex) {
+      const digits = hex[1].length <= 4
+        ? hex[1].slice(0, 3).split("").map((digit) => digit + digit).join("")
+        : hex[1].slice(0, 6);
+      const number = Number.parseInt(digits, 16);
+      channels = [number >> 16, (number >> 8) & 255, number & 255];
+    } else {
+      const rgb = color.match(/rgba?\(\s*([\d.]+)[, ]+\s*([\d.]+)[, ]+\s*([\d.]+)/i);
+      if (rgb) channels = [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+    }
+    if (!channels) {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (context) {
+          context.clearRect(0, 0, 1, 1);
+          context.fillStyle = "rgba(0, 0, 0, 0)";
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          const pixel = context.getImageData(0, 0, 1, 1).data;
+          if (pixel[3] > 0) channels = [pixel[0], pixel[1], pixel[2]];
+        }
+      } catch {}
+    }
+    resolvedColorChannels.set(color, channels);
+    return channels;
+  };
   const defaultProfile = {
     appearance: "dark",
     accent: [108, 131, 142],
@@ -298,7 +334,8 @@
       ? profile.aspect >= 2.25 ? "banner" : "ambient"
       : config.taskMode;
     const accent = config.accent || `rgb(${profile.accent.join(" ")})`;
-    const accentInk = luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
+    const accentChannels = resolveColorChannels(accent) || profile.accent;
+    const accentInk = luminance(...accentChannels) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
     root.classList.toggle("dream-theme-light", appearance === "light");
     root.classList.toggle("dream-theme-dark", appearance === "dark");
     root.classList.toggle("dream-art-wide", profile.aspect >= 1.75);

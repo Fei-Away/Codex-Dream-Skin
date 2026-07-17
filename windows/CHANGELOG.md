@@ -1,5 +1,11 @@
 # Windows Changelog
 
+## Unreleased
+
+### 修复
+
+- 自定义 `palette.accent` 的按钮前景色改为依据最终 CSS 强调色计算，而不是继续使用图片分析出的颜色；十六进制、RGB、HSL 与 OKLab/OKLCH 等已允许格式通过本地 Canvas 安全解析，解析失败时保留原有自适应回退。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

@@ -504,6 +504,28 @@ assert.equal(explicit.attributes.get("data-dream-art-task-mode"), "off");
 assert.equal(explicit.rootStyle.values.get("--dream-art-position"), "15.00% 80.00%");
 assert.equal(explicit.window.__CODEX_DREAM_SKIN_STATE__.analysis, null);
 
+const lightAccent = createFixture({
+  id: "light-accent-contract",
+  appearance: "dark",
+  explicitColorKeys: ["accent"],
+  colors: { accent: "#F4E66A" },
+  art: { safeArea: "auto", taskMode: "auto" },
+});
+vm.runInNewContext(lightAccent.payload, lightAccent.context);
+assert.equal(lightAccent.rootStyle.values.get("--ds-green"), "#F4E66A");
+assert.equal(lightAccent.rootStyle.values.get("--ds-on-accent"), "rgb(26 24 28)");
+
+const darkAccent = createFixture({
+  id: "dark-accent-contract",
+  appearance: "light",
+  explicitColorKeys: ["accent"],
+  colors: { accent: "#221A20" },
+  art: { safeArea: "auto", taskMode: "auto" },
+});
+vm.runInNewContext(darkAccent.payload, darkAccent.context);
+assert.equal(darkAccent.rootStyle.values.get("--ds-green"), "#221A20");
+assert.equal(darkAccent.rootStyle.values.get("--ds-on-accent"), "rgb(250 248 251)");
+
 const banner = createFixture({
   id: "banner-contract",
   appearance: "auto",

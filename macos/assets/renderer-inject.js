@@ -19,6 +19,7 @@
   const THEME_VARIABLES = [
     "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime",
     "--ds-cyan", "--ds-purple", "--ds-text", "--ds-muted", "--ds-line",
+    "--ds-on-accent",
     "--ds-bg-rgb", "--ds-panel-rgb", "--ds-panel-2-rgb", "--ds-accent-rgb",
     "--ds-accent-alt-rgb", "--ds-secondary-rgb", "--ds-highlight-rgb",
     "--ds-text-rgb", "--ds-muted-rgb", "--ds-line-rgb",
@@ -324,6 +325,13 @@
 
     for (const [name, value] of Object.entries(variables)) {
       if (typeof value === "string" && value) setStyleProperty(root, name, value);
+    }
+    if (explicit.has("accent")) {
+      const accentRgb = parseRgb(accent);
+      if (accentRgb) {
+        const onAccent = luminance(accentRgb) > 0.42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
+        setStyleProperty(root, "--ds-on-accent", onAccent);
+      }
     }
     const rgbVariables = {
       "--ds-bg-rgb": variables["--ds-bg"],

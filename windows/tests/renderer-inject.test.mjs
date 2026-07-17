@@ -29,6 +29,7 @@ function createFixture({
   computedColorScheme = "",
   osAppearance = "light",
   analysisFixture = null,
+  colorFixture = null,
 }) {
   const nodes = new Map();
   const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
@@ -109,6 +110,20 @@ function createFixture({
   const staleShell = { classList: makeClassList(new Set(["dream-home-shell"])) };
 
   const createElement = (tagName) => {
+    if (tagName === "canvas" && colorFixture && !analysisFixture) {
+      return {
+        width: 0,
+        height: 0,
+        getContext() {
+          return {
+            clearRect() {},
+            fillRect() {},
+            fillStyle: "rgba(0, 0, 0, 0)",
+            getImageData() { return { data: new Uint8ClampedArray(colorFixture) }; },
+          };
+        },
+      };
+    }
     if (tagName === "canvas" && analysisFixture) {
       return {
         width: 0,
@@ -280,7 +295,7 @@ const configured = createFixture({
 });
 const configuredPayload = buildPayload({
   appearance: "light",
-  palette: { accent: "#d45a70" },
+  palette: { accent: "#f4e66a" },
   art: { focusX: .15, focusY: .8, safeArea: "right", taskMode: "off" },
 });
 const configuredResult = vm.runInNewContext(configuredPayload, configured.context);
@@ -291,12 +306,21 @@ assert.equal(configured.rootClasses.has("dream-focus-left"), true);
 assert.equal(configured.rootClasses.has("dream-safe-right"), true);
 assert.equal(configured.rootClasses.has("dream-task-off"), true);
 assert.equal(configured.rootStyles.get("--dream-art-position"), "15% 80%");
-assert.equal(configured.rootStyles.get("--dream-accent"), "#d45a70");
+assert.equal(configured.rootStyles.get("--dream-accent"), "#f4e66a");
+assert.equal(configured.rootStyles.get("--dream-accent-ink"), "rgb(26 24 28)");
 assert.equal(configured.routeClasses.has("dream-home"), true);
 assert.equal(configured.routeClasses.has("dream-task"), false);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), true);
 assert.equal(configured.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), false);
+
+const functionalAccent = createFixture({
+  shellPresent: true,
+  colorFixture: [244, 230, 106, 255],
+});
+vm.runInNewContext(buildPayload({ palette: { accent: "hsl(56 88% 68%)" } }), functionalAccent.context);
+assert.equal(functionalAccent.rootStyles.get("--dream-accent"), "hsl(56 88% 68%)");
+assert.equal(functionalAccent.rootStyles.get("--dream-accent-ink"), "rgb(26 24 28)");
 
 const analysisPixels = new Uint8ClampedArray(48 * 12 * 4);
 for (let index = 0; index < 48 * 12; index += 1) {
