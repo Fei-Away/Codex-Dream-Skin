@@ -191,6 +191,46 @@ Reset to the bundled abstract demo:
 ~/.codex/codex-dream-skin-studio/scripts/customize-theme-macos.sh --reset-demo
 ```
 
+## Theme fit reports
+
+Inspect the predictable parts of a saved theme's composition without applying
+it or starting Codex. The report validates a stable snapshot through the
+existing theme staging and payload checks, then simulates CSS `cover` cropping,
+pixel density, explicit safe-area conflicts, and declared color contrast.
+
+Print a terminal report:
+
+```bash
+node ./scripts/theme-fit-report.mjs \
+  --theme-dir ./presets/preset-midnight-aurora \
+  --format text
+```
+
+Emit deterministic JSON for automation or attach a self-contained visual
+report to local QA notes:
+
+```bash
+node ./scripts/theme-fit-report.mjs \
+  --theme-dir ./presets/preset-midnight-aurora \
+  --format json \
+  --output /tmp/midnight-fit.json
+
+node ./scripts/theme-fit-report.mjs \
+  --theme-dir ./presets/preset-midnight-aurora \
+  --format html \
+  --output /tmp/midnight-fit.html
+```
+
+The report checks representative `1440 x 900`, `1154 x 786`, and `880 x 820`
+home windows plus a `1440 x 360` task banner. A task-banner preview is marked as
+reference-only when the resolved task mode is `ambient` or `off`, so an unused
+layout cannot create a false warning.
+
+This tool is read-only. It does not publish a theme, change the active theme,
+open CDP, or restart Codex. Automatic focus and safe-area values remain a
+runtime Canvas decision; the static report labels those values as adaptive
+instead of claiming pixel-level certainty.
+
 ## License
 
 MIT — see `LICENSE`. Additional notices in `NOTICE.md` cover trademarks,
