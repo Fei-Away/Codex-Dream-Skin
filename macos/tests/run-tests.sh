@@ -852,11 +852,15 @@ IMPORT_INSTALL_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
 '
 IMPORT_SWITCH_LOCK="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/.theme-switch.lock"
 IMPORT_SWITCH_META="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/.theme-switch.meta"
-IMPORT_SWITCH_START="$(/bin/ps -p "$$" -o lstart= | /usr/bin/awk '{$1=$1; print}')"
+IMPORT_SWITCH_START="$(HOME="$IMPORT_HOME" /bin/bash -c '
+  . "$1/scripts/common-macos.sh"
+  process_started_at "$2"
+' _ "$ROOT" "$$")"
 /usr/bin/shlock -f "$IMPORT_SWITCH_LOCK" -p "$$" \
   || fail 'Could not establish the competing macOS theme switch test lock.'
 /usr/bin/printf 'pid=%s\nstartedAt=%s\n' "$$" "$IMPORT_SWITCH_START" > "$IMPORT_SWITCH_META"
-if HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
+if HOME="$IMPORT_HOME" NODE="$NODE" LC_ALL=zh_CN.UTF-8 TZ=Asia/Shanghai \
+  "$ROOT/scripts/switch-theme-macos.sh" \
   --id dev.codex-dream-skin.kimi-sakura-dawn --no-apply >/dev/null 2>&1; then
   fail 'macOS theme switch ignored another live switch operation.'
 fi
