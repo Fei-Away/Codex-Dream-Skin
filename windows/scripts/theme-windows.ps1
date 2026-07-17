@@ -49,16 +49,18 @@ function Ensure-DreamSkinManagedDirectory {
 
 function Get-DreamSkinValidatedImageMetadata {
   param([Parameter(Mandatory = $true)][string]$Path)
-  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue)) {
+  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue) -or
+    -not (Get-Command Invoke-DreamSkinNative -ErrorAction SilentlyContinue)) {
     throw 'Node.js runtime validation is unavailable for image metadata checks.'
   }
   $node = Get-DreamSkinNodeRuntime
   $metadataScript = Join-Path $PSScriptRoot 'image-metadata.mjs'
-  $output = @(& $node.Path $metadataScript '--check' ([System.IO.Path]::GetFullPath($Path)) 2>&1)
-  if ($LASTEXITCODE -ne 0) {
+  $probe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    $metadataScript, '--check', ([System.IO.Path]::GetFullPath($Path))) -DiscardStderr
+  if ($probe.ExitCode -ne 0) {
     throw "Image metadata is invalid or exceeds the 16384px / 50MP safety limit: $Path"
   }
-  try { $metadata = ($output -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch {
+  try { $metadata = ($probe.Output -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch {
     throw "Image metadata helper returned invalid output: $Path"
   }
   if ($null -eq $metadata -or $null -eq $metadata.width -or $null -eq $metadata.height) {
