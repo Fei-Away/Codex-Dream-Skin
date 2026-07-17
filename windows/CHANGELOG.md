@@ -1,5 +1,11 @@
 # Windows Changelog
 
+## Unreleased
+
+### 修复
+
+- 主题载荷模板改用回调替换 JSON，主题名称中的 `$&`、`$'`、`$$` 和“美元符号 + 反引号”不再触发 `String.replace` 的特殊替换语义；payload 自检同时校验占位符、主题序列化完整性与 JavaScript 语法。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

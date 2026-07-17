@@ -3,6 +3,7 @@ import { constants as fsConstants, watch as watchFs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Script as VmScript } from "node:vm";
 import { readImageMetadata } from "./image-metadata.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -464,11 +465,11 @@ async function loadPayload(themeDir) {
     : extension === ".webp" ? "image/webp" : "image/png";
   const artDataUrl = `data:${mime};base64,${art.toString("base64")}`;
   const payload = template
-    .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
-    .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
-    .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
-    .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
-    .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision));
+    .replace("__DREAM_SKIN_CSS_JSON__", () => JSON.stringify(css))
+    .replace("__DREAM_SKIN_ART_JSON__", () => JSON.stringify(artDataUrl))
+    .replace("__DREAM_SKIN_THEME_JSON__", () => JSON.stringify(theme))
+    .replace("__DREAM_SKIN_VERSION_JSON__", () => JSON.stringify(SKIN_VERSION))
+    .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", () => JSON.stringify(styleRevision));
   const revision = createHash("sha256")
     .update(SKIN_VERSION)
     .update(css)
@@ -486,6 +487,23 @@ async function loadPayload(themeDir) {
       staticCacheHit: staticAssets.cacheHit,
     },
   };
+}
+
+function assertPayloadIntegrity(loaded) {
+  const placeholders = [
+    "__DREAM_SKIN_CSS_JSON__",
+    "__DREAM_SKIN_ART_JSON__",
+    "__DREAM_SKIN_THEME_JSON__",
+    "__DREAM_SKIN_VERSION_JSON__",
+    "__DREAM_SKIN_STYLE_REVISION_JSON__",
+  ];
+  if (placeholders.some((placeholder) => loaded.payload.includes(placeholder))) {
+    throw new Error("Payload placeholders were not fully replaced");
+  }
+  if (!loaded.payload.includes(JSON.stringify(loaded.theme))) {
+    throw new Error("Payload did not preserve the serialized theme");
+  }
+  new VmScript(loaded.payload, { filename: "codex-dream-skin-payload.js" });
 }
 
 async function applyToSession(session, payload) {
@@ -872,6 +890,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
     const options = parseArgs(process.argv.slice(2));
     if (options.mode === "check") {
       const loaded = await loadPayload(options.themeDir);
+      assertPayloadIntegrity(loaded);
       console.log(JSON.stringify({
         pass: true,
         version: SKIN_VERSION,

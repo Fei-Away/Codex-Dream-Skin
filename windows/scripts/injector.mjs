@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Script as VmScript } from "node:vm";
 import { readImageMetadata } from "./image-metadata.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -392,11 +393,22 @@ async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme 
     : extension === ".webp" ? "image/webp" : "image/png";
   const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
   const payload = template
-    .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
-    .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
-    .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme));
+    .replace("__DREAM_CSS_JSON__", () => JSON.stringify(css))
+    .replace("__DREAM_ART_JSON__", () => JSON.stringify(artDataUrl))
+    .replace("__DREAM_THEME_JSON__", () => JSON.stringify(loadedTheme.theme));
   const { imageBytes: _imageBytes, ...themeState } = loadedTheme;
   return { ...themeState, payload };
+}
+
+function assertPayloadIntegrity(loaded) {
+  const placeholders = ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_THEME_JSON__"];
+  if (placeholders.some((placeholder) => loaded.payload.includes(placeholder))) {
+    throw new Error("Payload placeholders were not fully replaced");
+  }
+  if (!loaded.payload.includes(JSON.stringify(loaded.theme))) {
+    throw new Error("Payload did not preserve the serialized theme");
+  }
+  new VmScript(loaded.payload, { filename: "codex-dream-skin-payload.js" });
 }
 
 async function fileExists(filePath) {
@@ -974,16 +986,13 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
   } else if (options.mode === "check-payload") {
     const loaded = await loadPayload(options.themeDir);
-    const unresolved = ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_THEME_JSON__"]
-      .some((placeholder) => loaded.payload.includes(placeholder));
-    if (unresolved) {
-      throw new Error("Payload placeholders were not fully replaced");
-    }
+    assertPayloadIntegrity(loaded);
     console.log(JSON.stringify({
       pass: true,
       version: SKIN_VERSION,
       payloadBytes: Buffer.byteLength(loaded.payload),
       themeId: loaded.theme.id,
+      themeName: loaded.theme.name,
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
