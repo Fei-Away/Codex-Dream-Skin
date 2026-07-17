@@ -1,6 +1,6 @@
 # Codex Dream Skin 外部主题包技术蓝图
 
-> 本文把 `BUSINESS.md` 翻译为目标技术边界。当前代码仍只有单图导入和内部主题切换；本文不表示外部包导入已经实现。
+> 本文把 `BUSINESS.md` 翻译为技术边界。1.3.0 功能分支已实现外部包作者工具、共享导入核心、原子主题库事务和两端入口；Windows 发布结论仍以原生 PowerShell 5.1/7 CI 为最终证据。
 
 ## 1. 技术目标与边界
 
@@ -29,7 +29,7 @@
 | 状态存储 | 现有平台主题库 + 每主题来源记录 | 不引入数据库；保持安装后离线、自包含 | macOS `themes/`；Windows `themes/`/`active-theme` | 不复用外部包路径；安装后不依赖源文件 |
 | 最终验证 | 现有 injector `--check-payload` + 图片元数据检查 | 最接近真实渲染输入，可阻断平台编译错误 | 两端现有注入器与测试 | 上游需包含 PR #123 或等价字符串加固 |
 
-本功能不依赖 Kimi 或其他外部服务，因此不创建 `CAPABILITIES.md`。首模块的能力 Spike 已选择仓库内纯 Node ZIP 路线：作者工具不调用系统 `zip/unzip`，也不引入第三方包；路径、重复、加密、链接、CRC 和尺寸门禁由恶意夹具验证。平台 importer 的文件句柄与流式中止仍属于模块二实现门禁。
+本功能不依赖 Kimi 或其他外部服务，因此不创建 `CAPABILITIES.md`。实现采用仓库内纯 Node ZIP 路线：作者工具不调用系统 `zip/unzip`，也不引入第三方包；路径、重复、加密、链接、CRC、尺寸门禁、文件句柄流式读取和中止行为由夹具验证。
 
 ## 3. 系统组成与关系
 
@@ -110,7 +110,7 @@ theme-name.dreamskin  # ZIP v1
 ```
 
 - `manifest.json` 是包身份与兼容性权威：`formatVersion`、`packageId`、`packageVersion`、显示名、作者、目标平台、最低 Dream Skin 版本、资源路径/类型/大小/SHA-256。
-- `theme.json` 是便携声明式主题权威：主题名称、背景引用、appearance、art、受控 palette 与受控文案字段；精确字段由后续 `docs/THEME_PACKAGE.md` 和 JSON Schema 固化。
+- `theme.json` 是便携声明式主题权威：主题名称、背景引用、appearance、art、受控 palette 与受控文案字段；精确字段由 `docs/THEME_PACKAGE.md` 和 JSON Schema 固化。
 - `import.json` 只在安装后生成，记录原包身份、内容哈希、安装时间和编译器版本；外部包不能自行提供或覆盖它。
 - 平台运行时 `theme.json` 是便携主题编译结果，不是直接信任复制。macOS `colors`、Windows `palette` 等差异由显式编译器承接。
 - 当前主题与已安装主题继续以平台现有目录为权威；原 `.dreamskin` 可以删除，不影响已安装主题。
@@ -153,7 +153,7 @@ theme-name.dreamskin  # ZIP v1
 
 - 会改变架构或路线的外部能力：无 AI/API 或第三方归档依赖；平台 importer 的流式文件读取只依赖 Node 文件句柄与 `zlib`，不依赖系统工具输出文本。
 - 证据位置：`lib/theme-package/zip.mjs`、`tests/theme-package-cli.test.mjs`、`tests/theme-package-contract.test.mjs` 与 checked-in golden package；若以后引入第三方归档库，再新增 `CAPABILITIES.md` 记录版本、许可证、供应链和打包边界。
-- 当前目标环境验证状态：作者 `validate/pack/inspect`、图片限制、确定性 Store 包、Store/Deflate 读取门禁和 payload 加固已实现；平台流式 importer 与主题库事务尚未实现。
+- 当前目标环境验证状态：作者 `validate/pack/inspect`、图片限制、确定性 Store 包、Store/Deflate 流式读取、平台编译、主题库事务和 payload 加固已实现；Windows 原生 PowerShell 5.1/7 仍由 CI 给出发布门禁证据。
 - 理论支持与当前项目可用性的差异：系统存在 ZIP 工具或 .NET API 不等于满足本项目的条目唯一性、链接、限额、路径和流式中止不变量。
 
 | 视图 | 是否需要 | 触发原因 | 对应章节或文件 |
@@ -163,17 +163,15 @@ theme-name.dreamskin  # ZIP v1
 
 | 问题 | 当前判断 | 影响 | 如何确认 |
 | --- | --- | --- | --- |
-| 平台 ZIP importer | 路线已决，实现待模块二 | 使用共享纯 Node 中央目录规则，并把条目读取改为文件句柄 + 有界流 | 对 Store/Deflate、恶意 ZIP、读取中变化、限额和流式中止运行共享夹具 |
+| 平台 ZIP importer | 已实现 | 使用共享纯 Node 中央目录规则和文件句柄 + 有界流 | Store/Deflate、恶意 ZIP、限额、CRC/哈希和流式写入夹具 |
 | 便携字段与平台映射 | 首模块固化 | 决定 Kimi 能设计到什么程度以及两端差异 | 建立 `THEME_PACKAGE.md`、Schema、能力矩阵和 golden compiler fixtures |
 | PR #123 依赖 | 必须合入或等价带入 | 外部自由文本可能破坏 payload | 以 `$&`、`$'`、`$$`、反引号美元序列和占位符形文本跑两端 CLI 回归 |
 | macOS 预览交互 | 不阻塞契约，但阻塞最终 UX | 决定菜单入口是否需要辅助窗口/系统预览 | 做不写主题库的本地原型并由用户确认 |
 
 ## 8. 实施准备摘要
 
-- 当前判断：完成关键事项后进入完整实施。
-- 已解除的首模块阻塞：v1 字段/能力契约、纯 Node ZIP 路线与 PR #123 等价加固已进入本功能分支。
-- 继续进入完整导入前的技术门禁：实现文件句柄 + 有界条目流、平台编译器、主题库事务和故障注入。
-- 关键外部能力与目标环境状态：部分验证；本地主题存储与 payload 门禁已确认，外部包容器尚未验证。
-- 建议首个项目级模块：主题包契约与作者套件，包括能力 Spike、Schema、示例、校验器和 Kimi 提示词。
+- 当前判断：功能实现已覆盖作者、导入、安装和平台入口；进入完整回归与发布证据阶段。
+- 已解除的技术阻塞：v1 契约、纯 Node ZIP、文件句柄有界流、平台编译器、主题库事务、故障恢复和 PR #123 等价加固均已进入功能分支。
+- 关键目标环境状态：macOS 可在本机完整验证；Windows 必须以原生 PowerShell 5.1/7 CI 作为最终发布事实。
 - 蓝图候选建议：见 `RECOMMENDATIONS.md`。
 - 正式总体 Plan：[`../PLAN.md`](../PLAN.md)。

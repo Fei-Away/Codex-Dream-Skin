@@ -41,7 +41,7 @@ if [ -d "$INSTALL_ROOT" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
   /bin/cp -f "$PLUGIN_SRC" "$INSTALL_ROOT/menubar/codex_dream_skin.10s.sh"
   /bin/chmod 755 "$INSTALL_ROOT/menubar/codex_dream_skin.10s.sh"
   for name in pause-dream-skin-macos.sh status-dream-skin-macos.sh apply-from-menubar-macos.sh \
-    switch-theme-macos.sh load-image-theme-macos.sh install-menubar-macos.sh; do
+    switch-theme-macos.sh load-image-theme-macos.sh import-theme-package-macos.sh install-menubar-macos.sh; do
     if [ -f "$PROJECT_ROOT/scripts/$name" ]; then
       /bin/cp -f "$PROJECT_ROOT/scripts/$name" "$INSTALL_ROOT/scripts/$name"
       /bin/chmod 755 "$INSTALL_ROOT/scripts/$name"
@@ -55,6 +55,7 @@ fi
   "$PROJECT_ROOT/scripts/apply-from-menubar-macos.sh" \
   "$PROJECT_ROOT/scripts/switch-theme-macos.sh" \
   "$PROJECT_ROOT/scripts/load-image-theme-macos.sh" \
+  "$PROJECT_ROOT/scripts/import-theme-package-macos.sh" \
   "$PROJECT_ROOT/scripts/install-menubar-macos.sh" \
   "$PROJECT_ROOT/Install Menu Bar.command" 2>/dev/null || true
 

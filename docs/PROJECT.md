@@ -16,7 +16,7 @@
 - [`RECOMMENDATIONS.md`](./RECOMMENDATIONS.md)：尚未转成正式 Plan 的候选模块路线。
 - [`../PLAN.md`](../PLAN.md)：用户已确认的唯一实施计划、模块范围与完成标准。
 
-外部 `.dreamskin` 主题包仍是目标能力，当前版本尚未实现；不要把蓝图当作当前安装手册。
+外部 `.dreamskin` v1 的作者工具、流式导入核心、原子主题库事务和 macOS/Windows 平台入口已在 1.3.0 功能分支实现。当前使用方法以 [`THEME_PACKAGE.md`](./THEME_PACKAGE.md) 和平台 README 为准；Windows 最终发布验收仍以原生 PowerShell 5.1/7 CI 为门禁。
 
 ---
 

@@ -17,9 +17,9 @@ done
 
 [ -n "$THEME_ID" ] || fail "Usage: switch-theme-macos.sh --id <theme-id>"
 case "$THEME_ID" in
-  *[!A-Za-z0-9_-]*|'') fail "Theme id may contain only letters, numbers, underscores, and hyphens." ;;
+  ''|.|..|*[!A-Za-z0-9._-]*) fail "Theme id contains unsupported characters." ;;
 esac
-[ "${#THEME_ID}" -le 80 ] || fail "Theme id is too long."
+[ "${#THEME_ID}" -le 128 ] || fail "Theme id is too long."
 
 ensure_state_root
 THEMES_ROOT="$STATE_ROOT/themes"

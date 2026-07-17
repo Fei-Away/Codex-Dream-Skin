@@ -61,6 +61,17 @@ The verification script confirms:
 
 Next, use the generated screenshot to check horizontal overflow and text contrast. On both the home and normal task routes, manually check the project menu and composer interaction. See [`references/qa-inventory.md`](./references/qa-inventory.md) for the complete visual checklist.
 
+## Import an external `.dreamskin` theme
+
+After installing 1.3.0, choose **Import `.dreamskin` theme** from the system tray. The offline flow validates the package, shows its name/ID/version, asks again for same-ID replacement, and supports install-only or install-and-apply. For automation:
+
+```powershell
+.\scripts\import-theme-package.ps1 -File C:\path\theme.dreamskin -DryRun -NoPrompt
+.\scripts\import-theme-package.ps1 -File C:\path\theme.dreamskin -NoPrompt
+```
+
+Packages are installed self-contained under `%LOCALAPPDATA%\CodexDreamSkin\themes\<packageId>`. Deleting the source package does not remove the theme. Use `-Replace` only after the caller has obtained explicit replacement consent.
+
 ## Change and save themes
 
 Open `Codex Dream Skin - Tray` to:

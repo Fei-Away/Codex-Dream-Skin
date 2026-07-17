@@ -121,6 +121,19 @@ To contribute a preset, see [`presets/README.md`](./presets/README.md).
 - The prompt-ready composition template and negative prompt live in
   [`docs/reference-background-prompt-guide.md`](../docs/reference-background-prompt-guide.md)
 
+## Import an external `.dreamskin` package
+
+After installing 1.3.0, choose **导入 `.dreamskin` 主题…** from the SwiftBar menu or double-click the generated **Codex Dream Skin - Import Theme.command** launcher. The flow validates the package, shows its ID/version, asks before replacing the same ID, and lets you install only or install and apply.
+
+For automation or diagnosis:
+
+```bash
+scripts/import-theme-package-macos.sh --file /path/theme.dreamskin --dry-run
+scripts/import-theme-package-macos.sh --file /path/theme.dreamskin --yes --no-apply
+```
+
+`--dry-run` does not create theme state. `--replace` is accepted only when the caller has already obtained explicit replacement consent. Installed packages are self-contained under `~/Library/Application Support/CodexDreamSkinStudio/themes/<packageId>/`; deleting the original package does not remove the installed theme.
+
 ## Adaptive image themes
 
 The renderer treats every image as a theme input instead of assuming a fixed

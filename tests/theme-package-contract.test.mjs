@@ -37,7 +37,7 @@ try {
 
   const validateReport = runCli("validate", example);
   const inspectReport = runCli("inspect", golden);
-  assert.equal(validateReport.contentHash, "cd3919a9c9782fa968da7397549ca177b57921699bac53cf9c61b84778859e58");
+  assert.equal(validateReport.contentHash, "0849c3b462e38fe0639941df5a8e1c6832e1a182d4ddd632464bbbf0d6ddc785");
   assert.equal(inspectReport.contentHash, validateReport.contentHash);
   assert.equal(inspectReport.packageId, validateReport.packageId);
 

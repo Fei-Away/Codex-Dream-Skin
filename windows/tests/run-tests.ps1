@@ -18,6 +18,16 @@ try {
     Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
       -Recurse -Force -ErrorAction Stop
   }
+  $repositoryRoot = Split-Path -Parent $Root
+  $runtimeThemePackage = Join-Path $runtimeSourceRoot 'theme-package'
+  New-Item -ItemType Directory -Path $runtimeThemePackage | Out-Null
+  foreach ($relative in @('lib\theme-package', 'tools\theme-package.mjs', 'schemas', 'docs', 'examples\theme-package')) {
+    $source = Join-Path $repositoryRoot $relative
+    if (-not (Test-Path -LiteralPath $source)) { continue }
+    $destination = Join-Path $runtimeThemePackage $relative
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+    Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force -ErrorAction Stop
+  }
 
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
   $sourcePrefix = $runtimeSourceRoot.TrimEnd('\') + '\'
@@ -836,7 +846,16 @@ try {
     (Join-Path $PSScriptRoot 'image-metadata.test.mjs'))
   if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }
 
-  Write-Host 'PASS: config transactions, restore scoping, state safety, argument quoting, and loopback CDP validation.'
+  $packagePath = Join-Path $repositoryRoot 'examples\theme-package\kimi-sakura-dawn.dreamskin'
+  $importOutput = @(& (Join-Path $Root 'scripts\import-theme-package.ps1') `
+    -File $packagePath -DryRun -NoPrompt -StateRoot (Join-Path $temporaryRoot 'import-state'))
+  $importReport = ($importOutput -join "`n") | ConvertFrom-Json -ErrorAction Stop
+  if (-not $importReport.pass -or $importReport.platform -cne 'windows' -or
+    $importReport.packageId -cne 'dev.codex-dream-skin.kimi-sakura-dawn') {
+    throw 'Windows .dreamskin dry-run did not return the shared package identity.'
+  }
+
+  Write-Host 'PASS: config transactions, theme-package import, restore scoping, state safety, argument quoting, and loopback CDP validation.'
 } finally {
   Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

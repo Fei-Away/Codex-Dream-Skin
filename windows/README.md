@@ -61,6 +61,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 随后用生成的截图检查横向溢出和文字对比度，再分别在首页与普通任务页手动检查项目菜单和输入框交互。完整视觉检查项见 [`references/qa-inventory.md`](./references/qa-inventory.md)。
 
+## 导入外部 `.dreamskin` 主题
+
+安装 1.3.0 后，在系统托盘选择“导入 `.dreamskin` 主题”。系统会离线校验包、显示名称/ID/版本、在同 ID 冲突时再次确认，并允许“仅安装”或“安装并应用”。也可以使用 PowerShell：
+
+```powershell
+# 只校验，不写主题库
+.\scripts\import-theme-package.ps1 -File C:\path\theme.dreamskin -DryRun -NoPrompt
+
+# 非交互安装；不会自动应用
+.\scripts\import-theme-package.ps1 -File C:\path\theme.dreamskin -NoPrompt
+```
+
+外部主题会自包含安装到 `%LOCALAPPDATA%\CodexDreamSkin\themes\<packageId>`。删除原 `.dreamskin` 文件不影响已安装主题；`-Replace` 只能在调用方已取得明确替换同意后使用。
+
 ## 更换和保存主题
 
 打开 `Codex Dream Skin - Tray` 后可以：

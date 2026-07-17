@@ -14,13 +14,15 @@ Excluded: model APIs, URL import, a theme marketplace, arbitrary CSS or executab
 
 - Author CLI: `node tools/theme-package.mjs validate <source-dir>`, `pack <source-dir> --output <file.dreamskin>`, and `inspect <file.dreamskin>`.
 - Artifact: one local `.dreamskin` ZIP v1 file containing only the documented allowlist.
-- Import core: machine-readable dry-run/report and install operations with stable error codes.
+- Import core: `import <file.dreamskin> --platform <macos|windows> --dream-skin-version <semver> --dry-run`, or `--install --state-root <dir> [--replace]`, with machine-readable reports and stable error codes. `--replace` is an upper-layer confirmation result, never an automatic policy.
 - Platform entry points: macOS command/menu and Windows PowerShell/tray actions call the same contract rather than maintaining independent validators.
 - Runtime safety: normalized themes pass the existing platform payload/image validators before an active theme can change.
 
 New public seams or package fields require updating the contract, fixtures, and both platform mappings before implementation.
 
 ## Module 1 — Package contract and author kit
+
+Status: implemented and reviewed.
 
 Scope:
 
@@ -43,6 +45,8 @@ QA boundary: public CLI behavior and artifact bytes only; no platform importer f
 
 ## Module 2 — Shared import core and atomic transactions
 
+Status: implemented; shared and macOS regression gates pass locally.
+
 Scope:
 
 - Add bounded entry streaming, schema/hash/compatibility validation, platform normalization, and machine-readable import reports.
@@ -62,6 +66,8 @@ QA boundary: isolated temporary state roots and fault injection; do not read or 
 
 ## Module 3 — macOS entry point and apply flow
 
+Status: implemented; final macOS regression gate is part of this branch handoff.
+
 Scope:
 
 - Add a macOS CLI and SwiftBar menu action with system file selection, summary, compatibility warnings, conflict confirmation, and immediate/later apply choice.
@@ -79,6 +85,8 @@ Completion criteria:
 QA boundary: automation uses isolated state; real Codex interaction happens only at the final integration gate.
 
 ## Module 4 — Windows entry point and cross-platform release
+
+Status: implemented; native Windows PowerShell 5.1/7 CI remains the release evidence gate.
 
 Scope:
 

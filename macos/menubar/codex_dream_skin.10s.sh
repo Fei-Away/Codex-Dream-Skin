@@ -47,6 +47,7 @@ RESTORE="$SCRIPTS/restore-dream-skin-macos.sh"
 STATUS="$SCRIPTS/status-dream-skin-macos.sh"
 SWITCH="$SCRIPTS/switch-theme-macos.sh"
 LOAD_IMG="$SCRIPTS/load-image-theme-macos.sh"
+IMPORT_PACKAGE="$SCRIPTS/import-theme-package-macos.sh"
 [ -x "$APPLY" ] || APPLY="$START"
 
 STATE_ROOT="$HOME/Library/Application Support/CodexDreamSkinStudio"
@@ -100,6 +101,9 @@ echo "---"
 echo "应用皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
 echo "暂停皮肤 | bash=\"$PAUSE\" terminal=false refresh=true"
 echo "换一张图… | bash=\"$CUSTOMIZE\" terminal=false refresh=true"
+if [ -x "$IMPORT_PACKAGE" ]; then
+  echo "导入 .dreamskin 主题… | bash=\"$IMPORT_PACKAGE\" terminal=false refresh=true"
+fi
 
 # Dynamic: saved theme packs
 echo "已保存的主题"
@@ -109,8 +113,8 @@ if [ -d "$THEMES_ROOT" ]; then
     [ -d "$dir" ] || continue
     [ -f "$dir/theme.json" ] || continue
     tid="$(/usr/bin/basename "$dir")"
-    case "$tid" in *[!A-Za-z0-9_-]*|'') continue ;; esac
-    [ "${#tid}" -le 80 ] || continue
+    case "$tid" in ''|.|..|*[!A-Za-z0-9._-]*) continue ;; esac
+    [ "${#tid}" -le 128 ] || continue
     tname="$(/usr/bin/plutil -extract name raw -o - "$dir/theme.json" 2>/dev/null)"
     [ -n "$tname" ] || tname="$tid"
     mark=""

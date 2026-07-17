@@ -132,11 +132,17 @@ for the eight individual styles.
   <sub>Stage Black-Gold</sub>
 </p>
 
-## External theme author kit (in development)
+## External `.dreamskin` themes
 
 Kimi, another AI agent, or a human developer can follow the [`.dreamskin` v1 contract](./docs/THEME_PACKAGE.md) and use the repository's `validate / pack / inspect` tools to create a zero-code, single-file theme package. Start with the [Kimi prompt](./docs/KIMI_THEME_AUTHORING_PROMPT.md) and [example source directory](./examples/theme-package/kimi-sakura-dawn/).
 
-> The author tools and golden package are testable now. End-user import entry points for macOS and Windows are implemented in later modules of this feature branch. Released versions should continue using the existing image import and local-theme controls for now.
+Import runs offline and validates the ZIP, schema, images, hashes, target platform, and minimum version before showing a summary. Identical content is idempotent; a different package with the same ID requires explicit replacement. Use “Import `.dreamskin` theme…” from the macOS menu bar or Windows tray, or run:
+
+```bash
+macos/scripts/import-theme-package-macos.sh --file my-theme.dreamskin --dry-run
+powershell -NoProfile -File windows/scripts/import-theme-package.ps1 \
+  -File my-theme.dreamskin -DryRun -NoPrompt
+```
 
 ## What it does
 

@@ -30,6 +30,19 @@ deploy_project() {
     --exclude 'release/' \
     --exclude 'runtime/' \
     "$PROJECT_ROOT/" "$temporary/"
+  if [ ! -f "$temporary/tools/theme-package.mjs" ] \
+    && [ -f "$PROJECT_ROOT/../tools/theme-package.mjs" ]; then
+    local repository_root
+    repository_root="$(cd "$PROJECT_ROOT/.." && pwd -P)"
+    /bin/mkdir -p "$temporary/lib" "$temporary/tools" "$temporary/schemas" \
+      "$temporary/docs" "$temporary/examples"
+    /usr/bin/rsync -a "$repository_root/lib/theme-package" "$temporary/lib/"
+    /bin/cp "$repository_root/tools/theme-package.mjs" "$temporary/tools/"
+    /usr/bin/rsync -a "$repository_root/schemas/" "$temporary/schemas/"
+    /usr/bin/rsync -a "$repository_root/examples/theme-package" "$temporary/examples/"
+    /bin/cp "$repository_root/docs/THEME_PACKAGE.md" \
+      "$repository_root/docs/KIMI_THEME_AUTHORING_PROMPT.md" "$temporary/docs/"
+  fi
   /bin/chmod 700 "$temporary"/*.command "$temporary"/scripts/*.sh 2>/dev/null || true
   if [ -e "$INSTALL_ROOT" ]; then /bin/mv "$INSTALL_ROOT" "$previous"; fi
   if ! /bin/mv "$temporary" "$INSTALL_ROOT"; then
@@ -87,6 +100,8 @@ if [ "$CREATE_LAUNCHERS" = "true" ]; then
   screenshot="$(shell_quote "$HOME/Desktop/Codex Dream Skin Verification.png")"
   write_launcher "$HOME/Desktop/Codex Dream Skin.command" "exec $start_script --port $PORT --prompt-restart"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Customize.command" "exec $customize_script"
+  import_script="$(shell_quote "$SCRIPT_DIR/import-theme-package-macos.sh")"
+  write_launcher "$HOME/Desktop/Codex Dream Skin - Import Theme.command" "exec $import_script"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Verify.command" "$verify_script --screenshot $screenshot && /usr/bin/open $screenshot"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Restore.command" "exec $restore_script --restore-base-theme --restart-codex"
 fi

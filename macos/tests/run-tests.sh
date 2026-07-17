@@ -770,7 +770,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.3.0" ]' _ "$ROOT"
 DOCTOR_HOME="$TMP/doctor-home"
 DOCTOR_THEME="$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/theme"
 /bin/mkdir -p "$DOCTOR_HOME/.codex" "$DOCTOR_THEME"
@@ -778,4 +778,21 @@ DOCTOR_THEME="$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/them
 /bin/cp "$ROOT/assets/theme.json" "$ROOT/assets/portal-hero.png" "$DOCTOR_THEME/"
 HOME="$DOCTOR_HOME" "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
-printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
+IMPORT_HOME="$TMP/import-home"
+/bin/mkdir -p "$IMPORT_HOME"
+IMPORT_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
+  "$ROOT/scripts/import-theme-package-macos.sh" \
+  --file "$ROOT/../examples/theme-package/kimi-sakura-dawn.dreamskin" \
+  --dry-run --no-prompt)"
+/usr/bin/printf '%s' "$IMPORT_REPORT" | "$NODE" -e '
+  let text = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk) => { text += chunk; });
+  process.stdin.on("end", () => {
+    const report = JSON.parse(text);
+    if (!report.pass || report.platform !== "macos"
+      || report.packageId !== "dev.codex-dream-skin.kimi-sakura-dawn") process.exit(1);
+  });
+'
+
+printf 'PASS: syntax, payload, theme-package import, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

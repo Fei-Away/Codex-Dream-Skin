@@ -133,6 +133,7 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',
     'scripts\image-metadata.mjs',
+    'scripts\import-theme-package.ps1',
     'scripts\injector.mjs',
     'scripts\install-dream-skin.ps1',
     'scripts\restore-dream-skin.ps1',
@@ -144,6 +145,16 @@ function Install-DreamSkinRuntimeEngine {
   foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot $relative) -PathType Leaf)) {
       throw "Dream Skin runtime source is incomplete: $relative"
+    }
+  }
+  $themePackageSource = if (Test-Path -LiteralPath (Join-Path $sourceRoot 'theme-package\tools\theme-package.mjs')) {
+    Join-Path $sourceRoot 'theme-package'
+  } else {
+    Split-Path -Parent $sourceRoot
+  }
+  foreach ($relative in @('lib\theme-package', 'tools\theme-package.mjs')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $themePackageSource $relative))) {
+      throw "Dream Skin theme-package runtime is incomplete: $relative"
     }
   }
   foreach ($directoryName in @('assets', 'scripts')) {
@@ -166,10 +177,31 @@ function Install-DreamSkinRuntimeEngine {
       Copy-Item -LiteralPath (Join-Path $sourceRoot $directoryName) -Destination $stagingRoot `
         -Recurse -Force -ErrorAction Stop
     }
+    $stagedThemePackage = Join-Path $stagingRoot 'theme-package'
+    New-Item -ItemType Directory -Force -Path $stagedThemePackage | Out-Null
+    foreach ($relative in @(
+      'lib\theme-package',
+      'tools\theme-package.mjs',
+      'schemas',
+      'docs\THEME_PACKAGE.md',
+      'docs\KIMI_THEME_AUTHORING_PROMPT.md',
+      'examples\theme-package'
+    )) {
+      $source = Join-Path $themePackageSource $relative
+      if (-not (Test-Path -LiteralPath $source)) { continue }
+      $destination = Join-Path $stagedThemePackage $relative
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+      Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force -ErrorAction Stop
+    }
     Assert-DreamSkinRuntimeTree -Path $stagingRoot
     foreach ($relative in $required) {
       if (-not (Test-Path -LiteralPath (Join-Path $stagingRoot $relative) -PathType Leaf)) {
         throw "Staged Dream Skin runtime is incomplete: $relative"
+      }
+    }
+    foreach ($relative in @('theme-package\lib\theme-package\import-core.mjs', 'theme-package\tools\theme-package.mjs')) {
+      if (-not (Test-Path -LiteralPath (Join-Path $stagingRoot $relative) -PathType Leaf)) {
+        throw "Staged Dream Skin theme-package runtime is incomplete: $relative"
       }
     }
 

@@ -19,8 +19,21 @@ node tools/theme-package.mjs inspect kimi-sakura-dawn.dreamskin
 
 ```bash
 node tools/theme-package.mjs inspect kimi-sakura-dawn.dreamskin \
-  --platform macos --dream-skin-version 1.2.0
+  --platform macos --dream-skin-version 1.3.0
 ```
+
+最终用户导入使用同一核心。`--dry-run` 会流式读取并调用目标平台运行时校验，但不创建主题状态；`--install` 把完整候选原子发布到指定主题库，不会自动改活动主题：
+
+```bash
+node tools/theme-package.mjs import kimi-sakura-dawn.dreamskin \
+  --platform macos --dream-skin-version 1.3.0 --dry-run
+
+node tools/theme-package.mjs import kimi-sakura-dawn.dreamskin \
+  --platform macos --dream-skin-version 1.3.0 \
+  --install --state-root /path/to/isolated/state
+```
+
+同一 `packageId` 的不同版本或内容返回 `CONFLICT_CONFIRMATION_REQUIRED`。只有上层界面取得用户确认后才能追加 `--replace`。平台用户应优先使用 macOS 菜单栏/`import-theme-package-macos.sh` 或 Windows 托盘/`import-theme-package.ps1`，由平台入口提供文件选择、摘要和应用选择。
 
 ## 2. 作者源目录与包内结构
 
@@ -118,7 +131,7 @@ v1 只开放两端能够明确承接的字段：
 | `COMPAT_*` | 平台与版本 | 目标平台或最低版本不兼容 |
 | `CONFLICT_*` / `INSTALL_*` / `APPLY_*` | 后续导入阶段 | 身份冲突、事务失败、应用失败 |
 
-失败报告中的 `persistentChanges: false` 表示该作者工具没有写用户主题库。平台 importer 的安装/应用报告会分别说明持久状态。
+失败报告中的 `persistentChanges: false` 表示没有留下主题库变更。极端情况下替换提交失败且旧目录无法自动恢复时，返回 `INSTALL_RECOVERY_REQUIRED` 与 `persistentChanges: true`，保留受管主题库内的 recovery backup，避免删除最后一份旧主题。安装和应用是两个独立结果；安装器不会替导入核心自动改活动主题。
 
 ## 8. 给 AI 作者的边界
 

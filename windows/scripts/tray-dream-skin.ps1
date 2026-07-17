@@ -15,6 +15,7 @@ $paths = Initialize-DreamSkinThemeStore -SkillRoot $SkillRoot -StateRoot $StateR
 $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
 $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
 $restoreScript = Join-Path $PSScriptRoot 'restore-dream-skin.ps1'
+$importScript = Join-Path $PSScriptRoot 'import-theme-package.ps1'
 
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
@@ -104,6 +105,9 @@ try {
       } finally {
         $dialog.Dispose()
       }
+    }
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '导入 .dreamskin 主题' -Action {
+      Start-DreamSkinPowerShell -Script $importScript
     }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Action {
       $name = [Microsoft.VisualBasic.Interaction]::InputBox('输入主题名称：', '保存 Codex Dream Skin 主题', '')

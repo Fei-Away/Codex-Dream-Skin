@@ -119,11 +119,20 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
   <sub>舞台黑金</sub>
 </p>
 
-## 外部主题作者套件（开发中）
+## 外部 `.dreamskin` 主题
 
-Kimi、其他 AI Agent 或人工开发者现在可以按 [`.dreamskin` v1 契约](./docs/THEME_PACKAGE.md)制作零代码主题源目录，并用仓库提供的 `validate / pack / inspect` 工具生成、检查单文件主题包。可直接使用 [Kimi 提示词](./docs/KIMI_THEME_AUTHORING_PROMPT.md)和[示例源目录](./examples/theme-package/kimi-sakura-dawn/)。
+Kimi、其他 AI Agent 或人工开发者可以按 [`.dreamskin` v1 契约](./docs/THEME_PACKAGE.md)制作零代码主题源目录，并用仓库提供的 `validate / pack / inspect` 工具生成、检查单文件主题包。可直接使用 [Kimi 提示词](./docs/KIMI_THEME_AUTHORING_PROMPT.md)和[示例源目录](./examples/theme-package/kimi-sakura-dawn/)。
 
-> 作者工具与 golden 包已经可测试；macOS/Windows 的最终用户导入入口仍在本功能分支后续模块中实现。当前正式版本请继续使用各平台已有的选图与本地主题切换入口。
+导入时会先离线校验 ZIP、字段、图片、哈希、目标平台和最低版本，再显示摘要。相同内容幂等返回；同 ID 不同内容必须明确确认替换。macOS 菜单栏提供“导入 `.dreamskin` 主题…”，Windows 托盘提供“导入 `.dreamskin` 主题”；也可以使用平台脚本：
+
+```bash
+# macOS：仅验证，不写主题库
+macos/scripts/import-theme-package-macos.sh --file my-theme.dreamskin --dry-run
+
+# Windows：仅验证，不写主题库
+powershell -NoProfile -File windows/scripts/import-theme-package.ps1 \
+  -File my-theme.dreamskin -DryRun -NoPrompt
+```
 
 ## 它能做什么
 
