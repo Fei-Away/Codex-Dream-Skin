@@ -48,6 +48,32 @@ fi
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
 
+# check-image-dimensions rejects decompression bombs before sips can rasterize them.
+write_png_header() { # <path> <width> <height>
+  "$NODE" -e '
+    const fs = require("node:fs");
+    const buffer = Buffer.alloc(24);
+    Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]).copy(buffer, 0);
+    buffer.writeUInt32BE(13, 8);
+    buffer.write("IHDR", 12, "ascii");
+    buffer.writeUInt32BE(Number(process.argv[2]), 16);
+    buffer.writeUInt32BE(Number(process.argv[3]), 20);
+    fs.writeFileSync(process.argv[1], buffer);
+  ' "$1" "$2" "$3"
+}
+CID_TMP="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/codex-dream-skin-cid.XXXXXX")"
+write_png_header "$CID_TMP/huge.png" 20000 20000
+if "$NODE" "$ROOT/scripts/check-image-dimensions.mjs" "$CID_TMP/huge.png" >/dev/null 2>&1; then
+  printf 'check-image-dimensions accepted a 20000x20000 (400 MP) image.\n' >&2
+  /bin/rm -rf "$CID_TMP"; exit 1
+fi
+write_png_header "$CID_TMP/ok.png" 1600 900
+if ! "$NODE" "$ROOT/scripts/check-image-dimensions.mjs" "$CID_TMP/ok.png" >/dev/null 2>&1; then
+  printf 'check-image-dimensions rejected a valid 1600x900 image.\n' >&2
+  /bin/rm -rf "$CID_TMP"; exit 1
+fi
+/bin/rm -rf "$CID_TMP"
+
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do
   [ -d "$preset" ] || continue
