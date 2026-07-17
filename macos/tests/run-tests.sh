@@ -64,6 +64,7 @@ TEST_INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.tests.$$"
 DUMMY_PID=""
 STATUS_PID=""
 WATCH_PID=""
+APPLY_CHILD_PID=""
 cleanup_tests() {
   if [ -n "$DUMMY_PID" ]; then
     /bin/kill -TERM "$DUMMY_PID" 2>/dev/null || true
@@ -76,6 +77,10 @@ cleanup_tests() {
   if [ -n "$WATCH_PID" ]; then
     /bin/kill -TERM "$WATCH_PID" 2>/dev/null || true
     wait "$WATCH_PID" 2>/dev/null || true
+  fi
+  if [ -n "$APPLY_CHILD_PID" ]; then
+    /bin/kill -TERM "$APPLY_CHILD_PID" 2>/dev/null || true
+    wait "$APPLY_CHILD_PID" 2>/dev/null || true
   fi
   /bin/rm -rf "$TMP"
 }
@@ -212,6 +217,37 @@ fi
   if (theme.id !== "preset-switch-fixture" || theme.name !== "切换测试") process.exit(1);
 ' "$SWITCH_STATE/theme/theme.json"
 [ -z "$(/usr/bin/find "$SWITCH_STATE" -maxdepth 1 -name '.theme-switch.*' -print -quit)" ]
+
+# Exercise the cold apply branch with a long-lived child. A lock descriptor
+# inherited by that child would make the immediate second switch fail.
+APPLY_ENGINE="$TMP/apply-engine"
+APPLY_HOME="$TMP/apply-home"
+APPLY_STATE="$APPLY_HOME/Library/Application Support/CodexDreamSkinStudio"
+APPLY_MARKER="$TMP/apply-child.pid"
+/usr/bin/rsync -a "$ROOT/" "$APPLY_ENGINE/"
+/usr/bin/printf '%s\n' \
+  '#!/bin/bash' \
+  'set -euo pipefail' \
+  '"$NODE" -e '\''process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 30000);'\'' &' \
+  '/usr/bin/printf '\''%s\n'\'' "$!" > "$CODEX_DREAM_SKIN_TEST_CHILD_MARKER"' \
+  > "$APPLY_ENGINE/scripts/start-dream-skin-macos.sh"
+/bin/chmod 755 "$APPLY_ENGINE/scripts/start-dream-skin-macos.sh"
+/bin/mkdir -p "$APPLY_STATE/themes/preset-apply-fixture"
+/bin/cp "$ROOT/assets/portal-hero.png" "$APPLY_STATE/themes/preset-apply-fixture/background.png"
+/usr/bin/printf '%s\n' \
+  '{"schemaVersion":1,"id":"preset-apply-fixture","name":"应用锁测试","image":"background.png"}' \
+  > "$APPLY_STATE/themes/preset-apply-fixture/theme.json"
+HOME="$APPLY_HOME" NODE="$NODE" CODEX_DREAM_SKIN_TEST_CHILD_MARKER="$APPLY_MARKER" \
+  "$APPLY_ENGINE/scripts/switch-theme-macos.sh" --id preset-apply-fixture >/dev/null
+APPLY_CHILD_PID="$(/bin/cat "$APPLY_MARKER")"
+/bin/kill -0 "$APPLY_CHILD_PID"
+[ ! -e "$APPLY_STATE/.theme-switch.lock" ]
+[ ! -e "$APPLY_STATE/.theme-switch.meta" ]
+HOME="$APPLY_HOME" NODE="$NODE" "$APPLY_ENGINE/scripts/switch-theme-macos.sh" \
+  --id preset-apply-fixture --no-apply >/dev/null
+/bin/kill -TERM "$APPLY_CHILD_PID" 2>/dev/null || true
+wait "$APPLY_CHILD_PID" 2>/dev/null || true
+APPLY_CHILD_PID=""
 
 RUNTIME_HOME="$TMP/runtime-home"
 RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
@@ -815,13 +851,18 @@ IMPORT_INSTALL_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
   });
 '
 IMPORT_SWITCH_LOCK="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/.theme-switch.lock"
+IMPORT_SWITCH_META="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/.theme-switch.meta"
+IMPORT_SWITCH_START="$(/bin/ps -p "$$" -o lstart= | /usr/bin/awk '{$1=$1; print}')"
 /usr/bin/shlock -f "$IMPORT_SWITCH_LOCK" -p "$$" \
   || fail 'Could not establish the competing macOS theme switch test lock.'
+/usr/bin/printf 'pid=%s\nstartedAt=%s\n' "$$" "$IMPORT_SWITCH_START" > "$IMPORT_SWITCH_META"
 if HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
   --id dev.codex-dream-skin.kimi-sakura-dawn --no-apply >/dev/null 2>&1; then
   fail 'macOS theme switch ignored another live switch operation.'
 fi
-/bin/rm -f "$IMPORT_SWITCH_LOCK"
+# A stale lock whose PID has been reused must not stay busy when the recorded
+# process start time no longer matches the live process.
+/usr/bin/printf 'pid=%s\nstartedAt=%s\n' "$$" 'stale-process-start' > "$IMPORT_SWITCH_META"
 HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
   --id dev.codex-dream-skin.kimi-sakura-dawn \
   --expected-content-hash 0849c3b462e38fe0639941df5a8e1c6832e1a182d4ddd632464bbbf0d6ddc785 \
