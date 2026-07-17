@@ -854,7 +854,7 @@ IMPORT_SWITCH_LOCK="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudi
 IMPORT_SWITCH_META="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/.theme-switch.meta"
 IMPORT_SWITCH_START="$(HOME="$IMPORT_HOME" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
-  process_started_at "$2"
+  canonical_process_started_at "$2"
 ' _ "$ROOT" "$$")"
 /usr/bin/shlock -f "$IMPORT_SWITCH_LOCK" -p "$$" \
   || fail 'Could not establish the competing macOS theme switch test lock.'

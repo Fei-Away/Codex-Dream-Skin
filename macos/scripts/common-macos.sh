@@ -174,8 +174,11 @@ codex_is_running() {
 }
 
 process_started_at() {
-  LC_ALL=C TZ=UTC /bin/ps -p "$1" -o lstart= 2>/dev/null \
-    | /usr/bin/awk '{$1=$1; print}'
+  /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
+}
+
+canonical_process_started_at() {
+  LC_ALL=C TZ=UTC process_started_at "$1"
 }
 
 recorded_injector_process_matches() {

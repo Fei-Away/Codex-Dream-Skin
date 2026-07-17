@@ -84,7 +84,7 @@ fi
   || fail "Theme switch gate must be a regular file."
 /bin/chmod 600 "$SWITCH_GATE"
 
-LOCK_OWNER_START="$(process_started_at "$$")"
+LOCK_OWNER_START="$(canonical_process_started_at "$$")"
 [ -n "$LOCK_OWNER_START" ] || fail "Could not identify the theme switch process."
 exec 9<>"$SWITCH_GATE" || fail "Could not open the theme switch gate."
 /usr/bin/lockf -s -t 1 9 || fail "Another theme switch is already starting."
@@ -99,7 +99,7 @@ if ! /usr/bin/shlock -f "$SWITCH_LOCK" -p "$$"; then
   existing_process_start=""
   case "$existing_pid" in
     ''|*[!0-9]*) ;;
-    *) existing_process_start="$(process_started_at "$existing_pid")" ;;
+    *) existing_process_start="$(canonical_process_started_at "$existing_pid")" ;;
   esac
   if [ -n "$existing_process_start" ] \
     && [ "$existing_meta_pid" = "$existing_pid" ] \
