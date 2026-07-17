@@ -273,7 +273,12 @@ const configured = createFixture({
 });
 const configuredPayload = buildPayload({
   appearance: "light",
-  palette: { accent: "#d45a70" },
+  palette: {
+    accent: "#E99A72",
+    surface: "rgb(255 250 240 / .68)",
+    surfaceRaised: "rgb(255 250 240 / .88)",
+    sidebar: "rgb(255 250 240 / .76)",
+  },
   art: { focusX: .15, focusY: .8, safeArea: "right", taskMode: "off" },
 });
 const configuredResult = vm.runInNewContext(configuredPayload, configured.context);
@@ -284,11 +289,17 @@ assert.equal(configured.rootClasses.has("dream-focus-left"), true);
 assert.equal(configured.rootClasses.has("dream-safe-right"), true);
 assert.equal(configured.rootClasses.has("dream-task-off"), true);
 assert.equal(configured.rootStyles.get("--dream-art-position"), "15% 80%");
-assert.equal(configured.rootStyles.get("--dream-accent"), "#d45a70");
+assert.equal(configured.rootStyles.get("--dream-accent"), "#E99A72");
+assert.equal(configured.rootStyles.get("--dream-surface"), "rgb(255 250 240 / .68)");
+assert.equal(configured.rootStyles.get("--dream-surface-raised"), "rgb(255 250 240 / .88)");
+assert.equal(configured.rootStyles.get("--dream-sidebar"), "rgb(255 250 240 / .76)");
 assert.equal(configured.routeClasses.has("dream-home"), true);
 assert.equal(configured.routeClasses.has("dream-task"), false);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), true);
 assert.equal(configured.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+assert.equal(configured.rootStyles.has("--dream-surface"), false);
+assert.equal(configured.rootStyles.has("--dream-surface-raised"), false);
+assert.equal(configured.rootStyles.has("--dream-sidebar"), false);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), false);
 
 const analysisPixels = new Uint8ClampedArray(48 * 12 * 4);

@@ -344,12 +344,13 @@ async function loadTheme(themeDir) {
     },
     palette: {},
   };
-  if (typeof palette.accent === "string" && palette.accent.trim()) {
-    const accent = palette.accent.trim();
-    if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(accent)) {
-      throw new Error("palette.accent is not a supported CSS color");
+  for (const key of ["accent", "surface", "surfaceRaised", "sidebar"]) {
+    if (typeof palette[key] !== "string" || !palette[key].trim()) continue;
+    const color = palette[key].trim();
+    if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(color)) {
+      throw new Error(`palette.${key} is not a supported CSS color`);
     }
-    theme.palette.accent = accent;
+    theme.palette[key] = color;
   }
   const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
   if (!imageStat.isFile()) throw new Error("Theme image is not a file");

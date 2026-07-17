@@ -664,6 +664,35 @@ try {
   $payloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload')
   if ($payloadTest.ExitCode -ne 0) { throw 'Injector self-test failed.' }
+  $surfaceTheme = Join-Path $temporaryRoot 'surface-theme'
+  Copy-Item -LiteralPath $themePaths.Active -Destination $surfaceTheme -Recurse
+  $surfaceThemePath = Join-Path $surfaceTheme 'theme.json'
+  $surfaceImage = Get-ChildItem -LiteralPath $surfaceTheme -File |
+    Where-Object { $_.Name -ne 'theme.json' } | Select-Object -First 1
+  $surfaceThemeJson = [pscustomobject]@{
+    id = 'surface-palette-test'
+    name = 'Surface palette test'
+    image = $surfaceImage.Name
+    appearance = 'auto'
+    art = [pscustomobject]@{}
+    palette = [pscustomobject]@{
+      accent = '#E99A72'
+      surface = 'rgb(255 250 240 / .68)'
+      surfaceRaised = 'rgb(255 250 240 / .88)'
+      sidebar = 'rgb(255 250 240 / .76)'
+    }
+  }
+  Write-DreamSkinUtf8FileAtomically -Path $surfaceThemePath `
+    -Content ($surfaceThemeJson | ConvertTo-Json -Depth 10)
+  $surfacePayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $surfaceTheme)
+  if ($surfacePayloadTest.ExitCode -ne 0) { throw 'Theme surface palette was not preserved in the payload.' }
+  $surfaceThemeJson.palette.surface = 'url(https://invalid.example)'
+  Write-DreamSkinUtf8FileAtomically -Path $surfaceThemePath `
+    -Content ($surfaceThemeJson | ConvertTo-Json -Depth 10)
+  $invalidSurfacePayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $surfaceTheme)
+  if ($invalidSurfacePayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an unsupported surface color.' }
   $managedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
   if ($managedPayloadTest.ExitCode -ne 0) { throw 'Managed theme payload validation failed.' }

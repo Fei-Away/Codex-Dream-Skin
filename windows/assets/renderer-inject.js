@@ -25,6 +25,9 @@
     "--dream-focus-x",
     "--dream-focus-y",
     "--dream-accent",
+    "--dream-surface",
+    "--dream-surface-raised",
+    "--dream-sidebar",
     "--dream-accent-ink",
     "--dream-image-luma",
   ];
@@ -81,6 +84,9 @@
       focusX: hasNumber(art.focusX) ? clamp(art.focusX) : null,
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
       accent: safeAccent,
+      surface: config?.palette?.surface,
+      surfaceRaised: config?.palette?.surfaceRaised,
+      sidebar: config?.palette?.sidebar,
       initialAspect: Number.isFinite(metadataRatio) && metadataRatio > 0 ? metadataRatio : null,
     };
   };
@@ -317,6 +323,14 @@
     root.style.setProperty("--dream-focus-x", String(focusX));
     root.style.setProperty("--dream-focus-y", String(focusY));
     root.style.setProperty("--dream-accent", accent);
+    for (const [property, value] of [
+      ["--dream-surface", config.surface],
+      ["--dream-surface-raised", config.surfaceRaised],
+      ["--dream-sidebar", config.sidebar],
+    ]) {
+      if (value) root.style.setProperty(property, value);
+      else root.style.removeProperty(property);
+    }
     root.style.setProperty("--dream-accent-ink", accentInk);
     root.style.setProperty("--dream-image-luma", profile.luma.toFixed(3));
   };
