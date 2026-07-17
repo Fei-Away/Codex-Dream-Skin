@@ -131,7 +131,7 @@ v1 只开放两端能够明确承接的字段：
 | `COMPAT_*` | 平台与版本 | 目标平台或最低版本不兼容 |
 | `CONFLICT_*` / `INSTALL_*` / `APPLY_*` | 后续导入阶段 | 身份冲突、事务失败、应用失败 |
 
-失败报告中的 `persistentChanges: false` 表示没有留下主题库变更。用户确认后，平台入口会把首次报告的 `contentHash` 作为安装前置条件；若文件在确认窗口被替换，返回 `PACKAGE_CONFIRMATION_STALE` 并要求重新检查。极端情况下替换提交失败且旧目录无法自动恢复，或新版本已提交但旧 backup 无法清理时，返回 `INSTALL_RECOVERY_REQUIRED` 与 `persistentChanges: true`，保留受管主题库内的 recovery backup。安装和应用是两个独立结果；安装器不会替导入核心自动改活动主题。
+失败报告中的 `persistentChanges: false` 表示没有留下主题库变更。用户确认后，平台入口会把首次报告的 `contentHash` 作为安装前置条件；若文件在确认窗口被替换，返回 `PACKAGE_CONFIRMATION_STALE` 并要求重新检查。极端情况下替换提交失败且旧目录无法自动恢复，或新版本已提交但旧 backup 无法清理时，返回 `INSTALL_RECOVERY_REQUIRED` 与 `persistentChanges: true`，保留受管主题库内的 recovery backup。安装和应用是两个独立结果；应用失败返回 `pass: false`、`APPLY_FAILED_AFTER_INSTALL`、`persistentChanges: true`，并同时保留成功的 `install` 结果与 `apply.status: failed-after-install`。
 
 ## 8. 给 AI 作者的边界
 

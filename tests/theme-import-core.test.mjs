@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ThemePackageError } from "../lib/theme-package/errors.mjs";
-import { prepareThemePackage } from "../lib/theme-package/import-core.mjs";
+import { addApplyResult, prepareThemePackage } from "../lib/theme-package/import-core.mjs";
 import { installPreparedTheme } from "../lib/theme-package/theme-store.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +51,16 @@ async function assertNoTransactionArtifacts(stateRoot) {
 }
 
 try {
+  const applyFailure = addApplyResult({ pass: true, install: { status: "installed" } }, "failed-after-install");
+  assert.deepEqual(applyFailure, {
+    pass: false,
+    install: { status: "installed" },
+    apply: { status: "failed-after-install" },
+    code: "APPLY_FAILED_AFTER_INSTALL",
+    message: "The theme was installed, but it could not be applied and verified.",
+    persistentChanges: true,
+  });
+
   const unusedStateRoot = path.join(temporaryRoot, "state-must-not-exist");
   const dryRun = reportFor(runCli(
     "import",
@@ -109,6 +119,27 @@ try {
     "WINDOWS_TEXT_FIELDS_NOT_RENDERED",
     "WINDOWS_EXTENDED_PALETTE_NOT_RENDERED",
   ]);
+  const windowsStateRoot = path.join(temporaryRoot, "windows-state");
+  reportFor(runCli(
+    "import",
+    golden,
+    "--platform",
+    "windows",
+    "--dream-skin-version",
+    "1.3.0",
+    "--install",
+    "--state-root",
+    windowsStateRoot,
+    "--expected-content-hash",
+    windowsDryRun.contentHash,
+  ));
+  const windowsRuntimeTheme = JSON.parse(await fs.readFile(path.join(
+    windowsStateRoot,
+    "themes",
+    windowsDryRun.packageId,
+    "theme.json",
+  )));
+  assert.equal(windowsRuntimeTheme.packageContentHash, windowsDryRun.contentHash);
 
   const source = path.join(temporaryRoot, "changed-source");
   const changedPackage = path.join(temporaryRoot, "changed.dreamskin");

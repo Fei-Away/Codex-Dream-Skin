@@ -112,6 +112,7 @@ theme-name.dreamskin  # ZIP v1
 - `manifest.json` 是包身份与兼容性权威：`formatVersion`、`packageId`、`packageVersion`、显示名、作者、目标平台、最低 Dream Skin 版本、资源路径/类型/大小/SHA-256。
 - `theme.json` 是便携声明式主题权威：主题名称、背景引用、appearance、art、受控 palette 与受控文案字段；精确字段由 `docs/THEME_PACKAGE.md` 和 JSON Schema 固化。
 - `import.json` 只在安装后生成，记录原包身份、内容哈希、安装时间和编译器版本；外部包不能自行提供或覆盖它。
+- 包编译出的平台 `theme.json` 额外携带只读 `packageContentHash`；切换、启动和页面验证用 `id + packageContentHash` 绑定同一份已确认内容，渲染器不把它解释为可执行能力。
 - 平台运行时 `theme.json` 是便携主题编译结果，不是直接信任复制。macOS `colors`、Windows `palette` 等差异由显式编译器承接。
 - 当前主题与已安装主题继续以平台现有目录为权威；原 `.dreamskin` 可以删除，不影响已安装主题。
 

@@ -12,6 +12,8 @@ const root = path.resolve(here, "..");
 const SKIN_VERSION = "1.3.0";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
+const THEME_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
+const CONTENT_HASH_PATTERN = /^[0-9a-f]{64}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
 let staticPayloadAssets = null;
 
@@ -23,6 +25,8 @@ function parseArgs(argv) {
     screenshot: null,
     reload: false,
     themeDir: null,
+    expectedThemeId: null,
+    expectedContentHash: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -35,6 +39,8 @@ function parseArgs(argv) {
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
     else if (arg === "--theme-dir") options.themeDir = path.resolve(argv[++i]);
+    else if (arg === "--expected-theme-id") options.expectedThemeId = argv[++i];
+    else if (arg === "--expected-content-hash") options.expectedContentHash = argv[++i];
     else if (arg === "--reload") options.reload = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -44,7 +50,17 @@ function parseArgs(argv) {
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 250 || options.timeoutMs > 120000) {
     throw new Error(`Invalid timeout: ${options.timeoutMs}`);
   }
+  if ((options.expectedThemeId === null) !== (options.expectedContentHash === null)
+      || (options.expectedThemeId !== null && !THEME_ID_PATTERN.test(options.expectedThemeId))
+      || (options.expectedContentHash !== null && !CONTENT_HASH_PATTERN.test(options.expectedContentHash))) {
+    throw new Error("Expected theme identity requires a valid ID and lowercase SHA-256 hash");
+  }
   return options;
+}
+
+export function themeIdentityMatches(actualId, actualContentHash, expectedId, expectedContentHash) {
+  if (expectedId === null && expectedContentHash === null) return true;
+  return actualId === expectedId && actualContentHash === expectedContentHash;
 }
 
 function validatedDebuggerUrl(target, port) {
@@ -343,6 +359,11 @@ async function loadTheme(themeDir) {
     "highlight", "text", "muted", "line",
   ];
   const appearance = choice(raw.appearance, "appearance", ["auto", "light", "dark"]);
+  const packageContentHash = raw.packageContentHash === undefined ? null : raw.packageContentHash;
+  if (packageContentHash !== null
+      && (typeof packageContentHash !== "string" || !CONTENT_HASH_PATTERN.test(packageContentHash))) {
+    throw new Error(`${configPath} has an invalid packageContentHash field`);
+  }
   if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
     throw new Error(`${configPath} has an invalid art field`);
   }
@@ -364,6 +385,7 @@ async function loadTheme(themeDir) {
     statusText: text(raw.statusText, "DREAM SKIN ONLINE", 80, "statusText"),
     quote: text(raw.quote, "MAKE SOMETHING WONDERFUL", 80, "quote"),
     image: raw.image,
+    packageContentHash,
     colorMode: rawColors ? "explicit" : "auto",
     explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
     colors: {
@@ -544,8 +566,35 @@ async function verifyRemovedSession(session) {
   )()`);
 }
 
-async function verifySession(session) {
-  return session.evaluate(`(() => {
+export function assessVerificationResult(result, expectedThemeId = null, expectedContentHash = null) {
+  const identityMatches = themeIdentityMatches(
+    result.themeId,
+    result.packageContentHash,
+    expectedThemeId,
+    expectedContentHash,
+  );
+  const basePass = result.installed && result.version === SKIN_VERSION && identityMatches
+    && result.stylePresent && result.chromePresent && result.chromePointerEvents === "none"
+    && Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible) && !result.documentOverflow.x;
+  const homePass = !result.homeRoute || (
+    result.homePresent && result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120
+  );
+  return {
+    ...result,
+    expectedThemeId,
+    expectedContentHash,
+    identityMatches,
+    pass: Boolean(basePass && homePass),
+    softNotes: {
+      projectButtonOptional: !result.projectButton?.visible,
+      composerOptionalOnNonTaskRoutes: !result.composer?.visible,
+      suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
+    },
+  };
+}
+
+async function verifySession(session, options = {}) {
+  const result = await session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
@@ -573,6 +622,8 @@ async function verifySession(session) {
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
       version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
+      themeId: window.__CODEX_DREAM_SKIN_STATE__?.themeId ?? null,
+      packageContentHash: window.__CODEX_DREAM_SKIN_STATE__?.packageContentHash ?? null,
       stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
       chromePresent: Boolean(chrome),
       chromePointerEvents: getComputedStyle(chrome || document.body).pointerEvents,
@@ -591,28 +642,16 @@ async function verifySession(session) {
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    const basePass = result.installed && result.version === ${JSON.stringify(SKIN_VERSION)} &&
-      result.stylePresent && result.chromePresent && result.chromePointerEvents === 'none' &&
-      Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible) && !result.documentOverflow.x;
-    // Project selector markup varies across Codex builds — soft requirement.
-    const homePass = !result.homeRoute || (
-      result.homePresent && result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120
-    );
-    result.pass = Boolean(basePass && homePass);
-    result.softNotes = {
-      projectButtonOptional: !result.projectButton?.visible,
-      composerOptionalOnNonTaskRoutes: !result.composer?.visible,
-      suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
-    };
     return result;
   })()`);
+  return assessVerificationResult(result, options.expectedThemeId, options.expectedContentHash);
 }
 
-async function waitForVerifiedSession(session, timeoutMs) {
+async function waitForVerifiedSession(session, timeoutMs, options = {}) {
   const deadline = Date.now() + timeoutMs;
   let lastResult;
   while (Date.now() < deadline) {
-    lastResult = await verifySession(session);
+    lastResult = await verifySession(session, options);
     if (lastResult.pass) return lastResult;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -653,6 +692,12 @@ async function capture(session, outputPath) {
 async function runOneShot(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs);
   const loaded = (options.mode === "once" || options.reload) ? await loadPayload(options.themeDir) : null;
+  if (loaded && !themeIdentityMatches(
+    loaded.theme.id,
+    loaded.theme.packageContentHash,
+    options.expectedThemeId,
+    options.expectedContentHash,
+  )) throw new Error("Selected theme does not match the expected package identity");
   const payload = loaded?.payload ?? null;
   const results = [];
   let screenshotCaptured = false;
@@ -670,7 +715,7 @@ async function runOneShot(options) {
 
       const result = options.mode === "remove"
         ? await verifyRemovedSession(session)
-        : await waitForVerifiedSession(session, options.timeoutMs);
+        : await waitForVerifiedSession(session, options.timeoutMs, options);
       results.push({ targetId: target.id, title: target.title, url: target.url, probe, result });
 
       if (options.screenshot && !screenshotCaptured) {
@@ -906,6 +951,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         pass: true,
         version: SKIN_VERSION,
         themeId: loaded.theme.id,
+        packageContentHash: loaded.theme.packageContentHash,
         themeName: loaded.theme.name,
         imageBytes: loaded.imageBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),

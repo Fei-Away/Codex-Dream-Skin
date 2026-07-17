@@ -13,6 +13,8 @@ const MAX_ART_BYTES = 16 * 1024 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
+const THEME_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
+const CONTENT_HASH_PATTERN = /^[0-9a-f]{64}$/;
 
 class CdpIdentityMismatchError extends Error {}
 
@@ -24,6 +26,8 @@ function parseArgs(argv) {
     screenshot: null,
     reload: false,
     browserId: null,
+    expectedThemeId: null,
+    expectedContentHash: null,
     themeDir: path.join(root, "assets"),
     pauseFile: null,
   };
@@ -36,6 +40,8 @@ function parseArgs(argv) {
     else if (arg === "--remove") options.mode = "remove";
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--browser-id") options.browserId = argv[++i];
+    else if (arg === "--expected-theme-id") options.expectedThemeId = argv[++i];
+    else if (arg === "--expected-content-hash") options.expectedContentHash = argv[++i];
     else if (arg === "--theme-dir") options.themeDir = path.resolve(argv[++i]);
     else if (arg === "--pause-file") options.pauseFile = path.resolve(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
@@ -52,6 +58,11 @@ function parseArgs(argv) {
   }
   if (options.browserId !== null && !BROWSER_ID_PATTERN.test(options.browserId)) {
     throw new Error(`Invalid browser ID: ${options.browserId}`);
+  }
+  if ((options.expectedThemeId === null) !== (options.expectedContentHash === null)
+      || (options.expectedThemeId !== null && !THEME_ID_PATTERN.test(options.expectedThemeId))
+      || (options.expectedContentHash !== null && !CONTENT_HASH_PATTERN.test(options.expectedContentHash))) {
+    throw new Error("Expected theme identity requires a valid ID and lowercase SHA-256 hash");
   }
   if (["watch", "once", "verify", "remove"].includes(options.mode) && !options.browserId) {
     throw new Error(`--browser-id is required in ${options.mode} mode`);
@@ -305,6 +316,19 @@ function normalizedText(value, name, fallback, maxLength = 120) {
   return value;
 }
 
+function normalizedContentHash(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || !CONTENT_HASH_PATTERN.test(value)) {
+    throw new Error("packageContentHash must be a lowercase SHA-256 digest");
+  }
+  return value;
+}
+
+export function themeIdentityMatches(actualId, actualContentHash, expectedId, expectedContentHash) {
+  if (expectedId === null && expectedContentHash === null) return true;
+  return actualId === expectedId && actualContentHash === expectedContentHash;
+}
+
 async function loadTheme(themeDir) {
   const realThemeDir = await fs.realpath(themeDir);
   const themePath = path.join(realThemeDir, "theme.json");
@@ -344,6 +368,7 @@ async function loadTheme(themeDir) {
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
     palette: {},
+    packageContentHash: normalizedContentHash(raw.packageContentHash),
   };
   if (typeof palette.accent === "string" && palette.accent.trim()) {
     const accent = palette.accent.trim();
@@ -600,8 +625,29 @@ async function verifyRemovedSession(session) {
   )()`);
 }
 
-async function verifySession(session) {
-  return session.evaluate(`(() => {
+export function assessVerificationResult(result, expectedThemeId = null, expectedContentHash = null) {
+  const identityMatches = themeIdentityMatches(
+    result.themeId,
+    result.packageContentHash,
+    expectedThemeId,
+    expectedContentHash,
+  );
+  return {
+    ...result,
+    expectedVersion: SKIN_VERSION,
+    expectedThemeId,
+    expectedContentHash,
+    identityMatches,
+    pass: result.installed && result.version === SKIN_VERSION && identityMatches
+      && result.stylePresent && result.chromePresent
+      && result.chromePointerEvents === "none" && Boolean(result.composer) && Boolean(result.sidebar)
+      && (!result.homePresent || (Boolean(result.hero)
+        && (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4)))),
+  };
+}
+
+async function verifySession(session, options = {}) {
+  const result = await session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
@@ -613,7 +659,8 @@ async function verifySession(session) {
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
       version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
-      expectedVersion: ${JSON.stringify(SKIN_VERSION)},
+      themeId: window.__CODEX_DREAM_SKIN_STATE__?.themeId ?? null,
+      packageContentHash: window.__CODEX_DREAM_SKIN_STATE__?.packageContentHash ?? null,
       stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
       chromePresent: Boolean(document.getElementById('codex-dream-skin-chrome')),
       chromePointerEvents: getComputedStyle(document.getElementById('codex-dream-skin-chrome') || document.body).pointerEvents,
@@ -629,22 +676,18 @@ async function verifySession(session) {
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.chromePresent &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
-      (!result.homePresent || (Boolean(result.hero) &&
-        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
     return result;
   })()`);
+  return assessVerificationResult(result, options.expectedThemeId, options.expectedContentHash);
 }
 
-async function waitForVerifiedSession(session, timeoutMs) {
+async function waitForVerifiedSession(session, timeoutMs, options = {}) {
   const deadline = Date.now() + timeoutMs;
   let lastResult;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      lastResult = await verifySession(session);
+      lastResult = await verifySession(session, options);
       lastError = null;
       if (lastResult.pass) return lastResult;
     } catch (error) {
@@ -680,6 +723,12 @@ async function runOneShot(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs, options.browserId);
   const loadedPayload = (options.mode === "once" || options.reload)
     ? await loadPayload(options.themeDir) : null;
+  if (loadedPayload && !themeIdentityMatches(
+    loadedPayload.theme.id,
+    loadedPayload.theme.packageContentHash,
+    options.expectedThemeId,
+    options.expectedContentHash,
+  )) throw new Error("Selected theme does not match the expected package identity");
   const payload = loadedPayload?.payload ?? null;
   const results = [];
   let screenshotCaptured = false;
@@ -699,8 +748,8 @@ async function runOneShot(options) {
         const verified = options.mode === "remove"
           ? await verifyRemovedSession(session)
           : (options.reload || options.mode === "once" || options.mode === "verify")
-            ? await waitForVerifiedSession(session, options.timeoutMs)
-            : await verifySession(session);
+            ? await waitForVerifiedSession(session, options.timeoutMs, options)
+            : await verifySession(session, options);
         results.push({ targetId: target.id, markers: probe.markers, result: verified });
         if (options.screenshot && !screenshotCaptured) {
           await capture(session, options.screenshot);
@@ -1010,6 +1059,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       payloadBytes: Buffer.byteLength(loaded.payload),
       payloadIntegrity: "verified",
       themeId: loaded.theme.id,
+      packageContentHash: loaded.theme.packageContentHash,
       themeName: loaded.theme.name,
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,

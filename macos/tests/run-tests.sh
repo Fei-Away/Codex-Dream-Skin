@@ -814,8 +814,29 @@ IMPORT_INSTALL_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
     if (report.install?.status !== "installed" || report.apply?.status !== "not-requested") process.exit(1);
   });
 '
+IMPORT_SWITCH_LOCK="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/.theme-switch.lock"
+/bin/mkdir "$IMPORT_SWITCH_LOCK"
+/usr/bin/printf '%s\n' "$$" > "$IMPORT_SWITCH_LOCK/pid"
+if HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
+  --id dev.codex-dream-skin.kimi-sakura-dawn --no-apply >/dev/null 2>&1; then
+  fail 'macOS theme switch ignored another live switch operation.'
+fi
+/bin/rm -rf "$IMPORT_SWITCH_LOCK"
 HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
-  --id dev.codex-dream-skin.kimi-sakura-dawn --no-apply >/dev/null
+  --id dev.codex-dream-skin.kimi-sakura-dawn \
+  --expected-content-hash 0849c3b462e38fe0639941df5a8e1c6832e1a182d4ddd632464bbbf0d6ddc785 \
+  --no-apply >/dev/null
 [ -f "$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/theme/theme.json" ]
+if HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
+  --id dev.codex-dream-skin.kimi-sakura-dawn \
+  --expected-content-hash bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  --no-apply >/dev/null 2>&1; then
+  fail 'macOS switch accepted the same package ID with a different confirmed content hash.'
+fi
+"$NODE" -e '
+  const theme = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  if (theme.id !== "dev.codex-dream-skin.kimi-sakura-dawn"
+    || theme.packageContentHash !== "0849c3b462e38fe0639941df5a8e1c6832e1a182d4ddd632464bbbf0d6ddc785") process.exit(1);
+' "$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/theme/theme.json"
 
 printf 'PASS: syntax, payload, theme-package import, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

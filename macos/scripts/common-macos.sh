@@ -559,6 +559,8 @@ ensure_node_runtime() {
 hot_reapply_theme() {
   local port="${1:-9341}"
   local timeout_ms="${2:-8000}"
+  local expected_theme_id="${3:-}"
+  local expected_content_hash="${4:-}"
   local inj_pid=""
   local injector_protocol=""
   local started_at=""
@@ -575,8 +577,12 @@ hot_reapply_theme() {
       index($0, inj) && index($0, "--watch") && index($0, "--port " port " --theme-dir ") { print $1; exit }
     ')"
   fi
+  local identity_args=()
+  if [ -n "$expected_content_hash" ]; then
+    identity_args=(--expected-theme-id "$expected_theme_id" --expected-content-hash "$expected_content_hash")
+  fi
   if ! "$NODE" "$INJECTOR" --once --port "$port" --theme-dir "$THEME_DIR" \
-    --timeout-ms "$timeout_ms" >/dev/null 2>&1; then
+    --timeout-ms "$timeout_ms" "${identity_args[@]}" >/dev/null 2>&1; then
     return 1
   fi
 

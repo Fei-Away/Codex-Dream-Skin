@@ -156,14 +156,16 @@ if ($applyAfterInstall -and $applyStatus -ne 'failed-after-install') {
       $verifyScript = Join-Path $PSScriptRoot 'verify-dream-skin.ps1'
       $startArguments = @(
         '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $startScript,
-        '-Port', "$Port", '-ExpectedThemeId', "$($installed.Json.packageId)"
+        '-Port', "$Port", '-ExpectedThemeId', "$($installed.Json.packageId)",
+        '-ExpectedThemeContentHash', $expectedContentHash
       )
       if (-not $NoPrompt) { $startArguments += '-PromptRestart' }
       $startResult = Invoke-DreamSkinNative -FilePath $powershell -ArgumentList $startArguments
       $verifyResult = if ($startResult.ExitCode -eq 0) {
         Invoke-DreamSkinNative -FilePath $powershell -ArgumentList @(
           '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $verifyScript,
-          '-Port', "$Port", '-ExpectedThemeId', "$($installed.Json.packageId)"
+          '-Port', "$Port", '-ExpectedThemeId', "$($installed.Json.packageId)",
+          '-ExpectedThemeContentHash', $expectedContentHash
         )
       } else {
         [pscustomobject]@{ ExitCode = $startResult.ExitCode; Output = $startResult.Output }
@@ -181,9 +183,8 @@ if ($applyAfterInstall -and $applyStatus -ne 'failed-after-install') {
   }
 }
 
-$applyResult = [ordered]@{ status = $applyStatus }
-if ($applyMessage) { $applyResult.message = $applyMessage }
-$installed.Json | Add-Member -NotePropertyName apply -NotePropertyValue ([pscustomobject]$applyResult) -Force
+$installed.Json = Add-DreamSkinImportApplyResult -Report $installed.Json `
+  -Status $applyStatus -Message $applyMessage
 $finalReport = $installed.Json | ConvertTo-Json -Depth 12
 
 if ($applyStatus -eq 'failed-after-install') {

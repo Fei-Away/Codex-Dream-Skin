@@ -3,9 +3,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { assessVerificationResult } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const windowsRoot = path.resolve(here, "..");
+const packageHash = "a".repeat(64);
 const template = await fs.readFile(path.join(windowsRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(windowsRoot, "assets", "dream-skin.css"), "utf8");
 const buildPayload = (config = {}) => template
@@ -279,12 +281,16 @@ const configured = createFixture({
   utilityPresent: true,
 });
 const configuredPayload = buildPayload({
+  id: "dev.codex-dream-skin.identity-fixture",
+  packageContentHash: packageHash,
   appearance: "light",
   palette: { accent: "#d45a70" },
   art: { focusX: .15, focusY: .8, safeArea: "right", taskMode: "off" },
 });
 const configuredResult = vm.runInNewContext(configuredPayload, configured.context);
 assert.equal(configuredResult.adaptive, true);
+assert.equal(configuredResult.themeId, "dev.codex-dream-skin.identity-fixture");
+assert.equal(configuredResult.packageContentHash, packageHash);
 assert.equal(configured.rootClasses.has("dream-theme-light"), true);
 assert.equal(configured.rootClasses.has("dream-theme-dark"), false);
 assert.equal(configured.rootClasses.has("dream-focus-left"), true);
@@ -297,6 +303,37 @@ assert.equal(configured.routeClasses.has("dream-task"), false);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), true);
 assert.equal(configured.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), false);
+
+const verificationFixture = {
+  installed: true,
+  version: "1.3.0",
+  themeId: "dev.codex-dream-skin.identity-fixture",
+  packageContentHash: packageHash,
+  stylePresent: true,
+  chromePresent: true,
+  chromePointerEvents: "none",
+  homePresent: false,
+  suggestionsPresent: false,
+  hero: null,
+  cards: [],
+  composer: { width: 640 },
+  sidebar: { width: 280 },
+};
+assert.equal(assessVerificationResult(
+  verificationFixture,
+  "dev.codex-dream-skin.identity-fixture",
+  packageHash,
+).pass, true);
+assert.equal(assessVerificationResult(
+  verificationFixture,
+  "dev.codex-dream-skin.identity-fixture",
+  "b".repeat(64),
+).pass, false, "Page verification must reject the same theme ID with different package content.");
+assert.equal(assessVerificationResult(
+  verificationFixture,
+  "dev.codex-dream-skin.different-fixture",
+  packageHash,
+).pass, false, "Page verification must reject a different theme ID.");
 
 const analysisPixels = new Uint8ClampedArray(48 * 12 * 4);
 for (let index = 0; index < 48 * 12; index += 1) {

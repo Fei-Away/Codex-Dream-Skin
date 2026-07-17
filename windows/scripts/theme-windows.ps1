@@ -102,17 +102,43 @@ function Get-DreamSkinThemePaths {
   }
 }
 
-function Assert-DreamSkinActiveThemeId {
+function Assert-DreamSkinActiveThemeIdentity {
   param(
     [Parameter(Mandatory = $true)][string]$StateRoot,
-    [Parameter(Mandatory = $true)][string]$ExpectedThemeId
+    [Parameter(Mandatory = $true)][string]$ExpectedThemeId,
+    [Parameter(Mandatory = $true)][string]$ExpectedContentHash
   )
+  if ($ExpectedContentHash -cnotmatch '^[0-9a-f]{64}$') {
+    throw 'Expected theme content hash must be a lowercase SHA-256 digest.'
+  }
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   $activeTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($activeTheme.Theme.id -cne $ExpectedThemeId) {
-    throw "The active Dream Skin theme changed before verification: expected $ExpectedThemeId."
+  if ($activeTheme.Theme.id -cne $ExpectedThemeId -or
+    $activeTheme.Theme.packageContentHash -cne $ExpectedContentHash) {
+    throw "The active Dream Skin theme changed before verification: expected $ExpectedThemeId with the confirmed content hash."
   }
   return $activeTheme
+}
+
+function Add-DreamSkinImportApplyResult {
+  param(
+    [Parameter(Mandatory = $true)][object]$Report,
+    [Parameter(Mandatory = $true)][ValidateSet('not-requested', 'selected-awaiting-runtime', 'applied', 'failed-after-install')][string]$Status,
+    [string]$Message
+  )
+  if ($Status -eq 'failed-after-install' -and -not $Message) {
+    $Message = 'The theme was installed, but it could not be applied and verified.'
+  }
+  $applyResult = [ordered]@{ status = $Status }
+  if ($Message) { $applyResult['message'] = $Message }
+  $Report | Add-Member -NotePropertyName apply -NotePropertyValue ([pscustomobject]$applyResult) -Force
+  if ($Status -eq 'failed-after-install') {
+    $Report.pass = $false
+    $Report | Add-Member -NotePropertyName code -NotePropertyValue 'APPLY_FAILED_AFTER_INSTALL' -Force
+    $Report | Add-Member -NotePropertyName message -NotePropertyValue $Message -Force
+    $Report | Add-Member -NotePropertyName persistentChanges -NotePropertyValue $true -Force
+  }
+  return $Report
 }
 
 function Test-DreamSkinThemePathWithin {

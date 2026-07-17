@@ -14,7 +14,7 @@ Excluded: model APIs, URL import, a theme marketplace, arbitrary CSS or executab
 
 - Author CLI: `node tools/theme-package.mjs validate <source-dir>`, `pack <source-dir> --output <file.dreamskin>`, and `inspect <file.dreamskin>`.
 - Artifact: one local `.dreamskin` ZIP v1 file containing only the documented allowlist.
-- Import core: `import <file.dreamskin> --platform <macos|windows> --dream-skin-version <semver> --dry-run`, or `--install --state-root <dir> [--replace]`, with machine-readable reports and stable error codes. `--replace` is an upper-layer confirmation result, never an automatic policy.
+- Import core: `import <file.dreamskin> --platform <macos|windows> --dream-skin-version <semver> --dry-run`, or `--install --state-root <dir> [--replace] [--expected-content-hash <sha256>]`, with machine-readable reports and stable error codes. `--replace` is an upper-layer confirmation result, never an automatic policy；`--expected-content-hash` 把安装绑定到用户刚确认的候选内容。
 - Platform entry points: macOS command/menu and Windows PowerShell/tray actions call the same contract rather than maintaining independent validators.
 - Runtime safety: normalized themes pass the existing platform payload/image validators before an active theme can change.
 

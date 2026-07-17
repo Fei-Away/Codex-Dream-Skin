@@ -781,12 +781,14 @@ try {
     -not $startSource.Contains('Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot')) {
     throw 'Start does not preserve an existing pause marker when startup rolls back.'
   }
-  if (-not $startSource.Contains('Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId')) {
-    throw 'Start does not reject an active theme that changed after import confirmation.'
+  if (-not $startSource.Contains('Assert-DreamSkinActiveThemeIdentity -StateRoot $StateRoot') -or
+    -not $startSource.Contains('-ExpectedContentHash $ExpectedThemeContentHash')) {
+    throw 'Start does not reject active theme content that changed after import confirmation.'
   }
   $verifySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
-  if (-not $verifySource.Contains('Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId')) {
-    throw 'Verify does not bind live validation to the theme selected by the importer.'
+  if (-not $verifySource.Contains('Assert-DreamSkinActiveThemeIdentity -StateRoot $StateRoot') -or
+    -not $verifySource.Contains("'--expected-content-hash', `$ExpectedThemeContentHash")) {
+    throw 'Verify does not bind active files and page validation to the content selected by the importer.'
   }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
@@ -867,6 +869,7 @@ try {
   $installedImportSource = Read-DreamSkinUtf8File -Path $installedImportScript
   if (-not $installedImportSource.Contains("'--expected-content-hash', `$expectedContentHash") -or
     -not $installedImportSource.Contains("'-ExpectedThemeId'") -or
+    -not $installedImportSource.Contains("'-ExpectedThemeContentHash'") -or
     -not $installedImportSource.Contains('$installed.Json.packageId')) {
     throw 'Installed importer does not bind confirmation, start, and verification to one package identity.'
   }
@@ -891,8 +894,31 @@ try {
     throw 'Windows .dreamskin repeat/apply did not preserve idempotency and separate live status.'
   }
   $selected = Read-DreamSkinTheme -ThemeDirectory (Join-Path $importState 'active-theme')
-  if ($selected.Theme.id -cne 'dev.codex-dream-skin.kimi-sakura-dawn') {
-    throw 'Windows .dreamskin apply did not select the installed saved theme.'
+  if ($selected.Theme.id -cne 'dev.codex-dream-skin.kimi-sakura-dawn' -or
+    $selected.Theme.packageContentHash -cne $importReport.contentHash) {
+    throw 'Windows .dreamskin apply did not select the installed package identity.'
+  }
+  $null = Assert-DreamSkinActiveThemeIdentity -StateRoot $importState `
+    -ExpectedThemeId $selected.Theme.id -ExpectedContentHash $importReport.contentHash
+  $sameIdDifferentHashRejected = $false
+  try {
+    $null = Assert-DreamSkinActiveThemeIdentity -StateRoot $importState `
+      -ExpectedThemeId $selected.Theme.id -ExpectedContentHash ('b' * 64)
+  } catch {
+    $sameIdDifferentHashRejected = $true
+  }
+  if (-not $sameIdDifferentHashRejected) {
+    throw 'Windows active-theme identity accepted the same package ID with different content.'
+  }
+  $applyFailureFixture = [pscustomobject]@{ pass = $true; install = [pscustomobject]@{ status = 'installed' } }
+  $applyFailureFixture = Add-DreamSkinImportApplyResult -Report $applyFailureFixture `
+    -Status 'failed-after-install' -Message 'fixture apply failure'
+  if ($applyFailureFixture.pass -ne $false -or
+    $applyFailureFixture.code -cne 'APPLY_FAILED_AFTER_INSTALL' -or
+    $applyFailureFixture.persistentChanges -ne $true -or
+    $applyFailureFixture.install.status -cne 'installed' -or
+    $applyFailureFixture.apply.status -cne 'failed-after-install') {
+    throw 'Windows apply failure did not preserve install success under a stable machine-readable failure contract.'
   }
 
   Write-Host 'PASS: config transactions, theme-package import, restore scoping, state safety, argument quoting, and loopback CDP validation.'

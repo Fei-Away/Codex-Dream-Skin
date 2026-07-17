@@ -403,7 +403,10 @@
   });
   const timer = setInterval(ensure, 5000);
   window[STATE_KEY] = {
-    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.3.0",
+    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken,
+    themeId: rawConfig?.id ?? "custom",
+    packageContentHash: rawConfig?.packageContentHash ?? null,
+    version: "1.3.0",
   };
   ensure();
   analyzeArt().then((result) => {
@@ -413,5 +416,11 @@
     state.profile = result;
     ensure();
   });
-  return { installed: true, version: "1.3.0", adaptive: true };
+  return {
+    installed: true,
+    version: "1.3.0",
+    themeId: rawConfig?.id ?? "custom",
+    packageContentHash: rawConfig?.packageContentHash ?? null,
+    adaptive: true,
+  };
 })(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__)

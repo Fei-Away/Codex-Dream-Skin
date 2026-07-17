@@ -2,7 +2,8 @@
 param(
   [int]$Port = 9335,
   [string]$ScreenshotPath,
-  [string]$ExpectedThemeId
+  [string]$ExpectedThemeId,
+  [string]$ExpectedThemeContentHash
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,8 +17,9 @@ $verifyExitCode = 1
 try {
   $StatePath = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin\state.json'
   $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
-  if ($ExpectedThemeId) {
-    $null = Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId
+  if ($ExpectedThemeId -or $ExpectedThemeContentHash) {
+    $null = Assert-DreamSkinActiveThemeIdentity -StateRoot $StateRoot `
+      -ExpectedThemeId $ExpectedThemeId -ExpectedContentHash $ExpectedThemeContentHash
   }
   $state = Read-DreamSkinState -Path $StatePath
   if (-not $PortExplicit -and $null -ne $state -and $state.port) { $Port = [int]$state.port }
@@ -46,11 +48,18 @@ try {
 
   $arguments = @($injector, '--verify', '--port', "$Port", '--browser-id', $cdpIdentity.BrowserId,
     '--timeout-ms', '30000')
+  if ($ExpectedThemeId -or $ExpectedThemeContentHash) {
+    $arguments += @(
+      '--expected-theme-id', $ExpectedThemeId,
+      '--expected-content-hash', $ExpectedThemeContentHash
+    )
+  }
   if ($ScreenshotPath) { $arguments += @('--screenshot', $ScreenshotPath) }
   & $node.Path @arguments
   $verifyExitCode = $LASTEXITCODE
-  if ($verifyExitCode -eq 0 -and $ExpectedThemeId) {
-    $null = Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId
+  if ($verifyExitCode -eq 0 -and ($ExpectedThemeId -or $ExpectedThemeContentHash)) {
+    $null = Assert-DreamSkinActiveThemeIdentity -StateRoot $StateRoot `
+      -ExpectedThemeId $ExpectedThemeId -ExpectedContentHash $ExpectedThemeContentHash
   }
 } finally {
   Exit-DreamSkinOperationLock -Mutex $operationLock

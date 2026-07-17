@@ -3,9 +3,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { assessVerificationResult } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const macosRoot = path.resolve(here, "..");
+const packageHash = "a".repeat(64);
 const template = await fs.readFile(path.join(macosRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(macosRoot, "assets", "dream-skin.css"), "utf8");
 
@@ -342,11 +344,14 @@ function createFixture(theme, {
 
 const defaults = createFixture({
   id: "default-contract",
+  packageContentHash: packageHash,
   appearance: "auto",
   art: { safeArea: "auto", taskMode: "auto" },
 });
 const defaultResult = vm.runInNewContext(defaults.payload, defaults.context);
 assert.equal(defaultResult.installed, true);
+assert.equal(defaults.window.__CODEX_DREAM_SKIN_STATE__.themeId, "default-contract");
+assert.equal(defaults.window.__CODEX_DREAM_SKIN_STATE__.packageContentHash, packageHash);
 assert.equal(defaults.attributes.get("data-dream-shell"), "light");
 assert.equal(defaults.attributes.get("data-dream-art-safe-area"), "center");
 assert.equal(defaults.attributes.get("data-dream-art-task-mode"), "ambient");
@@ -372,6 +377,40 @@ assert.equal(defaultMetrics.layoutReads, 2, "Shell ResizeObserver changes must r
 const defaultChrome = defaults.nodes.get("codex-dream-skin-chrome");
 assert.equal(defaultChrome.style.values.get("left"), "196px");
 assert.equal(defaultChrome.style.values.get("width"), "1084px");
+
+const verificationFixture = {
+  installed: true,
+  version: "1.3.0",
+  themeId: "default-contract",
+  packageContentHash: packageHash,
+  stylePresent: true,
+  chromePresent: true,
+  chromePointerEvents: "none",
+  homeRoute: false,
+  homePresent: false,
+  hero: null,
+  visibleCardCount: 0,
+  projectButton: null,
+  composer: null,
+  shell: { visible: true },
+  sidebar: { visible: true },
+  documentOverflow: { x: false, y: false },
+};
+assert.equal(assessVerificationResult(
+  verificationFixture,
+  "default-contract",
+  packageHash,
+).pass, true);
+assert.equal(assessVerificationResult(
+  verificationFixture,
+  "default-contract",
+  "b".repeat(64),
+).pass, false, "Page verification must reject the same theme ID with different package content.");
+assert.equal(assessVerificationResult(
+  verificationFixture,
+  "different-theme",
+  packageHash,
+).pass, false, "Page verification must reject a different theme ID.");
 
 // Auto appearance must continue following the native shell after the skin is
 // already installed. The fixture makes the injected root color-scheme win

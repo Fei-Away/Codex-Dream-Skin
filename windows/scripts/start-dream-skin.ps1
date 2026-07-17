@@ -5,7 +5,8 @@ param(
   [switch]$PromptRestart,
   [string]$ProfilePath,
   [switch]$ForegroundInjector,
-  [string]$ExpectedThemeId
+  [string]$ExpectedThemeId,
+  [string]$ExpectedThemeContentHash
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,8 +30,9 @@ try {
   $StderrPath = Join-Path $StateRoot 'injector-error.log'
   $VerifyPath = Join-Path $StateRoot 'verify.log'
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot
-  if ($ExpectedThemeId) {
-    $null = Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId
+  if ($ExpectedThemeId -or $ExpectedThemeContentHash) {
+    $null = Assert-DreamSkinActiveThemeIdentity -StateRoot $StateRoot `
+      -ExpectedThemeId $ExpectedThemeId -ExpectedContentHash $ExpectedThemeContentHash
   }
   $pauseWasSet = Test-DreamSkinPaused -StateRoot $StateRoot
 

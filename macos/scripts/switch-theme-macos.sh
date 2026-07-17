@@ -6,10 +6,12 @@ set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-macos.sh"
 
 THEME_ID=""
+EXPECTED_CONTENT_HASH=""
 APPLY_NOW="true"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --id) THEME_ID="${2:-}"; shift 2 ;;
+    --expected-content-hash) EXPECTED_CONTENT_HASH="${2:-}"; shift 2 ;;
     --no-apply) APPLY_NOW="false"; shift ;;
     *) fail "Unknown argument: $1" ;;
   esac
@@ -20,8 +22,36 @@ case "$THEME_ID" in
   ''|.|..|*[!A-Za-z0-9._-]*) fail "Theme id contains unsupported characters." ;;
 esac
 [ "${#THEME_ID}" -le 128 ] || fail "Theme id is too long."
+case "$EXPECTED_CONTENT_HASH" in
+  '') ;;
+  *[!0-9a-f]*) fail "Expected content hash must be a lowercase SHA-256 digest." ;;
+esac
+[ -z "$EXPECTED_CONTENT_HASH" ] || [ "${#EXPECTED_CONTENT_HASH}" -eq 64 ] \
+  || fail "Expected content hash must be a lowercase SHA-256 digest."
 
 ensure_state_root
+SWITCH_LOCK="$STATE_ROOT/.theme-switch.lock"
+if ! /bin/mkdir "$SWITCH_LOCK" 2>/dev/null; then
+  [ ! -L "$SWITCH_LOCK" ] || fail "Theme switch lock must not be a symbolic link."
+  LOCK_PID="$(/bin/cat "$SWITCH_LOCK/pid" 2>/dev/null || true)"
+  case "$LOCK_PID" in
+    ''|*[!0-9]*) LOCK_PID="" ;;
+  esac
+  if [ -n "$LOCK_PID" ] && /bin/kill -0 "$LOCK_PID" 2>/dev/null; then
+    fail "Another theme switch is already running."
+  fi
+  /bin/rm -rf "$SWITCH_LOCK"
+  /bin/mkdir "$SWITCH_LOCK" 2>/dev/null || fail "Another theme switch is already running."
+fi
+/usr/bin/printf '%s\n' "$$" > "$SWITCH_LOCK/pid"
+/bin/chmod 700 "$SWITCH_LOCK"
+stage=""
+cleanup_switch() {
+  [ -z "$stage" ] || /bin/rm -rf "$stage"
+  /bin/rm -rf "$SWITCH_LOCK"
+}
+trap cleanup_switch EXIT
+
 THEMES_ROOT="$STATE_ROOT/themes"
 SRC="$THEMES_ROOT/$THEME_ID"
 [ -d "$SRC" ] || fail "Theme not found: $THEME_ID"
@@ -39,8 +69,6 @@ progress() {
 progress "Switching..."
 
 stage="$(/usr/bin/mktemp -d "$STATE_ROOT/.theme-switch.XXXXXX")"
-cleanup_stage() { /bin/rm -rf "$stage"; }
-trap cleanup_stage EXIT
 /bin/mkdir -p "$THEME_DIR"
 /bin/chmod 700 "$stage"
 # Snapshot theme.json and its referenced image from stable, no-follow file
@@ -49,6 +77,13 @@ trap cleanup_stage EXIT
 # that will be published to the live theme directory.
 THEME_IMAGE="$("$NODE" "$SCRIPT_DIR/stage-theme.mjs" "$SRC" "$stage")" \
   || fail "Theme pack changed or failed staging: $THEME_ID"
+if [ -n "$EXPECTED_CONTENT_HASH" ]; then
+  "$NODE" -e '
+    const theme = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    if (theme.id !== process.argv[2] || theme.packageContentHash !== process.argv[3]) process.exit(1);
+  ' "$stage/theme.json" "$THEME_ID" "$EXPECTED_CONTENT_HASH" \
+    || fail "Theme pack no longer matches the confirmed package identity: $THEME_ID"
+fi
 # Validate the exact staged pair, not the mutable library directory. The
 # injector performs the full schema, path, dimensions, and image checks.
 "$NODE" "$INJECTOR" --check-payload --theme-dir "$stage" >/dev/null \
@@ -68,7 +103,7 @@ done
 /usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
   ! -name 'theme.json' ! -name "$THEME_IMAGE" -delete
 /bin/rm -rf "$stage"
-trap - EXIT
+stage=""
 
 THEME_NAME="$("$NODE" -e 'try{const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(t.name||"")}catch{}' "$THEME_DIR/theme.json" 2>/dev/null || true)"
 [ -n "$THEME_NAME" ] || THEME_NAME="$THEME_ID"
@@ -85,14 +120,17 @@ if [ -f "$STATE_PATH" ]; then
 fi
 
 # Hot path: CDP already open → seconds, not tens of seconds
-if hot_reapply_theme "$PORT" 8000; then
+if hot_reapply_theme "$PORT" 8000 "$THEME_ID" "$EXPECTED_CONTENT_HASH"; then
   progress "Done: ${THEME_NAME}"
   exit 0
 fi
 
 # Cold path only when debug port is missing
 progress "CDP not ready, full start..."
-if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing; then
+if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing \
+  && { [ -z "$EXPECTED_CONTENT_HASH" ] || "$NODE" "$INJECTOR" --verify --port "$PORT" \
+    --theme-dir "$THEME_DIR" --timeout-ms 12000 --expected-theme-id "$THEME_ID" \
+    --expected-content-hash "$EXPECTED_CONTENT_HASH" >/dev/null; }; then
   progress "Done: ${THEME_NAME}"
   exit 0
 fi

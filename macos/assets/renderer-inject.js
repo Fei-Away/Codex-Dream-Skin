@@ -734,8 +734,9 @@
     analysis: artAnalysis,
     artMetadata: ART_METADATA,
     metrics,
-    version: VERSION,
     themeId: THEME.id || "custom",
+    packageContentHash: THEME.packageContentHash ?? null,
+    version: VERSION,
     detectShellMode,
   };
   const firstEnsureStartedAt = now();
@@ -780,6 +781,7 @@
     installed: true,
     version: VERSION,
     themeId: THEME.id || "custom",
+    packageContentHash: THEME.packageContentHash ?? null,
     shell: resolvedShell(),
     analysis: artAnalysis,
   };

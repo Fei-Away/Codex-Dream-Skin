@@ -42,6 +42,8 @@ else
   THEME_PACKAGE_TOOL="$PROJECT_ROOT/../tools/theme-package.mjs"
 fi
 [ -f "$THEME_PACKAGE_TOOL" ] || fail "Theme package runtime is missing. Reinstall Dream Skin."
+THEME_IMPORT_CORE="$(cd "$(dirname "$THEME_PACKAGE_TOOL")/../lib/theme-package" && pwd -P)/import-core.mjs"
+[ -f "$THEME_IMPORT_CORE" ] || fail "Theme package report runtime is missing. Reinstall Dream Skin."
 
 run_import() {
   "$NODE" "$THEME_PACKAGE_TOOL" import "$PACKAGE_FILE" \
@@ -141,16 +143,18 @@ report_with_apply() {
     let text = "";
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => { text += chunk; });
-    process.stdin.on("end", () => {
+    process.stdin.on("end", async () => {
       const report = JSON.parse(text);
-      report.apply = { status: process.argv[1] };
-      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      const { pathToFileURL } = await import("node:url");
+      const { addApplyResult } = await import(pathToFileURL(process.argv[2]).href);
+      process.stdout.write(`${JSON.stringify(addApplyResult(report, process.argv[1]), null, 2)}\n`);
     });
-  ' "$2"
+  ' "$2" "$THEME_IMPORT_CORE"
 }
 
 if [ "$APPLY_NOW" = "true" ]; then
-  if ! "$SCRIPT_DIR/switch-theme-macos.sh" --id "$PACKAGE_ID"; then
+  if ! "$SCRIPT_DIR/switch-theme-macos.sh" --id "$PACKAGE_ID" \
+    --expected-content-hash "$CONTENT_HASH"; then
     report_with_apply "$INSTALL_REPORT" "failed-after-install"
     alert_user "主题已安装，但未能应用：${THEME_NAME}"
     exit 1
