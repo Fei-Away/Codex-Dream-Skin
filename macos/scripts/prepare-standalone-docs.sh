@@ -29,7 +29,8 @@ DOCS_TARGET="$ARCHIVE_ROOT/docs"
 for name in \
   reference-background-prompt-guide.md \
   reference-background-prompt-guide.en.md \
-  background-generation-prompts.md; do
+  background-generation-prompts.md \
+  dreamskin-package.md; do
   [ -f "$DOCS_SOURCE/$name" ] || {
     printf 'Required prompt documentation is missing: %s\n' "$DOCS_SOURCE/$name" >&2
     exit 1
@@ -57,6 +58,7 @@ done
 /bin/cp "$DOCS_SOURCE/reference-background-prompt-guide.md" \
   "$DOCS_SOURCE/reference-background-prompt-guide.en.md" \
   "$DOCS_SOURCE/background-generation-prompts.md" \
+  "$DOCS_SOURCE/dreamskin-package.md" \
   "$DOCS_TARGET/"
 /bin/cp -R "$DOCS_SOURCE/images/gallery" "$DOCS_TARGET/images/"
 /bin/cp -R "$DOCS_SOURCE/images/presets" "$DOCS_TARGET/images/"
@@ -69,12 +71,15 @@ fi
 # the root of standalone archives, while Windows files remain repository-only.
 WINDOWS_ASSET_URL='https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/assets/'
 WINDOWS_ASSET_TOKEN='__CODEX_DREAM_SKIN_WINDOWS_ASSET_URL__'
+DREAMSKIN_SCHEMA_URL='https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/schemas/dreamskin-package-v1.schema.json'
 for file in "$DOCS_TARGET"/*.md; do
   temporary="${file}.standalone"
   /usr/bin/sed \
     -e 's#macos/presets/#presets/#g' \
     -e 's#macos/assets/#assets/#g' \
+    -e 's#macos/scripts/dreamskin-package\.mjs#scripts/dreamskin-package.mjs#g' \
     -e 's#macos/NOTICE\.md#NOTICE.md#g' \
+    -e "s#\.\./schemas/dreamskin-package-v1\.schema\.json#${DREAMSKIN_SCHEMA_URL}#g" \
     -e "s#${WINDOWS_ASSET_URL}#${WINDOWS_ASSET_TOKEN}#g" \
     -e "s#https://github.com/Fei-Away/Codex-Dream-Skin/tree/main/windows/assets/#${WINDOWS_ASSET_TOKEN}#g" \
     -e "s#windows/assets/#${WINDOWS_ASSET_URL}#g" \

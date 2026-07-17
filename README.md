@@ -125,6 +125,7 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 - **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰
 - **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
 - **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
+- **可迁移主题**：用 `.dreamskin` 单文件在 macOS 与 Windows 之间检查、备份和导入主题
 - **可恢复**：一键还原官方外观
 - **相对安全**：本机回环 CDP 注入，不改官方二进制与签名
 
@@ -142,6 +143,7 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 - Mac：[`macos/README.md`](./macos/README.md)
 - Windows：[`windows/SKILL.md`](./windows/SKILL.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
+- `.dreamskin` 导入与导出：[`docs/dreamskin-package.md`](./docs/dreamskin-package.md)
 - 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
 - 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - 项目记录：[`docs/PROJECT.md`](./docs/PROJECT.md)

@@ -93,6 +93,10 @@ STANDALONE_DOCS="$TMP/standalone-source-docs"
   "$STANDALONE_DOCS/reference-background-prompt-guide.en.md"
 /bin/cp "$STANDALONE_DOCS/reference-background-prompt-guide.md" \
   "$STANDALONE_DOCS/background-generation-prompts.md"
+/usr/bin/printf '%s\n' \
+  'node macos/scripts/dreamskin-package.mjs inspect rose.dreamskin' \
+  '[schema](../schemas/dreamskin-package-v1.schema.json)' \
+  > "$STANDALONE_DOCS/dreamskin-package.md"
 : > "$STANDALONE_DOCS/images/gallery/skin-01.jpg"
 : > "$STANDALONE_DOCS/images/presets/romantic-rose-source.png"
 : > "$STANDALONE_DOCS/images/hero-banner-red-white.png"
@@ -109,6 +113,11 @@ STANDALONE_DOCS="$TMP/standalone-source-docs"
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 /usr/bin/grep -F -q 'https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/assets/theme.json' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
+/usr/bin/grep -F -q 'node scripts/dreamskin-package.mjs inspect rose.dreamskin' \
+  "$STANDALONE_ROOT/docs/dreamskin-package.md"
+/usr/bin/grep -F -q \
+  'https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/schemas/dreamskin-package-v1.schema.json' \
+  "$STANDALONE_ROOT/docs/dreamskin-package.md"
 [ -f "$STANDALONE_ROOT/docs/images/hero-banner-red-white.png" ]
 /usr/bin/grep -F -q '`docs/images/presets/romantic-rose-source.png`' \
   "$STANDALONE_ROOT/NOTICE.md"

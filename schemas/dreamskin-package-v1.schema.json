@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Fei-Away/Codex-Dream-Skin/main/schemas/dreamskin-package-v1.schema.json",
+  "title": "Codex Dream Skin package v1",
+  "description": "A declarative single-file envelope for one portable Theme v1 descriptor, one primary image, and an optional preview.",
+  "type": "object",
+  "required": [
+    "format",
+    "packageVersion",
+    "theme",
+    "image"
+  ],
+  "properties": {
+    "format": {
+      "const": "codex-dream-skin"
+    },
+    "packageVersion": {
+      "const": 1
+    },
+    "theme": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/contentRecord"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "const": "theme.json"
+            },
+            "mediaType": {
+              "const": "application/json"
+            },
+            "bytes": {
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "data": {
+              "maxLength": 1398104
+            }
+          }
+        }
+      ]
+    },
+    "image": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/contentRecord"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/portableImageName"
+            },
+            "mediaType": {
+              "enum": [
+                "image/png",
+                "image/jpeg",
+                "image/webp"
+              ]
+            },
+            "bytes": {
+              "minimum": 1,
+              "maximum": 16777216
+            },
+            "data": {
+              "maxLength": 22369624
+            }
+          }
+        }
+      ]
+    },
+    "preview": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/contentRecord"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^[Pp][Rr][Ee][Vv][Ii][Ee][Ww]\\.(?:[Pp][Nn][Gg]|[Jj][Pp](?:[Ee])?[Gg]|[Ww][Ee][Bb][Pp])$"
+            },
+            "mediaType": {
+              "enum": [
+                "image/png",
+                "image/jpeg",
+                "image/webp"
+              ]
+            },
+            "bytes": {
+              "minimum": 1,
+              "maximum": 3145728
+            },
+            "data": {
+              "maxLength": 4194304
+            }
+          }
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "contentRecord": {
+      "type": "object",
+      "required": [
+        "path",
+        "mediaType",
+        "encoding",
+        "bytes",
+        "sha256",
+        "data"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "encoding": {
+          "const": "base64"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "data": {
+          "type": "string",
+          "minLength": 4,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "portableImageName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])\\.)(?!.*[<>:\"/\\\\|?*])(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]).+\\.(?:[Pp][Nn][Gg]|[Jj][Pp](?:[Ee])?[Gg]|[Ww][Ee][Bb][Pp])$"
+    }
+  },
+  "x-dream-skin-limits": {
+    "packageBytes": 31457280,
+    "decodedBytes": 20971520,
+    "themeBytes": 1048576,
+    "imageBytes": 16777216,
+    "previewBytes": 3145728,
+    "imageDimension": 16384,
+    "imagePixels": 50000000,
+    "previewDimension": 4096,
+    "previewPixels": 16777216
+  },
+  "x-dream-skin-integrity": {
+    "sha256": "Integrity and content identity only; not an author signature.",
+    "crossFieldChecks": [
+      "Decoded byte length equals bytes.",
+      "Decoded SHA-256 equals sha256.",
+      "theme.image exactly equals image.path.",
+      "Extension, mediaType, image magic bytes, and dimensions agree.",
+      "Logical paths are unique under a case-insensitive comparison."
+    ]
+  }
+}

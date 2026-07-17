@@ -138,6 +138,7 @@ for the eight individual styles.
 - **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable.
 - **Swappable art** — Drop in a UI-free image you like and it becomes your theme.
 - **Saved themes** — Switch local themes from the macOS menu bar or Windows system tray.
+- **Portable themes** — Inspect, back up, and import one `.dreamskin` file on macOS or Windows.
 - **Restorable** — One-click restore to the stock look.
 - **Safer path** — Local-loopback CDP inject only. No official binary or signature changes.
 
@@ -155,6 +156,7 @@ More detail:
 - Mac: [`macos/README.md`](./macos/README.md)
 - Windows: [`windows/SKILL.md`](./windows/SKILL.md)
 - Paths: [`docs/platforms.md`](./docs/platforms.md)
+- `.dreamskin` import and export: [`docs/dreamskin-package.md`](./docs/dreamskin-package.md)
 - Copy-ready reference prompt guide: [`docs/reference-background-prompt-guide.en.md`](./docs/reference-background-prompt-guide.en.md)
 - Eight concept prompt breakdowns: [`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - Project notes: [`docs/PROJECT.md`](./docs/PROJECT.md)
