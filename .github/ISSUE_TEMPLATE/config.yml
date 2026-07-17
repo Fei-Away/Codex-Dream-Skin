@@ -11,8 +11,8 @@ contact_links:
   - name: macOS 使用说明 / macOS README
     url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/macos/README.md
     about: 安装路径、定制、Verify / Restore · Install paths, customize, verify & restore
-  - name: Windows 说明 / Windows SKILL
-    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/SKILL.md
+  - name: Windows 使用说明 / Windows README
+    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/README.md
     about: Windows 安装、启动、校验、恢复 · Install, start, verify, restore on Windows
   - name: 平台路径对照 / Platform paths
     url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/docs/platforms.md
