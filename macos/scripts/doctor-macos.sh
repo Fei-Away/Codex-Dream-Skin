@@ -28,18 +28,21 @@ RECOVERY_PLIST_VALID="false"
 if [ -f "$RECOVERY_ENABLED_PATH" ]; then
   RECOVERY_ENABLED="true"
   [ -f "$RECOVERY_PLIST_PATH" ] || fail "Reopen recovery is enabled but its LaunchAgent plist is missing."
-  /usr/bin/python3 - "$RECOVERY_PLIST_PATH" "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" <<'PY' \
+  /usr/bin/python3 - \
+    "$RECOVERY_PLIST_PATH" \
+    "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" \
+    "$INSTALL_ROOT/scripts/watch-dream-skin-macos.sh" <<'PY' \
     || fail "Reopen recovery LaunchAgent is invalid or unsafe."
 import plistlib
 import sys
 
-path, expected_watcher = sys.argv[1:]
+path, project_watcher, installed_watcher = sys.argv[1:]
 with open(path, "rb") as stream:
     payload = plistlib.load(stream)
 arguments = payload.get("ProgramArguments")
 if not isinstance(arguments, list) or arguments[:1] != ["/bin/bash"]:
     raise SystemExit(1)
-if len(arguments) != 3 or arguments[1:] != [expected_watcher, "--watch"]:
+if len(arguments) != 3 or arguments[1] not in {project_watcher, installed_watcher} or arguments[2] != "--watch":
     raise SystemExit(1)
 joined = " ".join(str(value) for value in arguments)
 if "remote-debugging" in joined or "ChatGPT" in joined or "Codex.app" in joined:

@@ -867,6 +867,12 @@ async function runWatch(options) {
   }
 }
 
+async function runOneShotAndExit(options) {
+  await runOneShot(options);
+  await new Promise((resolve) => process.stdout.write("", resolve));
+  process.exit(process.exitCode ?? 0);
+}
+
 if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
   try {
     const options = parseArgs(process.argv.slice(2));
@@ -883,7 +889,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         timings: loaded.timings,
       }, null, 2));
     } else if (options.mode === "watch") await runWatch(options);
-    else await runOneShot(options);
+    else await runOneShotAndExit(options);
   } catch (error) {
     console.error(`[dream-skin] ${error.stack || error.message}`);
     process.exitCode = 1;
