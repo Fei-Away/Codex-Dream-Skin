@@ -85,6 +85,8 @@ switch to the included pastel Miku theme:
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id miku-dream
 ```
 
+![Miku Dream sanitized preview](../docs/images/miku-dream-preview.png)
+
 Existing user themes with the same ID are never overwritten during install.
 
 ## Customer ZIP (optional packaging)
