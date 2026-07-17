@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "主题包导入会话生命周期",
+    "subtitle": "候选文件从验证到安装完成、拒绝或取消",
+    "viewBox": [980, 660]
+  },
+  "lanes": [
+    { "id": "main", "label": "正常阶段" },
+    { "id": "waiting", "label": "人工决定" },
+    { "id": "terminal", "label": "终止结果" }
+  ],
+  "states": [
+    { "id": "selected", "type": "start", "label": "已选择", "sublabel": "本地 .dreamskin", "lane": "main", "col": 0, "step": "01", "tag": "仅候选" },
+    { "id": "validating", "type": "active", "label": "校验中", "sublabel": "只读 + 暂存", "lane": "main", "col": 1, "step": "02", "tag": "无持久写入" },
+    { "id": "validated", "type": "decision", "label": "校验通过", "sublabel": "生成导入报告", "lane": "main", "col": 2, "step": "03", "tag": "待确认" },
+    { "id": "installing", "type": "active", "label": "安装中", "sublabel": "原子发布", "lane": "main", "col": 3, "step": "04", "tag": "可回滚" },
+    { "id": "completed", "type": "success", "label": "导入完成", "sublabel": "已进入主题库", "lane": "main", "col": 4, "step": "05", "tag": "可应用" },
+    { "id": "conflict", "type": "waiting", "label": "身份冲突", "sublabel": "取消或确认替换", "lane": "waiting", "col": 0, "tag": "人工门禁" },
+    { "id": "rejected", "type": "failure", "label": "已拒绝", "sublabel": "校验失败", "lane": "terminal", "col": 0, "tag": "无副作用" },
+    { "id": "cancelled", "type": "failure", "label": "已取消", "sublabel": "用户未确认", "lane": "terminal", "col": 1, "tag": "无副作用" }
+  ],
+  "transitions": [
+    { "from": "validating", "to": "rejected", "label": "任一门禁失败", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "left-channel" },
+    { "from": "validated", "to": "conflict", "label": "同一 packageId", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "straight", "labelAt": [402, 202] },
+    { "from": "conflict", "to": "installing", "label": "确认替换", "variant": "emphasis", "route": "right-channel" },
+    { "from": "validated", "to": "cancelled", "label": "取消", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "bottom-channel" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "正常阶段",
+      "items": [
+        "校验通过不等于已安装",
+        "只有用户确认后才能进入原子安装",
+        "完成表示主题已持久化并可选择应用"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "失败与冲突",
+      "items": [
+        "校验失败直接拒绝并清理暂存",
+        "同一 packageId 的更新必须人工确认",
+        "取消、拒绝和安装失败都保留原主题"
+      ]
+    }
+  ]
+}

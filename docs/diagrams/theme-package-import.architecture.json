@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "外部主题包导入架构",
+    "subtitle": "同一 .dreamskin 契约由 macOS 与 Windows 本地适配器安全承接"
+  },
+  "components": [
+    { "id": "author", "type": "external", "label": "AI / 开发者", "sublabel": "Kimi、Claude、人工", "pos": [40, 280], "size": [140, 64] },
+    { "id": "package", "type": "external", "label": ".dreamskin", "sublabel": "不可信本地包", "pos": [240, 280], "size": [140, 64], "tag": "ZIP v1" },
+    { "id": "mac_entry", "type": "frontend", "label": "macOS 入口", "sublabel": "菜单 / CLI", "pos": [450, 110], "size": [140, 60] },
+    { "id": "win_entry", "type": "frontend", "label": "Windows 入口", "sublabel": "托盘 / CLI", "pos": [450, 450], "size": [140, 60] },
+    { "id": "validator", "type": "security", "label": "主题包核心", "sublabel": "枚举、限额、Schema、哈希", "pos": [660, 277], "size": [160, 70], "tag": "共享契约" },
+    { "id": "staging", "type": "security", "label": "隔离暂存区", "sublabel": "受控文件名与权限", "pos": [890, 100], "size": [150, 64] },
+    { "id": "library", "type": "database", "label": "已安装主题库", "sublabel": "规范化主题 + 来源记录", "pos": [890, 277], "size": [160, 70] },
+    { "id": "active", "type": "database", "label": "当前主题", "sublabel": "平台现有 active store", "pos": [890, 460], "size": [150, 64] },
+    { "id": "injector", "type": "backend", "label": "现有注入器", "sublabel": "payload 校验与 CDP", "pos": [1110, 280], "size": [150, 64] },
+    { "id": "codex", "type": "cloud", "label": "官方 Codex", "sublabel": "不修改安装与签名", "pos": [1320, 280], "size": [150, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "不可信外部输入", "wraps": ["author", "package"] },
+    { "kind": "security-group", "label": "导入安全边界", "wraps": ["validator", "staging"] },
+    { "kind": "region", "label": "Dream Skin 受管状态", "wraps": ["library", "active"] },
+    { "kind": "security-group", "label": "官方应用边界", "wraps": ["codex"] }
+  ],
+  "connections": [
+    { "from": "author", "to": "package", "label": "pack", "variant": "emphasis" },
+    { "from": "package", "to": "validator", "label": "本地读取", "variant": "security" },
+    { "from": "mac_entry", "to": "validator", "label": "导入请求", "variant": "emphasis", "fromSide": "right", "toSide": "top", "route": "orthogonal-h" },
+    { "from": "win_entry", "to": "validator", "label": "导入请求", "variant": "emphasis", "fromSide": "right", "toSide": "bottom", "route": "orthogonal-h" },
+    { "from": "validator", "to": "staging", "label": "允许条目", "variant": "security", "fromSide": "top", "toSide": "left", "route": "orthogonal-v" },
+    { "from": "validator", "to": "library", "label": "原子安装", "variant": "emphasis" },
+    { "from": "library", "to": "active", "label": "用户应用", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "orthogonal-v" },
+    { "from": "active", "to": "injector", "label": "规范化主题", "variant": "emphasis", "fromSide": "right", "toSide": "bottom", "route": "orthogonal-h" },
+    { "from": "injector", "to": "codex", "label": "loopback CDP", "variant": "security", "labelAt": [1290, 358] }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "零代码主题",
+      "items": [
+        "主题包不进入脚本加载路径",
+        "归档条目不决定最终写入路径",
+        "所有输入先过共享契约与平台安全门禁"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "跨平台承接",
+      "items": [
+        "macOS 与 Windows 复用 manifest、theme 与错误语义",
+        "平台适配器只负责文件选择、归档读取和本地主题库",
+        "现有注入器继续负责最终 payload 与图片安全验证"
+      ]
+    }
+  ]
+}

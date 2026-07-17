@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "主题包安装与回滚时序",
+    "subtitle": "校验先于持久写入；同 ID 更新通过备份与原子重命名保护旧主题",
+    "viewBox": [860, 880]
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "用户", "sublabel": "本地确认" },
+    { "id": "importer", "type": "frontend", "label": "导入器", "sublabel": "平台入口" },
+    { "id": "core", "type": "security", "label": "主题包核心", "sublabel": "共享验证" },
+    { "id": "staging", "type": "security", "label": "暂存区", "sublabel": "受控写入" },
+    { "id": "library", "type": "database", "label": "主题库", "sublabel": "持久状态" },
+    { "id": "runtime", "type": "backend", "label": "运行时", "sublabel": "可选应用" }
+  ],
+  "segments": [
+    { "from": 150, "to": 355, "label": "只读校验" },
+    { "from": 370, "to": 660, "label": "确认与原子发布" },
+    { "from": 675, "to": 785, "label": "应用与结果" }
+  ],
+  "messages": [
+    { "from": "user", "to": "importer", "y": 185, "label": "选择 .dreamskin", "variant": "emphasis" },
+    { "from": "importer", "to": "core", "y": 225, "label": "检查容器与清单", "variant": "security" },
+    { "from": "core", "to": "staging", "y": 270, "label": "流式写入允许条目", "variant": "security" },
+    { "from": "staging", "to": "core", "y": 312, "label": "受限字节与哈希", "variant": "return" },
+    { "from": "core", "to": "importer", "y": 350, "label": "验证报告", "variant": "return" },
+    { "from": "importer", "to": "user", "y": 395, "label": "显示摘要与冲突", "variant": "return" },
+    { "from": "user", "to": "importer", "y": 438, "label": "确认安装 / 替换", "variant": "emphasis" },
+    { "from": "importer", "to": "library", "y": 486, "label": "存在时备份旧目录", "variant": "security" },
+    { "from": "importer", "to": "library", "y": 532, "label": "原子发布新目录", "variant": "emphasis" },
+    { "from": "library", "to": "importer", "y": 575, "label": "提交成功或失败", "variant": "return" },
+    { "from": "importer", "to": "library", "y": 620, "label": "失败时恢复备份", "variant": "security", "note": "仅在发布失败时执行" },
+    { "from": "library", "to": "importer", "y": 658, "label": "旧主题已保留", "variant": "return" },
+    { "from": "importer", "to": "runtime", "y": 705, "label": "成功后可选应用", "variant": "emphasis" },
+    { "from": "runtime", "to": "importer", "y": 744, "label": "已应用或待应用", "variant": "return" },
+    { "from": "importer", "to": "user", "y": 783, "label": "分开报告安装与应用", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "importer", "from": 180, "to": 790, "type": "frontend" },
+    { "participant": "core", "from": 220, "to": 355, "type": "security" },
+    { "participant": "staging", "from": 265, "to": 318, "type": "security" },
+    { "participant": "library", "from": 480, "to": 665, "type": "database" },
+    { "participant": "runtime", "from": 700, "to": 750, "type": "backend" }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "失败补偿",
+      "items": [
+        "校验阶段不接触持久主题库",
+        "更新先备份旧目录，再原子发布新目录",
+        "发布失败恢复旧目录并清理暂存"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "结果语义",
+      "items": [
+        "安装成功与实时 CDP 应用是两个结果",
+        "运行时不可用不否定已验证的主题包",
+        "用户可以稍后从已保存主题再次应用"
+      ]
+    }
+  ]
+}

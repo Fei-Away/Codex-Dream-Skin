@@ -6,6 +6,20 @@
 
 ---
 
+## 语义蓝图入口
+
+`PROJECT.md` 继续记录项目现状、历史与维护背景。涉及产品目标、业务状态和目标技术边界时，以下文档具有更高权威：
+
+- [`PRD.md`](./PRD.md)：目标用户、范围、非目标和可观察验收。
+- [`BUSINESS.md`](./BUSINESS.md)：角色、导入流程、状态和业务不变量。
+- [`TECHNICAL.md`](./TECHNICAL.md)：系统边界、安全读取、主题库事务和跨平台承接。
+- [`RECOMMENDATIONS.md`](./RECOMMENDATIONS.md)：尚未转成正式 Plan 的候选模块路线。
+- [`../PLAN.md`](../PLAN.md)：用户已确认的唯一实施计划、模块范围与完成标准。
+
+外部 `.dreamskin` 主题包仍是目标能力，当前版本尚未实现；不要把蓝图当作当前安装手册。
+
+---
+
 ## 1. 它是什么
 
 **Codex Dream Skin** 是给 **OpenAI Codex 桌面端** 用的**外部主题 / 换肤**方案：

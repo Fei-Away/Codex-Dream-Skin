@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "外部主题包导入工作流",
+    "subtitle": "从 AI / 开发者产物到本地验证、安装与应用"
+  },
+  "lanes": [
+    { "id": "author", "label": "AI / 主题开发者" },
+    { "id": "user", "label": "本地用户" },
+    { "id": "importer", "label": "主题包导入器" },
+    { "id": "library", "label": "受管主题库" },
+    { "id": "runtime", "label": "Dream Skin 运行时" },
+    { "id": "exceptions", "label": "拒绝与冲突处理", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "authoring", "label": "创作与选择", "fromCol": 0, "toCol": 1 },
+    { "id": "security", "label": "暂存与安全校验", "fromCol": 2, "toCol": 3, "variant": "security" },
+    { "id": "publish", "label": "确认、安装与应用", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "mainPath": ["package", "choose", "stage", "validate", "review", "commit"],
+  "nodes": [
+    { "id": "package", "lane": "author", "col": 0, "type": "external", "label": "生成 .dreamskin", "sublabel": "规范化主题包", "width": 96 },
+    { "id": "choose", "lane": "user", "col": 1, "type": "frontend", "label": "选择本地文件", "sublabel": "菜单 / 托盘 / CLI", "width": 108 },
+    { "id": "review", "lane": "user", "col": 4, "type": "frontend", "label": "查看摘要并确认", "sublabel": "作者、版本、兼容性", "width": 112 },
+    { "id": "stage", "lane": "importer", "col": 2, "type": "security", "label": "受控读取", "sublabel": "白名单条目 + 限额" },
+    { "id": "validate", "lane": "importer", "col": 3, "type": "security", "label": "完整校验", "sublabel": "Schema + 哈希 + payload", "width": 108, "tag": "阻断门禁" },
+    { "id": "commit", "lane": "importer", "col": 5, "type": "backend", "label": "原子提交", "sublabel": "新装或确认替换", "width": 108 },
+    { "id": "installed", "lane": "library", "col": 5, "type": "database", "label": "已安装主题", "sublabel": "包身份 + 规范化资源", "width": 110 },
+    { "id": "apply", "lane": "runtime", "col": 5, "type": "backend", "label": "应用主题", "sublabel": "active theme + CDP", "width": 108 },
+    { "id": "invalid", "lane": "exceptions", "col": 3, "type": "security", "label": "拒绝导入", "sublabel": "不修改主题库", "width": 104 },
+    { "id": "conflict", "lane": "exceptions", "col": 5, "type": "messagebus", "label": "身份冲突", "sublabel": "取消或确认替换", "width": 108 }
+  ],
+  "edges": [
+    { "from": "package", "to": "choose", "label": "本地文件", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop" },
+    { "from": "choose", "to": "stage", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "drop" },
+    { "from": "stage", "to": "validate", "variant": "security" },
+    { "from": "validate", "to": "review", "label": "通过", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "route": "drop" },
+    { "from": "review", "to": "commit", "label": "确认", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop" },
+    { "from": "validate", "to": "invalid", "variant": "security", "role": "error", "fromSide": "bottom", "toSide": "top", "route": "drop" },
+    { "from": "review", "to": "conflict", "variant": "security", "role": "branch", "fromSide": "right", "toSide": "right", "route": "outside-right" },
+    { "from": "commit", "to": "installed", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "straight" },
+    { "from": "installed", "to": "apply", "label": "可选立即应用", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "straight", "labelAt": [625, 545] }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "安全边界",
+      "items": [
+        "主题包不携带或执行 JavaScript、Shell、PowerShell 与任意 CSS",
+        "归档条目只能流式写入系统决定的暂存路径",
+        "任一门禁失败都不得改变主题库或当前主题"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "用户结果",
+      "items": [
+        "合法包显示作者、版本、兼容平台和预览摘要",
+        "同一包重复导入保持幂等；更新必须明确确认",
+        "安装成功与实时应用失败分开报告"
+      ]
+    }
+  ]
+}
