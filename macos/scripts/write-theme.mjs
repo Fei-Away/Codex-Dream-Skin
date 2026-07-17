@@ -19,6 +19,13 @@ function validateHex(value, name) {
   return value.toLowerCase();
 }
 
+function validateAppearance(value) {
+  if (!["system", "dark", "light"].includes(value)) {
+    throw new Error("appearance must be system, dark, or light.");
+  }
+  return value;
+}
+
 function hexToRgba(hex, alpha) {
   const value = Number.parseInt(hex.slice(1), 16);
   return `rgba(${value >> 16}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
@@ -63,6 +70,7 @@ if (!imageStat.isFile() || imageStat.size < 1 || imageStat.size > 16 * 1024 * 10
 const name = valueFor("name", "我的 Codex Dream Skin").trim().slice(0, 80);
 const tagline = valueFor("tagline", "把喜欢的画面变成可交互的 Codex 工作台。").trim().slice(0, 160);
 const quote = valueFor("quote", "MAKE SOMETHING WONDERFUL").trim().slice(0, 80);
+const appearance = validateAppearance(valueFor("appearance", "system"));
 const accent = validateHex(valueFor("accent", "#7cff46"), "accent");
 const secondary = validateHex(valueFor("secondary", "#36d7e8"), "secondary");
 const highlight = validateHex(valueFor("highlight", "#642a8c"), "highlight");
@@ -73,6 +81,7 @@ const custom = {
   name: name || "我的 Codex Dream Skin",
   brandSubtitle: "CODEX DREAM SKIN",
   tagline: tagline || "把喜欢的画面变成可交互的 Codex 工作台。",
+  appearance,
   projectPrefix: "选择项目 · ",
   projectLabel: "◉  选择项目",
   statusText: "DREAM SKIN ONLINE",

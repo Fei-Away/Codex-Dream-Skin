@@ -25,8 +25,14 @@ APP_ERROR_LOG="$STATE_ROOT/codex-launch-error.log"
 START_ERROR_LOG="$STATE_ROOT/start-error.log"
 CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
+AUTOLOAD_LABEL="com.openai.codex-dream-skin-studio.autoload"
+AUTOLOAD_PLIST="$HOME/Library/LaunchAgents/$AUTOLOAD_LABEL.plist"
+AUTOLOAD_STATE_PATH="$STATE_ROOT/autoload.json"
+AUTOLOAD_LOG="$STATE_ROOT/autoload.log"
+AUTOLOAD_ERROR_LOG="$STATE_ROOT/autoload-error.log"
+AUTOLOAD_SUPERVISOR="$SCRIPT_DIR/supervise-dream-skin-macos.sh"
 EXPECTED_CODEX_TEAM_ID="${CODEX_EXPECTED_TEAM_ID:-2DC432GLL2}"
-SKIN_VERSION="1.1.1"
+SKIN_VERSION="1.5.2"
 
 fail() {
   local message="$*"
@@ -291,6 +297,7 @@ write_state() {
     const [file, version, port, pid, startedAt, injector, node, nodeVersion, bundle, exe, appVersion, teamId, root, themeDir, codexPid, arch] = process.argv.slice(1);
     const state = {
       schemaVersion: 4,
+      session: "active",
       platform: `darwin-${arch}`,
       skinVersion: version,
       port: Number(port),

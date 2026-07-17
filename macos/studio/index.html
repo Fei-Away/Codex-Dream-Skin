@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Codex Dream Skin Studio</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">◉</div>
+          <div><strong>Dream Skin</strong><span>Codex Theme Studio</span></div>
+        </div>
+        <div class="topbar-meta"><span id="connectionDot" class="status-dot"></span><span id="connectionText">Connecting</span><span class="version">v1.5.2</span></div>
+      </header>
+
+      <main class="workspace">
+        <aside class="rail" aria-label="Studio sections">
+          <div class="rail-caption">WORKSPACE</div>
+          <button class="rail-item is-active" data-section="canvas"><span class="rail-icon">✦</span>Canvas</button>
+          <button class="rail-item" data-section="appearance"><span class="rail-icon">◐</span>Appearance</button>
+          <button class="rail-item" data-section="runtime"><span class="rail-icon">↗</span>Runtime</button>
+          <div class="rail-spacer"></div>
+          <button class="rail-item" id="refreshButton"><span class="rail-icon">↻</span>Refresh</button>
+          <div class="rail-footer">LOOPBACK ONLY<br><span>127.0.0.1</span></div>
+        </aside>
+
+        <section class="editor-column">
+          <div class="section-header">
+            <div><span class="overline">THEME WORKSPACE</span><h1>Shape the atmosphere.</h1></div>
+            <button class="text-button" id="resetButton">Reset demo</button>
+          </div>
+
+          <div class="studio-section is-visible" data-view="canvas">
+            <section class="control-block hero-control">
+              <div class="block-heading"><div><span class="overline">01 / IMAGE</span><h2>Choose your signal</h2></div><span class="block-note">PNG · JPG · WEBP</span></div>
+              <label class="drop-zone" for="imageInput">
+                <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp">
+                <span class="drop-icon">＋</span><span><strong id="imageName">Use the built-in atmosphere</strong><small>Drop an image here or browse your Mac</small></span><span class="drop-arrow">↗</span>
+              </label>
+            </section>
+
+            <section class="control-block">
+              <div class="block-heading"><div><span class="overline">02 / VOICE</span><h2>Give it a point of view</h2></div></div>
+              <div class="field-grid">
+                <label class="field field-wide"><span>Theme name</span><input id="nameInput" maxlength="80" placeholder="My Dream Skin"></label>
+                <label class="field"><span>Tagline</span><input id="taglineInput" maxlength="160" placeholder="Make something wonderful."></label>
+                <label class="field"><span>Quiet signature</span><input id="quoteInput" maxlength="80" placeholder="MAKE SOMETHING WONDERFUL"></label>
+              </div>
+            </section>
+
+            <section class="control-block">
+              <div class="block-heading"><div><span class="overline">03 / COLOR SYSTEM</span><h2>Set the energy</h2></div></div>
+              <div class="color-grid">
+                <label class="color-field"><input id="accentInput" type="color"><span>Primary</span><code id="accentValue">#7CFF46</code></label>
+                <label class="color-field"><input id="secondaryInput" type="color"><span>Secondary</span><code id="secondaryValue">#36D7E8</code></label>
+                <label class="color-field"><input id="highlightInput" type="color"><span>Highlight</span><code id="highlightValue">#642A8C</code></label>
+              </div>
+            </section>
+          </div>
+
+          <div class="studio-section" data-view="appearance">
+            <section class="control-block">
+              <div class="block-heading"><div><span class="overline">APPEARANCE MODE</span><h2>Choose how the shell responds</h2></div></div>
+              <div class="mode-picker" role="radiogroup" aria-label="Appearance mode">
+                <button data-appearance="system" class="mode-button"><span>◌</span><strong>System</strong><small>Follow Codex</small></button>
+                <button data-appearance="dark" class="mode-button"><span>◐</span><strong>Dark</strong><small>Deep contrast</small></button>
+                <button data-appearance="light" class="mode-button"><span>○</span><strong>Light</strong><small>Soft studio</small></button>
+              </div>
+            </section>
+            <section class="control-block appearance-note"><span class="overline">LIVE RULE</span><p>The selected mode controls the injected shell. Codex itself and its signed app bundle stay untouched.</p></section>
+          </div>
+
+          <div class="studio-section" data-view="runtime">
+            <section class="control-block">
+              <div class="block-heading"><div><span class="overline">AUTOMATION</span><h2>Keep the skin close</h2></div></div>
+              <div class="runtime-row"><div><strong>Load with Codex</strong><small id="runtimeDescription">Checking LaunchAgent…</small></div><label class="switch"><input id="autoloadInput" type="checkbox"><span></span></label></div>
+              <div class="runtime-stats"><div><span>Agent</span><strong id="agentStatus">—</strong></div><div><span>CDP</span><strong id="cdpStatus">—</strong></div><div><span>Injector</span><strong id="injectorStatus">—</strong></div></div>
+            </section>
+            <section class="control-block appearance-note"><span class="overline">SAFE BOUNDARY</span><p>Theme Studio only talks to the local loopback service. It never edits app.asar, API settings, or signatures.</p></section>
+          </div>
+
+          <div class="editor-footer"><span id="saveMessage">Ready to tune.</span><button class="apply-button" id="applyButton"><span>Apply to Codex</span><b>↗</b></button></div>
+        </section>
+
+        <section class="preview-column" aria-label="Live preview">
+          <div class="preview-header"><div><span class="overline">LIVE PREVIEW</span><h2>Codex / Home</h2></div><span class="preview-state"><i></i> Native UI</span></div>
+          <div class="preview-device" id="previewDevice">
+            <div class="preview-toolbar"><span class="traffic"><i></i><i></i><i></i></span><span>Codex</span><span class="toolbar-symbol">···</span></div>
+            <div class="preview-body">
+              <div class="preview-sidebar"><div class="preview-logo">◉ <strong>Codex</strong></div><div class="preview-new">＋ New task <kbd>⌘N</kbd></div><div class="preview-label">RECENT</div><div class="preview-row active">Deploy the project</div><div class="preview-row">Untitled workspace</div><div class="preview-row">A quiet place to think</div><div class="preview-bottom">⌁ <span>Projects</span></div></div>
+              <div class="preview-main"><div class="preview-hero" id="previewHero"><div class="hero-copy"><span class="hero-kicker">DREAM SKIN</span><strong id="previewName">Dream Skin</strong><p id="previewTagline">把喜欢的画面变成可交互的 Codex 工作台。</p><span class="hero-action">Choose project ·</span></div></div><div class="preview-cards"><div><span>✦</span><strong>Build something</strong><small>Start a new task</small></div><div><span>◌</span><strong>Explore an idea</strong><small>Open a clean canvas</small></div></div><div class="preview-composer">Ask Codex anything <span>↗</span></div></div>
+            </div>
+          </div>
+          <div class="preview-caption"><span>Current theme</span><strong id="previewThemeName">Dream Skin</strong><small id="previewAppearance">SYSTEM / AUTO</small></div>
+        </section>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

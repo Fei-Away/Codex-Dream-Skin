@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "miku-dream",
+  "name": "Miku Dream",
+  "brandSubtitle": "VIRTUAL MELODY",
+  "tagline": "让灵感与代码一起歌唱。",
+  "projectPrefix": "开始创作 · ",
+  "projectLabel": "♫  选择项目",
+  "statusText": "MIKU DREAM ONLINE",
+  "quote": "CREATE THE FUTURE",
+  "appearance": "light",
+  "heroTextTone": "dark",
+  "image": "background.png",
+  "colors": {
+    "background": "#eefcff",
+    "panel": "#ffffff",
+    "panelAlt": "#f5fdff",
+    "accent": "#20bfc5",
+    "accentAlt": "#54dce2",
+    "secondary": "#f2a6d7",
+    "highlight": "#8b70e8",
+    "text": "#174a55",
+    "muted": "#5d7d85",
+    "line": "rgba(32, 191, 197, .24)",
+    "heroText": "#174f5d",
+    "heroMuted": "#3d7782",
+    "heroKicker": "#0c9ba3"
+  }
+}

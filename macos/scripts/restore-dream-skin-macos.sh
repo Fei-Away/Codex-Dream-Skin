@@ -21,6 +21,10 @@ done
 discover_codex_app
 require_macos_runtime
 ensure_state_root
+
+# Remove auto-load supervision before restoring the official appearance.
+"$SCRIPT_DIR/autoload-dream-skin-macos.sh" disable --keep-live >/dev/null
+
 if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   PORT="$(state_field port)" || fail "Could not read the saved CDP port; state was preserved."
 fi
@@ -55,6 +59,10 @@ if [ "$UNINSTALL" = "true" ]; then
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Customize.command"
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Verify.command"
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Restore.command"
+  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Enable Auto Load.command"
+  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Disable Auto Load.command"
+  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Auto Load Status.command"
+  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Theme Studio.command"
 fi
 
 printf 'Codex Dream Skin Studio was removed and the requested macOS restore actions completed successfully.\n'

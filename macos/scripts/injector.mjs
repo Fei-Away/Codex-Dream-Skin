@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.1.1";
+const SKIN_VERSION = "1.5.2";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const MAX_ART_BYTES = 16 * 1024 * 1024;
 
@@ -159,12 +159,15 @@ async function probeSession(session) {
       sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
       composer: Boolean(document.querySelector('.composer-surface-chrome')),
       main: Boolean(document.querySelector('[role="main"]')),
+      root: Boolean(document.getElementById('root')),
+      input: Boolean(document.querySelector('textarea, [contenteditable="true"]')),
     };
     return {
       title: document.title,
       href: location.href,
       markers,
-      codex: markers.shell && markers.sidebar && (markers.composer || markers.main),
+      codex: markers.shell && markers.sidebar && markers.root &&
+        (markers.composer || markers.main || markers.input),
     };
   })()`);
 }
@@ -239,6 +242,8 @@ async function loadTheme(themeDir) {
     projectLabel: text(raw.projectLabel, "◉  选择项目", 80),
     statusText: text(raw.statusText, "DREAM SKIN ONLINE", 80),
     quote: text(raw.quote, "MAKE SOMETHING WONDERFUL", 80),
+    appearance: ["system", "dark", "light"].includes(raw.appearance) ? raw.appearance : "system",
+    heroTextTone: ["dark", "light"].includes(raw.heroTextTone) ? raw.heroTextTone : "light",
     image: raw.image,
     colors: {
       background: color(raw.colors?.background, "#071116"),
@@ -251,6 +256,9 @@ async function loadTheme(themeDir) {
       text: color(raw.colors?.text, "#e9fff1"),
       muted: color(raw.colors?.muted, "#9ebdb3"),
       line: color(raw.colors?.line, "rgba(124, 255, 70, .28)"),
+      heroText: color(raw.colors?.heroText, "#fffaf9"),
+      heroMuted: color(raw.colors?.heroMuted, "#fff5f7"),
+      heroKicker: color(raw.colors?.heroKicker, "#ffd6dc"),
     },
   };
   const imagePath = path.join(assetsRoot, theme.image);
@@ -283,6 +291,32 @@ async function loadPayload(themeDir) {
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION));
   return { imageBytes: art.length, payload, theme };
+}
+
+async function fileRevision(file) {
+  try {
+    const stat = await fs.stat(file);
+    return `${file}:${stat.size}:${stat.mtimeMs}`;
+  } catch (error) {
+    if (error.code === "ENOENT") return `${file}:missing`;
+    throw error;
+  }
+}
+
+async function payloadRevision(themeDir) {
+  const loaded = await loadTheme(themeDir);
+  const files = [
+    path.join(root, "assets", "dream-skin.css"),
+    path.join(root, "assets", "renderer-inject.js"),
+    path.join(loaded.assetsRoot, "theme.json"),
+    loaded.imagePath,
+  ];
+  return (await Promise.all(files.map(fileRevision))).join("|");
+}
+
+async function refreshSession(session, payload) {
+  await removeFromSession(session);
+  return applyToSession(session, payload);
 }
 
 async function applyToSession(session, payload) {
@@ -334,7 +368,7 @@ async function verifySession(session) {
     const visibleCards = cardBoxes.filter((item) => item?.visible);
     const hero = box(home?.firstElementChild?.firstElementChild?.firstElementChild);
     const projectButton = box(home?.querySelector('.group\\\\/project-selector > button'));
-    const composer = box(document.querySelector('.composer-surface-chrome'));
+    const composer = box(document.querySelector('.composer-surface-chrome, .dream-skin-composer-surface'));
     const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
     const chrome = document.getElementById('codex-dream-skin-chrome');
     const result = {
@@ -442,7 +476,9 @@ async function runOneShot(options) {
 }
 
 async function runWatch(options) {
-  const { payload } = await loadPayload(options.themeDir);
+  let { payload } = await loadPayload(options.themeDir);
+  let revision = await payloadRevision(options.themeDir);
+  let lastRevisionError = "";
   const sessions = new Map();
   const rejected = new Set();
   let stopping = false;
@@ -451,6 +487,29 @@ async function runWatch(options) {
   process.on("SIGTERM", stop);
 
   while (!stopping) {
+    try {
+      const nextRevision = await payloadRevision(options.themeDir);
+      if (nextRevision !== revision) {
+        const next = await loadPayload(options.themeDir);
+        for (const [id, session] of sessions) {
+          try {
+            await refreshSession(session, next.payload);
+          } catch (error) {
+            console.error(`[dream-skin] refresh failed for ${id}: ${error.message}`);
+          }
+        }
+        payload = next.payload;
+        revision = nextRevision;
+        lastRevisionError = "";
+        console.log(`[dream-skin] reloaded updated theme payload (${next.theme.id})`);
+      }
+    } catch (error) {
+      if (error.message !== lastRevisionError) {
+        console.error(`[dream-skin] theme update pending: ${error.message}`);
+        lastRevisionError = error.message;
+      }
+    }
+
     let targets = [];
     try {
       targets = await listAppTargets(options.port);

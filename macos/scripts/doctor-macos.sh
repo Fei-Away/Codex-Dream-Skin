@@ -18,7 +18,15 @@ for required in \
   "$PROJECT_ROOT/assets/dream-skin.css" \
   "$PROJECT_ROOT/assets/renderer-inject.js" \
   "$PROJECT_ROOT/assets/theme.json" \
-  "$PROJECT_ROOT/scripts/injector.mjs"; do
+  "$PROJECT_ROOT/scripts/injector.mjs" \
+  "$PROJECT_ROOT/scripts/autoload-dream-skin-macos.sh" \
+  "$PROJECT_ROOT/scripts/supervise-dream-skin-macos.sh" \
+  "$PROJECT_ROOT/scripts/write-autoload-plist.mjs" \
+  "$PROJECT_ROOT/scripts/start-theme-studio-macos.sh" \
+  "$PROJECT_ROOT/scripts/theme-studio-server.mjs" \
+  "$PROJECT_ROOT/studio/index.html" \
+  "$PROJECT_ROOT/studio/styles.css" \
+  "$PROJECT_ROOT/studio/app.js"; do
   [ -s "$required" ] || fail "Required project file is missing or empty: $required"
 done
 
@@ -29,8 +37,9 @@ if [ -f "$STATE_PATH" ]; then
 fi
 LIVE="false"
 if [ -f "$STATE_PATH" ] && verified_cdp_endpoint "$PORT"; then
-  "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >/dev/null
-  LIVE="true"
+  if "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >/dev/null 2>&1; then
+    LIVE="true"
+  fi
 fi
 [ "$REQUIRE_LIVE" = "false" ] || [ "$LIVE" = "true" ] || fail "No verified live Dream Skin session is active."
 

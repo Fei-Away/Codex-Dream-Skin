@@ -20,7 +20,7 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 # 1) Optional static checks (needs Codex.app present for bundled Node path)
 ./tests/run-tests.sh
 
-# 2) Install to the stable path and create Desktop launchers
+# 2) Install to the stable path, create Desktop launchers, and enable macOS auto-load
 ./scripts/install-dream-skin-macos.sh --no-launch
 
 # 3) Customize with your image (Finder picker if you omit flags)
@@ -31,6 +31,10 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 #    Codex Dream Skin - Customize.command
 #    Codex Dream Skin - Verify.command
 #    Codex Dream Skin - Restore.command
+#    Codex Dream Skin - Enable Auto Load.command
+#    Codex Dream Skin - Disable Auto Load.command
+#    Codex Dream Skin - Auto Load Status.command
+#    Codex Dream Skin - Theme Studio.command
 
 # 5) Optional: menu bar (SwiftBar) — apply / pause / change image
 ./Install\ Menu\ Bar.command
@@ -45,6 +49,43 @@ Install location after step 2:
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
 
+Automatic loading is enabled by default. It registers the per-user LaunchAgent
+`com.openai.codex-dream-skin-studio.autoload`, starts the official Codex with a
+loopback CDP port, and keeps the injector attached after Codex exits or its
+renderer reloads. Use `--no-auto-load` during installation to keep manual mode.
+
+The injector also watches the installed theme configuration, background image,
+CSS, and renderer script. When any of them changes, it reloads the newest
+payload into the current Codex renderer automatically. A partially written
+theme is ignored until the next valid update; Codex itself does not need to
+restart.
+
+CLI controls:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/autoload-dream-skin-macos.sh enable
+~/.codex/codex-dream-skin-studio/scripts/autoload-dream-skin-macos.sh disable
+~/.codex/codex-dream-skin-studio/scripts/autoload-dream-skin-macos.sh status
+```
+
+`pause` and `restore` disable the auto-load supervisor before removing the
+theme. If Codex is already running without a verified CDP endpoint when auto
+load is enabled, the tool asks for one explicit restart confirmation.
+
+Theme Studio provides a local browser interface for changing the background,
+appearance mode, theme copy, accent colors, and auto-load state. Open it from
+`Codex Dream Skin - Theme Studio.command`; the service binds to `127.0.0.1`
+only and uses the existing signed Codex Node runtime.
+
+The installer also seeds bundled theme packs into the user theme library. To
+switch to the included pastel Miku theme:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id miku-dream
+```
+
+Existing user themes with the same ID are never overwritten during install.
+
 ## Customer ZIP (optional packaging)
 
 To build the “double-click install” folder layout for non-git users:
@@ -58,7 +99,7 @@ That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio` e
 ## How it works (security boundary)
 
 1. Discover `com.openai.codex` and validate signature / Team ID / arch / bundled Node.
-2. Start Codex via user `launchd` with CDP bound to `127.0.0.1` only.
+2. Start Codex via a per-user LaunchAgent with CDP bound to `127.0.0.1` only.
 3. Accept the debug port only when it belongs to Codex (or a legitimate child).
 4. Inject only into expected `app://` renderer targets.
 5. Keep a small injector alive across reloads and route changes.

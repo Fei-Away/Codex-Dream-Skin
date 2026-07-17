@@ -4,11 +4,17 @@
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
   const SHELL_ATTR = "data-dream-shell";
+  const HERO_TEXT_ATTR = "data-dream-hero-text";
+  const THEME_ATTR = "data-dream-theme";
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const THEME = themeConfig && typeof themeConfig === "object" ? themeConfig : {};
+  const THEME_ID = String(THEME.id || "custom").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").slice(0, 80);
+  const REQUESTED_APPEARANCE = ["system", "dark", "light"].includes(THEME.appearance)
+    ? THEME.appearance : "system";
   const THEME_VARIABLES = [
     "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime",
     "--ds-cyan", "--ds-purple", "--ds-text", "--ds-muted", "--ds-line",
+    "--ds-hero-text", "--ds-hero-muted", "--ds-hero-kicker",
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
     "--dream-skin-project-label",
   ];
@@ -52,6 +58,7 @@
 
   /** Detect Codex app light/dark shell for CSS branching. */
   const detectShellMode = () => {
+    if (REQUESTED_APPEARANCE !== "system") return REQUESTED_APPEARANCE;
     const root = document.documentElement;
     const body = document.body;
     const cls = `${root.className || ""} ${body?.className || ""}`.toLowerCase();
@@ -115,6 +122,7 @@
 
   const applyTheme = (root, shell) => {
     const colors = THEME.colors || {};
+    const heroTextTone = THEME.heroTextTone === "dark" ? "dark" : "light";
     const accent = colors.accent || (shell === "light" ? "#e25563" : "#7cff46");
     const accentAlt = colors.accentAlt || accent;
     const secondary = colors.secondary || (shell === "light" ? "#f3a8af" : "#36d7e8");
@@ -134,6 +142,9 @@
         "--ds-text": "#1f1a1b",
         "--ds-muted": "#6b5f62",
         "--ds-line": colors.line || "rgba(196, 120, 128, .22)",
+        "--ds-hero-text": colors.heroText || (heroTextTone === "dark" ? "#174f5d" : "#fffaf9"),
+        "--ds-hero-muted": colors.heroMuted || (heroTextTone === "dark" ? "#3d7782" : "#fff5f7"),
+        "--ds-hero-kicker": colors.heroKicker || (heroTextTone === "dark" ? accent : "#ffd6dc"),
       };
     } else {
       variables = {
@@ -147,9 +158,13 @@
         "--ds-text": colors.text || "#e9fff1",
         "--ds-muted": colors.muted || "#9ebdb3",
         "--ds-line": colors.line || "rgba(124, 255, 70, .28)",
+        "--ds-hero-text": colors.heroText || "#fffaf9",
+        "--ds-hero-muted": colors.heroMuted || "#fff5f7",
+        "--ds-hero-kicker": colors.heroKicker || accent,
       };
     }
 
+    root.setAttribute(HERO_TEXT_ATTR, heroTextTone);
     for (const [name, value] of Object.entries(variables)) {
       if (typeof value === "string" && value) root.style.setProperty(name, value);
     }
@@ -172,6 +187,7 @@
     const shell = detectShellMode();
     root.classList.add("codex-dream-skin");
     root.setAttribute(SHELL_ATTR, shell);
+    root.setAttribute(THEME_ATTR, THEME_ID);
     root.style.setProperty("--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
 
@@ -187,6 +203,45 @@
     }
 
     const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
+    let inputSurface = document.querySelector(".composer-surface-chrome");
+    if (!inputSurface) {
+      const input = [...document.querySelectorAll("textarea, [contenteditable='true']")]
+        .find((candidate) => {
+          const rect = candidate.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+      for (let candidate = input?.parentElement; candidate && candidate !== shellMain; candidate = candidate.parentElement) {
+        const classes = String(candidate.className || "");
+        if (classes.includes("bg-token-input-background") || classes.includes("request-card")) {
+          inputSurface = candidate;
+          break;
+        }
+      }
+    }
+    for (const candidate of document.querySelectorAll(".dream-skin-composer-surface")) {
+      if (candidate !== inputSurface) candidate.classList.remove("dream-skin-composer-surface");
+    }
+    inputSurface?.classList.add("dream-skin-composer-surface");
+    let inputFrame = inputSurface?.parentElement;
+    while (inputFrame && inputFrame !== shellMain) {
+      const classes = String(inputFrame.className || "");
+      if (classes.includes("px-toolbar") && classes.includes("max-w-")) break;
+      inputFrame = inputFrame.parentElement;
+    }
+    let inputDock = inputSurface?.parentElement;
+    while (inputDock && inputDock !== shellMain) {
+      const classes = String(inputDock.className || "");
+      if (classes.includes("sticky") && classes.includes("bottom-0")) break;
+      inputDock = inputDock.parentElement;
+    }
+    for (const candidate of document.querySelectorAll(".dream-skin-composer-frame")) {
+      if (candidate !== inputFrame) candidate.classList.remove("dream-skin-composer-frame");
+    }
+    for (const candidate of document.querySelectorAll(".dream-skin-composer-dock")) {
+      if (candidate !== inputDock) candidate.classList.remove("dream-skin-composer-dock");
+    }
+    if (inputFrame && inputFrame !== shellMain) inputFrame.classList.add("dream-skin-composer-frame");
+    if (inputDock && inputDock !== shellMain) inputDock.classList.add("dream-skin-composer-dock");
     const homeIndicator = document.querySelector('[data-testid="home-icon"]');
     const home = homeIndicator?.closest('[role="main"]') ||
       [...document.querySelectorAll('[role="main"]')].find((candidate) =>
@@ -233,10 +288,15 @@
     window[DISABLED_KEY] = true;
     document.documentElement?.classList.remove("codex-dream-skin");
     document.documentElement?.removeAttribute(SHELL_ATTR);
+    document.documentElement?.removeAttribute(HERO_TEXT_ATTR);
+    document.documentElement?.removeAttribute(THEME_ATTR);
     document.documentElement?.style.removeProperty("--dream-skin-art");
     for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);
     document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
     document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
+    document.querySelectorAll(".dream-skin-composer-surface").forEach((node) => node.classList.remove("dream-skin-composer-surface"));
+    document.querySelectorAll(".dream-skin-composer-frame").forEach((node) => node.classList.remove("dream-skin-composer-frame"));
+    document.querySelectorAll(".dream-skin-composer-dock").forEach((node) => node.classList.remove("dream-skin-composer-dock"));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
     const state = window[STATE_KEY];

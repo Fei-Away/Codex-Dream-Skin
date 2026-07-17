@@ -25,8 +25,28 @@ fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 
+MIKU_PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$ROOT/themes/miku-dream")"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (!value.pass || value.version !== "1.5.2" || value.themeId !== "miku-dream" || value.themeName !== "Miku Dream" || value.imageBytes < 1) process.exit(1);
+' "$MIKU_PAYLOAD_JSON"
+
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
 trap '/bin/rm -rf "$TMP"' EXIT
+
+PLIST="$TMP/codex-dream-skin-autoload.plist"
+"$NODE" "$ROOT/scripts/write-autoload-plist.mjs" \
+  --output "$PLIST" \
+  --label com.openai.codex-dream-skin-studio.autoload \
+  --supervisor "$ROOT/scripts/supervise-dream-skin-macos.sh" \
+  --stdout "$TMP/autoload.log" \
+  --stderr "$TMP/autoload-error.log" >/dev/null
+/usr/bin/plutil -lint "$PLIST" >/dev/null
+[ "$(/usr/bin/plutil -extract Label raw -o - "$PLIST")" = "com.openai.codex-dream-skin-studio.autoload" ]
+[ "$(/usr/bin/plutil -extract RunAtLoad raw -o - "$PLIST")" = "true" ]
+[ "$(/usr/bin/plutil -extract KeepAlive raw -o - "$PLIST")" = "true" ]
+[ "$(/usr/bin/plutil -extract LimitLoadToSessionType raw -o - "$PLIST")" = "Aqua" ]
+
 /bin/mkdir -p "$TMP/theme"
 /bin/cp "$ROOT/assets/portal-hero.png" "$TMP/theme/background.png"
 "$NODE" "$ROOT/scripts/write-theme.mjs" custom --output-dir "$TMP/theme" \
@@ -51,11 +71,11 @@ BACKUP="$TMP/theme-backup.json"
   'keepMe = true' > "$CONFIG"
 /bin/cp "$CONFIG" "$TMP/original.toml"
 "$NODE" "$ROOT/scripts/theme-config.mjs" install "$CONFIG" "$BACKUP" >/dev/null
-/usr/bin/grep -q 'appearanceTheme = "dark"' "$CONFIG"
+/usr/bin/grep -q 'appearanceTheme = "system"' "$CONFIG"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CONFIG" "$BACKUP" >/dev/null
 /usr/bin/cmp -s "$CONFIG" "$TMP/original.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.1" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.2" ]' _ "$ROOT"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
-printf 'PASS: syntax, payload, custom-theme, config round-trip, HOME recovery, signature, and doctor checks.\n'
+printf 'PASS: syntax, bundled-theme, payload, custom-theme, config round-trip, HOME recovery, signature, and doctor checks.\n'

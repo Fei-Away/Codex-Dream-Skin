@@ -10,6 +10,9 @@
   --ds-text: #e9fff1;
   --ds-muted: #9ebdb3;
   --ds-line: rgba(124, 255, 70, .28);
+  --ds-hero-text: #fffaf9;
+  --ds-hero-muted: #fff5f7;
+  --ds-hero-kicker: #ffd6dc;
 }
 
 html.codex-dream-skin body {
@@ -507,7 +510,7 @@ html.codex-dream-skin[data-dream-shell="light"] {
 
 html.codex-dream-skin[data-dream-shell="light"] body {
   background:
-    radial-gradient(circle at 88% 6%, rgba(255, 200, 210, .22), transparent 34%),
+    radial-gradient(circle at 88% 6%, color-mix(in srgb, var(--ds-cyan) 22%, transparent), transparent 34%),
     linear-gradient(180deg, #fbf8f9 0%, #f3eef0 100%) !important;
   color: var(--ds-text) !important;
   font-family: "SF Pro Text", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif !important;
@@ -516,8 +519,8 @@ html.codex-dream-skin[data-dream-shell="light"] body {
 html.codex-dream-skin[data-dream-shell="light"] body::before {
   opacity: .12 !important;
   background-image:
-    radial-gradient(circle, rgba(226, 85, 99, .35) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(243, 168, 175, .28) 0 1px, transparent 1.8px) !important;
+    radial-gradient(circle, color-mix(in srgb, var(--ds-green) 35%, transparent) 0 1px, transparent 1.8px),
+    radial-gradient(circle, color-mix(in srgb, var(--ds-cyan) 28%, transparent) 0 1px, transparent 1.8px) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel {
@@ -546,7 +549,7 @@ html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel svg {
 }
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel button:hover {
-  background: rgba(217, 72, 86, .08) !important;
+  background: color-mix(in srgb, var(--ds-green) 8%, transparent) !important;
   box-shadow: none !important;
   transform: none !important;
   color: #1f1a1b !important;
@@ -563,8 +566,8 @@ html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel butto
 
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
 html.codex-dream-skin[data-dream-shell="light"] aside.app-shell-left-panel [aria-current="page"] {
-  background: rgba(217, 72, 86, .10) !important;
-  border: 1px solid rgba(217, 72, 86, .14) !important;
+  background: color-mix(in srgb, var(--ds-green) 10%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--ds-green) 14%, transparent) !important;
   box-shadow: none !important;
   color: #1f1a1b !important;
 }
@@ -595,10 +598,27 @@ html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-ski
   backdrop-filter: blur(10px) saturate(108%);
 }
 
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [class*="_markdownContent_"],
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [class*="_markdownText_"],
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [class*="_inlineMarkdown_"] {
+  color: #273c42 !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .78) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [class*="_markdownContent_"] a {
+  color: color-mix(in srgb, var(--ds-green) 78%, #145a62) !important;
+}
+
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface > header.app-header-tint {
   background: rgba(255, 255, 255, .88) !important;
   border-bottom: 1px solid rgba(40, 30, 32, .06) !important;
   backdrop-filter: blur(12px) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface > header.app-header-tint,
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface > header.app-header-tint * {
+  color: #25373c !important;
+  text-shadow: none !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-child > div:first-child > div:first-child {
@@ -624,17 +644,17 @@ html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home > div:first-chi
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"] {
-  color: #fffaf9 !important;
+  color: var(--ds-hero-text) !important;
   text-shadow: 0 2px 12px rgba(0, 0, 0, .32), 0 1px 0 rgba(0, 0, 0, .2) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"]::before {
-  color: #ffd6dc !important;
+  color: var(--ds-hero-kicker) !important;
   text-shadow: 0 1px 6px rgba(0, 0, 0, .3) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"]::after {
-  color: rgba(255, 245, 247, .9) !important;
+  color: var(--ds-hero-muted) !important;
   text-shadow: 0 1px 8px rgba(0, 0, 0, .28) !important;
 }
 
@@ -647,7 +667,7 @@ html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-su
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home .group\/home-suggestions button > span:first-child > span:first-child {
-  background: linear-gradient(145deg, #f07a86, #e25563) !important;
+  background: linear-gradient(145deg, var(--ds-cyan), var(--ds-green)) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .composer-surface-chrome {
@@ -658,7 +678,16 @@ html.codex-dream-skin[data-dream-shell="light"] .composer-surface-chrome {
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .composer-surface-chrome::before {
-  background: linear-gradient(180deg, #f07a86, #e25563) !important;
+  background: linear-gradient(180deg, var(--ds-cyan), var(--ds-green)) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-hero-text="dark"] .dream-skin-home [data-feature="game-source"] {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .9), 0 3px 16px rgba(32, 191, 197, .16) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-hero-text="dark"] .dream-skin-home [data-feature="game-source"]::before,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-hero-text="dark"] .dream-skin-home [data-feature="game-source"]::after {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .94), 0 2px 12px rgba(32, 191, 197, .12) !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-brand,
@@ -673,4 +702,223 @@ html.codex-dream-skin[data-dream-shell="light"] .dream-skin-quote {
 
 html.codex-dream-skin[data-dream-shell="light"] .dream-skin-particles {
   opacity: .2 !important;
+}
+
+/* Miku Dream keeps the native sidebar structure and gives its existing
+   controls a coordinated pastel shell. */
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel {
+  background:
+    radial-gradient(circle at 14% 7%, rgba(32, 191, 197, .16), transparent 27%),
+    radial-gradient(circle at 86% 92%, rgba(242, 166, 215, .2), transparent 34%),
+    radial-gradient(circle, rgba(139, 112, 232, .12) 0 1px, transparent 1.7px) 0 0 / 58px 58px,
+    linear-gradient(180deg, rgba(248, 254, 255, .98) 0%, rgba(250, 253, 255, .98) 48%, rgba(255, 247, 252, .98) 100%) !important;
+  border: 1px solid rgba(32, 191, 197, .2) !important;
+  border-left: 0 !important;
+  border-radius: 0 12px 12px 0 !important;
+  box-shadow: 8px 0 26px rgba(32, 125, 135, .09), inset -1px 0 rgba(255, 255, 255, .86) !important;
+  scrollbar-color: rgba(32, 191, 197, .3) transparent;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel button,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel a,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel span,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel div {
+  color: #24535c !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel svg {
+  color: #299fa8 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel button[aria-label^="切换模式"] {
+  color: #147c84 !important;
+  font-size: 16px !important;
+  font-weight: 750 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel button[aria-label^="切换模式"]::after {
+  content: "♫" !important;
+  margin-left: 5px;
+  color: #e878b8 !important;
+  font-size: 13px;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel button[class*="group/section-toggle"] {
+  color: #4c7d85 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel kbd,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel [class*="text-token-description"] {
+  color: #78959b !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel button:hover,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel [class*="group/folder-row"]:hover,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel [role="button"]:hover {
+  background: rgba(32, 191, 197, .08) !important;
+  border-color: rgba(32, 191, 197, .12) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel [aria-current="page"] {
+  background: linear-gradient(90deg, rgba(32, 191, 197, .16), rgba(242, 166, 215, .14)) !important;
+  border: 1px solid rgba(32, 191, 197, .22) !important;
+  box-shadow: inset 3px 0 #20bfc5, 0 3px 10px rgba(32, 125, 135, .07) !important;
+  color: #174f5d !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel [aria-current="page"] svg {
+  color: #e878b8 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel button:focus-visible,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel a:focus-visible,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] aside.app-shell-left-panel [role="button"]:focus-visible {
+  outline: 2px solid rgba(32, 191, 197, .42) !important;
+  outline-offset: -2px !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) {
+  border: 1px solid rgba(32, 191, 197, .24) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, .98) 0%, rgba(240, 252, 253, .98) 58%, rgba(255, 241, 249, .98) 100%) !important;
+  box-shadow:
+    0 2px 8px rgba(32, 156, 166, .08),
+    inset 0 1px rgba(255, 255, 255, .9) !important;
+  backdrop-filter: none !important;
+  color: #234b53 !important;
+  transition: border-color .16s ease, box-shadow .16s ease !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface):focus-within {
+  border-color: rgba(32, 191, 197, .48) !important;
+  box-shadow:
+    0 3px 10px rgba(32, 156, 166, .1),
+    inset 0 0 0 1px rgba(32, 191, 197, .08) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-frame {
+  position: relative;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  border-radius: 28px;
+  background: linear-gradient(90deg, #eafafb 0%, #f8fdff 52%, #fff0f8 100%) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-frame::after {
+  content: none;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-dock {
+  padding-bottom: 0 !important;
+  background: transparent !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-frame [class*="bg-gradient-to-t"][class*="from-token-main-surface-primary"] {
+  background-image: linear-gradient(to top, #f8fdff 0%, rgba(248, 253, 255, 0) 100%) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-dock [class*="bg-gradient-to-t"][class*="from-token-main-surface-primary"] {
+  background-image: linear-gradient(to top, #f8fdff 0%, rgba(248, 253, 255, .94) 54%, rgba(248, 253, 255, 0) 100%) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-frame div[class*="rounded-3xl"][class*="bg-token-input-background/70"] {
+  border-color: rgba(32, 191, 197, .18) !important;
+  background: rgba(255, 255, 255, .9) !important;
+  color: #315f67 !important;
+  box-shadow: 0 2px 8px rgba(32, 125, 135, .08) !important;
+  backdrop-filter: none !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-dock [class*="bg-token-input-validation-error-background"] {
+  background: linear-gradient(90deg, rgba(255, 245, 249, .96), rgba(255, 233, 243, .9)) !important;
+  color: #a44461 !important;
+  box-shadow: 0 4px 14px rgba(190, 83, 119, .08) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-dock [class*="bg-token-input-validation-error-background"] * {
+  color: #a44461 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .dream-skin-composer-dock [class*="bg-token-charts-red"] {
+  border-color: rgba(190, 83, 119, .18) !important;
+  background: rgba(232, 120, 184, .13) !important;
+  color: #a44461 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] .composer-surface-chrome::before {
+  color: #174f5d !important;
+  border-color: rgba(32, 191, 197, .42) !important;
+  background: linear-gradient(145deg, #f2a6d7, #54dce2) !important;
+  box-shadow: 0 4px 12px rgba(32, 156, 166, .2) !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) .ProseMirror,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) textarea,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) [class*="_root_"],
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) [class*="text-token-foreground"] {
+  color: #203f46 !important;
+  caret-color: #168d96 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) [data-placeholder]::before,
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) textarea::placeholder {
+  color: #78959b !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button:not([class*="size-token-button-composer"]) {
+  border: 1px solid rgba(32, 191, 197, .13) !important;
+  background: rgba(255, 255, 255, .66) !important;
+  color: #315f67 !important;
+  box-shadow: 0 1px 3px rgba(32, 125, 135, .06) !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button:not([class*="size-token-button-composer"]) svg {
+  color: #299fa8 !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button:not([class*="size-token-button-composer"]) span {
+  color: #315f67 !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button:not([class*="size-token-button-composer"]) [class*="EffortLabel"] {
+  color: #68868c !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button:not([class*="size-token-button-composer"]):hover {
+  border-color: rgba(32, 191, 197, .24) !important;
+  background: rgba(32, 191, 197, .1) !important;
+  color: #174f5d !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button[aria-expanded="true"]:not([class*="size-token-button-composer"]) {
+  border-color: rgba(232, 120, 184, .28) !important;
+  background: rgba(242, 166, 215, .15) !important;
+  color: #7a3d68 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button:focus-visible {
+  outline: 2px solid rgba(32, 191, 197, .48) !important;
+  outline-offset: 2px !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button[class*="size-token-button-composer"] {
+  border: 0 !important;
+  background: linear-gradient(145deg, #54dce2, #20bfc5) !important;
+  color: #073b43 !important;
+  box-shadow: 0 5px 14px rgba(32, 156, 166, .2) !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin[data-dream-shell="light"][data-dream-theme="miku-dream"] :is(.composer-surface-chrome, .dream-skin-composer-surface) button[class*="size-token-button-composer"] svg {
+  color: #073b43 !important;
+  opacity: 1 !important;
 }

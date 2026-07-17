@@ -19,6 +19,9 @@ discover_codex_app
 require_macos_runtime
 ensure_state_root
 
+# Disable the auto-load supervisor first so it cannot immediately re-inject the skin.
+"$SCRIPT_DIR/autoload-dream-skin-macos.sh" disable --keep-live --paused >/dev/null
+
 if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   saved_port="$(state_field port 2>/dev/null || true)"
   [ -n "${saved_port:-}" ] && PORT="$saved_port"
