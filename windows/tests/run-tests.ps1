@@ -718,6 +718,7 @@ try {
     'background-position: var(--dream-art-position)',
     '.dream-home-utility',
     ':has(.dream-home-utility) .composer-surface-chrome',
+    'main.main-surface:has(div.main-surface.flex.h-full.min-h-0.flex-col)',
     ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }

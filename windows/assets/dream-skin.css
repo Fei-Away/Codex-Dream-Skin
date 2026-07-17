@@ -448,6 +448,25 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
     var(--dream-task-immersive-far)) !important;
 }
 
+html.codex-dream-skin.dream-art-wide
+  main.main-surface:has(div.main-surface.flex.h-full.min-h-0.flex-col) {
+  background: color-mix(in oklab,
+    var(--dream-surface) var(--dream-overlay-opacity, 58%), transparent) !important;
+}
+
+html.codex-dream-skin.dream-art-wide main.main-surface
+  div.main-surface.flex.h-full.min-h-0.flex-col {
+  background: transparent !important;
+  border-color: var(--dream-line-soft) !important;
+  backdrop-filter: none !important;
+}
+
+html.codex-dream-skin:has(main.main-surface div.main-surface.flex.h-full.min-h-0.flex-col)
+  nav.flex.min-h-0.flex-1.flex-col.select-none.px-row-x {
+  background: color-mix(in oklab,
+    var(--dream-sidebar) var(--dream-overlay-opacity, 58%), transparent) !important;
+}
+
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner) .dream-task {
   background: transparent !important;
 }
