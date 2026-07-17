@@ -1,5 +1,5 @@
 :root.codex-dream-skin {
-  color-scheme: light;
+  color-scheme: light dark;
   --dream-accent: oklch(0.66 0.15 18);
   --dream-accent-ink: oklch(0.98 0.006 20);
   --dream-art-position: 72% 45%;
@@ -26,6 +26,10 @@
   --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 86%, transparent);
   --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 78%, transparent);
   --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 66%, transparent);
+}
+
+:root.codex-dream-skin.dream-theme-light {
+  color-scheme: light;
 }
 
 :root.codex-dream-skin.dream-theme-dark {

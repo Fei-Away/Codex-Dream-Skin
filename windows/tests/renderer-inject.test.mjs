@@ -14,6 +14,22 @@ const buildPayload = (config = {}) => template
   .replace("__DREAM_THEME_JSON__", JSON.stringify(config));
 const payload = buildPayload();
 
+assert.match(
+  css,
+  /:root\.codex-dream-skin\s*\{[^}]*color-scheme:\s*light dark;/,
+  "The unclassified Windows shell should defer native controls to the OS color scheme.",
+);
+assert.match(
+  css,
+  /:root\.codex-dream-skin\.dream-theme-light\s*\{[^}]*color-scheme:\s*light;/,
+  "An explicitly detected light Windows shell must override a dark OS preference.",
+);
+assert.match(
+  css,
+  /:root\.codex-dream-skin\.dream-theme-dark\s*\{[^}]*color-scheme:\s*dark;/,
+  "An explicitly detected dark Windows shell must override a light OS preference.",
+);
+
 assert.doesNotMatch(
   css,
   /main\.main-surface\s*>\s*header\.app-header-tint\s*\{[^}]*\b(?:position|z-index)\s*:/,

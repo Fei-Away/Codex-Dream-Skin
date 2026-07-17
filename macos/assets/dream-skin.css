@@ -1,5 +1,5 @@
 :root.codex-dream-skin {
-  color-scheme: dark !important;
+  color-scheme: light dark !important;
   --ds-bg: #111318;
   --ds-panel: #191c22;
   --ds-panel-2: #20242b;
@@ -55,6 +55,10 @@
   --ds-task-immersive-edge: rgb(var(--ds-bg-rgb) / .82);
   --ds-task-immersive-mid: rgb(var(--ds-bg-rgb) / .74);
   --ds-task-immersive-far: rgb(var(--ds-bg-rgb) / .60);
+}
+
+html.codex-dream-skin[data-dream-shell="dark"] {
+  color-scheme: dark !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] {

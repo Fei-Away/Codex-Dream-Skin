@@ -9,6 +9,22 @@ const macosRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(macosRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(macosRoot, "assets", "dream-skin.css"), "utf8");
 
+assert.match(
+  css,
+  /:root\.codex-dream-skin\s*\{[^}]*color-scheme:\s*light dark !important;/,
+  "The unclassified macOS shell should defer native controls to the OS color scheme.",
+);
+assert.match(
+  css,
+  /data-dream-shell="light"\]\s*\{[^}]*color-scheme:\s*light !important;/,
+  "An explicitly detected light macOS shell must override a dark OS preference.",
+);
+assert.match(
+  css,
+  /data-dream-shell="dark"\]\s*\{[^}]*color-scheme:\s*dark !important;/,
+  "An explicitly detected dark macOS shell must override a light OS preference.",
+);
+
 assert.doesNotMatch(
   css,
   /main\.main-surface\s*>\s*header\.app-header-tint\s*\{[^}]*\b(?:position|z-index)\s*:/,
