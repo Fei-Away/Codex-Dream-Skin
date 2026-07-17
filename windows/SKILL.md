@@ -34,6 +34,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 - Preserve `config.toml` as strict UTF-8. Never use encoding-dependent whole-file PowerShell reads/writes, silently transcode UTF-16, or overwrite a file that changed after it was read. Ambiguous TOML shapes must fail before writing rather than receive a best-effort rewrite.
 - Keep install/start/restore/verify serialized with the per-user operation lock in `common-windows.ps1`.
 - Treat `%LOCALAPPDATA%\CodexDreamSkin\engine` as an installer-managed runtime. Exit the Dream Skin tray before reinstalling so the installer can replace that runtime atomically and update every shortcut to the same copy.
+- Keep installed shortcuts and tray child processes on `RemoteSigned`, never `Bypass`. Clear Internet-zone markers only from staged managed `.ps1` copies after their byte-content hashes match the selected source; never change the user's persistent execution policy or override Group Policy.
 
 ## Checks
 

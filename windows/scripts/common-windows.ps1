@@ -195,6 +195,12 @@ function Install-DreamSkinRuntimeEngine {
       }
     }
 
+    # Unblock only verified managed copies so shortcuts can honor RemoteSigned instead of bypassing policy.
+    foreach ($runtimeScript in Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'scripts') `
+      -Filter '*.ps1' -Recurse -File -Force -ErrorAction Stop) {
+      Unblock-File -LiteralPath $runtimeScript.FullName -ErrorAction Stop
+    }
+
     $hasBackup = $false
     if (Test-Path -LiteralPath $engine.Root) {
       Assert-DreamSkinRuntimeTree -Path $engine.Root

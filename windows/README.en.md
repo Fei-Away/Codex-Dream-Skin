@@ -28,11 +28,17 @@ The installer validates the official Codex Store package and Node.js, saves a re
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
+`Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
+
 Pass `-Port` during installation to use a fixed custom port. Valid ports range from `1024` through `65535`.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -Port 9444
 ```
+
+## Update
+
+Exit the Dream Skin tray and close Codex, update the checkout (`git pull`, or download the latest source again), then rerun the install command above. The installer atomically replaces the managed runtime and rebuilds its shortcuts without deleting the active theme, saved themes, or imported images.
 
 ## Launch and verify
 
@@ -125,6 +131,10 @@ The scripts accept only a registered official Store package. They do not launch 
 ### The installer asks you to close Codex
 
 Close every Codex window and run the installer again. Installation requires stable app and configuration state.
+
+### Antivirus reports the old tray shortcut
+
+Older tray shortcuts combined hidden PowerShell with `ExecutionPolicy Bypass`, which can trigger behavior-based LNK detections. Do not whitelist the detection blindly. Update the source and rerun the installer so the shortcuts use `RemoteSigned`. If the updated shortcut is still detected, leave it quarantined and report the antivirus product, version, detection name, and shortcut properties without sharing secrets or private data.
 
 ### The port is occupied
 
