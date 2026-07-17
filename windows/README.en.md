@@ -28,6 +28,8 @@ The installer validates the official Codex Store package and Node.js, saves a re
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
+The installer generates an original multi-size Dream Skin icon inside the managed engine and assigns it to the tray and these shortcuts, so it remains available after the source checkout is moved or removed. The tray safely falls back to the Windows system icon when the resource is missing or damaged.
+
 Pass `-Port` during installation to use a fixed custom port. Valid ports range from `1024` through `65535`.
 
 ```powershell

@@ -4,6 +4,7 @@ param([switch]$EngineOnly)
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $Root 'scripts\common-windows.ps1')
+. (Join-Path $Root 'scripts\icon-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
 
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-tests-$PID-$([guid]::NewGuid().ToString('N'))"
@@ -129,12 +130,41 @@ try {
     '$trayScript = $engine.Tray',
     '$shortcut.WorkingDirectory = $engine.Root',
     '$restore.WorkingDirectory = $engine.Root',
-    '$tray.WorkingDirectory = $engine.Root'
+    '$tray.WorkingDirectory = $engine.Root',
+    '$shortcut.IconLocation = "$iconPath,0"',
+    '$restore.IconLocation = "$iconPath,0"',
+    '$tray.IconLocation = "$iconPath,0"'
   )) {
     if (-not $installSource.Contains($requiredShortcutBinding)) {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
     }
   }
+
+  $installedIcon = Join-Path $engine.Root 'assets\dream-skin.ico'
+  $null = New-DreamSkinIconFile -Path $installedIcon
+  $iconBytes = [System.IO.File]::ReadAllBytes($installedIcon)
+  if ($iconBytes.Length -lt 22 -or
+    [System.BitConverter]::ToUInt16($iconBytes, 0) -ne 0 -or
+    [System.BitConverter]::ToUInt16($iconBytes, 2) -ne 1 -or
+    [System.BitConverter]::ToUInt16($iconBytes, 4) -ne 7) {
+    throw 'Generated Dream Skin icon does not contain a valid seven-frame ICO directory.'
+  }
+  $iconSizes = for ($index = 0; $index -lt 7; $index++) {
+    $width = [int]$iconBytes[6 + (16 * $index)]
+    if ($width -eq 0) { 256 } else { $width }
+  }
+  if (($iconSizes -join ',') -cne '16,24,32,48,64,128,256') {
+    throw "Generated Dream Skin icon has the wrong frame sizes: $($iconSizes -join ',')"
+  }
+  $loadedIcon = Get-DreamSkinIcon -Path $installedIcon
+  if ($null -eq $loadedIcon) { throw 'Generated Dream Skin icon could not be loaded by System.Drawing.' }
+  $loadedIcon.Dispose()
+  $corruptIcon = Join-Path $temporaryRoot 'corrupt.ico'
+  [System.IO.File]::WriteAllBytes($corruptIcon, [byte[]](0, 1, 2, 3))
+  if ($null -ne (Get-DreamSkinIcon -Path $corruptIcon)) {
+    throw 'Corrupt Dream Skin icon did not use the safe fallback path.'
+  }
+  Remove-Item -LiteralPath $corruptIcon -Force
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
   foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {
@@ -149,8 +179,9 @@ try {
   }
   if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
-    throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
+    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $installedIcon -PathType Leaf)) {
+    throw 'Installed launch, restore, tray, or icon resource disappeared with the source checkout.'
   }
   Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
 

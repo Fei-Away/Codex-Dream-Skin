@@ -28,6 +28,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
+安装器会在受管 engine 中生成原创的多尺寸 Dream Skin 图标，并将其用于托盘和以上快捷方式；因此移动或删除源码仓库后图标仍然有效。资源缺失或损坏时，托盘会自动回退到 Windows 系统图标。
+
 如需使用自定义端口，可以在安装时传入 `-Port`。端口范围必须是 `1024` 到 `65535`。
 
 ```powershell

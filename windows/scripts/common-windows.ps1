@@ -132,6 +132,7 @@ function Install-DreamSkinRuntimeEngine {
     'assets\theme.json',
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',
+    'scripts\icon-windows.ps1',
     'scripts\image-metadata.mjs',
     'scripts\injector.mjs',
     'scripts\install-dream-skin.ps1',

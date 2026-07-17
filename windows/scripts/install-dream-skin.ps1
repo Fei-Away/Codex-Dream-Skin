@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $PortExplicit = $PSBoundParameters.ContainsKey('Port')
 $SkillRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
+. (Join-Path $PSScriptRoot 'icon-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
 $operationLock = Enter-DreamSkinOperationLock
@@ -39,6 +40,13 @@ try {
     throw 'Exit the Codex Dream Skin tray before reinstalling so every shortcut can move to the new runtime safely.'
   }
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $SkillRoot -StateRoot $StateRoot
+  $iconPath = Join-Path $engine.Root 'assets\dream-skin.ico'
+  try {
+    $iconPath = New-DreamSkinIconFile -Path $iconPath
+  } catch {
+    Write-Warning "Could not create the Dream Skin icon; system icon fallback will be used: $($_.Exception.Message)"
+    $iconPath = $null
+  }
   $null = Initialize-DreamSkinThemeStore -SkillRoot $engine.Root -StateRoot $StateRoot
   $ConfigPath = Join-Path $HOME '.codex\config.toml'
   $BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
@@ -60,6 +68,7 @@ try {
       $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$startScript`"$portArgument -PromptRestart"
       $shortcut.WorkingDirectory = $engine.Root
       $shortcut.Description = 'Launch the official Codex app with Codex Dream Skin'
+      if ($null -ne $iconPath) { $shortcut.IconLocation = "$iconPath,0" }
       $shortcut.Save()
     }
 
@@ -68,6 +77,7 @@ try {
     $restore.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$restoreScript`"$portArgument -RestoreBaseTheme -PromptRestart"
     $restore.WorkingDirectory = $engine.Root
     $restore.Description = 'Restore the official Codex appearance and close the CDP session'
+    if ($null -ne $iconPath) { $restore.IconLocation = "$iconPath,0" }
     $restore.Save()
 
     foreach ($folder in @($desktop, $startMenu)) {
@@ -76,6 +86,7 @@ try {
       $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$trayScript`"$portArgument"
       $tray.WorkingDirectory = $engine.Root
       $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
+      if ($null -ne $iconPath) { $tray.IconLocation = "$iconPath,0" }
       $tray.Save()
     }
     Start-Process -FilePath $powershell -ArgumentList `

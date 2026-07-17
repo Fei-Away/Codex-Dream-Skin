@@ -1,5 +1,11 @@
 # Windows Changelog
 
+## Unreleased
+
+### 新增
+
+- 安装器会用纯 PowerShell/System.Drawing 生成原创的 7 尺寸 Dream Skin ICO，并把受管 engine 中的稳定图标绑定到启动、托盘与恢复快捷方式；托盘在图标缺失或损坏时安全回退到 Windows 系统图标。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增
