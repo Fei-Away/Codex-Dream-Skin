@@ -58,9 +58,15 @@ function Test-DreamSkinCommandLineToken {
 function ConvertTo-DreamSkinProcessArgument {
   param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
   if ($Value.Contains('"')) { throw 'Process arguments containing a double quote are not supported.' }
+  if ($Value.Length -eq 0) { return '""' }
   if ($Value -notmatch '\s') { return $Value }
   $escaped = [regex]::Replace($Value, '(\\+)$', '$1$1')
   return '"' + $escaped + '"'
+}
+
+function ConvertTo-DreamSkinArgumentLine {
+  param([AllowEmptyCollection()][string[]]$Arguments = @())
+  return (($Arguments | ForEach-Object { ConvertTo-DreamSkinProcessArgument -Value $_ }) -join ' ')
 }
 
 function Get-DreamSkinProcessExecutablePath {
@@ -121,7 +127,10 @@ function Get-DreamSkinNodeRuntime {
 }
 
 function ConvertTo-DreamSkinCodexInstall {
-  param([Parameter(Mandatory = $true)][object]$Package)
+  param(
+    [Parameter(Mandatory = $true)][object]$Package,
+    [AllowNull()][object]$Manifest
+  )
   if ("$($Package.Name)" -ine 'OpenAI.Codex' -or -not $Package.InstallLocation -or
     -not $Package.PackageFullName -or -not $Package.PackageFamilyName -or
     "$($Package.SignatureKind)" -ine 'Store' -or [bool]$Package.IsDevelopmentMode) {
@@ -130,12 +139,31 @@ function ConvertTo-DreamSkinCodexInstall {
   $packageRoot = "$($Package.InstallLocation)"
   $executable = Join-Path $packageRoot 'app\ChatGPT.exe'
   if (-not (Test-Path -LiteralPath $executable)) { return $null }
+  try {
+    if (-not $PSBoundParameters.ContainsKey('Manifest')) {
+      $Manifest = Get-AppxPackageManifest -Package $Package -ErrorAction Stop
+    }
+    $applications = @($Manifest.Package.Applications.Application | Where-Object {
+      "$($_.Executable)".Replace('/', '\') -ieq 'app\ChatGPT.exe'
+    })
+    if ($applications.Count -ne 1) { return $null }
+    $applicationId = "$($applications[0].Id)"
+  } catch {
+    return $null
+  }
+  $packageFamilyName = "$($Package.PackageFamilyName)"
+  if ($packageFamilyName -cnotmatch '^[A-Za-z0-9._-]{1,128}$' -or
+    $applicationId -cnotmatch '^[A-Za-z0-9._-]{1,64}$') {
+    return $null
+  }
   return [pscustomobject]@{
     PackageRoot = $packageRoot
     Executable = $executable
     Version = "$($Package.Version)"
     PackageFullName = "$($Package.PackageFullName)"
-    PackageFamilyName = "$($Package.PackageFamilyName)"
+    PackageFamilyName = $packageFamilyName
+    ApplicationId = $applicationId
+    AppUserModelId = "$packageFamilyName!$applicationId"
     SignatureKind = "$($Package.SignatureKind)"
   }
 }
@@ -154,6 +182,71 @@ function Get-DreamSkinCodexInstall {
   $installs = @(Get-DreamSkinRegisteredCodexInstalls)
   if ($installs.Count -eq 0) { throw 'The official OpenAI.Codex Store package is not installed or its identity cannot be validated.' }
   return $installs[0]
+}
+
+function Initialize-DreamSkinPackageLauncher {
+  if ('CodexDreamSkin.PackageLauncher' -as [type]) { return }
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace CodexDreamSkin {
+  [Flags]
+  internal enum ActivateOptions : uint {
+    None = 0
+  }
+
+  [ComImport]
+  [Guid("2e941141-7f97-4756-ba1d-9decde894a3d")]
+  [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  internal interface IApplicationActivationManager {
+    [PreserveSig]
+    int ActivateApplication(
+      [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+      [MarshalAs(UnmanagedType.LPWStr)] string arguments,
+      ActivateOptions options,
+      out uint processId);
+  }
+
+  [ComImport]
+  [Guid("45ba127d-10a8-46ea-8ab7-56ea9078943c")]
+  internal class ApplicationActivationManager {}
+
+  public static class PackageLauncher {
+    public static uint Launch(string appUserModelId, string arguments) {
+      var manager = (IApplicationActivationManager)new ApplicationActivationManager();
+      try {
+        uint processId;
+        int result = manager.ActivateApplication(
+          appUserModelId,
+          arguments ?? string.Empty,
+          ActivateOptions.None,
+          out processId);
+        Marshal.ThrowExceptionForHR(result);
+        return processId;
+      } finally {
+        if (Marshal.IsComObject(manager)) Marshal.FinalReleaseComObject(manager);
+      }
+    }
+  }
+}
+'@
+}
+
+function Start-DreamSkinCodex {
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [AllowEmptyCollection()][string[]]$Arguments = @()
+  )
+  $appUserModelId = "$($Codex.AppUserModelId)"
+  if ($appUserModelId -cnotmatch '^[A-Za-z0-9._-]{1,128}![A-Za-z0-9._-]{1,64}$') {
+    throw 'The registered Codex AppUserModelId is unavailable or invalid.'
+  }
+  Initialize-DreamSkinPackageLauncher
+  $argumentLine = ConvertTo-DreamSkinArgumentLine -Arguments $Arguments
+  $processId = [CodexDreamSkin.PackageLauncher]::Launch($appUserModelId, $argumentLine)
+  if ($processId -le 0) { throw 'Windows did not return a Codex process ID after package activation.' }
+  return $processId
 }
 
 function Get-DreamSkinCodexStatePathCandidate {
@@ -197,6 +290,8 @@ function Resolve-DreamSkinCodexInstallFromState {
       Version = $install.Version
       PackageFullName = $install.PackageFullName
       PackageFamilyName = $install.PackageFamilyName
+      ApplicationId = $install.ApplicationId
+      AppUserModelId = $install.AppUserModelId
       SignatureKind = $install.SignatureKind
       FromState = $true
       RegisteredPackageVerified = $true
