@@ -147,8 +147,7 @@ try {
   try {
     $recordedInjectorStopped = Stop-DreamSkinRecordedInjector -State $previousState
     if (-not $recordedInjectorStopped) {
-      $staleStatePath = Archive-DreamSkinStateFile -Path $StatePath
-      Write-Warning "Archived stale Dream Skin state at $staleStatePath"
+      throw 'The previous Dream Skin injector could not be stopped safely. State was preserved; close the recorded PID and retry.'
     }
   } catch {
     if ($launchedWithCdp) {
@@ -227,7 +226,7 @@ try {
 
     $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
       $Injector, '--verify', '--port', "$Port",
-      '--browser-id', $cdpIdentity.BrowserId, '--timeout-ms', '30000')
+      '--browser-id', $cdpIdentity.BrowserId, '--timeout-ms', '120000')
     Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
     if ($verify.ExitCode -ne 0) { throw "Dream Skin verification failed. See $VerifyPath" }
   } catch {

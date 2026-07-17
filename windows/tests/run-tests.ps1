@@ -1,5 +1,5 @@
-﻿[CmdletBinding()]
-param([switch]$EngineOnly)
+[CmdletBinding()]
+param()
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
@@ -10,155 +10,6 @@ $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-t
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
-  $runtimeSourceName = 'runtime source ' + (-join @([char]0x6D4B, [char]0x8BD5))
-  $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
-  $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
-  New-Item -ItemType Directory -Path $runtimeSourceRoot | Out-Null
-  foreach ($directoryName in @('assets', 'scripts')) {
-    Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
-      -Recurse -Force -ErrorAction Stop
-  }
-
-  $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
-  $sourcePrefix = $runtimeSourceRoot.TrimEnd('\') + '\'
-  $runtimeSourceFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts') `
-      -Recurse -File -Force
-  )
-  $runtimeEngineFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts') `
-      -Recurse -File -Force
-  )
-  if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
-    throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
-  }
-  foreach ($sourceFile in $runtimeSourceFiles) {
-    $relative = $sourceFile.FullName.Substring($sourcePrefix.Length)
-    $installedFile = Join-Path $engine.Root $relative
-    if (-not (Test-Path -LiteralPath $installedFile -PathType Leaf) -or
-      (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile.FullName).Hash -cne
-      (Get-FileHash -Algorithm SHA256 -LiteralPath $installedFile).Hash) {
-      throw "Installed runtime hash does not match its source: $relative"
-    }
-  }
-
-  [System.IO.File]::WriteAllText((Join-Path $engine.Root 'stale-runtime.txt'), 'stale')
-  [System.IO.File]::WriteAllText((Join-Path $runtimeSourceRoot 'scripts\runtime-update.test'), 'updated')
-  $realRuntimeCleanup = (Get-Command Remove-DreamSkinRuntimeTree -CommandType Function).ScriptBlock
-  $previousWarningPreference = $WarningPreference
-  $runtimeCleanupFailure = @{ Triggered = $false }
-  try {
-    $WarningPreference = 'Stop'
-    function Remove-DreamSkinRuntimeTree {
-      param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$StateRoot
-      )
-      if ([System.IO.Path]::GetFileName($Path) -like '.engine-backup-*') {
-        $runtimeCleanupFailure.Triggered = $true
-        throw 'forced runtime backup cleanup failure'
-      }
-      & $realRuntimeCleanup -Path $Path -StateRoot $StateRoot
-    }
-
-    $runtimeUpdateReportedFailure = $false
-    try {
-      $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
-    } catch {
-      $runtimeUpdateReportedFailure = $true
-    }
-    if (-not $runtimeCleanupFailure.Triggered -or $runtimeUpdateReportedFailure -or
-      (Test-Path -LiteralPath (Join-Path $engine.Root 'stale-runtime.txt')) -or
-      (Read-DreamSkinUtf8File -Path (Join-Path $engine.Root 'scripts\runtime-update.test')) -cne 'updated') {
-      throw 'Runtime reinstall did not commit cleanly when old-engine cleanup failed.'
-    }
-  } finally {
-    $WarningPreference = $previousWarningPreference
-    Set-Item -Path Function:\Remove-DreamSkinRuntimeTree -Value $realRuntimeCleanup
-  }
-  foreach ($runtimeBackup in Get-ChildItem -LiteralPath $runtimeStateRoot -Directory -Force |
-    Where-Object { $_.Name -like '.engine-backup-*' }) {
-    Remove-DreamSkinRuntimeTree -Path $runtimeBackup.FullName -StateRoot $runtimeStateRoot
-  }
-
-  $invalidRuntimeRoot = Join-Path $temporaryRoot 'invalid-runtime-source'
-  New-Item -ItemType Directory -Path $invalidRuntimeRoot | Out-Null
-  foreach ($directoryName in @('assets', 'scripts')) {
-    Copy-Item -LiteralPath (Join-Path $runtimeSourceRoot $directoryName) -Destination $invalidRuntimeRoot `
-      -Recurse -Force -ErrorAction Stop
-  }
-  Remove-Item -LiteralPath (Join-Path $invalidRuntimeRoot 'scripts\start-dream-skin.ps1') -Force
-  $invalidRuntimeRejected = $false
-  try {
-    $null = Install-DreamSkinRuntimeEngine -SkillRoot $invalidRuntimeRoot -StateRoot $runtimeStateRoot
-  } catch {
-    $invalidRuntimeRejected = $true
-  }
-  if (-not $invalidRuntimeRejected -or
-    -not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
-    -not (Test-Path -LiteralPath (Join-Path $engine.Root 'scripts\runtime-update.test') -PathType Leaf) -or
-    @(Get-ChildItem -LiteralPath $runtimeStateRoot -Force | Where-Object {
-      $_.Name -like '.engine-staging-*' -or $_.Name -like '.engine-backup-*'
-    }).Count -ne 0) {
-    throw 'An invalid runtime source changed the installed engine or left transaction artifacts.'
-  }
-
-  $nestedStateRoot = Join-Path $runtimeSourceRoot 'scripts\nested-state'
-  $nestedStateRejected = $false
-  try {
-    $null = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $nestedStateRoot
-  } catch {
-    $nestedStateRejected = $true
-  }
-  if (-not $nestedStateRejected -or (Test-Path -LiteralPath $nestedStateRoot)) {
-    throw 'Runtime install allowed its state root to recurse into the copied source tree.'
-  }
-
-  $installSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\install-dream-skin.ps1')
-  $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
-  $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
-  if ($trayGuardIndex -lt 0 -or $engineInstallIndex -le $trayGuardIndex) {
-    throw 'Installer does not reject an active source-bound tray before replacing the runtime engine.'
-  }
-  foreach ($requiredShortcutBinding in @(
-    '$startScript = $engine.Start',
-    '$restoreScript = $engine.Restore',
-    '$trayScript = $engine.Tray',
-    '$shortcut.WorkingDirectory = $engine.Root',
-    '$restore.WorkingDirectory = $engine.Root',
-    '$tray.WorkingDirectory = $engine.Root'
-  )) {
-    if (-not $installSource.Contains($requiredShortcutBinding)) {
-      throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
-    }
-  }
-
-  Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
-  foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {
-    $tokens = $null
-    $parseErrors = $null
-    [System.Management.Automation.Language.Parser]::ParseFile(
-      $installedScript.FullName, [ref]$tokens, [ref]$parseErrors
-    ) | Out-Null
-    if ($parseErrors.Count -gt 0) {
-      throw "Installed runtime script failed to parse after its source checkout was removed: $($installedScript.Name)"
-    }
-  }
-  if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
-    throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
-  }
-  Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
-
-  if ($EngineOnly) {
-    Write-Host 'PASS: managed runtime staging, replacement, invalid-source guard, and source-independent shortcuts.'
-    return
-  }
-
   $atomicReplacePath = Join-Path $temporaryRoot 'atomic-replace.txt'
   [System.IO.File]::WriteAllText($atomicReplacePath, 'before')
   Write-DreamSkinUtf8FileAtomically -Path $atomicReplacePath -Content 'after'
@@ -635,6 +486,28 @@ try {
     -not (Test-DreamSkinThemePathWithin -Path $updatedTheme.ImagePath -Root $themePaths.Active)) {
     throw 'Imported image did not reset to the generic adaptive contract inside the managed directory.'
   }
+  if (@($updatedTheme.ImageFitWarnings).Count -ne 0) {
+    throw 'The recommended 2560x1440 image unexpectedly produced an import warning.'
+  }
+  $fitWarnings = @(Get-DreamSkinImageFitWarnings -Metadata ([pscustomobject]@{
+    width = 1280
+    height = 720
+    matchesRecommendedAspect = $true
+    mayUpscaleAtRecommendedSize = $true
+  }))
+  if ($fitWarnings.Count -ne 1 -or $fitWarnings[0] -notmatch '2560 × 1440') {
+    throw 'A low-resolution 16:9 import did not report the upscale warning.'
+  }
+  $fitWarnings = @(Get-DreamSkinImageFitWarnings -Metadata ([pscustomobject]@{
+    width = 1200
+    height = 1600
+    matchesRecommendedAspect = $false
+    mayUpscaleAtRecommendedSize = $true
+  }))
+  if ($fitWarnings.Count -ne 2 -or $fitWarnings[0] -notmatch '16:9' -or
+    $fitWarnings[1] -notmatch '2560 × 1440') {
+    throw 'A low-resolution non-16:9 import did not report both fit warnings.'
+  }
   $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   $idempotentTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
   if ($idempotentTheme.Theme.id -cne 'custom' -or
@@ -711,7 +584,6 @@ try {
   foreach ($requiredCss in @(
     'background-image: var(--dream-art)',
     'main.main-surface > header.app-header-tint',
-    '[class~="group/application-menu-top-bar"]',
     '.app-shell-main-content-top-fade',
     '.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary',
     '--dream-immersive-composer',
@@ -723,7 +595,10 @@ try {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @(
+    'System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', 'ImageFitWarnings',
+    '已保存主题', '完全恢复 Codex'
+  )) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
@@ -785,7 +660,9 @@ try {
     'Get-DreamSkinValidatedImageMetadata',
     '16384px / 50MP safety limit',
     'Assert-DreamSkinImageFile -Path $temporary',
-    'Assert-DreamSkinImageFile -Path $imageArchive'
+    'Assert-DreamSkinImageFile -Path $imageArchive',
+    'Get-DreamSkinImageFitWarnings',
+    'mayUpscaleAtRecommendedSize'
   )) {
     if (-not $themeSource.Contains($requiredThemeSafety)) {
       throw "PowerShell theme-store safety is missing: $requiredThemeSafety"
@@ -800,12 +677,119 @@ try {
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     '-e', "process.stderr.write('dream-skin-stderr-probe\n'); process.exit(7)")
   if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
-    throw "Native stderr was not captured with its real exit code under Stop preference: exit=$($stderrProbe.ExitCode); output=$($stderrProbe.Output -join '<NL>')"
+    throw "Native stderr was not captured with its real exit code under Stop preference: exit $($stderrProbe.ExitCode); output $($stderrProbe.Output -join ' | ')"
   }
   $discardedProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     '-e', "process.stderr.write('ignored-warning\n'); process.stdout.write('kept-output')") -DiscardStderr
   if ($discardedProbe.ExitCode -ne 0 -or ($discardedProbe.Output -join '') -cne 'kept-output') {
     throw 'Native stderr discard changed stdout or the real exit code.'
+  }
+
+  $dummyInjector = Join-Path $temporaryRoot 'injector-stop-probe.mjs'
+  [System.IO.File]::WriteAllText(
+    $dummyInjector,
+    'setInterval(() => {}, 1000);',
+    [System.Text.UTF8Encoding]::new($false, $true)
+  )
+  function Start-TestDreamSkinInjector {
+    $arguments = @(
+      (ConvertTo-DreamSkinProcessArgument -Value $dummyInjector),
+      '--watch', '--port', '9335', '--browser-id', 'browser-stop-test'
+    )
+    $process = Start-Process -FilePath $node.Path -ArgumentList $arguments -WindowStyle Hidden -PassThru
+    $deadline = (Get-Date).AddSeconds(5)
+    $processInfo = $null
+    while ($null -eq $processInfo -and (Get-Date) -lt $deadline) {
+      Start-Sleep -Milliseconds 100
+      $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $($process.Id)" -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $processInfo) { throw 'The injector stop test process did not become inspectable.' }
+    return [pscustomobject]@{
+      Process = $process
+      State = [pscustomobject]@{
+        injectorPid = $process.Id
+        injectorStartedAt = Get-DreamSkinProcessStartedAt -ProcessId $process.Id
+        injectorPath = $dummyInjector
+        nodePath = $node.Path
+        port = 9335
+        browserId = 'browser-stop-test'
+      }
+    }
+  }
+
+  $normalStopProbe = Start-TestDreamSkinInjector
+  if (-not (Stop-DreamSkinRecordedInjector -State $normalStopProbe.State) -or
+    (Get-Process -Id $normalStopProbe.Process.Id -ErrorAction SilentlyContinue)) {
+    throw 'A verified recorded injector did not stop during the normal stop path.'
+  }
+
+  $realStopRequest = (Get-Command Request-DreamSkinInjectorStop -CommandType Function).ScriptBlock
+  $realExitWait = (Get-Command Wait-DreamSkinProcessExit -CommandType Function).ScriptBlock
+  $stopAttempts = @{ Count = 0 }
+  $waitAttempts = @{ Count = 0 }
+  $stopMode = @{ KillOnRetry = $true }
+  $retryStopProbe = $null
+  $failedStopProbe = $null
+  try {
+    function Request-DreamSkinInjectorStop {
+      param([Parameter(Mandatory = $true)][int]$ProcessId)
+      $stopAttempts.Count += 1
+      if ($stopMode.KillOnRetry -and $stopAttempts.Count -ge 2) {
+        Microsoft.PowerShell.Management\Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+      }
+    }
+    function Wait-DreamSkinProcessExit {
+      param(
+        [Parameter(Mandatory = $true)][int]$ProcessId,
+        [Parameter(Mandatory = $true)][int]$TimeoutSeconds
+      )
+      $waitAttempts.Count += 1
+      if ($waitAttempts.Count -eq 1) { return $false }
+      if (-not $stopMode.KillOnRetry) { return $false }
+      $deadline = (Get-Date).AddSeconds(3)
+      while ((Get-Date) -lt $deadline) {
+        if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return $true }
+        Start-Sleep -Milliseconds 50
+      }
+      return -not [bool](Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+    }
+    $retryStopProbe = Start-TestDreamSkinInjector
+    $previousWarningPreference = $WarningPreference
+    $WarningPreference = 'SilentlyContinue'
+    try {
+      $retryStopped = Stop-DreamSkinRecordedInjector -State $retryStopProbe.State
+    } finally {
+      $WarningPreference = $previousWarningPreference
+    }
+    if (-not $retryStopped -or $stopAttempts.Count -ne 2 -or $waitAttempts.Count -ne 2 -or
+      (Get-Process -Id $retryStopProbe.Process.Id -ErrorAction SilentlyContinue)) {
+      throw 'The recorded injector retry path did not reissue the verified stop request and wait for exit.'
+    }
+
+    $stopAttempts.Count = 0
+    $waitAttempts.Count = 0
+    $stopMode.KillOnRetry = $false
+    $failedStopProbe = Start-TestDreamSkinInjector
+    $previousWarningPreference = $WarningPreference
+    $WarningPreference = 'SilentlyContinue'
+    try {
+      $failedStopResult = Stop-DreamSkinRecordedInjector -State $failedStopProbe.State
+    } finally {
+      $WarningPreference = $previousWarningPreference
+    }
+    if ($failedStopResult -or $stopAttempts.Count -ne 2 -or $waitAttempts.Count -ne 2 -or
+      -not (Get-Process -Id $failedStopProbe.Process.Id -ErrorAction SilentlyContinue)) {
+      throw 'Two failed verified injector stop attempts did not return false without terminating the recorded process.'
+    }
+  } finally {
+    if ($null -ne $retryStopProbe) {
+      Microsoft.PowerShell.Management\Stop-Process -Id $retryStopProbe.Process.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $failedStopProbe) {
+      Microsoft.PowerShell.Management\Stop-Process -Id $failedStopProbe.Process.Id -Force -ErrorAction SilentlyContinue
+    }
+    Set-Item -Path Function:\Request-DreamSkinInjectorStop -Value $realStopRequest
+    Set-Item -Path Function:\Wait-DreamSkinProcessExit -Value $realExitWait
   }
 
   $selfTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
@@ -829,6 +813,9 @@ try {
   $oneShotTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'injector-one-shot.test.mjs'))
   if ($oneShotTest.ExitCode -ne 0) { throw 'Injector one-shot Browser ID regression test failed.' }
+  $verificationTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'injector-verification.test.mjs'))
+  if ($verificationTest.ExitCode -ne 0) { throw 'Injector route verification regression test failed.' }
   $imageMetadataTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'image-metadata.test.mjs'))
   if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }

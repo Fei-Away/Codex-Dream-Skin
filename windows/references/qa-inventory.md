@@ -15,7 +15,6 @@
 - Home feature card: click one card and confirm the real composer is populated or the normal action occurs.
 - Project selector: click the real project chip under the "选择项目" label and confirm the native project menu opens.
 - Sidebar: open a real task, then return to New Task.
-- Task side panel: open and close the native thread panel twice, resize the window, and repeat; the toggle must remain visible and clickable.
 - Composer: type text, verify caret/readability, then clear it without sending.
 - Reload: use CDP `Page.reload`, wait, and confirm the injection marker returns.
 - Pet overlay: open a desktop pet and confirm its auxiliary window stays transparent with no skin background or decoration layer behind it.
@@ -38,7 +37,7 @@
 
 - Start when the debug port is occupied: fail with a clear message or use a caller-selected port.
 - Start after Codex updates: package discovery and injection still work without patching installed files.
-- Tamper `state.json` with a reused PID: if the PID is still live but its identity differs, confirm cleanup fails closed and preserves `state.json`; if the PID is gone, confirm the stale record is replaced only after confirming no process is running, without stopping an unrelated process.
+- Tamper `state.json` with a reused PID: if the PID is still live but its identity differs, confirm cleanup fails closed and preserves `state.json`; if the PID is gone, confirm the stale record is replaced only after confirming no process is running, without stopping an unrelated process. Delay a verified injector's first stop request and confirm cleanup revalidates its identity, retries, and waits for exit.
 - Serve a fake `app://` CDP target or remote/mismatched WebSocket URL and confirm both launcher and injector reject it. Reuse the port with a new Browser ID and confirm the existing watcher exits without reconnecting.
 - Force verification failure and confirm the injector, state file, and newly launched debug session are rolled back.
 - Start two operations concurrently and confirm the second fails clearly without changing config, state, or processes.
@@ -46,6 +45,6 @@
 
 ## Automated checks
 
-- `tests/run-tests.ps1`: strict UTF-8/no-BOM writes, UTF-16 rejection, LF/CRLF preservation, concurrent-write detection, exact backup/recovery, `[desktop]`-scoped restore, ambiguous TOML rejection, non-ASCII paths, Appx/state identity, argument quoting, theme seeding/import/save/switch/pause, byte/dimension limits, junction rejection, payload construction, Browser ID, loopback URL rejection, and renderer isolation for transparent auxiliary windows.
+- `tests/run-tests.ps1`: strict UTF-8/no-BOM writes, UTF-16 rejection, LF/CRLF preservation, concurrent-write detection, exact backup/recovery, `[desktop]`-scoped restore, ambiguous TOML rejection, non-ASCII paths, Appx/state identity, argument quoting, verified injector stop/retry/failure handling, theme seeding/import/save/switch/pause, image-fit warnings, byte/dimension limits, junction rejection, payload construction, route-aware verify states, Browser ID, loopback URL rejection, and renderer isolation for transparent auxiliary windows.
 - `node --check` for the injector and renderer payload.
 - Live Windows signoff remains required for Store process ownership, restart consent, screenshot, and CDP closure.

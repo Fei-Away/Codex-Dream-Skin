@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param([int]$Port = 9335)
 
 $ErrorActionPreference = 'Stop'
@@ -97,9 +97,15 @@ try {
       $dialog.Multiselect = $false
       try {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-          $null = Set-DreamSkinActiveTheme -ImagePath $dialog.FileName -Theme $null -StateRoot $StateRoot
+          $updated = Set-DreamSkinActiveTheme -ImagePath $dialog.FileName -Theme $null -StateRoot $StateRoot
           Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '背景图已更新。', [System.Windows.Forms.ToolTipIcon]::Info)
+          $fitWarnings = @($updated.ImageFitWarnings)
+          if ($fitWarnings.Count -gt 0) {
+            $message = "背景图已更新。`n" + ($fitWarnings -join "`n")
+            $notify.ShowBalloonTip(6000, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Warning)
+          } else {
+            $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '背景图已更新。', [System.Windows.Forms.ToolTipIcon]::Info)
+          }
         }
       } finally {
         $dialog.Dispose()

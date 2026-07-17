@@ -1,8 +1,10 @@
-﻿if (-not (Get-Command Read-DreamSkinUtf8File -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command Read-DreamSkinUtf8File -ErrorAction SilentlyContinue)) {
   . (Join-Path $PSScriptRoot 'config-utf8.ps1')
 }
 
 $script:DreamSkinMaxImageBytes = 16 * 1024 * 1024
+$script:DreamSkinRecommendedImageWidth = 2560
+$script:DreamSkinRecommendedImageHeight = 1440
 
 function Assert-DreamSkinNoReparseComponents {
   param([Parameter(Mandatory = $true)][string]$Path)
@@ -64,6 +66,21 @@ function Get-DreamSkinValidatedImageMetadata {
   if ($null -eq $metadata -or $null -eq $metadata.width -or $null -eq $metadata.height) {
     throw "Image metadata is invalid or exceeds the 16384px / 50MP safety limit: $Path"
   }
+  return $metadata
+}
+
+function Get-DreamSkinImageFitWarnings {
+  param([Parameter(Mandatory = $true)][object]$Metadata)
+  $width = [int]$Metadata.width
+  $height = [int]$Metadata.height
+  $warnings = @()
+  if (-not [bool]$Metadata.matchesRecommendedAspect) {
+    $warnings += "图片为 $width × $height，不是 16:9；背景将以 cover 方式裁切边缘，建议预先裁成 16:9。"
+  }
+  if ([bool]$Metadata.mayUpscaleAtRecommendedSize) {
+    $warnings += "图片为 $width × $height，低于建议的 $($script:DreamSkinRecommendedImageWidth) × $($script:DreamSkinRecommendedImageHeight)；显示时可能被放大并变模糊。"
+  }
+  return @($warnings)
 }
 
 function Assert-DreamSkinImageFile {
@@ -85,7 +102,7 @@ function Assert-DreamSkinImageFile {
     throw 'Theme image exceeds the 16 MB limit.'
   }
   if (-not $SkipImageMetadata) {
-    Get-DreamSkinValidatedImageMetadata -Path $fullPath
+    [void](Get-DreamSkinValidatedImageMetadata -Path $fullPath)
   }
 }
 
@@ -251,7 +268,14 @@ function Set-DreamSkinActiveTheme {
   Ensure-DreamSkinManagedDirectory -Path $paths.Active -Root $paths.Root
   Ensure-DreamSkinManagedDirectory -Path $paths.Images -Root $paths.Root
   $source = [System.IO.Path]::GetFullPath($ImagePath)
-  Assert-DreamSkinImageFile -Path $source
+  $isNewImport = $null -eq $Theme
+  Assert-DreamSkinImageFile -Path $source -SkipImageMetadata
+  $sourceMetadata = Get-DreamSkinValidatedImageMetadata -Path $source
+  $imageFitWarnings = [string[]]@()
+  if ($isNewImport) {
+    $imageFitWarnings = [string[]]@(Get-DreamSkinImageFitWarnings -Metadata $sourceMetadata)
+  }
+  foreach ($warning in $imageFitWarnings) { Write-Warning $warning }
   $extension = [System.IO.Path]::GetExtension($source).ToLowerInvariant()
   $oldImage = $null
   try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
@@ -301,7 +325,10 @@ function Set-DreamSkinActiveTheme {
   Copy-Item -LiteralPath $target -Destination $imageArchive -Force
   Assert-DreamSkinNoReparseComponents -Path $imageArchive
   Assert-DreamSkinImageFile -Path $imageArchive
-  return Read-DreamSkinTheme -ThemeDirectory $paths.Active
+  $result = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+  $result | Add-Member -NotePropertyName ImageFitWarnings `
+    -NotePropertyValue ([string[]]$imageFitWarnings) -Force
+  return $result
 }
 
 function Save-DreamSkinCurrentTheme {

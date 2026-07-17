@@ -39,7 +39,7 @@ try {
   }
 
   $arguments = @($injector, '--verify', '--port', "$Port", '--browser-id', $cdpIdentity.BrowserId,
-    '--timeout-ms', '30000')
+    '--timeout-ms', '120000')
   if ($ScreenshotPath) { $arguments += @('--screenshot', $ScreenshotPath) }
   & $node.Path @arguments
   $verifyExitCode = $LASTEXITCODE

@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import {
   MAX_IMAGE_DIMENSION,
   MAX_IMAGE_PIXELS,
+  RECOMMENDED_IMAGE_HEIGHT,
+  RECOMMENDED_IMAGE_WIDTH,
   classifyImageDimensions,
   readImageMetadata,
 } from "../scripts/image-metadata.mjs";
@@ -22,6 +24,8 @@ assert.deepEqual(readImageMetadata(featured, ".jpg"), {
   wide: true,
   aspect: "wide",
   taskMode: "ambient",
+  matchesRecommendedAspect: true,
+  mayUpscaleAtRecommendedSize: false,
 });
 
 const cli = spawnSync(process.execPath, [helper, "--check", path.join(windowsRoot, "assets", "dream-reference.jpg")], {
@@ -37,9 +41,23 @@ assert.deepEqual(classifyImageDimensions({ width: 800, height: 1200 }), {
   wide: false,
   aspect: "portrait",
   taskMode: "ambient",
+  matchesRecommendedAspect: false,
+  mayUpscaleAtRecommendedSize: true,
 });
 assert.equal(MAX_IMAGE_DIMENSION, 16384);
 assert.equal(MAX_IMAGE_PIXELS, 50_000_000);
+assert.equal(RECOMMENDED_IMAGE_WIDTH, 2560);
+assert.equal(RECOMMENDED_IMAGE_HEIGHT, 1440);
+assert.deepEqual(classifyImageDimensions({ width: 1280, height: 720 }), {
+  width: 1280,
+  height: 720,
+  ratio: 1280 / 720,
+  wide: true,
+  aspect: "wide",
+  taskMode: "ambient",
+  matchesRecommendedAspect: true,
+  mayUpscaleAtRecommendedSize: true,
+});
 assert.equal(classifyImageDimensions({ width: 10000, height: 6000 }), null);
 assert.equal(classifyImageDimensions({ width: 20000, height: 1 }), null);
 assert.equal(classifyImageDimensions({ width: 2560.5, height: 1440 }), null);

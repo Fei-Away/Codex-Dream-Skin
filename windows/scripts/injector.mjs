@@ -571,6 +571,19 @@ async function verifyRemovedSession(session) {
   )()`);
 }
 
+export function assessVerificationResult(result) {
+  const homeVerification = !result.homePresent ? "skipped"
+    : Boolean(result.hero) &&
+      (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))
+      ? "pass" : "fail";
+  const mainVerification = result.mainPresent ? "pass" : "fail";
+  const pass = result.installed && result.version === result.expectedVersion &&
+    result.stylePresent && result.chromePresent && result.chromePointerEvents === "none" &&
+    Boolean(result.composer) && Boolean(result.sidebar) && mainVerification === "pass" &&
+    homeVerification !== "fail";
+  return { mainVerification, homeVerification, pass };
+}
+
 async function verifySession(session) {
   return session.evaluate(`(() => {
     const box = (node) => {
@@ -588,6 +601,7 @@ async function verifySession(session) {
       stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
       chromePresent: Boolean(document.getElementById('codex-dream-skin-chrome')),
       chromePointerEvents: getComputedStyle(document.getElementById('codex-dream-skin-chrome') || document.body).pointerEvents,
+      mainPresent: Boolean(document.querySelector('[role="main"]')),
       homePresent: Boolean(home),
       suggestionsPresent: Boolean(suggestions),
       hero: box(home?.firstElementChild?.firstElementChild?.firstElementChild),
@@ -600,11 +614,8 @@ async function verifySession(session) {
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.chromePresent &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
-      (!result.homePresent || (Boolean(result.hero) &&
-        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
+    const assess = ${assessVerificationResult.toString()};
+    Object.assign(result, assess(result));
     return result;
   })()`);
 }

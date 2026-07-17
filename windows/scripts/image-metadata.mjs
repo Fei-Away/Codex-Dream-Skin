@@ -8,6 +8,8 @@ const SOF_MARKERS = new Set([
 ]);
 export const MAX_IMAGE_DIMENSION = 16384;
 export const MAX_IMAGE_PIXELS = 50_000_000;
+export const RECOMMENDED_IMAGE_WIDTH = 2560;
+export const RECOMMENDED_IMAGE_HEIGHT = 1440;
 
 function uint16be(bytes, offset) {
   return bytes[offset] * 256 + bytes[offset + 1];
@@ -120,6 +122,10 @@ export function classifyImageDimensions({ width, height }) {
     wide: ratio >= 1.75,
     aspect,
     taskMode: ratio >= 2.25 ? "banner" : "ambient",
+    matchesRecommendedAspect: width * RECOMMENDED_IMAGE_HEIGHT ===
+      height * RECOMMENDED_IMAGE_WIDTH,
+    mayUpscaleAtRecommendedSize: width < RECOMMENDED_IMAGE_WIDTH ||
+      height < RECOMMENDED_IMAGE_HEIGHT,
   };
 }
 

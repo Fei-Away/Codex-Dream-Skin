@@ -48,196 +48,6 @@ function Test-DreamSkinPathWithin {
   }
 }
 
-function Get-DreamSkinRuntimeEnginePaths {
-  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
-  $root = Join-Path ([System.IO.Path]::GetFullPath($StateRoot)) 'engine'
-  $scripts = Join-Path $root 'scripts'
-  return [pscustomobject]@{
-    Root = $root
-    Scripts = $scripts
-    Start = Join-Path $scripts 'start-dream-skin.ps1'
-    Restore = Join-Path $scripts 'restore-dream-skin.ps1'
-    Tray = Join-Path $scripts 'tray-dream-skin.ps1'
-  }
-}
-
-function Test-DreamSkinTrayActive {
-  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-  $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
-  $acquired = $false
-  try {
-    try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] {
-      $acquired = $true
-    }
-    if ($acquired) {
-      $mutex.ReleaseMutex()
-      $acquired = $false
-      return $false
-    }
-    return $true
-  } finally {
-    if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
-    $mutex.Dispose()
-  }
-}
-
-function Assert-DreamSkinRuntimeTree {
-  param([Parameter(Mandatory = $true)][string]$Path)
-  $root = [System.IO.Path]::GetFullPath($Path)
-  if (-not (Test-Path -LiteralPath $root -PathType Container)) {
-    throw "Dream Skin runtime directory does not exist: $root"
-  }
-  if (-not (Get-Command Assert-DreamSkinNoReparseComponents -ErrorAction SilentlyContinue)) {
-    throw 'Dream Skin managed-path validation is unavailable.'
-  }
-  Assert-DreamSkinNoReparseComponents -Path $root
-  foreach ($item in Get-ChildItem -LiteralPath $root -Recurse -Force -ErrorAction Stop) {
-    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-      throw "Dream Skin runtime contains a junction or symbolic link: $($item.FullName)"
-    }
-  }
-}
-
-function Remove-DreamSkinRuntimeTree {
-  param(
-    [Parameter(Mandatory = $true)][string]$Path,
-    [Parameter(Mandatory = $true)][string]$StateRoot
-  )
-  $fullPath = [System.IO.Path]::GetFullPath($Path)
-  $fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
-  if (-not (Test-DreamSkinPathWithin -Path $fullPath -Root $fullStateRoot)) {
-    throw "Refusing to remove a runtime path outside the Dream Skin state root: $fullPath"
-  }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return }
-  Assert-DreamSkinRuntimeTree -Path $fullPath
-  Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
-}
-
-function Install-DreamSkinRuntimeEngine {
-  param(
-    [Parameter(Mandatory = $true)][string]$SkillRoot,
-    [Parameter(Mandatory = $true)][string]$StateRoot
-  )
-  if (-not (Get-Command Ensure-DreamSkinManagedDirectory -ErrorAction SilentlyContinue)) {
-    throw 'Dream Skin managed-directory validation is unavailable.'
-  }
-
-  $sourceRoot = [System.IO.Path]::GetFullPath($SkillRoot)
-  $fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
-  $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $fullStateRoot
-  $required = @(
-    'assets\dream-reference.jpg',
-    'assets\dream-skin.css',
-    'assets\renderer-inject.js',
-    'assets\theme.json',
-    'scripts\common-windows.ps1',
-    'scripts\config-utf8.ps1',
-    'scripts\image-metadata.mjs',
-    'scripts\injector.mjs',
-    'scripts\install-dream-skin.ps1',
-    'scripts\restore-dream-skin.ps1',
-    'scripts\start-dream-skin.ps1',
-    'scripts\theme-windows.ps1',
-    'scripts\tray-dream-skin.ps1',
-    'scripts\verify-dream-skin.ps1'
-  )
-  foreach ($relative in $required) {
-    if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot $relative) -PathType Leaf)) {
-      throw "Dream Skin runtime source is incomplete: $relative"
-    }
-  }
-  foreach ($directoryName in @('assets', 'scripts')) {
-    $sourceDirectory = Join-Path $sourceRoot $directoryName
-    if ((Test-DreamSkinPathEqual -Left $fullStateRoot -Right $sourceDirectory) -or
-      (Test-DreamSkinPathWithin -Path $fullStateRoot -Root $sourceDirectory)) {
-      throw "Dream Skin state root cannot be created inside its runtime source: $fullStateRoot"
-    }
-    Assert-DreamSkinRuntimeTree -Path $sourceDirectory
-  }
-
-  Ensure-DreamSkinManagedDirectory -Path $fullStateRoot -Root $fullStateRoot
-  $token = [guid]::NewGuid().ToString('N')
-  $stagingRoot = Join-Path $fullStateRoot ".engine-staging-$token"
-  $backupRoot = Join-Path $fullStateRoot ".engine-backup-$token"
-  Ensure-DreamSkinManagedDirectory -Path $stagingRoot -Root $fullStateRoot
-
-  try {
-    foreach ($directoryName in @('assets', 'scripts')) {
-      Copy-Item -LiteralPath (Join-Path $sourceRoot $directoryName) -Destination $stagingRoot `
-        -Recurse -Force -ErrorAction Stop
-    }
-    Assert-DreamSkinRuntimeTree -Path $stagingRoot
-    foreach ($relative in $required) {
-      if (-not (Test-Path -LiteralPath (Join-Path $stagingRoot $relative) -PathType Leaf)) {
-        throw "Staged Dream Skin runtime is incomplete: $relative"
-      }
-    }
-
-    $sourcePrefix = $sourceRoot.TrimEnd('\') + '\'
-    $sourceFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'assets'), (Join-Path $sourceRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
-    )
-    $stagedFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'assets'), (Join-Path $stagingRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
-    )
-    if ($sourceFiles.Count -ne $stagedFiles.Count) {
-      throw 'Staged Dream Skin runtime file count does not match its source.'
-    }
-    foreach ($sourceFile in $sourceFiles) {
-      $relative = $sourceFile.FullName.Substring($sourcePrefix.Length)
-      $stagedFile = Join-Path $stagingRoot $relative
-      if (-not (Test-Path -LiteralPath $stagedFile -PathType Leaf) -or
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile.FullName).Hash -cne
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $stagedFile).Hash) {
-        throw "Staged Dream Skin runtime failed hash verification: $relative"
-      }
-    }
-
-    $hasBackup = $false
-    if (Test-Path -LiteralPath $engine.Root) {
-      Assert-DreamSkinRuntimeTree -Path $engine.Root
-      Move-Item -LiteralPath $engine.Root -Destination $backupRoot -ErrorAction Stop
-      $hasBackup = $true
-    }
-    try {
-      Move-Item -LiteralPath $stagingRoot -Destination $engine.Root -ErrorAction Stop
-    } catch {
-      $installError = $_.Exception.Message
-      if ($hasBackup -and -not (Test-Path -LiteralPath $engine.Root)) {
-        try {
-          Move-Item -LiteralPath $backupRoot -Destination $engine.Root -ErrorAction Stop
-          $hasBackup = $false
-        } catch {
-          throw "Dream Skin runtime update failed and its previous engine could not be restored. Backup preserved at ${backupRoot}: $installError"
-        }
-      }
-      throw
-    }
-    if ($hasBackup) {
-      try { Remove-DreamSkinRuntimeTree -Path $backupRoot -StateRoot $fullStateRoot } catch {
-        try {
-          Write-Warning "Installed the new runtime but could not remove its previous backup: $($_.Exception.Message)"
-        } catch {
-          # Cleanup must never make a committed runtime update look unsuccessful.
-        }
-      }
-    }
-    return Get-DreamSkinRuntimeEnginePaths -StateRoot $fullStateRoot
-  } finally {
-    if (Test-Path -LiteralPath $stagingRoot) {
-      try { Remove-DreamSkinRuntimeTree -Path $stagingRoot -StateRoot $fullStateRoot } catch {
-        try {
-          Write-Warning "Could not remove the staged Dream Skin runtime: $($_.Exception.Message)"
-        } catch {
-          # Cleanup must never mask the runtime installation result.
-        }
-      }
-    }
-  }
-}
-
 function Test-DreamSkinCommandLineToken {
   param([string]$CommandLine, [string]$Token)
   if (-not $CommandLine -or -not $Token) { return $false }
@@ -285,13 +95,11 @@ function Invoke-DreamSkinNative {
   $ErrorActionPreference = 'Continue'
   try {
     if ($DiscardStderr) {
-      $nativeOutput = @(& $FilePath @ArgumentList 2>$null)
+      $output = @(& $FilePath @ArgumentList 2>$null | ForEach-Object { "$_" })
     } else {
-      $nativeOutput = @(& $FilePath @ArgumentList 2>&1)
+      $output = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" })
     }
-    $exitCode = $LASTEXITCODE
-    $output = @($nativeOutput | ForEach-Object { "$_" })
-    return [pscustomobject]@{ Output = $output; ExitCode = $exitCode }
+    return [pscustomobject]@{ Output = $output; ExitCode = $LASTEXITCODE }
   } finally {
     $ErrorActionPreference = $previousPreference
   }
@@ -711,13 +519,12 @@ function Get-DreamSkinProcessStartedAt {
   }
 }
 
-function Stop-DreamSkinRecordedInjector {
-  param([AllowNull()][object]$State)
-  if ($null -eq $State -or -not $State.injectorPid) { return $true }
+function Assert-DreamSkinRecordedInjectorIdentity {
+  param(
+    [Parameter(Mandatory = $true)][object]$State,
+    [Parameter(Mandatory = $true)][object]$ProcessInfo
+  )
   $processId = [int]$State.injectorPid
-  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
-  if (-not $process) { return $true }
-
   $expectedInjector = if ($State.injectorPath) {
     "$($State.injectorPath)"
   } elseif ($State.skillRoot) {
@@ -725,8 +532,8 @@ function Stop-DreamSkinRecordedInjector {
   } else {
     $null
   }
-  $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $process
-  $commandLine = "$($process.CommandLine)"
+  $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $ProcessInfo
+  $commandLine = "$($ProcessInfo.CommandLine)"
   if (-not $processPath -or -not $commandLine) {
     throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
   }
@@ -753,13 +560,65 @@ function Stop-DreamSkinRecordedInjector {
   if (-not $identityMatches) {
     throw "The recorded injector PID $processId is running, but its visible identity does not match the saved Dream Skin process. State was preserved."
   }
-
-  Stop-Process -Id $processId -Force -ErrorAction Stop
-  try { Wait-Process -Id $processId -Timeout 5 -ErrorAction Stop } catch {}
-  if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
-    throw "The recorded Dream Skin injector did not stop: PID $processId"
-  }
   return $true
+}
+
+function Request-DreamSkinInjectorStop {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+  Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+}
+
+function Wait-DreamSkinProcessExit {
+  param(
+    [Parameter(Mandatory = $true)][int]$ProcessId,
+    [Parameter(Mandatory = $true)][int]$TimeoutSeconds
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return $true }
+    Start-Sleep -Milliseconds 250
+  }
+  return -not [bool](Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+}
+
+function Stop-DreamSkinRecordedInjector {
+  param([AllowNull()][object]$State)
+  if ($null -eq $State -or -not $State.injectorPid) { return $true }
+  $processId = [int]$State.injectorPid
+  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
+  if (-not $process) { return $true }
+  [void](Assert-DreamSkinRecordedInjectorIdentity -State $State -ProcessInfo $process)
+
+  $firstStopError = $null
+  try {
+    Request-DreamSkinInjectorStop -ProcessId $processId
+  } catch {
+    $firstStopError = $_.Exception.Message
+  }
+  if (-not (Get-Process -Id $processId -ErrorAction SilentlyContinue)) { return $true }
+  if (-not $firstStopError -and (Wait-DreamSkinProcessExit -ProcessId $processId -TimeoutSeconds 8)) {
+    return $true
+  }
+
+  # Revalidate after the wait so a reused PID can never receive the retry.
+  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
+  if (-not $process) { return $true }
+  [void](Assert-DreamSkinRecordedInjectorIdentity -State $State -ProcessInfo $process)
+  if ($firstStopError) {
+    Write-Warning "The verified Dream Skin injector rejected the first stop request; retrying PID $processId."
+  } else {
+    Write-Warning "The verified Dream Skin injector is still exiting; retrying PID $processId."
+  }
+
+  try {
+    Request-DreamSkinInjectorStop -ProcessId $processId
+  } catch {
+    Write-Warning "The verified Dream Skin injector could not be stopped after two attempts. Close PID $processId manually if it remains visible."
+    return $false
+  }
+  if (Wait-DreamSkinProcessExit -ProcessId $processId -TimeoutSeconds 12) { return $true }
+  Write-Warning "The verified Dream Skin injector did not exit after two attempts. Close PID $processId manually if it remains visible."
+  return $false
 }
 
 function Get-DreamSkinCodexProcesses {
