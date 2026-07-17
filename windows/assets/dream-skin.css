@@ -105,8 +105,7 @@ html.codex-dream-skin main.main-surface {
 }
 
 html.codex-dream-skin main.main-surface > header.app-header-tint {
-  position: relative;
-  z-index: 20;
+  /* Preserve Codex's native fixed header geometry and side-panel controls. */
   color: var(--dream-text) !important;
   background: color-mix(in oklab, var(--dream-surface) 94%, transparent) !important;
   border-color: var(--dream-line-soft) !important;
