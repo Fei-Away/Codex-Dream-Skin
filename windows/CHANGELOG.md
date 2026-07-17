@@ -1,5 +1,26 @@
 # Windows Changelog
 
+## 1.5.2 — 2026-07-17
+
+### 新增
+
+- 增加本地 Dream Skin Studio、24 套 Theme v3 官方场景、双调色板编辑器、实时构图、对比度检查和诊断页。
+- 新建任务页增加可交互场景 Hero 与四张行动卡，子菜单转交 Codex 原生上下文、插件、智能体和项目入口。
+
+### 改进
+
+- Studio、主题 schema、主题资源和场景层改由 `shared/` 复用；Windows Store 启动、PowerShell 配置往返、CDP Browser ID 与基础窗口样式继续保留平台实现。
+- Windows 受管 engine 原子复制并校验 `shared/`、Studio 和平台适配器，源码目录移动后仍可独立运行。
+- 移除 Hero 右上角“场景状态”浮层；旧主题中的 `widget` 数据继续兼容。
+
+### 安全
+
+- Studio 主题切换复用既有受管主题仓库与 reparse point 检查；暂停使用 watcher pause marker；启动和恢复继续要求重启确认，不绕过 Store 包身份校验。
+
+### 说明
+
+- 已覆盖共享 Node、Studio API/UI 和 PowerShell 静态契约；Windows Store Codex 最终视觉效果仍需 Windows 主机验收。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

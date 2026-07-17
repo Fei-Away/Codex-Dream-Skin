@@ -58,6 +58,7 @@ function Get-DreamSkinRuntimeEnginePaths {
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
+    Studio = Join-Path $scripts 'start-dream-skin-studio.ps1'
   }
 }
 
@@ -123,6 +124,12 @@ function Install-DreamSkinRuntimeEngine {
   }
 
   $sourceRoot = [System.IO.Path]::GetFullPath($SkillRoot)
+  $sharedSource = @(
+    (Join-Path $sourceRoot 'shared'),
+    (Join-Path (Split-Path -Parent $sourceRoot) 'shared')
+  ) | Where-Object { Test-Path -LiteralPath (Join-Path $_ 'runtime\scene-inject.js') -PathType Leaf } |
+    Select-Object -First 1
+  if (-not $sharedSource) { throw 'Shared Dream Skin runtime is missing.' }
   $fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
   $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $fullStateRoot
   $required = @(
@@ -140,14 +147,31 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\theme-windows.ps1',
     'scripts\tray-dream-skin.ps1',
     'scripts\verify-dream-skin.ps1'
+    'scripts\pause-dream-skin.ps1'
+    'scripts\start-dream-skin-studio.ps1'
+    'scripts\status-dream-skin.ps1'
+    'scripts\switch-theme.ps1'
+    'platform\studio-adapter.mjs'
+    'studio\server.mjs'
+    'shared\runtime\scene-inject.js'
   )
   foreach ($relative in $required) {
-    if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot $relative) -PathType Leaf)) {
+    $source = if ($relative.StartsWith('shared\')) {
+      Join-Path $sharedSource $relative.Substring(7)
+    } else { Join-Path $sourceRoot $relative }
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
       throw "Dream Skin runtime source is incomplete: $relative"
     }
   }
-  foreach ($directoryName in @('assets', 'scripts')) {
-    $sourceDirectory = Join-Path $sourceRoot $directoryName
+  $sourceSets = @(
+    [pscustomobject]@{ Name = 'assets'; Path = (Join-Path $sourceRoot 'assets') },
+    [pscustomobject]@{ Name = 'scripts'; Path = (Join-Path $sourceRoot 'scripts') },
+    [pscustomobject]@{ Name = 'platform'; Path = (Join-Path $sourceRoot 'platform') },
+    [pscustomobject]@{ Name = 'studio'; Path = (Join-Path $sourceRoot 'studio') },
+    [pscustomobject]@{ Name = 'shared'; Path = ([System.IO.Path]::GetFullPath($sharedSource)) }
+  )
+  foreach ($sourceSet in $sourceSets) {
+    $sourceDirectory = $sourceSet.Path
     if ((Test-DreamSkinPathEqual -Left $fullStateRoot -Right $sourceDirectory) -or
       (Test-DreamSkinPathWithin -Path $fullStateRoot -Root $sourceDirectory)) {
       throw "Dream Skin state root cannot be created inside its runtime source: $fullStateRoot"
@@ -162,8 +186,8 @@ function Install-DreamSkinRuntimeEngine {
   Ensure-DreamSkinManagedDirectory -Path $stagingRoot -Root $fullStateRoot
 
   try {
-    foreach ($directoryName in @('assets', 'scripts')) {
-      Copy-Item -LiteralPath (Join-Path $sourceRoot $directoryName) -Destination $stagingRoot `
+    foreach ($sourceSet in $sourceSets) {
+      Copy-Item -LiteralPath $sourceSet.Path -Destination (Join-Path $stagingRoot $sourceSet.Name) `
         -Recurse -Force -ErrorAction Stop
     }
     Assert-DreamSkinRuntimeTree -Path $stagingRoot
@@ -173,20 +197,22 @@ function Install-DreamSkinRuntimeEngine {
       }
     }
 
-    $sourcePrefix = $sourceRoot.TrimEnd('\') + '\'
-    $sourceFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'assets'), (Join-Path $sourceRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
-    )
-    $stagedFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'assets'), (Join-Path $stagingRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
-    )
+    $sourceFiles = @($sourceSets | ForEach-Object {
+      $set = $_
+      Get-ChildItem -LiteralPath $set.Path -Recurse -File -Force -ErrorAction Stop | ForEach-Object {
+        [pscustomobject]@{
+          File = $_
+          Relative = Join-Path $set.Name $_.FullName.Substring($set.Path.TrimEnd('\').Length).TrimStart('\')
+        }
+      }
+    })
+    $stagedFiles = @(Get-ChildItem -LiteralPath $stagingRoot -Recurse -File -Force -ErrorAction Stop)
     if ($sourceFiles.Count -ne $stagedFiles.Count) {
       throw 'Staged Dream Skin runtime file count does not match its source.'
     }
-    foreach ($sourceFile in $sourceFiles) {
-      $relative = $sourceFile.FullName.Substring($sourcePrefix.Length)
+    foreach ($sourceEntry in $sourceFiles) {
+      $sourceFile = $sourceEntry.File
+      $relative = $sourceEntry.Relative
       $stagedFile = Join-Path $stagingRoot $relative
       if (-not (Test-Path -LiteralPath $stagedFile -PathType Leaf) -or
         (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile.FullName).Hash -cne

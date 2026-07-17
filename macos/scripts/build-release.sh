@@ -16,6 +16,8 @@ if [ "${1:-}" != "--skip-tests" ]; then "$ROOT/tests/run-tests.sh"; fi
   --exclude '.DS_Store' \
   --exclude 'release/' \
   "$ROOT/" "$TMP/codex-dream-skin-studio/"
+/bin/mkdir -p "$TMP/codex-dream-skin-studio/shared"
+/usr/bin/rsync -a --exclude '.DS_Store' "$ROOT/../shared/" "$TMP/codex-dream-skin-studio/shared/"
 
 # The macOS tree is also published as a standalone ZIP. Bundle prompt guides
 # and their referenced images, then translate repository paths for this root.

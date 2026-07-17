@@ -52,6 +52,7 @@ try {
     $startScript = $engine.Start
     $restoreScript = $engine.Restore
     $trayScript = $engine.Tray
+    $studioScript = $engine.Studio
     $portArgument = if ($PortExplicit) { " -Port $Port" } else { '' }
 
     foreach ($folder in @($desktop, $startMenu)) {
@@ -69,6 +70,13 @@ try {
     $restore.WorkingDirectory = $engine.Root
     $restore.Description = 'Restore the official Codex appearance and close the CDP session'
     $restore.Save()
+
+    $studio = $shell.CreateShortcut((Join-Path $desktop 'Codex Dream Skin Studio.lnk'))
+    $studio.TargetPath = $powershell
+    $studio.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$studioScript`""
+    $studio.WorkingDirectory = $engine.Root
+    $studio.Description = 'Open the local Codex Dream Skin Studio'
+    $studio.Save()
 
     foreach ($folder in @($desktop, $startMenu)) {
       $tray = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))

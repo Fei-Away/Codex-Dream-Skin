@@ -43,14 +43,17 @@ async function readLog(name) {
 
 export async function createWindowsStudioAdapter() {
   let version = "unknown";
-  try { version = (await fs.readFile(path.join(projectRoot, "VERSION"), "utf8")).trim(); } catch {}
+  try {
+    const injector = await fs.readFile(path.join(projectRoot, "scripts", "injector.mjs"), "utf8");
+    version = /const SKIN_VERSION = "([^"]+)";/.exec(injector)?.[1] || version;
+  } catch {}
   return {
     platform: "win32",
     version,
     paths: {
       stateRoot,
       themeRoot: path.join(stateRoot, "themes"),
-      currentThemeRoot: path.join(stateRoot, "theme"),
+      currentThemeRoot: path.join(stateRoot, "active-theme"),
       imagesRoot: path.join(stateRoot, "images"),
       configPath: path.join(os.homedir(), ".codex", "config.toml"),
     },
@@ -61,10 +64,10 @@ export async function createWindowsStudioAdapter() {
     async runAction(action, input) {
       const actions = {
         "apply-theme": ["switch-theme.ps1", ["-Id", input.id]],
-        start: ["start-dream-skin.ps1", ["-RestartExisting"]],
-        reapply: ["start-dream-skin.ps1", ["-RestartExisting"]],
+        start: ["start-dream-skin.ps1", ["-PromptRestart"]],
+        reapply: ["start-dream-skin.ps1", ["-PromptRestart"]],
         pause: ["pause-dream-skin.ps1", []],
-        restore: ["restore-dream-skin.ps1", []],
+        restore: ["restore-dream-skin.ps1", ["-RestoreBaseTheme", "-PromptRestart"]],
         doctor: ["verify-dream-skin.ps1", []],
       };
       const entry = actions[action];

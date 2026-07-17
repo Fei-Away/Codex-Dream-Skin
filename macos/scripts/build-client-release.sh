@@ -17,6 +17,8 @@ trap '/bin/rm -rf "$TMP"' EXIT
   --exclude 'release/' \
   --exclude 'runtime/' \
   "$ROOT/" "$ENGINE/"
+/bin/mkdir -p "$ENGINE/shared"
+/usr/bin/rsync -a --exclude '.DS_Store' "$ROOT/../shared/" "$ENGINE/shared/"
 
 # Keep the customer ZIP self-contained: bundle prompt docs and referenced
 # images, then translate repository paths for the hidden standalone engine.

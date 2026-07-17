@@ -299,10 +299,13 @@
   };
 
   const applyTheme = (root, shell) => {
-    const colors = THEME.colors || {};
-    const explicit = new Set(Array.isArray(THEME.explicitColorKeys) ? THEME.explicitColorKeys : []);
+    const scenePalette = THEME.palettes?.[shell] || null;
+    const colors = scenePalette || THEME.colors || {};
+    const explicit = new Set(scenePalette
+      ? ["background", "panel", "panelAlt", "accent", "accentAlt", "secondary", "highlight", "text", "muted", "line"]
+      : Array.isArray(THEME.explicitColorKeys) ? THEME.explicitColorKeys : []);
     const adaptive = makeAdaptivePalette(artAnalysis?.accentRgb, shell);
-    const legacyLight = !THEME.appearance && shell === "light";
+    const legacyLight = !scenePalette && !THEME.appearance && shell === "light";
     const structural = new Set(["background", "panel", "panelAlt", "text", "muted"]);
     const pick = (name) => {
       const allowExplicit = explicit.has(name) && !(legacyLight && structural.has(name));

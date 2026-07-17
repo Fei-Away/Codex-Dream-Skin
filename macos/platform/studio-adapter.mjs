@@ -61,10 +61,10 @@ export async function createMacosStudioAdapter() {
     async runAction(action, input) {
       const actions = {
         "apply-theme": ["switch-theme-macos.sh", ["--id", input.id]],
-        start: ["start-dream-skin-macos.sh", ["--port", "9341", "--restart-existing"]],
-        reapply: ["start-dream-skin-macos.sh", ["--port", "9341", "--restart-existing"]],
+        start: ["start-dream-skin-macos.sh", ["--port", "9341", "--prompt-restart"]],
+        reapply: ["start-dream-skin-macos.sh", ["--port", "9341", "--prompt-restart"]],
         pause: ["pause-dream-skin-macos.sh", []],
-        restore: ["restore-dream-skin-macos.sh", ["--restore-base-theme"]],
+        restore: ["restore-dream-skin-macos.sh", ["--restore-base-theme", "--prompt-restart"]],
         doctor: ["doctor-macos.sh", []],
       };
       const entry = actions[action];

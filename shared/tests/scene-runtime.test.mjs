@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const testsRoot = path.dirname(fileURLToPath(import.meta.url));
 const sharedRoot = path.resolve(testsRoot, "..");
 const [injector, sceneCss, homeCss] = await Promise.all([
-  fs.readFile(path.join(sharedRoot, "runtime", "renderer-inject.js"), "utf8"),
+  fs.readFile(path.join(sharedRoot, "runtime", "scene-inject.js"), "utf8"),
   fs.readFile(path.join(sharedRoot, "runtime", "css", "scene-v3.css"), "utf8"),
   fs.readFile(path.join(sharedRoot, "runtime", "css", "home.css"), "utf8"),
 ]);
@@ -20,20 +20,19 @@ for (const marker of [
   "dream-skin-scene-action",
   "dream-skin-scene-menu",
   "dream-skin-scene-companion",
-  "dream-skin-scene-composer",
 ]) {
   assert.match(injector, new RegExp(marker), `运行时缺少 ${marker}`);
   assert.match(sceneCss, new RegExp(marker), `样式缺少 ${marker}`);
 }
-assert.match(injector, /SCENE_ICONS/);
-assert.match(injector, /SCENE_RENDERER_VERSION/);
+assert.match(injector, /const icons = Object\.freeze/);
+assert.match(injector, /RENDERER_VERSION/);
 assert.match(injector, /createElementNS\("http:\/\/www\.w3\.org\/2000\/svg"/);
 assert.doesNotMatch(injector, /spark:\s*"✦"/);
 assert.match(injector, /replaceChildren/);
-assert.match(injector, /removeSceneDecorations/);
+assert.match(injector, /removeScene/);
 assert.match(injector, /closestDirectChild/);
 assert.match(injector, /findHome/);
-assert.match(injector, /runSceneAction/);
+assert.match(injector, /runAction/);
 assert.match(injector, /openNativeComposerMenu/);
 assert.match(injector, /data-composer-navigation-target=\\?"add-context/);
 assert.match(injector, /composer-home-top-menu/);

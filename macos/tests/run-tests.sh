@@ -805,7 +805,8 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.2" ]' _ "$ROOT"
+"$NODE" --test "$ROOT/../shared/tests/"*.test.mjs
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

@@ -1,0 +1,146 @@
+html.codex-dream-skin [role="main"] {
+  background: transparent !important;
+  scrollbar-color: color-mix(in srgb, var(--ds-green) 42%, transparent) transparent;
+}
+
+html.codex-dream-skin .dream-skin-home {
+  --thread-content-max-width: min(980px, calc(100cqw - 44px)) !important;
+  overflow-x: hidden !important;
+}
+
+/* Codex changes the home markup frequently. Runtime classes isolate the native
+   hero and composer regions so the scene remains a continuous document flow. */
+.dream-skin-home > .dream-skin-home-flow {
+  min-height: 100% !important;
+  padding: 16px 0 18px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  gap: 14px !important;
+}
+
+.dream-skin-home .dream-skin-native-hero-region,
+.dream-skin-home .dream-skin-native-banner-region {
+  display: none !important;
+}
+
+.dream-skin-home .dream-skin-native-composer-region {
+  position: relative !important;
+  min-height: 0 !important;
+  margin-top: clamp(34px, 6vh, 64px) !important;
+  flex: 0 0 auto !important;
+  justify-content: flex-start !important;
+}
+
+.dream-skin-home .dream-skin-native-composer-region > div:last-child {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.dream-skin-home [data-feature="game-source"],
+.dream-skin-home [data-testid="home-icon"] {
+  display: none !important;
+}
+
+html.codex-dream-skin .composer-surface-chrome {
+  border: 1px solid color-mix(in srgb, var(--ds-line) 78%, var(--ds-green)) !important;
+  border-radius: var(--dream-radius) !important;
+  background:
+    radial-gradient(circle at 88% 20%, color-mix(in srgb, var(--ds-purple) 14%, transparent), transparent 28%),
+    linear-gradient(145deg, color-mix(in srgb, var(--ds-panel) 92%, transparent), color-mix(in srgb, var(--ds-bg) 88%, transparent)) !important;
+  box-shadow: 0 12px 30px rgb(0 0 0 / var(--dream-shadow-opacity)), inset 0 0 0 3px color-mix(in srgb, var(--ds-cyan) 4%, transparent) !important;
+  backdrop-filter: blur(var(--dream-panel-blur)) saturate(116%) !important;
+  overflow: visible !important;
+}
+
+html.codex-dream-skin .composer-surface-chrome::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: -1px;
+  width: 44px;
+  height: 1px;
+  background: var(--ds-green);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ds-green) 60%, transparent);
+}
+
+.dream-skin-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector) {
+  position: relative;
+  padding-top: 25px !important;
+  border: 1px solid color-mix(in srgb, var(--ds-line) 78%, transparent);
+  border-bottom: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ds-panel) 94%, transparent), color-mix(in srgb, var(--ds-bg) 90%, transparent)) !important;
+}
+
+.dream-skin-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
+  content: var(--dream-skin-project-label, "选择项目");
+  position: absolute;
+  left: 14px;
+  top: 6px;
+  z-index: 2;
+  color: var(--ds-green);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.dream-skin-home .group\/project-selector > button {
+  border-color: color-mix(in srgb, var(--ds-green) 30%, transparent) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ds-panel) 96%, var(--ds-green)), color-mix(in srgb, var(--ds-panel) 92%, var(--ds-purple))) !important;
+  color: var(--ds-text) !important;
+  box-shadow: 0 3px 12px rgb(0 0 0 / .22) !important;
+}
+
+html.codex-dream-skin .ProseMirror {
+  color: var(--ds-text) !important;
+  caret-color: var(--ds-green) !important;
+}
+
+html.codex-dream-skin button[class~="bg-token-foreground"] {
+  background: linear-gradient(145deg, var(--ds-lime), var(--ds-green)) !important;
+  color: var(--ds-bg) !important;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--ds-green) 22%, transparent) !important;
+}
+
+html.codex-dream-skin [role="menu"],
+html.codex-dream-skin [role="listbox"] {
+  border-color: color-mix(in srgb, var(--ds-line) 82%, var(--ds-green)) !important;
+  background: color-mix(in srgb, var(--ds-panel) 96%, transparent) !important;
+  color: var(--ds-text) !important;
+  box-shadow: 0 16px 42px rgb(0 0 0 / .38) !important;
+  backdrop-filter: blur(calc(var(--dream-panel-blur) + 4px)) saturate(118%) !important;
+}
+
+html.codex-dream-skin [role="menuitem"]:hover,
+html.codex-dream-skin [role="option"]:hover,
+html.codex-dream-skin [role="option"][aria-selected="true"] {
+  background: color-mix(in srgb, var(--ds-green) 13%, transparent) !important;
+  color: var(--ds-text) !important;
+}
+
+html.codex-dream-skin article,
+html.codex-dream-skin [data-message-author-role] {
+  border-radius: var(--dream-radius);
+}
+
+@keyframes ds-float {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .48; }
+  50% { transform: translate3d(4px, -8px, 0); opacity: 1; }
+}
+
+@media (max-width: 1120px) {
+  .dream-skin-quote, .dream-skin-orbit { display: none !important; }
+  .dream-skin-home { --thread-content-max-width: min(900px, calc(100cqw - 30px)) !important; }
+}
+
+@media (max-width: 720px) {
+  .dream-skin-home > .dream-skin-home-flow { padding-top: 10px !important; gap: 10px !important; }
+  .dream-skin-status { display: none !important; }
+  .dream-skin-brand { left: 15px; }
+  .dream-skin-brand b { font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dream-skin-particles i { animation: none !important; }
+}

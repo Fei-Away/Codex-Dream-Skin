@@ -10,7 +10,7 @@ const [install, start, common, injector, studio, status, switchTheme, adapter] =
   read("windows/scripts/install-dream-skin.ps1"),
   read("windows/scripts/start-dream-skin.ps1"),
   read("windows/scripts/common-windows.ps1"),
-  read("shared/runtime/injector.mjs"),
+  read("shared/runtime/scene-inject.js"),
   read("windows/scripts/start-dream-skin-studio.ps1"),
   read("windows/scripts/status-dream-skin.ps1"),
   read("windows/scripts/switch-theme.ps1"),
@@ -18,16 +18,14 @@ const [install, start, common, injector, studio, status, switchTheme, adapter] =
 ]);
 
 assert.doesNotMatch(install, /appearanceTheme\s*=\s*"light"/);
-assert.match(install, /\.codex[\\/]codex-dream-skin-studio/i);
-assert.match(install, /shared/i);
 assert.match(install, /Codex Dream Skin Studio\.lnk/);
 assert.doesNotMatch(`${install}\n${start}\n${common}`, /WindowsApps\\[^'"\s]*_\d/);
 
-assert.match(common, /Get-AppxPackage\s+OpenAI\.Codex/i);
-assert.match(common, /cua_node/i);
+assert.match(common, /Get-AppxPackage[^\n]+OpenAI\.Codex/i);
+assert.match(`${common}\n${start}`, /Get-DreamSkinNodeRuntime/);
 assert.match(start, /--theme-dir/i);
-assert.match(injector, /normalizeTheme/);
-assert.match(injector, /__DREAM_SKIN_RUNTIME_JSON__/);
+assert.match(injector, /composer-home-top-menu/);
+assert.match(common, /shared[\\/]runtime[\\/]scene-inject\.js/i);
 
 assert.match(studio, /studio[\\/]server\.mjs/i);
 assert.match(status, /ConvertTo-Json/);

@@ -7,13 +7,24 @@ import { readImageMetadata } from "./image-metadata.mjs";
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.2.0";
+const SKIN_VERSION = "1.5.2";
 const MAX_ART_BYTES = 16 * 1024 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 
 class CdpIdentityMismatchError extends Error {}
+
+async function resolveSharedRoot() {
+  const candidates = [path.join(root, "shared"), path.resolve(root, "..", "shared")];
+  for (const candidate of candidates) {
+    try {
+      await fs.access(path.join(candidate, "runtime", "scene-inject.js"));
+      return candidate;
+    } catch {}
+  }
+  throw new Error("Shared Theme v3 scene runtime is missing");
+}
 
 function parseArgs(argv) {
   const options = {
@@ -335,6 +346,10 @@ async function loadTheme(themeDir) {
   if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
+  const sceneAppearance = raw.appearance && typeof raw.appearance === "object" && !Array.isArray(raw.appearance)
+    ? raw.appearance : null;
+  const background = sceneAppearance?.background && typeof sceneAppearance.background === "object"
+    ? sceneAppearance.background : {};
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
@@ -342,10 +357,14 @@ async function loadTheme(themeDir) {
     id: normalizedText(raw.id, "id", "custom", 80),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
     image,
-    appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
+    appearance: normalizedChoice(
+      typeof raw.appearance === "string" ? raw.appearance
+        : raw.shellMode === "light" || raw.shellMode === "dark" ? raw.shellMode : "auto",
+      "appearance", THEME_CHOICES.appearance, "auto",
+    ),
     art: {
-      focusX: normalizedUnit(art.focusX, "art.focusX"),
-      focusY: normalizedUnit(art.focusY, "art.focusY"),
+      focusX: normalizedUnit(art.focusX ?? (Number.isFinite(background.focusX) ? background.focusX / 100 : null), "art.focusX"),
+      focusY: normalizedUnit(art.focusY ?? (Number.isFinite(background.focusY) ? background.focusY / 100 : null), "art.focusY"),
       safeArea: normalizedChoice(art.safeArea, "art.safeArea", THEME_CHOICES.safeArea, "auto"),
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
@@ -357,6 +376,12 @@ async function loadTheme(themeDir) {
       throw new Error("palette.accent is not a supported CSS color");
     }
     theme.palette.accent = accent;
+  }
+  if (sceneAppearance) theme.sceneAppearance = sceneAppearance;
+  if (raw.palettes && typeof raw.palettes === "object" && !Array.isArray(raw.palettes)) theme.palettes = raw.palettes;
+  if (raw.scene && typeof raw.scene === "object" && !Array.isArray(raw.scene)) theme.scene = raw.scene;
+  for (const key of ["brandSubtitle", "tagline", "projectPrefix", "projectLabel", "statusText", "quote"]) {
+    if (raw[key] !== undefined) theme[key] = normalizedText(raw[key], key, "", key === "tagline" ? 160 : 80);
   }
   const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
   if (!imageStat.isFile()) throw new Error("Theme image is not a file");
@@ -390,18 +415,24 @@ async function loadTheme(themeDir) {
 
 async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme = null) {
   const loadedTheme = candidateTheme ?? await loadTheme(themeDir);
-  const [css, template] = await Promise.all([
+  const sharedRoot = await resolveSharedRoot();
+  const [baseCss, template, homeCss, sceneCss, sceneTemplate] = await Promise.all([
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
+    fs.readFile(path.join(sharedRoot, "runtime", "css", "home.css"), "utf8"),
+    fs.readFile(path.join(sharedRoot, "runtime", "css", "scene-v3.css"), "utf8"),
+    fs.readFile(path.join(sharedRoot, "runtime", "scene-inject.js"), "utf8"),
   ]);
+  const css = [baseCss, homeCss, sceneCss].join("\n");
   const extension = path.extname(loadedTheme.imagePath).toLowerCase();
   const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
     : extension === ".webp" ? "image/webp" : "image/png";
   const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
-  const payload = template
+  const payload = `${template
     .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
     .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
-    .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme));
+    .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme))}\n;${sceneTemplate
+      .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(loadedTheme.theme))}`;
   const { imageBytes: _imageBytes, ...themeState } = loadedTheme;
   return { ...themeState, payload };
 }
@@ -542,6 +573,7 @@ async function removeEarlyPayload(session, identifier) {
 async function removeFromSession(session) {
   return session.evaluate(`(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
+    window.__CODEX_DREAM_SKIN_SCENE_STATE__?.cleanup?.();
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
     document.documentElement?.classList.remove(
@@ -561,6 +593,7 @@ async function removeFromSession(session) {
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
+    delete window.__CODEX_DREAM_SKIN_SCENE_STATE__;
     return true;
   })()`);
 }

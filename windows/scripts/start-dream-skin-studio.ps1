@@ -3,8 +3,9 @@ param([int]$Port = 8765)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
-$node = Get-CodexNode
-$server = Join-Path $Script:PlatformRoot 'studio\server.mjs'
+$node = (Get-DreamSkinNodeRuntime).Path
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$server = Join-Path $projectRoot 'studio\server.mjs'
 try { Invoke-WebRequest "http://127.0.0.1:$Port/" -UseBasicParsing -TimeoutSec 1 | Out-Null }
 catch {
   $previousPort = $env:DREAM_SKIN_STUDIO_PORT
