@@ -47,6 +47,7 @@ fi
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
+"$NODE" "$ROOT/tests/reset-demo.test.mjs"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do
@@ -608,20 +609,21 @@ fi
 /usr/bin/printf '%s\n' "$OVERSIZED_DIMENSION_OUTPUT" | /usr/bin/grep -F -q \
   'invalid or exceeds the 16384px / 50MP safety limit'
 
-# reset-demo must reject realpath aliases back into its own project, including
-# case aliases on the default case-insensitive macOS filesystem.
+# reset-demo must reject project paths, aliases, and arbitrary directory names.
+# A valid reset restores the bundled pair without recursively deleting user files.
 RESET_FIXTURE="$TMP/Reset-Project"
 /bin/mkdir -p "$RESET_FIXTURE/scripts"
 /bin/cp "$ROOT/scripts/write-theme.mjs" "$RESET_FIXTURE/scripts/write-theme.mjs"
 : > "$RESET_FIXTURE/keep-me"
-/bin/ln -s "$RESET_FIXTURE" "$TMP/reset-project-link"
+/bin/mkdir -p "$TMP/reset-alias"
+/bin/ln -s "$RESET_FIXTURE" "$TMP/reset-alias/theme"
 if "$NODE" "$RESET_FIXTURE/scripts/write-theme.mjs" reset-demo \
-  --output-dir "$TMP/reset-project-link" >/dev/null 2>&1; then
+  --output-dir "$TMP/reset-alias/theme" >/dev/null 2>&1; then
   printf 'reset-demo unexpectedly accepted a realpath alias to its project.\n' >&2
   exit 1
 fi
 [ -f "$RESET_FIXTURE/keep-me" ]
-[ -L "$TMP/reset-project-link" ]
+[ -L "$TMP/reset-alias/theme" ]
 RESET_CASE_ALIAS="$TMP/reset-project"
 if [ -f "$RESET_CASE_ALIAS/keep-me" ]; then
   if "$NODE" "$RESET_FIXTURE/scripts/write-theme.mjs" reset-demo \
@@ -631,8 +633,27 @@ if [ -f "$RESET_CASE_ALIAS/keep-me" ]; then
   fi
   [ -f "$RESET_FIXTURE/keep-me" ]
 fi
+
+/bin/mkdir -p "$TMP/unrelated-output"
+: > "$TMP/unrelated-output/keep-me"
+if "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo \
+  --output-dir "$TMP/unrelated-output" >/dev/null 2>&1; then
+  printf 'reset-demo unexpectedly accepted an arbitrary output directory.\n' >&2
+  exit 1
+fi
+[ -f "$TMP/unrelated-output/keep-me" ]
+
+/bin/mkdir -p "$TMP/theme/nested"
+: > "$TMP/theme/keep-me"
+: > "$TMP/theme/background-user.jpg"
+: > "$TMP/theme/nested/keep-me-too"
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
-[ ! -e "$TMP/theme" ]
+/usr/bin/cmp -s "$ROOT/assets/theme.json" "$TMP/theme/theme.json"
+/usr/bin/cmp -s "$ROOT/assets/portal-hero.png" "$TMP/theme/portal-hero.png"
+[ -f "$TMP/theme/keep-me" ]
+[ -f "$TMP/theme/background-user.jpg" ]
+[ -f "$TMP/theme/nested/keep-me-too" ]
+"$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$TMP/theme" >/dev/null
 
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
@@ -769,7 +790,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.1" ]' _ "$ROOT"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

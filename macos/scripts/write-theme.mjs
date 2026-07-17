@@ -84,14 +84,47 @@ function isContainedPath(rootPath, candidatePath) {
 
 if (mode === "reset-demo") {
   const realRoot = await fs.realpath(root);
-  const realOutput = await fs.realpath(outputDir).catch((error) => {
+  if (path.basename(outputDir) !== "theme") {
+    throw new Error("reset-demo output directory must be named theme.");
+  }
+  if (isContainedPath(root, outputDir)) {
+    throw new Error("Refusing to reset a theme inside the project directory.");
+  }
+
+  const outputStat = await fs.lstat(outputDir).catch((error) => {
     if (error.code === "ENOENT") return null;
     throw error;
   });
-  if (isContainedPath(root, outputDir) || (realOutput && isContainedPath(realRoot, realOutput))) {
-    throw new Error("Refusing to delete project files; pass a user --output-dir.");
+  if (outputStat?.isSymbolicLink() || (outputStat && !outputStat.isDirectory())) {
+    throw new Error("reset-demo output must be a real directory, not a link or file.");
   }
-  await fs.rm(outputDir, { recursive: true, force: true });
+  if (!outputStat) {
+    await fs.mkdir(outputDir, { mode: 0o700 });
+  }
+  const realOutput = await fs.realpath(outputDir);
+  if (isContainedPath(realRoot, realOutput)) {
+    throw new Error("Refusing to reset a theme inside the project directory.");
+  }
+  await fs.chmod(realOutput, 0o700);
+
+  const demoThemePath = path.join(root, "assets", "theme.json");
+  const demoThemeText = await fs.readFile(demoThemePath, "utf8");
+  const demoTheme = JSON.parse(demoThemeText);
+  const demoImage = demoTheme?.image;
+  if (typeof demoImage !== "string" || path.basename(demoImage) !== demoImage
+      || !/\.(?:png|jpe?g|webp)$/i.test(demoImage)) {
+    throw new Error("Bundled demo theme has an unsafe image path.");
+  }
+  const demoImageBytes = await fs.readFile(path.join(root, "assets", demoImage));
+  if (demoImageBytes.length < 1 || demoImageBytes.length > 16 * 1024 * 1024) {
+    throw new Error("Bundled demo image must be between 1 byte and 16 MB.");
+  }
+
+  // Publish the image first and theme.json last so a running watcher never
+  // observes a manifest that points to a missing image. Preserve unrelated
+  // user files because reset-demo must never recursively delete a directory.
+  await atomicWrite(path.join(realOutput, demoImage), demoImageBytes);
+  await atomicWrite(path.join(realOutput, "theme.json"), demoThemeText);
   console.log("Restored the bundled abstract demo preset.");
   process.exit(0);
 }
