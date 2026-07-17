@@ -723,6 +723,10 @@ html.codex-dream-skin:is([data-dream-art-safe="center"], [data-dream-art-safe-ar
     border-color .18s cubic-bezier(.22, 1, .36, 1) !important;
 }
 
+.dream-skin-home .group\/home-suggestions button [class~="text-token-text-primary"] {
+  color: var(--ds-text) !important;
+}
+
 .dream-skin-home .group\/home-suggestions button:hover {
   transform: translateY(-2px) !important;
   border-color: rgb(var(--ds-accent-rgb) / .42) !important;
