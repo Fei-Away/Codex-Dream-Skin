@@ -39,7 +39,8 @@ read_json_field() {
   /usr/bin/sed -n \
     -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p' \
     -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
-    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*true.*/true/p' \
+    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*false.*/false/p' \
     "$1" 2>/dev/null | /usr/bin/head -n1
 }
 

@@ -100,6 +100,25 @@ PLIST="$TMP/codex-dream-skin-autoload.plist"
 [ "$(/usr/bin/plutil -extract KeepAlive raw -o - "$PLIST")" = "true" ]
 [ "$(/usr/bin/plutil -extract LimitLoadToSessionType raw -o - "$PLIST")" = "Aqua" ]
 
+STATUS_HOME="$TMP/status-home"
+STATUS_STATE_ROOT="$STATUS_HOME/Library/Application Support/CodexDreamSkinStudio"
+/bin/mkdir -p "$STATUS_STATE_ROOT"
+/usr/bin/printf '%s\n' \
+  '{' \
+  '  "schemaVersion": 1,' \
+  '  "enabled": true,' \
+  '  "paused": false' \
+  '}' > "$STATUS_STATE_ROOT/autoload.json"
+AUTOLOAD_STATUS_JSON="$(HOME="$STATUS_HOME" "$ROOT/scripts/autoload-dream-skin-macos.sh" status --json)"
+FAST_STATUS_JSON="$(HOME="$STATUS_HOME" "$ROOT/scripts/status-dream-skin-macos.sh" --json)"
+"$NODE" -e '
+  for (const value of process.argv.slice(1).map(JSON.parse)) {
+    const enabled = value.enabled ?? value.autoLoadEnabled;
+    const paused = value.paused ?? value.autoLoadPaused;
+    if (enabled !== true || paused !== false) process.exit(1);
+  }
+' "$AUTOLOAD_STATUS_JSON" "$FAST_STATUS_JSON"
+
 # Standalone archives flatten macos/ to their root. Prompt guides and NOTICE
 # must describe that layout and must not claim that Windows assets are bundled.
 STANDALONE_ROOT="$TMP/standalone-root"
