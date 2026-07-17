@@ -142,9 +142,11 @@ Open the repository's [new issue page](https://github.com/Fei-Away/Codex-Dream-S
 
 ## Security boundaries
 
-- CDP binds only to `127.0.0.1`. Avoid untrusted local software while the skin is active.
+- CDP binds only to `127.0.0.1`, but it has no authentication; another process on the same computer may still connect and inspect or control the renderer.
+- Pausing the theme or stopping only the injector does not close the debug port of a running Codex process. Use a full restore with restart, or quit every Codex process and reopen the official app normally, to end the exposure window.
 - The tool does not modify the official Codex installation, WindowsApps, `app.asar`, or signatures.
 - It does not write API keys, Base URLs, or model provider settings.
 - Restore controls only Codex processes that pass package identity, executable path, and recorded session checks.
+- See [`../SECURITY.md`](../SECURITY.md) for the complete threat model and operating guidance.
 
 Maintainer and agent constraints live in [`SKILL.md`](./SKILL.md). See [`references/runtime-notes.md`](./references/runtime-notes.md) for deeper runtime troubleshooting.

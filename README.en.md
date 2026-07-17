@@ -166,9 +166,11 @@ More detail:
 
 ## Safety
 
-- CDP binds `127.0.0.1` only — avoid untrusted local processes while the theme runs.
+- CDP binds `127.0.0.1` only, but it has **no authentication**; another process on the same computer may still connect and inspect or control the renderer.
+- Pausing the theme or stopping only the injector does not close the debug port of an already running Codex process. Use a full Restore/restart, or quit every Codex process and reopen the official app normally, to end the exposure window.
 - Does not touch the official install directory or code signature.
 - **Never** rewrites API Key / Base URL; relay and theme stay separate.
+- See [`SECURITY.md`](./SECURITY.md) for the complete threat model and operating guidance.
 
 ## License
 

@@ -142,9 +142,11 @@ Get-AppxPackage -Name OpenAI.Codex
 
 ## 安全边界
 
-- CDP 只绑定 `127.0.0.1`。皮肤运行期间不要运行来路不明的本机程序。
+- CDP 只绑定 `127.0.0.1`，但没有身份认证；同一台电脑上的其他进程仍可能连接并读取或控制 renderer。
+- 暂停主题或只停止 injector 不会关闭正在运行的 Codex 调试端口；执行带重启的完整恢复，或退出全部 Codex 后从官方普通入口重新打开，风险窗口才结束。
 - 不修改官方 Codex 安装目录、WindowsApps、`app.asar` 或签名。
 - 不写入 API Key、Base URL 或模型供应商配置。
 - 恢复脚本只会控制经过包身份、进程路径和会话状态校验的 Codex 进程。
+- 完整威胁模型与操作建议见 [`../SECURITY.md`](../SECURITY.md)。
 
 维护者和代理使用的实现约束见 [`SKILL.md`](./SKILL.md)，运行时排错细节见 [`references/runtime-notes.md`](./references/runtime-notes.md)。
