@@ -12,6 +12,7 @@
 
 ### 改进
 
+- 为键盘触发的按钮、链接、输入框和 Codex 角色控件增加清晰焦点环，使用当前主题强调色且不改变鼠标点击样式。
 - watcher 在文档壳层出现后立即注入，按 CSS/主题/图片内容哈希热刷新并复用静态 payload；同一主题切换不再重复启动守护进程，减少原生界面闪现和后台轮询。
 - 主题切换先完整暂存图片，最后原子发布 `theme.json`；全新安装在没有活动主题时先启用 Gothic Void Crusade，已有活动主题保持不变。
 - `load-image-theme-macos.sh` 可通过 `--appearance`、`--focus-x`、`--focus-y`、`--safe-area`、`--task-mode` 精确调节构图；旧主题缺省时使用安全自适应值。
