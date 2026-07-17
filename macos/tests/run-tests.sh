@@ -726,10 +726,12 @@ STATUS_JSON="$(
     "$ROOT/scripts/status-dream-skin-macos.sh" --json
 )"
 "$NODE" -e '
+  const fs = require("node:fs");
   const value = JSON.parse(process.argv[1]);
+  const bundledTheme = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
   if (!value.codexRunning) throw new Error("status must recognize the current Codex executable path");
-  if (value.themeName !== "终焉星海") throw new Error("status must fall back to the bundled theme");
-' "$STATUS_JSON"
+  if (value.themeName !== bundledTheme.name) throw new Error("status must fall back to the bundled theme");
+' "$STATUS_JSON" "$ROOT/assets/theme.json"
 
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
@@ -877,6 +879,11 @@ NODE
 /usr/bin/grep -q 'recoveryEnabled' "$ROOT/scripts/status-dream-skin-macos.sh"
 /usr/bin/grep -q 'reopenRecovery' "$ROOT/scripts/doctor-macos.sh"
 /usr/bin/grep -q '重新打开' "$ROOT/CHANGELOG.md"
+DOCTOR_HOME="$TMP/doctor-home"
+/bin/mkdir -p "$DOCTOR_HOME/.codex"
+/usr/bin/touch "$DOCTOR_HOME/.codex/config.toml"
+CODEX_APP_BUNDLE=/Applications/ChatGPT.app HOME="$DOCTOR_HOME" \
+  "$ROOT/scripts/doctor-macos.sh" >/dev/null
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

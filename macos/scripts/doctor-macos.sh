@@ -22,32 +22,35 @@ for required in \
   [ -s "$required" ] || fail "Required project file is missing or empty: $required"
 done
 
-PAYLOAD_JSON="$("$NODE" "$INJECTOR" --check-payload --theme-dir "$THEME_DIR")"
+if [ -f "$THEME_DIR/theme.json" ]; then
+  PAYLOAD_JSON="$("$NODE" "$INJECTOR" --check-payload --theme-dir "$THEME_DIR")"
+else
+  PAYLOAD_JSON="$("$NODE" "$INJECTOR" --check-payload)"
+fi
 RECOVERY_ENABLED="false"
 RECOVERY_PLIST_VALID="false"
 if [ -f "$RECOVERY_ENABLED_PATH" ]; then
   RECOVERY_ENABLED="true"
   [ -f "$RECOVERY_PLIST_PATH" ] || fail "Reopen recovery is enabled but its LaunchAgent plist is missing."
-  /usr/bin/python3 - \
-    "$RECOVERY_PLIST_PATH" \
-    "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" \
-    "$INSTALL_ROOT/scripts/watch-dream-skin-macos.sh" <<'PY' \
+  recovery_arg0="$(/usr/bin/plutil -extract ProgramArguments.0 raw -o - "$RECOVERY_PLIST_PATH" 2>/dev/null)" \
     || fail "Reopen recovery LaunchAgent is invalid or unsafe."
-import plistlib
-import sys
-
-path, project_watcher, installed_watcher = sys.argv[1:]
-with open(path, "rb") as stream:
-    payload = plistlib.load(stream)
-arguments = payload.get("ProgramArguments")
-if not isinstance(arguments, list) or arguments[:1] != ["/bin/bash"]:
-    raise SystemExit(1)
-if len(arguments) != 3 or arguments[1] not in {project_watcher, installed_watcher} or arguments[2] != "--watch":
-    raise SystemExit(1)
-joined = " ".join(str(value) for value in arguments)
-if "remote-debugging" in joined or "ChatGPT" in joined or "Codex.app" in joined:
-    raise SystemExit(1)
-PY
+  recovery_arg1="$(/usr/bin/plutil -extract ProgramArguments.1 raw -o - "$RECOVERY_PLIST_PATH" 2>/dev/null)" \
+    || fail "Reopen recovery LaunchAgent is invalid or unsafe."
+  recovery_arg2="$(/usr/bin/plutil -extract ProgramArguments.2 raw -o - "$RECOVERY_PLIST_PATH" 2>/dev/null)" \
+    || fail "Reopen recovery LaunchAgent is invalid or unsafe."
+  [ "$recovery_arg0" = "/bin/bash" ] \
+    || fail "Reopen recovery LaunchAgent is invalid or unsafe."
+  [ "$recovery_arg1" = "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" ] \
+    || [ "$recovery_arg1" = "$INSTALL_ROOT/scripts/watch-dream-skin-macos.sh" ] \
+    || fail "Reopen recovery LaunchAgent is invalid or unsafe."
+  [ "$recovery_arg2" = "--watch" ] \
+    || fail "Reopen recovery LaunchAgent is invalid or unsafe."
+  if /usr/bin/plutil -extract ProgramArguments.3 raw -o - "$RECOVERY_PLIST_PATH" >/dev/null 2>&1; then
+    fail "Reopen recovery LaunchAgent is invalid or unsafe."
+  fi
+  case "$recovery_arg0 $recovery_arg1 $recovery_arg2" in
+    *remote-debugging*|*ChatGPT*|*Codex.app*) fail "Reopen recovery LaunchAgent is invalid or unsafe." ;;
+  esac
   RECOVERY_PLIST_VALID="true"
 fi
 PORT=9341
@@ -56,7 +59,11 @@ if [ -f "$STATE_PATH" ]; then
 fi
 LIVE="false"
 if [ -f "$STATE_PATH" ] && verified_cdp_endpoint "$PORT"; then
-  "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >/dev/null
+  if [ -f "$THEME_DIR/theme.json" ]; then
+    "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >/dev/null
+  else
+    "$NODE" "$INJECTOR" --verify --port "$PORT" --timeout-ms 12000 >/dev/null
+  fi
   LIVE="true"
 fi
 [ "$REQUIRE_LIVE" = "false" ] || [ "$LIVE" = "true" ] || fail "No verified live Dream Skin session is active."

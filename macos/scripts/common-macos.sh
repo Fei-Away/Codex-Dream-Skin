@@ -34,7 +34,8 @@ RECOVERY_JOB_LABEL="com.openai.codex-dream-skin-studio.reopen-recovery"
 RECOVERY_LAUNCH_AGENTS_DIR="${DREAM_SKIN_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 RECOVERY_PLIST_PATH="$RECOVERY_LAUNCH_AGENTS_DIR/$RECOVERY_JOB_LABEL.plist"
 EXPECTED_CODEX_TEAM_ID="${CODEX_EXPECTED_TEAM_ID:-2DC432GLL2}"
-SKIN_VERSION="1.2.0"
+SKIN_VERSION="$(/usr/bin/tr -d '[:space:]' < "$PROJECT_ROOT/VERSION")"
+[ -n "$SKIN_VERSION" ] || { printf 'Codex Dream Skin Studio: VERSION is empty.\n' >&2; exit 1; }
 
 fail() {
   local message="$*"
@@ -117,44 +118,27 @@ install_reopen_recovery_agent() {
   [ -x "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" ] \
     || fail "Recovery watcher is missing or not executable: $PROJECT_ROOT/scripts/watch-dream-skin-macos.sh"
   /bin/mkdir -p "$RECOVERY_LAUNCH_AGENTS_DIR"
-  /usr/bin/python3 - \
-    "$RECOVERY_PLIST_PATH" \
-    "$RECOVERY_JOB_LABEL" \
-    "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" \
-    "$HOME" \
-    "$RECOVERY_LOG" \
-    "$RECOVERY_ERROR_LOG" <<'PY'
-import os
-import plistlib
-import sys
-import tempfile
-
-path, label, watcher, home, stdout, stderr = sys.argv[1:]
-payload = {
-    "Label": label,
-    "ProgramArguments": ["/bin/bash", watcher, "--watch"],
-    "EnvironmentVariables": {"HOME": home},
-    "RunAtLoad": True,
-    "KeepAlive": True,
-    "ThrottleInterval": 5,
-    "StandardOutPath": stdout,
-    "StandardErrorPath": stderr,
-}
-fd, temporary = tempfile.mkstemp(
-    prefix=f".{os.path.basename(path)}.",
-    dir=os.path.dirname(path),
-)
-try:
-    with os.fdopen(fd, "wb") as stream:
-        plistlib.dump(payload, stream, sort_keys=True)
-    os.chmod(temporary, 0o600)
-    os.replace(temporary, path)
-finally:
-    try:
-        os.unlink(temporary)
-    except FileNotFoundError:
-        pass
-PY
+  local temporary
+  temporary="$(/usr/bin/mktemp "$RECOVERY_LAUNCH_AGENTS_DIR/.${RECOVERY_JOB_LABEL}.XXXXXX")" \
+    || fail "Could not create the reopen recovery LaunchAgent."
+  if ! /usr/bin/plutil -create xml1 "$temporary" \
+    || ! /usr/bin/plutil -insert Label -string "$RECOVERY_JOB_LABEL" "$temporary" \
+    || ! /usr/bin/plutil -insert ProgramArguments -array "$temporary" \
+    || ! /usr/bin/plutil -insert ProgramArguments.0 -string /bin/bash "$temporary" \
+    || ! /usr/bin/plutil -insert ProgramArguments.1 -string "$PROJECT_ROOT/scripts/watch-dream-skin-macos.sh" "$temporary" \
+    || ! /usr/bin/plutil -insert ProgramArguments.2 -string --watch "$temporary" \
+    || ! /usr/bin/plutil -insert EnvironmentVariables -dictionary "$temporary" \
+    || ! /usr/bin/plutil -insert EnvironmentVariables.HOME -string "$HOME" "$temporary" \
+    || ! /usr/bin/plutil -insert RunAtLoad -bool true "$temporary" \
+    || ! /usr/bin/plutil -insert KeepAlive -bool true "$temporary" \
+    || ! /usr/bin/plutil -insert ThrottleInterval -integer 5 "$temporary" \
+    || ! /usr/bin/plutil -insert StandardOutPath -string "$RECOVERY_LOG" "$temporary" \
+    || ! /usr/bin/plutil -insert StandardErrorPath -string "$RECOVERY_ERROR_LOG" "$temporary"; then
+    /bin/rm -f "$temporary"
+    fail "Could not create the reopen recovery LaunchAgent."
+  fi
+  /bin/chmod 600 "$temporary"
+  /bin/mv -f "$temporary" "$RECOVERY_PLIST_PATH"
   enable_reopen_recovery
   local launchctl_bin="${DREAM_SKIN_LAUNCHCTL:-/bin/launchctl}"
   "$launchctl_bin" bootout "gui/$(/usr/bin/id -u)/$RECOVERY_JOB_LABEL" >/dev/null 2>&1 || true
