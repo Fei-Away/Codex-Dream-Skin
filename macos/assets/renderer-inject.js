@@ -11,6 +11,7 @@
   ];
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
+  const ROUTE_SETTLE_MS = 120;
   const THEME = themeConfig && typeof themeConfig === "object" ? themeConfig : {};
   const ART = THEME.art && typeof THEME.art === "object" ? THEME.art : {};
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
@@ -662,9 +663,6 @@
     state?.resizeObserver?.disconnect();
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
-    if (state?.scheduler?.frame != null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(state.scheduler.frame);
-    }
     if (analysisTimer) clearTimeout(analysisTimer);
     if (state?.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
     if (state?.mediaHandler && state?.mediaQuery) {
@@ -675,13 +673,9 @@
     return true;
   };
 
-  const scheduler = { timeout: null, frame: null, root: false, route: false, layout: false };
+  const scheduler = { timeout: null, root: false, route: false, layout: false };
   const flushScheduledEnsure = () => {
-    if (scheduler.frame !== null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(scheduler.frame);
-    }
     if (scheduler.timeout) clearTimeout(scheduler.timeout);
-    scheduler.frame = null;
     scheduler.timeout = null;
     const pending = { root: scheduler.root, route: scheduler.route, layout: scheduler.layout };
     scheduler.root = false;
@@ -693,13 +687,8 @@
     scheduler.root ||= root;
     scheduler.route ||= route;
     scheduler.layout ||= layout;
-    if (scheduler.timeout || scheduler.frame !== null) return;
-    if (typeof requestAnimationFrame === "function") {
-      scheduler.frame = requestAnimationFrame(flushScheduledEnsure);
-      scheduler.timeout = setTimeout(flushScheduledEnsure, 96);
-    } else {
-      scheduler.timeout = setTimeout(flushScheduledEnsure, 64);
-    }
+    if (scheduler.timeout) return;
+    scheduler.timeout = setTimeout(flushScheduledEnsure, ROUTE_SETTLE_MS);
   };
   const observer = new MutationObserver(() => scheduleEnsure({ route: true }));
   rootObserver = new MutationObserver(() => {

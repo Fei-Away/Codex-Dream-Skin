@@ -358,7 +358,12 @@ assert.equal(defaultMetrics.routePasses, 1);
 assert.equal(defaultMetrics.layoutReads, 1);
 for (let index = 0; index < 50; index += 1) defaults.observers[0].callback([]);
 assert.equal(defaults.timers.size, 1, "Mutation bursts should coalesce into one scheduled ensure.");
-defaults.flushTimers(64);
+assert.deepEqual(
+  [...defaults.timers.values()].map(({ delay }) => delay),
+  [120],
+  "Continuous renderer mutations should be capped below animation-frame frequency.",
+);
+defaults.flushTimers(120);
 assert.equal(defaultMetrics.rootPasses, 1, "Subtree mutations must not recompute root theme tokens.");
 assert.equal(defaultMetrics.routePasses, 2);
 assert.equal(defaultMetrics.layoutReads, 1, "Subtree mutations must not force shell layout reads.");
@@ -367,7 +372,7 @@ assert.ok(defaults.resizeObservers[0].target);
 defaults.shellBox.left = 196;
 defaults.shellBox.width = 1084;
 defaults.resizeObservers[0].callback([]);
-defaults.flushTimers(64);
+defaults.flushTimers(120);
 assert.equal(defaultMetrics.layoutReads, 2, "Shell ResizeObserver changes must refresh chrome geometry.");
 const defaultChrome = defaults.nodes.get("codex-dream-skin-chrome");
 assert.equal(defaultChrome.style.values.get("left"), "196px");
@@ -395,7 +400,7 @@ assert.equal(shellFollow.attributes.get("data-dream-shell"), "light");
 defaults.root.className = "";
 defaults.body.setAttribute("data-theme", "dark");
 defaults.observers[1].callback([{ type: "attributes", target: defaults.body }]);
-defaults.flushTimers(64);
+defaults.flushTimers(120);
 assert.equal(defaults.attributes.get("data-dream-shell"), "dark", "Body theme changes must apply without the fallback interval.");
 
 const synchronousWide = createFixture({

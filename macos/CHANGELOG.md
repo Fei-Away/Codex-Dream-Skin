@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 性能
+
+- 连续的 renderer DOM 变更现在以 120ms 窗口合并路由刷新，不再在流式输出期间按 `requestAnimationFrame` 频率重复扫描完整界面；外观、布局和路由状态仍在同一窗口内更新。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增
