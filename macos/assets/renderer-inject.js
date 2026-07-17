@@ -11,6 +11,7 @@
   ];
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
+  const PAYLOAD_REVISION = __DREAM_SKIN_PAYLOAD_REVISION_JSON__;
   const THEME = themeConfig && typeof themeConfig === "object" ? themeConfig : {};
   const ART = THEME.art && typeof THEME.art === "object" ? THEME.art : {};
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
@@ -737,6 +738,7 @@
     themeId: THEME.id || "custom",
     packageContentHash: THEME.packageContentHash ?? null,
     version: VERSION,
+    revision: PAYLOAD_REVISION,
     detectShellMode,
   };
   const firstEnsureStartedAt = now();
@@ -782,6 +784,7 @@
     version: VERSION,
     themeId: THEME.id || "custom",
     packageContentHash: THEME.packageContentHash ?? null,
+    revision: PAYLOAD_REVISION,
     shell: resolvedShell(),
     analysis: artAnalysis,
   };

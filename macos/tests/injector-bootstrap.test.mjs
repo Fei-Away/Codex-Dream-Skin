@@ -76,5 +76,20 @@ assert.match(
   /const earlyApplied = await session\.evaluate\([\s\S]*if \(!earlyApplied\) \{[\s\S]*applyToSession/,
   "The watcher must not run the full payload twice after a successful early install.",
 );
+assert.match(
+  source,
+  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\([\s\S]{0,2500}visibleSuggestionLabels\.length >= result\.visibleCardCount[\s\S]{0,160}result\.suggestionLabelColorsMatch/,
+  "Live verification must reject visible home suggestion labels that diverge from the themed card color.",
+);
+assert.equal(
+  source.match(/expectedContentHash: current\.theme\.packageContentHash/g)?.length,
+  2,
+  "Watcher refresh and initial injection must both verify the selected package content hash.",
+);
+assert.equal(
+  source.match(/expectedRevision: current\.revision/g)?.length,
+  2,
+  "Watcher refresh and initial injection must both verify the exact payload revision.",
+);
 
 console.log("PASS: early injection is shell-guarded, generation-safe, and removed on shutdown.");

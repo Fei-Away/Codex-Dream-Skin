@@ -8,6 +8,19 @@ set -euo pipefail
 THEME_ID=""
 EXPECTED_CONTENT_HASH=""
 APPLY_NOW="true"
+OPERATION_TOKEN=""
+stage=""
+
+finish_switch() {
+  local code="$1"
+  cleanup_switch
+  if [ "$code" -ne 0 ] && [ -n "${OPERATION_TOKEN:-}" ]; then
+    write_operation_state failed "主题切换未完成，应用结果未确认" "$OPERATION_TOKEN" 2>/dev/null || true
+    finish_client_operation "${PORT:-9341}" error "主题切换未完成，应用结果未确认" \
+      "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
+  fi
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --id) THEME_ID="${2:-}"; shift 2 ;;
@@ -66,7 +79,7 @@ cleanup_switch() {
   fi
   exec 9>&-
 }
-trap cleanup_switch EXIT
+trap 'finish_switch "$?"' EXIT
 
 # The persistent gate serializes only lock publication/reclamation. FD 9 is
 # closed before staging or launching any injector/Codex child.
@@ -125,10 +138,24 @@ THEMES_ROOT="$STATE_ROOT/themes"
 SRC="$THEMES_ROOT/$THEME_ID"
 [ -d "$SRC" ] || fail "Theme not found: $THEME_ID"
 [ -f "$SRC/theme.json" ] || fail "theme.json missing in $THEME_ID"
+if [ "$APPLY_NOW" = "true" ]; then
+  OPERATION_TOKEN="$(new_operation_token)"
+  write_operation_state applying "正在切换主题" "$OPERATION_TOKEN" \
+    || fail "Could not publish the theme switch operation state."
+fi
 ensure_node_runtime
 themes_root_real="$(cd "$THEMES_ROOT" && pwd -P)"
 src_real="$(cd "$SRC" && pwd -P)"
 case "$src_real/" in "$themes_root_real/"*) ;; *) fail "Theme directory escapes the saved theme library." ;; esac
+
+PORT=9341
+if [ -f "$STATE_PATH" ]; then
+  saved="$(state_field port 2>/dev/null || true)"
+  [ -n "${saved:-}" ] && PORT="$saved"
+fi
+if [ -n "$OPERATION_TOKEN" ] && verified_cdp_endpoint "$PORT" 2>/dev/null; then
+  begin_client_operation "$PORT" switch 3000 "$OPERATION_TOKEN" >/dev/null 2>&1 || true
+fi
 
 progress() {
   printf '%s\n' "$*" >&2
@@ -182,14 +209,8 @@ if [ "$APPLY_NOW" != "true" ]; then
   exit 0
 fi
 
-PORT=9341
-if [ -f "$STATE_PATH" ]; then
-  saved="$(state_field port 2>/dev/null || true)"
-  [ -n "${saved:-}" ] && PORT="$saved"
-fi
-
 # Hot path: CDP already open → seconds, not tens of seconds
-if hot_reapply_theme "$PORT" 8000 "$THEME_ID" "$EXPECTED_CONTENT_HASH"; then
+if hot_reapply_theme "$PORT" 8000 "$OPERATION_TOKEN" "$THEME_ID" "$EXPECTED_CONTENT_HASH"; then
   progress "Done: ${THEME_NAME}"
   exit 0
 fi
