@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-05",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#102326",
+      "panel": "#173236",
+      "panelAlt": "#214348",
+      "accent": "#2dbdb7",
+      "accentAlt": "#f0c928",
+      "secondary": "#53a9df",
+      "highlight": "#ef7064",
+      "text": "#f4fffc",
+      "muted": "#a7cbc6",
+      "line": "#2dbdb7",
+      "lineOpacity": 0.34
+    },
+    "light": {
+      "background": "#f1faf8",
+      "panel": "#ffffff",
+      "panelAlt": "#e2f3f0",
+      "accent": "#2dbdb7",
+      "accentAlt": "#f0c928",
+      "secondary": "#53a9df",
+      "highlight": "#ef7064",
+      "text": "#173033",
+      "muted": "#567a77",
+      "line": "#2dbdb7",
+      "lineOpacity": 0.34
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 14
+    },
+    "surface": {
+      "opacity": 82,
+      "blur": 20,
+      "radius": 22,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "sparkles",
+      "intensity": 58
+    },
+    "typography": "rounded"
+  },
+  "name": "灵感小宇宙",
+  "brandSubtitle": "IDEA ENGINE",
+  "tagline": "青蓝、珊瑚与明黄碰撞，为快速原型补充能量。",
+  "projectPrefix": "灵感项目 ·",
+  "projectLabel": "选择灵感项目",
+  "statusText": "IDEA ENGINE ONLINE",
+  "quote": "TURN ENERGY INTO IDEAS",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "spark",
+      "shortName": "灵感小宇宙"
+    },
+    "hero": {
+      "eyebrow": "IDEA ENGINE",
+      "title": "把哪个灵感做成原型？",
+      "description": "青蓝、珊瑚与明黄碰撞，为快速原型补充能量。",
+      "tags": [
+        "灵感",
+        "原型",
+        "实验"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "spark",
+        "title": "捕捉火花",
+        "detail": "先理解上下文与边界。",
+        "badge": "灵感",
+        "tone": "accent"
+      },
+      {
+        "icon": "build",
+        "title": "快速构建",
+        "detail": "把方案转化为具体行动。",
+        "badge": "原型",
+        "tone": "secondary"
+      },
+      {
+        "icon": "research",
+        "title": "测试反馈",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "实验",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "wand",
+        "title": "迭代成形",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "灵感",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "灵感活跃",
+        "快速试验"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "灵感",
+      "hint": "在「灵感小宇宙」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#2dbdb7",
+    "surface": "#173236",
+    "ink": "#f4fffc",
+    "contrast": 62,
+    "diffAdded": "#f0c928",
+    "diffRemoved": "#ef7064",
+    "skill": "#53a9df"
+  }
+}

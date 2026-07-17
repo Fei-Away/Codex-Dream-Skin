@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-16",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#061116",
+      "panel": "#0a1b22",
+      "panelAlt": "#102a34",
+      "accent": "#23b9b6",
+      "accentAlt": "#56dfd5",
+      "secondary": "#318da9",
+      "highlight": "#e59b37",
+      "text": "#eaf9fb",
+      "muted": "#8eafb8",
+      "line": "#23b9b6",
+      "lineOpacity": 0.32
+    },
+    "light": {
+      "background": "#ebecec",
+      "panel": "#f5f6f6",
+      "panelAlt": "#e7eaeb",
+      "accent": "#23b9b6",
+      "accentAlt": "#56dfd5",
+      "secondary": "#318da9",
+      "highlight": "#e59b37",
+      "text": "#020507",
+      "muted": "#52666b",
+      "line": "#23b9b6",
+      "lineOpacity": 0.32
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 42
+    },
+    "surface": {
+      "opacity": 92,
+      "blur": 10,
+      "radius": 8,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grid",
+      "intensity": 64
+    },
+    "typography": "technical"
+  },
+  "name": "运维值守",
+  "brandSubtitle": "RELIABILITY WATCH",
+  "tagline": "稳定、警觉的持续观测模式。",
+  "projectPrefix": "值守项目 ·",
+  "projectLabel": "选择值守项目",
+  "statusText": "SYSTEMS NOMINAL",
+  "quote": "STEADY IS FAST",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "monitor",
+      "shortName": "运维值守"
+    },
+    "hero": {
+      "eyebrow": "RELIABILITY WATCH",
+      "title": "系统现在需要关注什么？",
+      "description": "稳定、警觉的持续观测模式。",
+      "tags": [
+        "监控",
+        "响应",
+        "稳定"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "monitor",
+        "title": "查看告警",
+        "detail": "先理解上下文与边界。",
+        "badge": "监控",
+        "tone": "accent"
+      },
+      {
+        "icon": "research",
+        "title": "定位影响",
+        "detail": "把方案转化为具体行动。",
+        "badge": "响应",
+        "tone": "secondary"
+      },
+      {
+        "icon": "repair",
+        "title": "执行处置",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "稳定",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "review",
+        "title": "复盘改进",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "监控",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "系统稳定",
+        "持续观测"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "监控",
+      "hint": "在「运维值守」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#23b9b6",
+    "surface": "#0a1b22",
+    "ink": "#eaf9fb",
+    "contrast": 62,
+    "diffAdded": "#56dfd5",
+    "diffRemoved": "#e59b37",
+    "skill": "#318da9"
+  }
+}

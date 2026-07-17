@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-18",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#182221",
+      "panel": "#24332f",
+      "panelAlt": "#354840",
+      "accent": "#4e9b7a",
+      "accentAlt": "#77b99a",
+      "secondary": "#39899c",
+      "highlight": "#a96b43",
+      "text": "#f1f6ec",
+      "muted": "#a6b9aa",
+      "line": "#4e9b7a",
+      "lineOpacity": 0.32
+    },
+    "light": {
+      "background": "#ededed",
+      "panel": "#f6f7f7",
+      "panelAlt": "#ebedec",
+      "accent": "#4e9b7a",
+      "accentAlt": "#77b99a",
+      "secondary": "#39899c",
+      "highlight": "#a96b43",
+      "text": "#080b0b",
+      "muted": "#606b63",
+      "line": "#4e9b7a",
+      "lineOpacity": 0.32
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 30
+    },
+    "surface": {
+      "opacity": 84,
+      "blur": 18,
+      "radius": 16,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grain",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "山海异闻",
+  "brandSubtitle": "MOUNTAIN SEA",
+  "tagline": "古代博物纹理与山海幻想。",
+  "projectPrefix": "异闻项目 ·",
+  "projectLabel": "选择异闻项目",
+  "statusText": "ANCIENT FIELD ONLINE",
+  "quote": "WONDER LIVES BEYOND THE MAP",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "mountain",
+      "shortName": "山海异闻"
+    },
+    "hero": {
+      "eyebrow": "MOUNTAIN SEA",
+      "title": "山海之外还有什么线索？",
+      "description": "古代博物纹理与山海幻想。",
+      "tags": [
+        "异闻",
+        "考据",
+        "远行"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "翻阅异志",
+        "detail": "先理解上下文与边界。",
+        "badge": "异闻",
+        "tone": "accent"
+      },
+      {
+        "icon": "compass",
+        "title": "辨认图腾",
+        "detail": "把方案转化为具体行动。",
+        "badge": "考据",
+        "tone": "secondary"
+      },
+      {
+        "icon": "mountain",
+        "title": "绘制路线",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "远行",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "pen",
+        "title": "收录见闻",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "异闻",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "异闻待考",
+        "地图展开"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "异闻",
+      "hint": "在「山海异闻」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#4e9b7a",
+    "surface": "#24332f",
+    "ink": "#f1f6ec",
+    "contrast": 62,
+    "diffAdded": "#77b99a",
+    "diffRemoved": "#a96b43",
+    "skill": "#39899c"
+  }
+}

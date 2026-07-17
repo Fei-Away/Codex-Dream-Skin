@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-12",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#071720",
+      "panel": "#0c2530",
+      "panelAlt": "#123744",
+      "accent": "#29c3ba",
+      "accentAlt": "#73e4d7",
+      "secondary": "#4b9be2",
+      "highlight": "#e45d5d",
+      "text": "#effcff",
+      "muted": "#94bcc4",
+      "line": "#29c3ba",
+      "lineOpacity": 0.34
+    },
+    "light": {
+      "background": "#ebeced",
+      "panel": "#f5f6f7",
+      "panelAlt": "#e7ebec",
+      "accent": "#29c3ba",
+      "accentAlt": "#73e4d7",
+      "secondary": "#4b9be2",
+      "highlight": "#e45d5d",
+      "text": "#02070a",
+      "muted": "#566d72",
+      "line": "#29c3ba",
+      "lineOpacity": 0.34
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 34
+    },
+    "surface": {
+      "opacity": 88,
+      "blur": 18,
+      "radius": 10,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grid",
+      "intensity": 58
+    },
+    "typography": "technical"
+  },
+  "name": "数据洞察",
+  "brandSubtitle": "SIGNAL ANALYSIS",
+  "tagline": "在噪声中寻找稳定信号。",
+  "projectPrefix": "分析项目 ·",
+  "projectLabel": "选择分析项目",
+  "statusText": "SIGNAL LOCKED",
+  "quote": "FIND THE SIGNAL",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "chart",
+      "shortName": "数据洞察"
+    },
+    "hero": {
+      "eyebrow": "SIGNAL ANALYSIS",
+      "title": "数据正在说明什么？",
+      "description": "在噪声中寻找稳定信号。",
+      "tags": [
+        "指标",
+        "信号",
+        "洞察"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "plan",
+        "title": "定义指标",
+        "detail": "先理解上下文与边界。",
+        "badge": "指标",
+        "tone": "accent"
+      },
+      {
+        "icon": "gear",
+        "title": "清洗数据",
+        "detail": "把方案转化为具体行动。",
+        "badge": "信号",
+        "tone": "secondary"
+      },
+      {
+        "icon": "chart",
+        "title": "识别信号",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "洞察",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "pen",
+        "title": "表达洞察",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "指标",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "信号锁定",
+        "关注异常"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "指标",
+      "hint": "在「数据洞察」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#29c3ba",
+    "surface": "#0c2530",
+    "ink": "#effcff",
+    "contrast": 62,
+    "diffAdded": "#73e4d7",
+    "diffRemoved": "#e45d5d",
+    "skill": "#4b9be2"
+  }
+}

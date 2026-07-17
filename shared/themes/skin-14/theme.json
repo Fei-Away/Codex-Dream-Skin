@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-14",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#172027",
+      "panel": "#223039",
+      "panelAlt": "#30434d",
+      "accent": "#2fa9a0",
+      "accentAlt": "#ef8b35",
+      "secondary": "#568da8",
+      "highlight": "#e66d3f",
+      "text": "#f4fafb",
+      "muted": "#a8bcc3",
+      "line": "#2fa9a0",
+      "lineOpacity": 0.3
+    },
+    "light": {
+      "background": "#f3f6f7",
+      "panel": "#ffffff",
+      "panelAlt": "#e7edef",
+      "accent": "#2fa9a0",
+      "accentAlt": "#ef8b35",
+      "secondary": "#568da8",
+      "highlight": "#e66d3f",
+      "text": "#263036",
+      "muted": "#69777c",
+      "line": "#2fa9a0",
+      "lineOpacity": 0.3
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 10
+    },
+    "surface": {
+      "opacity": 90,
+      "blur": 12,
+      "radius": 14,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "orbit",
+      "intensity": 42
+    },
+    "typography": "technical"
+  },
+  "name": "项目推进",
+  "brandSubtitle": "DELIVERY RHYTHM",
+  "tagline": "把依赖、里程碑和行动排成节奏。",
+  "projectPrefix": "交付项目 ·",
+  "projectLabel": "选择交付项目",
+  "statusText": "DELIVERY TRACK ONLINE",
+  "quote": "KEEP THE WORK MOVING",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "ship",
+      "shortName": "项目推进"
+    },
+    "hero": {
+      "eyebrow": "DELIVERY RHYTHM",
+      "title": "怎样让项目继续向前？",
+      "description": "把依赖、里程碑和行动排成节奏。",
+      "tags": [
+        "依赖",
+        "里程碑",
+        "行动"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "检查依赖",
+        "detail": "先理解上下文与边界。",
+        "badge": "依赖",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "更新计划",
+        "detail": "把方案转化为具体行动。",
+        "badge": "里程碑",
+        "tone": "secondary"
+      },
+      {
+        "icon": "repair",
+        "title": "解除阻塞",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "行动",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "ship",
+        "title": "推进交付",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "依赖",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "进度可控",
+        "下一步明确"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "依赖",
+      "hint": "在「项目推进」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#2fa9a0",
+    "surface": "#223039",
+    "ink": "#f4fafb",
+    "contrast": 62,
+    "diffAdded": "#ef8b35",
+    "diffRemoved": "#e66d3f",
+    "skill": "#568da8"
+  }
+}

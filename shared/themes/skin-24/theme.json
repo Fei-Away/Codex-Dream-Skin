@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-24",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#1a0d09",
+      "panel": "#2a1510",
+      "panelAlt": "#3d2117",
+      "accent": "#df482f",
+      "accentAlt": "#f18a3c",
+      "secondary": "#b6783f",
+      "highlight": "#a72824",
+      "text": "#fff1df",
+      "muted": "#c7a58f",
+      "line": "#df482f",
+      "lineOpacity": 0.36
+    },
+    "light": {
+      "background": "#edeceb",
+      "panel": "#f6f6f5",
+      "panelAlt": "#ece9e8",
+      "accent": "#df482f",
+      "accentAlt": "#f18a3c",
+      "secondary": "#b6783f",
+      "highlight": "#a72824",
+      "text": "#080403",
+      "muted": "#736053",
+      "line": "#df482f",
+      "lineOpacity": 0.36
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 42
+    },
+    "surface": {
+      "opacity": 90,
+      "blur": 12,
+      "radius": 10,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grain",
+      "intensity": 56
+    },
+    "typography": "editorial"
+  },
+  "name": "赤焰神话",
+  "brandSubtitle": "SCARLET MYTH",
+  "tagline": "上古火纹与祭器质感。",
+  "projectPrefix": "神话项目 ·",
+  "projectLabel": "选择神话项目",
+  "statusText": "EMBER ALTAR ONLINE",
+  "quote": "CARRY THE FIRST FIRE",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "flame",
+      "shortName": "赤焰神话"
+    },
+    "hero": {
+      "eyebrow": "SCARLET MYTH",
+      "title": "守住最初的火，也照亮前路",
+      "description": "上古火纹与祭器质感。",
+      "tags": [
+        "神话",
+        "火种",
+        "传承"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "辨认火纹",
+        "detail": "先理解上下文与边界。",
+        "badge": "神话",
+        "tone": "accent"
+      },
+      {
+        "icon": "gear",
+        "title": "重铸祭器",
+        "detail": "把方案转化为具体行动。",
+        "badge": "火种",
+        "tone": "secondary"
+      },
+      {
+        "icon": "flame",
+        "title": "守护火种",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "传承",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "pen",
+        "title": "续写神话",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "神话",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "火种稳定",
+        "仪式就绪"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "神话",
+      "hint": "在「赤焰神话」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#df482f",
+    "surface": "#2a1510",
+    "ink": "#fff1df",
+    "contrast": 62,
+    "diffAdded": "#f18a3c",
+    "diffRemoved": "#a72824",
+    "skill": "#b6783f"
+  }
+}

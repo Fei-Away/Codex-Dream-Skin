@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-23",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#090f19",
+      "panel": "#111b28",
+      "panelAlt": "#1b2938",
+      "accent": "#e33f48",
+      "accentAlt": "#f05bb4",
+      "secondary": "#37b8d0",
+      "highlight": "#6b4bd2",
+      "text": "#eefaff",
+      "muted": "#91a9b8",
+      "line": "#37b8d0",
+      "lineOpacity": 0.36
+    },
+    "light": {
+      "background": "#ebeced",
+      "panel": "#f5f6f6",
+      "panelAlt": "#e8eaeb",
+      "accent": "#e33f48",
+      "accentAlt": "#f05bb4",
+      "secondary": "#37b8d0",
+      "highlight": "#6b4bd2",
+      "text": "#030508",
+      "muted": "#54626b",
+      "line": "#37b8d0",
+      "lineOpacity": 0.36
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 38
+    },
+    "surface": {
+      "opacity": 82,
+      "blur": 22,
+      "radius": 16,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "sparkles",
+      "intensity": 70
+    },
+    "typography": "technical"
+  },
+  "name": "霓虹巡夜",
+  "brandSubtitle": "NEON NIGHT WATCH",
+  "tagline": "东方都市异能与夜行霓虹。",
+  "projectPrefix": "巡夜项目 ·",
+  "projectLabel": "选择巡夜项目",
+  "statusText": "NIGHT GRID ONLINE",
+  "quote": "KEEP WATCH THROUGH THE RAIN",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "moon",
+      "shortName": "霓虹巡夜"
+    },
+    "hero": {
+      "eyebrow": "NEON NIGHT WATCH",
+      "title": "今夜的城市有什么异常？",
+      "description": "东方都市异能与夜行霓虹。",
+      "tags": [
+        "霓虹",
+        "巡查",
+        "异能"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "monitor",
+        "title": "扫描街区",
+        "detail": "先理解上下文与边界。",
+        "badge": "霓虹",
+        "tone": "accent"
+      },
+      {
+        "icon": "research",
+        "title": "追踪异常",
+        "detail": "把方案转化为具体行动。",
+        "badge": "巡查",
+        "tone": "secondary"
+      },
+      {
+        "icon": "repair",
+        "title": "协同处置",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "异能",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "pen",
+        "title": "归档事件",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "霓虹",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "夜网在线",
+        "保持警觉"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "霓虹",
+      "hint": "在「霓虹巡夜」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#e33f48",
+    "surface": "#111b28",
+    "ink": "#eefaff",
+    "contrast": 62,
+    "diffAdded": "#f05bb4",
+    "diffRemoved": "#6b4bd2",
+    "skill": "#37b8d0"
+  }
+}

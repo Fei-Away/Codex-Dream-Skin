@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="在本机管理 Codex Dream Skin 主题、运行状态与安全诊断。">
+  <meta content="__DREAM_STUDIO_TOKEN__" name="dream-studio-token">
+  <title>Dream Skin Studio</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/studio.css">
+  <link rel="stylesheet" href="/editor-v3.css">
+  <script type="module" src="/studio.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="rail">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i></span>
+        <span><strong>Dream Skin</strong><small>Studio</small></span>
+      </div>
+      <nav class="nav" aria-label="主要导航">
+        <button class="nav-item active" data-view="overview" aria-current="page">
+          <span class="nav-icon" aria-hidden="true">◈</span><span>控制台</span>
+        </button>
+        <button class="nav-item" data-view="themes">
+          <span class="nav-icon" aria-hidden="true">✦</span><span>主题库</span>
+        </button>
+        <button class="nav-item" data-view="diagnostics">
+          <span class="nav-icon" aria-hidden="true">⌁</span><span>诊断</span>
+        </button>
+      </nav>
+      <div class="rail-status">
+        <span class="status-dot"></span>
+        <span><strong>本地安全连接</strong><small id="railLoopback">127.0.0.1</small></span>
+      </div>
+      <p class="rail-note">外部 CDP 主题层<br>不修改 Codex.app</p>
+    </aside>
+
+    <main id="mainContent">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="pageEyebrow">THEME CONTROL</p>
+          <h1 id="pageTitle">控制台</h1>
+          <p id="pageSubtitle">管理当前主题与 Codex 运行状态。</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-btn" id="refreshAll" title="刷新全部状态" aria-label="刷新全部状态">↻</button>
+          <div id="statusPill" class="status-pill"><span></span>正在读取状态</div>
+        </div>
+      </header>
+
+      <section class="page active" data-page="overview" aria-labelledby="pageTitle">
+        <div class="overview-grid">
+          <article id="currentPreview" class="current-preview">
+            <img id="currentImage" alt="当前主题预览">
+            <div class="preview-shade"></div>
+            <div class="preview-copy">
+              <span class="source-label">CURRENT THEME</span>
+              <h2 id="currentName">Dream Skin</h2>
+              <p id="currentTagline">正在读取当前主题。</p>
+              <small id="currentQuote">MAKE SOMETHING WONDERFUL</small>
+            </div>
+          </article>
+
+          <section class="quick-panel" aria-labelledby="quickTitle">
+            <div class="section-title compact">
+              <div><span class="section-kicker">LIVE CONTROL</span><h2 id="quickTitle">快捷操作</h2></div>
+              <span class="local-badge">LOCAL</span>
+            </div>
+            <p>操作由本机 Dream Skin 引擎执行。热重载可用时不会重启 Codex。</p>
+            <div class="quick-actions">
+              <button class="command primary" data-action="start"><span aria-hidden="true">⏻</span>开启皮肤</button>
+              <button class="command" data-action="reapply"><span aria-hidden="true">↻</span>重新应用</button>
+              <button class="command" data-action="pause"><span aria-hidden="true">Ⅱ</span>暂停皮肤</button>
+              <button class="command danger" data-action="restore"><span aria-hidden="true">×</span>恢复官方</button>
+            </div>
+            <button class="text-command" data-open-create><span aria-hidden="true">＋</span>创建自定义主题</button>
+            <div id="actionFeedback" class="action-feedback" hidden></div>
+          </section>
+        </div>
+
+        <section class="metrics" aria-label="运行状态摘要">
+          <article><span>皮肤会话</span><strong id="metricSession">读取中</strong><small id="metricSessionHint">等待本地状态</small></article>
+          <article><span>Codex</span><strong id="metricCodex">读取中</strong><small id="metricCodexHint">检测安装与进程</small></article>
+          <article><span>当前主题</span><strong id="metricTheme">读取中</strong><small>活动主题配置</small></article>
+          <article><span>CDP / 注入器</span><strong id="metricCdp">读取中</strong><small id="metricCdpHint">仅限本机回环</small></article>
+        </section>
+
+        <section class="content-section">
+          <div class="section-title">
+            <div><span class="section-kicker">QUICK SWITCH</span><h2>最近主题</h2><p>从控制台直接切换本机可用主题。</p></div>
+            <button class="text-command" data-go-themes>查看全部 <span aria-hidden="true">→</span></button>
+          </div>
+          <div id="recommendedThemes" class="recommendation-row skeleton-row" aria-live="polite"></div>
+        </section>
+
+        <section id="overviewNotice" class="notice-strip" hidden>
+          <span class="notice-icon" aria-hidden="true">!</span>
+          <div><strong>最近一次运行记录需要关注</strong><p id="overviewNoticeText"></p></div>
+          <button class="text-command" data-go-diagnostics>查看诊断</button>
+        </section>
+      </section>
+
+      <section class="page" data-page="themes" hidden aria-labelledby="themeLibraryTitle">
+        <div class="library-toolbar">
+          <div>
+            <p class="eyebrow">VISUAL LIBRARY</p>
+            <h2 id="themeLibraryTitle">浏览与管理</h2>
+            <p>24 套 Dream Skin 官方场景与自定义主题均可直接应用，并支持参考创建。</p>
+          </div>
+          <button class="command primary" data-open-create><span aria-hidden="true">＋</span>创建主题</button>
+        </div>
+
+        <div class="library-controls">
+          <label class="search-field"><span aria-hidden="true">⌕</span><input id="themeSearch" data-testid="theme-search" type="search" placeholder="搜索主题、标签或描述" autocomplete="off"></label>
+          <div class="segmented" role="group" aria-label="主题来源筛选" data-testid="theme-filter">
+            <button class="active" data-filter="all">全部</button>
+            <button data-filter="official">官方场景</button>
+            <button data-filter="mine">我的主题</button>
+          </div>
+          <span id="themeCount" class="result-count">0 个主题</span>
+        </div>
+
+        <article id="featuredTheme" class="featured-theme" hidden></article>
+        <div id="themeGrid" class="theme-grid skeleton-grid" aria-live="polite"></div>
+
+        <section class="inbox-section">
+          <div class="section-title">
+            <div><span class="section-kicker">IMAGE INBOX</span><h2>图片收件箱</h2><p>从本地 `images/` 目录直接生成并应用主题。</p></div>
+            <span id="inboxCount" class="result-count">0 张图片</span>
+          </div>
+          <div id="imageInbox" class="inbox-grid"></div>
+        </section>
+      </section>
+
+      <section class="page" data-page="diagnostics" hidden aria-labelledby="diagnosticTitle">
+        <div class="diagnostic-head">
+          <div>
+            <p class="eyebrow">SYSTEM HEALTH</p>
+            <h2 id="diagnosticTitle">诊断与环境</h2>
+            <p>检查官方应用、签名运行时、回环 CDP 和主题存储。</p>
+          </div>
+          <button class="command primary" data-action="doctor"><span aria-hidden="true">⌁</span>运行深度诊断</button>
+        </div>
+
+        <div id="healthGrid" class="health-grid skeleton-grid" aria-live="polite"></div>
+
+        <div class="diagnostic-columns">
+          <section class="environment-section">
+            <div class="section-title compact"><div><span class="section-kicker">ENVIRONMENT</span><h2>本地环境</h2></div></div>
+            <dl id="environmentList" class="environment-list"></dl>
+          </section>
+          <section class="report-section">
+            <div class="section-title compact"><div><span class="section-kicker">LAST REPORT</span><h2>诊断报告</h2></div></div>
+            <div id="doctorSummary" class="report-empty">尚未运行深度诊断。</div>
+            <details><summary>查看原始报告</summary><pre id="doctorOutput">暂无报告</pre></details>
+          </section>
+        </div>
+
+        <section class="logs-section">
+          <div class="section-title"><div><span class="section-kicker">RUNTIME LOGS</span><h2>运行日志</h2><p>默认折叠，仅在排查问题时展开。</p></div></div>
+          <div id="logGroups" class="log-groups"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="themePreviewDialog" class="preview-dialog">
+    <div class="dialog-head"><div><span class="source-label">DREAM SKIN OFFICIAL SCENE</span><h2 id="previewDialogTitle">主题预览</h2></div><button class="icon-btn" data-close-preview aria-label="关闭预览">×</button></div>
+    <img id="previewDialogImage" alt="Dream Skin 官方场景效果大图">
+    <div class="dialog-foot"><p id="previewDialogText"></p><button class="command primary" id="createFromPreview">以此为参考创建</button></div>
+  </dialog>
+
+  <dialog id="themeDialog">
+    <form id="themeForm" class="theme-form">
+      <div class="dialog-head"><div><span class="source-label" id="themeDialogMode">CUSTOM THEME</span><h2 id="themeDialogTitle">创建自定义主题</h2></div><button type="button" class="icon-btn" data-close-create aria-label="关闭主题编辑器">×</button></div>
+      <div class="theme-editor-layout">
+        <div class="theme-editor-controls">
+          <p id="referenceHint" class="reference-hint" hidden></p>
+          <label class="drop-zone" id="imageDropLabel">选择纯背景图片<span id="imageHelp">PNG、JPEG 或 WebP，最大 50 MB</span><input id="image" type="file" accept="image/png,image/jpeg,image/webp"></label>
+          <div class="form-grid">
+            <label>主题名称<input name="name" type="text" value="我的新主题" maxlength="80" required></label>
+            <label>标语<input name="tagline" type="text" value="把喜欢的画面变成可交互的 Codex 工作台。" maxlength="160"></label>
+            <label class="wide">Quote<input name="quote" type="text" value="MAKE SOMETHING WONDERFUL" maxlength="80"></label>
+          </div>
+          <details class="advanced-editor" open>
+            <summary>调色板与视觉</summary>
+            <div class="editor-section">
+              <div class="palette-toolbar">
+                <div class="segmented compact" role="group" aria-label="编辑调色板">
+                  <button type="button" class="active" data-palette="dark">深色</button>
+                  <button type="button" data-palette="light">浅色</button>
+                </div>
+                <button type="button" class="text-command" data-generate-palette>从深色自动生成浅色</button>
+              </div>
+              <div class="color-fields">
+                <label>背景色<input name="background" type="color" value="#071116"></label>
+                <label>面板色<input name="panel" type="color" value="#0b1a20"></label>
+                <label>次面板色<input name="panelAlt" type="color" value="#10272c"></label>
+                <label>强调色<input name="accent" type="color" value="#7cff46"></label>
+                <label>次强调色<input name="accentAlt" type="color" value="#a7ff75"></label>
+                <label>辅助色<input name="secondary" type="color" value="#36d7e8"></label>
+                <label>高亮色<input name="highlight" type="color" value="#f0bd4f"></label>
+                <label>主文字色<input name="text" type="color" value="#f2fff7"></label>
+                <label>弱文字色<input name="muted" type="color" value="#a7c2ba"></label>
+                <label>边线色<input name="line" type="color" value="#7cff46"></label>
+                <label class="range-field wide">边线透明度<span data-range-value="lineOpacity">32%</span><input name="lineOpacity" type="range" min="0" max="100" value="32"></label>
+              </div>
+            </div>
+            <div class="editor-section appearance-fields">
+              <label>外观模式<select name="shellMode"><option value="auto">跟随 Codex</option><option value="recommended">使用建议模式</option><option value="dark">固定深色</option><option value="light">固定浅色</option></select></label>
+              <label>字体气质<select name="typography"><option value="system">系统</option><option value="technical">技术</option><option value="editorial">编辑</option><option value="rounded">圆润</option></select></label>
+              <label>装饰风格<select name="decorationStyle"><option value="none">无</option><option value="grid">网格</option><option value="orbit">轨道</option><option value="sparkles">微光</option><option value="grain">颗粒</option></select></label>
+              <label class="range-field">装饰强度<span data-range-value="decorationIntensity">42%</span><input name="decorationIntensity" type="range" min="0" max="100" value="42"></label>
+              <label class="range-field">背景焦点 X<span data-range-value="focusX">58%</span><input name="focusX" type="range" min="0" max="100" value="58"></label>
+              <label class="range-field">背景焦点 Y<span data-range-value="focusY">50%</span><input name="focusY" type="range" min="0" max="100" value="50"></label>
+              <label class="range-field">背景缩放<span data-range-value="zoom">100%</span><input name="zoom" type="range" min="80" max="160" value="100"></label>
+              <label class="range-field">背景遮罩<span data-range-value="overlay">24%</span><input name="overlay" type="range" min="0" max="80" value="24"></label>
+              <label class="range-field">面板透明度<span data-range-value="surfaceOpacity">88%</span><input name="surfaceOpacity" type="range" min="40" max="100" value="88"></label>
+              <label class="range-field">磨砂模糊<span data-range-value="blur">18 px</span><input name="blur" type="range" min="0" max="30" value="18"></label>
+              <label class="range-field">圆角<span data-range-value="radius">18 px</span><input name="radius" type="range" min="0" max="24" value="18"></label>
+              <label class="range-field">阴影强度<span data-range-value="shadow">34%</span><input name="shadow" type="range" min="0" max="100" value="34"></label>
+            </div>
+            <div class="advanced-fields copy-fields">
+              <label>品牌副标题<input name="brandSubtitle" type="text" value="CODEX DREAM SKIN" maxlength="80"></label>
+              <label>运行状态文案<input name="statusText" type="text" value="DREAM SKIN ONLINE" maxlength="80"></label>
+              <label>项目选择前缀<input name="projectPrefix" type="text" value="选择项目 · " maxlength="80"></label>
+              <label>项目选择标签<input name="projectLabel" type="text" value="◉  选择项目" maxlength="80"></label>
+            </div>
+            <section class="editor-section scene-editor" aria-labelledby="sceneEditorTitle">
+              <div class="editor-copy"><span>03 · 场景内容</span><h3 id="sceneEditorTitle">工作台身份与行动卡</h3></div>
+              <div class="scene-copy-grid">
+                <label>场景简称<input name="sceneShortName" type="text" maxlength="40"></label>
+                <label>身份图标<select name="sceneIcon"><option value="spark">微光</option><option value="code">代码</option><option value="plan">计划</option><option value="monitor">监控</option><option value="palette">设计</option><option value="compass">探索</option></select></label>
+                <label class="wide">主标题<input name="heroTitle" type="text" maxlength="80"></label>
+                <label class="wide">场景说明<input name="heroDescription" type="text" maxlength="140"></label>
+                <label class="wide">标签（逗号分隔，最多 4 个）<input name="heroTags" type="text" maxlength="100"></label>
+                <label>状态组件标题<input name="widgetTitle" type="text" maxlength="48"></label>
+                <label>状态行（用 / 分隔）<input name="widgetLines" type="text" maxlength="120"></label>
+                <label>输入区标签<input name="composerLabel" type="text" maxlength="48"></label>
+                <label>输入区提示<input name="composerHint" type="text" maxlength="100"></label>
+              </div>
+              <div class="action-editor">
+                <div class="action-editor-head"><span>行动卡</span><small>标题 / 副文案 / 图标</small></div>
+                <div class="action-row"><b>01</b><input name="action1Title" aria-label="行动卡 1 标题" maxlength="48"><input name="action1Detail" aria-label="行动卡 1 副文案" maxlength="96"><select name="action1Icon" aria-label="行动卡 1 图标"><option value="code">代码</option><option value="research">研究</option><option value="plan">计划</option></select></div>
+                <div class="action-row"><b>02</b><input name="action2Title" aria-label="行动卡 2 标题" maxlength="48"><input name="action2Detail" aria-label="行动卡 2 副文案" maxlength="96"><select name="action2Icon" aria-label="行动卡 2 图标"><option value="build">构建</option><option value="ship">交付</option><option value="gear">工程</option></select></div>
+                <div class="action-row"><b>03</b><input name="action3Title" aria-label="行动卡 3 标题" maxlength="48"><input name="action3Detail" aria-label="行动卡 3 副文案" maxlength="96"><select name="action3Icon" aria-label="行动卡 3 图标"><option value="review">审查</option><option value="chart">分析</option><option value="pen">写作</option></select></div>
+                <div class="action-row"><b>04</b><input name="action4Title" aria-label="行动卡 4 标题" maxlength="48"><input name="action4Detail" aria-label="行动卡 4 副文案" maxlength="96"><select name="action4Icon" aria-label="行动卡 4 图标"><option value="repair">修复</option><option value="monitor">值守</option><option value="wand">创作</option></select></div>
+              </div>
+            </section>
+            <section class="editor-section native-editor" aria-labelledby="nativeEditorTitle">
+              <div class="editor-copy"><span>04 · Codex 外观建议</span><h3 id="nativeEditorTitle">原生界面配色</h3><p>Dream Skin 不会静默改写 Codex 设置；可复制配置后在 Codex 设置中应用。</p></div>
+              <div class="native-fields">
+                <label>建议模式<select name="nativeVariant"><option value="dark">深色</option><option value="light">浅色</option></select></label>
+                <label>强调色<input name="nativeAccent" type="color" value="#7cff46"></label>
+                <label>表面色<input name="nativeSurface" type="color" value="#0b1a20"></label>
+                <label>文字色<input name="nativeInk" type="color" value="#f2fff7"></label>
+                <label class="range-field wide">原生对比度<span data-range-value="nativeContrast">62%</span><input name="nativeContrast" type="range" min="0" max="100" value="62"></label>
+                <label>Diff 新增<input name="nativeDiffAdded" type="color" value="#a7ff75"></label>
+                <label>Diff 删除<input name="nativeDiffRemoved" type="color" value="#f0bd4f"></label>
+                <label>Skill 色<input name="nativeSkill" type="color" value="#36d7e8"></label>
+              </div>
+            </section>
+          </details>
+        </div>
+        <aside class="theme-live-preview" data-theme-preview>
+          <div class="preview-mode"><span>实时构图</span><small data-preview-shell>深色</small></div>
+          <div class="preview-tabs segmented compact" role="group" aria-label="预览视图">
+            <button type="button" class="active" data-preview-view="home">首页</button>
+            <button type="button" data-preview-view="task">任务</button>
+            <button type="button" data-preview-view="diff">差异</button>
+          </div>
+          <div class="preview-shell">
+            <nav><i></i><i></i><i></i><i></i></nav>
+            <section>
+              <div class="preview-pane active" data-preview-pane="home"><div class="preview-hero"><span data-preview-brand>CODEX DREAM SKIN</span><strong data-preview-name>我的新主题</strong><small data-preview-tagline>把喜欢的画面变成可交互的 Codex 工作台。</small><div data-preview-tags></div></div><div class="preview-cards" data-preview-actions></div><div class="preview-composer"><b data-preview-composer>场景输入</b></div></div>
+              <div class="preview-pane" data-preview-pane="task"><div class="preview-task-head"><i></i><span><b>实现主题配置</b><small>本地任务 · 正在工作</small></span></div><div class="preview-message"><small>CODEX</small><p>我正在检查主题契约，并逐项验证运行效果。</p><code>shared/runtime/theme-tokens.mjs</code></div><div class="preview-composer"></div></div>
+              <div class="preview-pane" data-preview-pane="diff"><div class="preview-diff-head"><b>theme.json</b><small>3 个更改</small></div><pre><i>-  "schemaVersion": 2</i><em>+  "schemaVersion": 3</em><em>+  "nativeAppearance": { ... }</em></pre></div>
+            </section>
+          </div>
+          <div class="readability-grid">
+            <article data-contrast-text><span>文字对比度<small>正文目标 4.5:1</small></span><b>--</b></article>
+            <article data-contrast-controls><span>控件对比度<small>控件目标 3:1</small></span><b>--</b></article>
+          </div>
+          <div class="native-actions"><button type="button" class="command" data-copy-native-theme>复制原生主题配置</button><a class="text-command" href="codex://settings">打开 Codex 设置</a></div>
+          <p>预览使用实际 Theme v3 参数。图片只在本机取色，不会上传。</p>
+        </aside>
+      </div>
+      <div class="dialog-actions"><button type="button" class="command" data-close-create>取消</button><button class="command primary" id="saveThemeButton">保存并应用</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="deleteDialog" class="confirm-dialog">
+    <div class="dialog-head"><div><span class="source-label danger-text">DELETE THEME</span><h2>删除这个主题？</h2></div><button class="icon-btn" data-cancel-delete aria-label="取消删除">×</button></div>
+    <p id="deleteThemeName"></p>
+    <div class="dialog-actions"><button class="command" data-cancel-delete>取消</button><button class="command danger" id="confirmDelete">删除主题</button></div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

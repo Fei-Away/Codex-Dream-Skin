@@ -6,9 +6,13 @@
 .vscode/
 README.preview.html
 docs/readme-preview.html
+docs/plans/
 release/
 runtime/
 
 # local agent context
 AGENTS.md
 TASK_PROGRESS.md
+.playwright-cli/
+output/
+tmp/

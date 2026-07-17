@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-01",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#2a171b",
+      "panel": "#3a2228",
+      "panelAlt": "#4a2c34",
+      "accent": "#e98b9c",
+      "accentAlt": "#f5b4bf",
+      "secondary": "#f2c7cf",
+      "highlight": "#c85f76",
+      "text": "#fff5f7",
+      "muted": "#d7b6bd",
+      "line": "#e98b9c",
+      "lineOpacity": 0.32
+    },
+    "light": {
+      "background": "#fff5f7",
+      "panel": "#ffffff",
+      "panelAlt": "#fce7eb",
+      "accent": "#e98b9c",
+      "accentAlt": "#f5b4bf",
+      "secondary": "#f2c7cf",
+      "highlight": "#c85f76",
+      "text": "#321d22",
+      "muted": "#7a5c63",
+      "line": "#e98b9c",
+      "lineOpacity": 0.32
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 64,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 18
+    },
+    "surface": {
+      "opacity": 84,
+      "blur": 20,
+      "radius": 22,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "sparkles",
+      "intensity": 42
+    },
+    "typography": "rounded"
+  },
+  "name": "粉系定制",
+  "brandSubtitle": "BLUSH GARDEN",
+  "tagline": "柔粉玫瑰与轻盈花瓣，让工作台保持温柔明亮。",
+  "projectPrefix": "花园项目 ·",
+  "projectLabel": "选择花园项目",
+  "statusText": "BLUSH GARDEN ONLINE",
+  "quote": "CREATE WITH GRACE",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "spark",
+      "shortName": "粉系定制"
+    },
+    "hero": {
+      "eyebrow": "BLUSH GARDEN",
+      "title": "今天，温柔地推进什么？",
+      "description": "柔粉玫瑰与轻盈花瓣，让工作台保持温柔明亮。",
+      "tags": [
+        "柔光",
+        "整理",
+        "专注"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "pen",
+        "title": "整理灵感",
+        "detail": "先理解上下文与边界。",
+        "badge": "柔光",
+        "tone": "accent"
+      },
+      {
+        "icon": "spark",
+        "title": "润色表达",
+        "detail": "把方案转化为具体行动。",
+        "badge": "整理",
+        "tone": "secondary"
+      },
+      {
+        "icon": "review",
+        "title": "检查细节",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "专注",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "ship",
+        "title": "完成收尾",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "柔光",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "保持从容",
+        "留意细节"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "柔光",
+      "hint": "在「粉系定制」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#e98b9c",
+    "surface": "#3a2228",
+    "ink": "#fff5f7",
+    "contrast": 62,
+    "diffAdded": "#f5b4bf",
+    "diffRemoved": "#c85f76",
+    "skill": "#f2c7cf"
+  }
+}

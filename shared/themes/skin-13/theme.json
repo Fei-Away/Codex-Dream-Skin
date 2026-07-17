@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-13",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#24151c",
+      "panel": "#34202a",
+      "panelAlt": "#482b38",
+      "accent": "#ef705f",
+      "accentAlt": "#efad3d",
+      "secondary": "#35bfc0",
+      "highlight": "#d84991",
+      "text": "#fff6f2",
+      "muted": "#d2acb4",
+      "line": "#ef705f",
+      "lineOpacity": 0.32
+    },
+    "light": {
+      "background": "#fff4ef",
+      "panel": "#ffffff",
+      "panelAlt": "#f9e5df",
+      "accent": "#ef705f",
+      "accentAlt": "#efad3d",
+      "secondary": "#35bfc0",
+      "highlight": "#d84991",
+      "text": "#382129",
+      "muted": "#7e5d66",
+      "line": "#ef705f",
+      "lineOpacity": 0.32
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 16
+    },
+    "surface": {
+      "opacity": 82,
+      "blur": 20,
+      "radius": 20,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "sparkles",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "内容创作",
+  "brandSubtitle": "STORY FLOW",
+  "tagline": "让素材、节奏与叙事持续流动。",
+  "projectPrefix": "内容项目 ·",
+  "projectLabel": "选择内容项目",
+  "statusText": "STORY ROOM ONLINE",
+  "quote": "FOLLOW THE THREAD",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "pen",
+      "shortName": "内容创作"
+    },
+    "hero": {
+      "eyebrow": "STORY FLOW",
+      "title": "今天要讲好哪个故事？",
+      "description": "让素材、节奏与叙事持续流动。",
+      "tags": [
+        "素材",
+        "叙事",
+        "发布"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "整理素材",
+        "detail": "先理解上下文与边界。",
+        "badge": "素材",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "搭建结构",
+        "detail": "把方案转化为具体行动。",
+        "badge": "叙事",
+        "tone": "secondary"
+      },
+      {
+        "icon": "pen",
+        "title": "润色叙事",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "发布",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "ship",
+        "title": "发布内容",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "素材",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "故事流动",
+        "保持真诚"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "素材",
+      "hint": "在「内容创作」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#ef705f",
+    "surface": "#34202a",
+    "ink": "#fff6f2",
+    "contrast": 62,
+    "diffAdded": "#efad3d",
+    "diffRemoved": "#d84991",
+    "skill": "#35bfc0"
+  }
+}

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-09",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#071313",
+      "panel": "#0b2020",
+      "panelAlt": "#123030",
+      "accent": "#38d996",
+      "accentAlt": "#82f4ba",
+      "secondary": "#31bfce",
+      "highlight": "#e0a94a",
+      "text": "#effff8",
+      "muted": "#91bdb0",
+      "line": "#38d996",
+      "lineOpacity": 0.3
+    },
+    "light": {
+      "background": "#ebecec",
+      "panel": "#f5f6f6",
+      "panelAlt": "#e7eaea",
+      "accent": "#38d996",
+      "accentAlt": "#82f4ba",
+      "secondary": "#31bfce",
+      "highlight": "#e0a94a",
+      "text": "#020606",
+      "muted": "#546e66",
+      "line": "#38d996",
+      "lineOpacity": 0.3
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 36
+    },
+    "surface": {
+      "opacity": 90,
+      "blur": 14,
+      "radius": 12,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grid",
+      "intensity": 42
+    },
+    "typography": "technical"
+  },
+  "name": "深度编码",
+  "brandSubtitle": "DEEP WORK MODE",
+  "tagline": "为长时间编码保留清晰层次。",
+  "projectPrefix": "代码项目 ·",
+  "projectLabel": "选择代码项目",
+  "statusText": "FOCUS SESSION ONLINE",
+  "quote": "STAY WITH THE PROBLEM",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "code",
+      "shortName": "深度编码"
+    },
+    "hero": {
+      "eyebrow": "DEEP WORK MODE",
+      "title": "今天要攻克哪段代码？",
+      "description": "为长时间编码保留清晰层次。",
+      "tags": [
+        "编码",
+        "调试",
+        "质量"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "code",
+        "title": "理解代码",
+        "detail": "先理解上下文与边界。",
+        "badge": "编码",
+        "tone": "accent"
+      },
+      {
+        "icon": "build",
+        "title": "实现功能",
+        "detail": "把方案转化为具体行动。",
+        "badge": "调试",
+        "tone": "secondary"
+      },
+      {
+        "icon": "repair",
+        "title": "定位缺陷",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "质量",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "review",
+        "title": "运行验证",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "编码",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "深度工作",
+        "测试优先"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "编码",
+      "hint": "在「深度编码」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#38d996",
+    "surface": "#0b2020",
+    "ink": "#effff8",
+    "contrast": 62,
+    "diffAdded": "#82f4ba",
+    "diffRemoved": "#e0a94a",
+    "skill": "#31bfce"
+  }
+}

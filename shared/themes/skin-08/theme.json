@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-08",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#0c0b09",
+      "panel": "#16130f",
+      "panelAlt": "#211c15",
+      "accent": "#d6ad5c",
+      "accentAlt": "#f0cf86",
+      "secondary": "#b79458",
+      "highlight": "#8f6a2f",
+      "text": "#fff9ea",
+      "muted": "#c5b89c",
+      "line": "#d6ad5c",
+      "lineOpacity": 0.36
+    },
+    "light": {
+      "background": "#f8f5ec",
+      "panel": "#fffdf7",
+      "panelAlt": "#eee8da",
+      "accent": "#d6ad5c",
+      "accentAlt": "#f0cf86",
+      "secondary": "#b79458",
+      "highlight": "#8f6a2f",
+      "text": "#29241c",
+      "muted": "#716752",
+      "line": "#d6ad5c",
+      "lineOpacity": 0.36
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 52,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 42
+    },
+    "surface": {
+      "opacity": 92,
+      "blur": 10,
+      "radius": 12,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grain",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "舞台黑金",
+  "brandSubtitle": "GOLDEN STAGE",
+  "tagline": "哑光黑、香槟金与舞台光束，让视觉焦点更集中。",
+  "projectPrefix": "舞台项目 ·",
+  "projectLabel": "选择舞台项目",
+  "statusText": "GOLDEN STAGE ONLINE",
+  "quote": "OWN THE STAGE",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "spark",
+      "shortName": "舞台黑金"
+    },
+    "hero": {
+      "eyebrow": "GOLDEN STAGE",
+      "title": "把最重要的工作放到聚光灯下",
+      "description": "哑光黑、香槟金与舞台光束，让视觉焦点更集中。",
+      "tags": [
+        "聚焦",
+        "品质",
+        "呈现"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "compass",
+        "title": "选定焦点",
+        "detail": "先理解上下文与边界。",
+        "badge": "聚焦",
+        "tone": "accent"
+      },
+      {
+        "icon": "palette",
+        "title": "打磨质感",
+        "detail": "把方案转化为具体行动。",
+        "badge": "品质",
+        "tone": "secondary"
+      },
+      {
+        "icon": "review",
+        "title": "审查呈现",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "呈现",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "ship",
+        "title": "正式发布",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "聚焦",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "舞台就绪",
+        "聚焦主线"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "聚焦",
+      "hint": "在「舞台黑金」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#d6ad5c",
+    "surface": "#16130f",
+    "ink": "#fff9ea",
+    "contrast": 62,
+    "diffAdded": "#f0cf86",
+    "diffRemoved": "#8f6a2f",
+    "skill": "#b79458"
+  }
+}
