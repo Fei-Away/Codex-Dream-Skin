@@ -23,6 +23,13 @@
 | 状态 / 日志 | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Codex 配置 | `~/.codex/config.toml`（仅外观相关项可能被改，可恢复） |
 
+#### 重新打开恢复
+
+- 安装器会创建 `~/Library/LaunchAgents/com.openai.codex-dream-skin-studio.reopen-recovery.plist`。这个被动恢复任务不会启动已退出的 Codex；它只会在检测到 Codex 已由用户重新打开、但当前没有经过验证的主题会话时执行恢复。
+- 恢复前会同时核对注入器 PID、进程启动标识、Node 路径、注入器路径和端口。身份不完整或不匹配的旧状态会原子移动到 `state.stale.json`，且不会向其中记录的 PID 发送信号，以免误伤复用该 PID 的其他进程。
+- 「暂停」会关闭自动恢复并清理尝试记录；再次启动主题会重新启用。执行「恢复」或卸载时会从 `launchd` 注销并删除该任务及隔离的旧状态。
+- Codex 自身更新或从 Dock 普通重开后，为补上仅绑定本机回环地址的 CDP 参数，恢复流程可能会执行一次短暂的 Codex 重启。
+
 ### Windows
 
 | 用途 | 路径 |

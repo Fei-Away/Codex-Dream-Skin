@@ -20,6 +20,7 @@ for seconds in "$SETTLE_SECONDS" "$POLL_SECONDS" "$COOLDOWN_SECONDS"; do
 done
 
 discover_codex_app
+ensure_node_runtime
 ensure_state_root
 
 current_codex_pid() {
@@ -34,8 +35,9 @@ recovery_port() {
   local port="9341"
   if [ -f "$STATE_PATH" ]; then
     port="$(state_field port 2>/dev/null || true)"
-    [ -n "$port" ] || port="9341"
   fi
+  case "$port" in ''|*[!0-9]*) port="9341" ;; esac
+  if [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ]; then port="9341"; fi
   printf '%s\n' "$port"
 }
 
@@ -54,15 +56,18 @@ recovery_injector_ready() {
   esac
   [ -f "$STATE_PATH" ] || return 1
   local pid
-  local command_line
+  local saved_port
+  local saved_start
+  local saved_node
+  local saved_injector
   pid="$(state_field injectorPid 2>/dev/null || true)"
   case "$pid" in ''|0|*[!0-9]*) return 1 ;; esac
-  /bin/kill -0 "$pid" 2>/dev/null || return 1
-  command_line="$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)"
-  case "$command_line" in
-    *injector.mjs*--watch*) return 0 ;;
-    *) return 1 ;;
-  esac
+  saved_port="$(state_field port 2>/dev/null || true)"
+  saved_start="$(state_field injectorStartedAt 2>/dev/null || true)"
+  saved_node="$(state_field nodePath 2>/dev/null || true)"
+  saved_injector="$(state_field injectorPath 2>/dev/null || true)"
+  recorded_injector_process_matches \
+    "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port"
 }
 
 recovery_session_ready() {
@@ -95,17 +100,20 @@ recover_once() {
   recovery_session_ready && return 0
 
   local now="${DREAM_SKIN_TEST_NOW:-$(/bin/date +%s)}"
+  local port
   case "$now" in ''|*[!0-9]*) fail "Watcher time must be an integer epoch." ;; esac
+  port="$(recovery_port)"
   attempt_is_cooling_down "$pid" "$now" && return 0
   /bin/mkdir "$RECOVERY_LOCK_DIR" 2>/dev/null || return 0
   trap '/bin/rm -rf "$RECOVERY_LOCK_DIR"' EXIT INT TERM
   /usr/bin/printf '%s %s\n' "$pid" "$now" > "$RECOVERY_ATTEMPT_PATH"
+  quarantine_untrusted_injector_state
 
   local start_command="${DREAM_SKIN_RECOVERY_START_COMMAND:-$SCRIPT_DIR/start-dream-skin-macos.sh}"
   if [ ! -x "$start_command" ]; then
     printf 'Codex Dream Skin recovery start command is not executable: %s\n' "$start_command" >> "$RECOVERY_ERROR_LOG"
   else
-    "$start_command" --restart-existing >> "$RECOVERY_LOG" 2>> "$RECOVERY_ERROR_LOG" || true
+    "$start_command" --port "$port" --restart-existing >> "$RECOVERY_LOG" 2>> "$RECOVERY_ERROR_LOG" || true
   fi
 
   /bin/rm -rf "$RECOVERY_LOCK_DIR"

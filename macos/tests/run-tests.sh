@@ -699,6 +699,42 @@ HOME="$RECOVERY_HOME" \
   "$ROOT/scripts/watch-dream-skin-macos.sh" --once
 [ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "2" ]
 
+# A live PID whose command resembles the injector but whose recorded start
+# identity is stale must be quarantined without being signalled, then recovered.
+RECOVERY_FAKE_INJECTOR="$TMP/reused-injector.mjs"
+/usr/bin/printf 'setTimeout(() => {}, 30000);\n' > "$RECOVERY_FAKE_INJECTOR"
+"$NODE" "$RECOVERY_FAKE_INJECTOR" --watch --port 9341 --theme-dir "$TMP" &
+WATCH_PID="$!"
+"$NODE" -e '
+  const fs = require("node:fs");
+  const [file, pid, node, injector] = process.argv.slice(1);
+  fs.writeFileSync(file, `${JSON.stringify({
+    schemaVersion: 4,
+    session: "active",
+    port: 9341,
+    injectorPid: Number(pid),
+    injectorStartedAt: "stale-start-identity",
+    nodePath: node,
+    injectorPath: injector,
+  }, null, 2)}\n`);
+' "$RECOVERY_STATE_ROOT/state.json" "$WATCH_PID" "$NODE" "$RECOVERY_FAKE_INJECTOR"
+/usr/bin/env -u NODE -u NODE_VERSION \
+  DREAM_SKIN_TEST_CODEX_PID=4244 \
+  DREAM_SKIN_TEST_CDP_READY=true \
+  DREAM_SKIN_RECOVERY_START_COMMAND="$TMP/fake-recovery-start" \
+  DREAM_SKIN_TEST_START_LOG="$RECOVERY_START_LOG" \
+  DREAM_SKIN_WATCHER_SETTLE_SECONDS=0 \
+  DREAM_SKIN_TEST_NOW=1100 \
+  HOME="$RECOVERY_HOME" \
+  "$ROOT/scripts/watch-dream-skin-macos.sh" --once
+[ "$(/usr/bin/wc -l < "$RECOVERY_START_LOG" | /usr/bin/xargs)" = "3" ]
+[ ! -e "$RECOVERY_STATE_ROOT/state.json" ]
+[ -f "$RECOVERY_STATE_ROOT/state.stale.json" ]
+/bin/kill -0 "$WATCH_PID"
+/bin/kill -TERM "$WATCH_PID"
+wait "$WATCH_PID" 2>/dev/null || true
+WATCH_PID=""
+
 RECOVERY_AGENT_HOME="$TMP/recovery-agent-home"
 RECOVERY_AGENT_DIR="$TMP/launch-agents"
 /bin/mkdir -p "$RECOVERY_AGENT_HOME" "$RECOVERY_AGENT_DIR"
@@ -715,6 +751,49 @@ if /usr/bin/plutil -extract ProgramArguments json -o - "$RECOVERY_PLIST" | /usr/
   exit 1
 fi
 [ -f "$RECOVERY_AGENT_HOME/Library/Application Support/CodexDreamSkinStudio/reopen-recovery.enabled" ]
+
+# Exercise the recovery lifecycle helpers instead of only checking that the
+# entrypoint scripts mention them.
+RECOVERY_AGENT_STATE="$RECOVERY_AGENT_HOME/Library/Application Support/CodexDreamSkinStudio"
+/usr/bin/touch "$RECOVERY_AGENT_STATE/reopen-recovery.attempt"
+/bin/mkdir -p "$RECOVERY_AGENT_STATE/reopen-recovery.lock"
+DREAM_SKIN_LAUNCH_AGENTS_DIR="$RECOVERY_AGENT_DIR" \
+HOME="$RECOVERY_AGENT_HOME" \
+  /bin/bash -c '. "$1/scripts/common-macos.sh"; disable_reopen_recovery' _ "$ROOT"
+[ ! -e "$RECOVERY_AGENT_STATE/reopen-recovery.enabled" ]
+[ ! -e "$RECOVERY_AGENT_STATE/reopen-recovery.attempt" ]
+[ ! -e "$RECOVERY_AGENT_STATE/reopen-recovery.lock" ]
+[ -f "$RECOVERY_PLIST" ]
+
+DREAM_SKIN_LAUNCH_AGENTS_DIR="$RECOVERY_AGENT_DIR" \
+HOME="$RECOVERY_AGENT_HOME" \
+  /bin/bash -c '. "$1/scripts/common-macos.sh"; enable_reopen_recovery' _ "$ROOT"
+[ -f "$RECOVERY_AGENT_STATE/reopen-recovery.enabled" ]
+[ "$(/usr/bin/stat -f '%Lp' "$RECOVERY_AGENT_STATE/reopen-recovery.enabled")" = "600" ]
+
+RECOVERY_LAUNCHCTL_LOG="$TMP/recovery-launchctl.log"
+RECOVERY_FAKE_LAUNCHCTL="$TMP/fake-launchctl"
+/usr/bin/printf '%s\n' \
+  '#!/bin/bash' \
+  '/usr/bin/printf '\''%s\n'\'' "$*" >> "${DREAM_SKIN_TEST_LAUNCHCTL_LOG:?}"' \
+  > "$RECOVERY_FAKE_LAUNCHCTL"
+/bin/chmod +x "$RECOVERY_FAKE_LAUNCHCTL"
+/usr/bin/touch "$RECOVERY_AGENT_STATE/reopen-recovery.attempt" \
+  "$RECOVERY_AGENT_STATE/state.stale.json"
+/bin/mkdir -p "$RECOVERY_AGENT_STATE/reopen-recovery.lock"
+DREAM_SKIN_TEST_LAUNCHCTL_LOG="$RECOVERY_LAUNCHCTL_LOG" \
+DREAM_SKIN_LAUNCH_AGENTS_DIR="$RECOVERY_AGENT_DIR" \
+DREAM_SKIN_LAUNCHCTL="$RECOVERY_FAKE_LAUNCHCTL" \
+HOME="$RECOVERY_AGENT_HOME" \
+  /bin/bash -c '. "$1/scripts/common-macos.sh"; remove_reopen_recovery' _ "$ROOT"
+[ ! -e "$RECOVERY_AGENT_STATE/reopen-recovery.enabled" ]
+[ ! -e "$RECOVERY_AGENT_STATE/reopen-recovery.attempt" ]
+[ ! -e "$RECOVERY_AGENT_STATE/reopen-recovery.lock" ]
+[ ! -e "$RECOVERY_AGENT_STATE/state.stale.json" ]
+[ ! -e "$RECOVERY_PLIST" ]
+/usr/bin/grep -q "bootout gui/$UID/com.openai.codex-dream-skin-studio.reopen-recovery" \
+  "$RECOVERY_LAUNCHCTL_LOG"
+
 /usr/bin/grep -q 'install_reopen_recovery_agent' "$ROOT/scripts/install-dream-skin-macos.sh"
 /usr/bin/grep -q 'enable_reopen_recovery' "$ROOT/scripts/start-dream-skin-macos.sh"
 /usr/bin/grep -q 'disable_reopen_recovery' "$ROOT/scripts/pause-dream-skin-macos.sh"
@@ -883,6 +962,14 @@ DOCTOR_HOME="$TMP/doctor-home"
 /bin/mkdir -p "$DOCTOR_HOME/.codex"
 /usr/bin/touch "$DOCTOR_HOME/.codex/config.toml"
 CODEX_APP_BUNDLE=/Applications/ChatGPT.app HOME="$DOCTOR_HOME" \
+  "$ROOT/scripts/doctor-macos.sh" >/dev/null
+
+DOCTOR_THEME_HOME="$TMP/doctor-theme-home"
+DOCTOR_THEME_DIR="$DOCTOR_THEME_HOME/Library/Application Support/CodexDreamSkinStudio/theme"
+/bin/mkdir -p "$DOCTOR_THEME_HOME/.codex" "$DOCTOR_THEME_DIR"
+/usr/bin/touch "$DOCTOR_THEME_HOME/.codex/config.toml"
+/bin/cp "$ROOT/assets/theme.json" "$ROOT/assets/portal-hero.png" "$DOCTOR_THEME_DIR/"
+CODEX_APP_BUNDLE=/Applications/ChatGPT.app HOME="$DOCTOR_THEME_HOME" \
   "$ROOT/scripts/doctor-macos.sh" >/dev/null
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 

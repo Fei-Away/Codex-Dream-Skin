@@ -15,6 +15,7 @@ INJECTOR="$SCRIPT_DIR/injector.mjs"
 INSTALL_ROOT="$HOME/.codex/codex-dream-skin-studio"
 STATE_ROOT="$HOME/Library/Application Support/CodexDreamSkinStudio"
 STATE_PATH="$STATE_ROOT/state.json"
+STALE_STATE_PATH="$STATE_ROOT/state.stale.json"
 THEME_BACKUP_PATH="$STATE_ROOT/theme-backup.json"
 THEME_DIR="$STATE_ROOT/theme"
 CONFIG_PATH="$HOME/.codex/config.toml"
@@ -110,7 +111,7 @@ remove_reopen_recovery() {
   disable_reopen_recovery
   local launchctl_bin="${DREAM_SKIN_LAUNCHCTL:-/bin/launchctl}"
   "$launchctl_bin" bootout "gui/$(/usr/bin/id -u)/$RECOVERY_JOB_LABEL" >/dev/null 2>&1 || true
-  /bin/rm -f "$RECOVERY_PLIST_PATH"
+  /bin/rm -f "$RECOVERY_PLIST_PATH" "$STALE_STATE_PATH"
 }
 
 install_reopen_recovery_agent() {
@@ -390,6 +391,34 @@ state_field() {
     const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))[process.argv[2]];
     if (value !== undefined && value !== null) process.stdout.write(String(value));
   ' "$STATE_PATH" "$key"
+}
+
+quarantine_untrusted_injector_state() {
+  [ -f "$STATE_PATH" ] || return 0
+  local pid=""
+  local saved_port=""
+  local saved_start=""
+  local saved_node=""
+  local saved_injector=""
+
+  pid="$(state_field injectorPid 2>/dev/null || true)"
+  saved_port="$(state_field port 2>/dev/null || true)"
+  saved_start="$(state_field injectorStartedAt 2>/dev/null || true)"
+  saved_node="$(state_field nodePath 2>/dev/null || true)"
+  saved_injector="$(state_field injectorPath 2>/dev/null || true)"
+  case "$pid" in
+    ''|0|*[!0-9]*) ;;
+    *)
+      if recorded_injector_process_matches \
+        "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port"; then
+        return 0
+      fi
+      ;;
+  esac
+
+  /bin/mv -f "$STATE_PATH" "$STALE_STATE_PATH"
+  /bin/chmod 600 "$STALE_STATE_PATH"
+  printf 'Quarantined an untrusted Dream Skin injector state without signalling its recorded PID.\n' >&2
 }
 
 restore_runtime_context_from_state() {
