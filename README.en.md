@@ -42,7 +42,25 @@
   </sub>
 </p>
 
-## Tested featured preset: Arina Hashimoto
+## Tested featured presets
+
+### Gothic Void Crusade / 哥特虚空远征
+
+**Special thanks to [@seansong-ideogram](https://github.com/seansong-ideogram) for designing and contributing this striking, atmospheric original gothic science-fiction work to the community.** It leads the tested featured presets and is the default theme for fresh macOS installs.
+
+<p align="center">
+  <img src="docs/images/presets/gothic-void-crusade-preview.jpg" alt="Gothic Void Crusade theme running in Codex" width="900"><br>
+  <sub>Real injected Codex home screen (preview only)</sub>
+</p>
+
+After installing on macOS, switch from **已保存主题** or run:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-gothic-void-crusade
+```
+
+### Arina Hashimoto / 桥本有菜
 
 “Arina Hashimoto / 桥本有菜” has been verified on the real Codex home screen in
 both light and dark appearances. The user-provided source PNG is `1672 × 941`;

@@ -41,7 +41,25 @@
   </sub>
 </p>
 
-## 实测精选预设：桥本有菜
+## 实测精选预设
+
+### Gothic Void Crusade / 哥特虚空远征
+
+**特别感谢 [@seansong-ideogram](https://github.com/seansong-ideogram) 为社区设计并贡献这套精美、极具氛围感的原创哥特科幻作品。** 它是当前实测精选的第一套预设，也是 macOS 全新安装时默认启用的主题。
+
+<p align="center">
+  <img src="docs/images/presets/gothic-void-crusade-preview.jpg" alt="哥特虚空远征主题实机效果" width="900"><br>
+  <sub>真实 Codex 首页注入效果（仅预览）</sub>
+</p>
+
+macOS 安装后可从「已保存主题」直接切换，也可以运行：
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-gothic-void-crusade
+```
+
+### 桥本有菜 / Arina Hashimoto
 
 下面这套「桥本有菜 / Arina Hashimoto」已经在真实 Codex 首页分别验证浅色和暗色外观。用户提供的源 PNG 为 `1672 × 941`，主题包在保持源图近 16:9 构图的前提下派生导出 `2560 × 1440` JPEG，并不代表增加了源图细节。截图中的侧栏、卡片、项目选择和输入框都是 Codex 原生控件。
 
