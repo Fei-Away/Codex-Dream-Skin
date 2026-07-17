@@ -45,6 +45,9 @@ Install location after step 2:
 | Engine | `~/.codex/codex-dream-skin-studio` |
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
+| Reopen recovery | `~/Library/LaunchAgents/com.openai.codex-dream-skin-studio.reopen-recovery.plist` |
+
+After installation, opening Codex normally from the Dock also restores the active theme. If Codex was opened without the loopback theme port—most commonly after an app update—it may perform one short automatic restart. Explicitly quitting Codex leaves it closed. Pause disables this recovery, and Restore removes it.
 
 ## Customer ZIP (optional packaging)
 
@@ -59,15 +62,18 @@ That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio` e
 ## How it works (security boundary)
 
 1. Discover `com.openai.codex` and validate signature / Team ID / arch / bundled Node.
-2. Start Codex via user `launchd` with CDP bound to `127.0.0.1` only.
+2. Start Codex as a normal user process with CDP bound to `127.0.0.1` only.
 3. Accept the debug port only when it belongs to Codex (or a legitimate child).
 4. Inject only into expected `app://` renderer targets.
 5. Resolve the selected theme and image to real paths, then enforce 16 MB,
    `16384px`-per-side, and 50-megapixel limits before injection.
 6. Keep a small injector alive across reloads and route changes.
-7. Pause/Restore stops the injector only when PID, executable, script path, and
+7. Keep a passive user LaunchAgent that waits while Codex is closed and recovers
+   the theme only after a plain Codex process appears.
+8. Pause/Restore stops the injector only when PID, executable, script path, and
    start time match the recorded job; a stop failure preserves state and aborts.
-8. Config backup/restore requires Codex to be closed, strict UTF-8, an operation
+   Restore also removes reopen recovery.
+9. Config backup/restore requires Codex to be closed, strict UTF-8, an operation
    lock, same-directory atomic replacement, and an unchanged-byte check.
 
 CDP is powerful and unauthenticated on loopback. Prefer Restore when you are done theming.

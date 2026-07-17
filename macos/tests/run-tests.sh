@@ -840,7 +840,17 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.1" ]' _ "$ROOT"
+[ "$(/bin/cat "$ROOT/VERSION")" = "1.2.1" ]
+"$NODE" - "$ROOT/package.json" <<'NODE'
+import fs from "node:fs";
+const packageJson = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+if (packageJson.version !== "1.2.1") throw new Error("package.json version must be 1.2.1");
+NODE
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.1" ]' _ "$ROOT"
+/usr/bin/grep -q 'recoveryEnabled' "$ROOT/scripts/status-dream-skin-macos.sh"
+/usr/bin/grep -q 'reopenRecovery' "$ROOT/scripts/doctor-macos.sh"
+/usr/bin/grep -q '重新打开' "$ROOT/CHANGELOG.md"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

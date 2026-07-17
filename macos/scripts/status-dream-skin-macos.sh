@@ -20,6 +20,8 @@ done
 STATE_ROOT="${HOME}/Library/Application Support/CodexDreamSkinStudio"
 STATE_PATH="${STATE_ROOT}/state.json"
 THEME_DIR="${STATE_ROOT}/theme"
+RECOVERY_ENABLED_PATH="${STATE_ROOT}/reopen-recovery.enabled"
+RECOVERY_JOB_LABEL="com.openai.codex-dream-skin-studio.reopen-recovery"
 
 PORT="9341"
 SESSION="off"
@@ -27,6 +29,8 @@ INJECTOR_ALIVE="false"
 CDP_OK="false"
 THEME_NAME=""
 CODEX_RUNNING="false"
+RECOVERY_ENABLED="false"
+RECOVERY_AGENT_LOADED="false"
 
 read_json_field() {
   # Parse machine-written JSON (one key per line) without python3, which macOS
@@ -74,6 +78,13 @@ injector_identity_matches() {
 # ChatGPT.app, while older installs still expose the former process name.
 if /usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 || /usr/bin/pgrep -x Codex >/dev/null 2>&1; then
   CODEX_RUNNING="true"
+fi
+
+if [ -f "$RECOVERY_ENABLED_PATH" ]; then
+  RECOVERY_ENABLED="true"
+fi
+if /bin/launchctl print "gui/$(/usr/bin/id -u)/$RECOVERY_JOB_LABEL" >/dev/null 2>&1; then
+  RECOVERY_AGENT_LOADED="true"
 fi
 
 if [ -f "$STATE_PATH" ]; then
@@ -125,9 +136,10 @@ if [ "$JSON" = "true" ]; then
   json_escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; printf '%s' "$s"; }
   bool() { [ "$1" = "true" ] && printf 'true' || printf 'false'; }
   case "$PORT" in ''|*[!0-9]*) port_json="\"$(json_escape "$PORT")\"" ;; *) port_json="$PORT" ;; esac
-  printf '{"session":"%s","port":%s,"injectorAlive":%s,"cdpOk":%s,"codexRunning":%s,"themeName":"%s"}\n' \
+  printf '{"session":"%s","port":%s,"injectorAlive":%s,"cdpOk":%s,"codexRunning":%s,"themeName":"%s","recoveryEnabled":%s,"recoveryAgentLoaded":%s}\n' \
     "$(json_escape "$SESSION")" "$port_json" "$(bool "$INJECTOR_ALIVE")" \
-    "$(bool "$CDP_OK")" "$(bool "$CODEX_RUNNING")" "$(json_escape "$THEME_NAME")"
+    "$(bool "$CDP_OK")" "$(bool "$CODEX_RUNNING")" "$(json_escape "$THEME_NAME")" \
+    "$(bool "$RECOVERY_ENABLED")" "$(bool "$RECOVERY_AGENT_LOADED")"
   exit 0
 fi
 
@@ -137,3 +149,5 @@ printf 'injector=%s\n' "$INJECTOR_ALIVE"
 printf 'cdp=%s\n' "$CDP_OK"
 printf 'codex=%s\n' "$CODEX_RUNNING"
 printf 'theme=%s\n' "${THEME_NAME:-}"
+printf 'recovery=%s\n' "$RECOVERY_ENABLED"
+printf 'recoveryAgent=%s\n' "$RECOVERY_AGENT_LOADED"
