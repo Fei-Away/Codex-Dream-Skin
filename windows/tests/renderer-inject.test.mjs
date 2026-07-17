@@ -234,6 +234,7 @@ const mainResult = vm.runInNewContext(payload, main.context);
 assert.equal(mainResult.installed, true);
 assert.equal(main.rootClasses.has("codex-dream-skin"), true);
 assert.equal(main.rootStyles.get("--dream-art"), 'url("blob:fixture-1")');
+assert.equal(main.rootStyles.get("--dream-overlay-opacity"), "58%");
 assert.equal(main.nodes.has("codex-dream-skin-style"), true);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), true);
 assert.equal(main.rootClasses.has("dream-theme-dark"), true);
@@ -280,6 +281,7 @@ const configured = createFixture({
 });
 const configuredPayload = buildPayload({
   appearance: "light",
+  overlayOpacity: .42,
   palette: { accent: "#d45a70" },
   art: { focusX: .15, focusY: .8, safeArea: "right", taskMode: "off" },
 });
@@ -292,6 +294,7 @@ assert.equal(configured.rootClasses.has("dream-safe-right"), true);
 assert.equal(configured.rootClasses.has("dream-task-off"), true);
 assert.equal(configured.rootStyles.get("--dream-art-position"), "15% 80%");
 assert.equal(configured.rootStyles.get("--dream-accent"), "#d45a70");
+assert.equal(configured.rootStyles.get("--dream-overlay-opacity"), "42%");
 assert.equal(configured.routeClasses.has("dream-home"), true);
 assert.equal(configured.routeClasses.has("dream-task"), false);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), true);

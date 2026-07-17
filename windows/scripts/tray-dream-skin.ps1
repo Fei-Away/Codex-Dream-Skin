@@ -50,7 +50,7 @@ try {
 
   function Add-DreamSkinTrayItem {
     param(
-      [Parameter(Mandatory = $true)][System.Windows.Forms.ToolStripItemCollection]$Items,
+      [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Windows.Forms.ToolStripItemCollection]$Items,
       [Parameter(Mandatory = $true)][string]$Text,
       [AllowNull()][scriptblock]$Action,
       [bool]$Enabled = $true
@@ -64,6 +64,63 @@ try {
     }
     [void]$Items.Add($item)
     return $item
+  }
+
+  function Show-DreamSkinOverlayOpacityDialog {
+    param([Parameter(Mandatory = $true)][int]$InitialPercent)
+    $form = [System.Windows.Forms.Form]::new()
+    $form.Text = '设置 Codex 遮罩强度'
+    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $form.ClientSize = [System.Drawing.Size]::new(420, 170)
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.ShowInTaskbar = $false
+
+    $description = [System.Windows.Forms.Label]::new()
+    $description.Text = '统一调整顶部栏、侧栏和内容区的遮罩强度。'
+    $description.AutoSize = $true
+    $description.Location = [System.Drawing.Point]::new(18, 15)
+
+    $slider = [System.Windows.Forms.TrackBar]::new()
+    $slider.Minimum = 0
+    $slider.Maximum = 100
+    $slider.TickFrequency = 10
+    $slider.SmallChange = 1
+    $slider.LargeChange = 10
+    $slider.Value = [Math]::Max(0, [Math]::Min(100, $InitialPercent))
+    $slider.Location = [System.Drawing.Point]::new(18, 42)
+    $slider.Size = [System.Drawing.Size]::new(384, 45)
+
+    $valueLabel = [System.Windows.Forms.Label]::new()
+    $valueLabel.Text = "遮罩强度：$($slider.Value)%"
+    $valueLabel.AutoSize = $true
+    $valueLabel.Location = [System.Drawing.Point]::new(18, 92)
+    $slider.add_ValueChanged({ $valueLabel.Text = "遮罩强度：$($slider.Value)%" }.GetNewClosure())
+
+    $ok = [System.Windows.Forms.Button]::new()
+    $ok.Text = '确定'
+    $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $ok.Location = [System.Drawing.Point]::new(238, 126)
+    $ok.Size = [System.Drawing.Size]::new(78, 28)
+
+    $cancel = [System.Windows.Forms.Button]::new()
+    $cancel.Text = '取消'
+    $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $cancel.Location = [System.Drawing.Point]::new(324, 126)
+    $cancel.Size = [System.Drawing.Size]::new(78, 28)
+
+    $form.AcceptButton = $ok
+    $form.CancelButton = $cancel
+    foreach ($control in @($description, $slider, $valueLabel, $ok, $cancel)) {
+      [void]$form.Controls.Add($control)
+    }
+    try {
+      if ($form.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { return [int]$slider.Value }
+      return $null
+    } finally {
+      $form.Dispose()
+    }
   }
 
   function Rebuild-DreamSkinTrayMenu {
@@ -105,6 +162,20 @@ try {
         $dialog.Dispose()
       }
     }
+    $overlayPercent = [int][Math]::Round((Get-DreamSkinOverlayOpacity -StateRoot $StateRoot) * 100)
+    $overlayAction = {
+      $selectedPercent = Show-DreamSkinOverlayOpacityDialog -InitialPercent $overlayPercent
+      if ($null -eq $selectedPercent) { return }
+      $null = Set-DreamSkinOverlayOpacity -Opacity ($selectedPercent / 100.0) -StateRoot $StateRoot
+      $notify.ShowBalloonTip(
+        1800,
+        'Codex Dream Skin',
+        "遮罩强度已更新为 $selectedPercent%。",
+        [System.Windows.Forms.ToolTipIcon]::Info
+      )
+    }.GetNewClosure()
+    $null = Add-DreamSkinTrayItem -Items $menu.Items `
+      -Text "设置遮罩强度（$overlayPercent%）" -Action $overlayAction
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Action {
       $name = [Microsoft.VisualBasic.Interaction]::InputBox('输入主题名称：', '保存 Codex Dream Skin 主题', '')
       if ($name.Trim()) {

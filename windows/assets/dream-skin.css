@@ -16,16 +16,17 @@
   --dream-hero-shade: color-mix(in oklab, var(--dream-surface) 93%, transparent);
   --dream-ambient-opacity: .18;
   --dream-shadow: 0 16px 42px color-mix(in oklab, var(--dream-accent) 9%, transparent);
-  --dream-immersive-edge: color-mix(in oklab, var(--dream-surface) 46%, transparent);
-  --dream-immersive-mid: color-mix(in oklab, var(--dream-surface) 28%, transparent);
-  --dream-immersive-far: color-mix(in oklab, var(--dream-surface) 14%, transparent);
-  --dream-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 50%, transparent);
-  --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 72%, transparent);
+  --dream-overlay-opacity: 58%;
+  --dream-immersive-edge: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-immersive-mid: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-immersive-far: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) var(--dream-overlay-opacity), transparent);
+  --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) var(--dream-overlay-opacity), transparent);
   --dream-immersive-composer: color-mix(in oklab, var(--dream-surface-raised) 76%, var(--dream-accent) 4%);
   --dream-immersive-line: color-mix(in oklab, var(--dream-line) 76%, transparent);
-  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 86%, transparent);
-  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 78%, transparent);
-  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 66%, transparent);
+  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
 }
 
 :root.codex-dream-skin.dream-theme-dark {
@@ -43,16 +44,16 @@
   --dream-hero-shade: color-mix(in oklab, var(--dream-surface) 91%, transparent);
   --dream-ambient-opacity: .22;
   --dream-shadow: 0 18px 48px color-mix(in oklab, oklch(0.06 0.01 245) 72%, transparent);
-  --dream-immersive-edge: color-mix(in oklab, var(--dream-surface) 43%, transparent);
-  --dream-immersive-mid: color-mix(in oklab, var(--dream-surface) 27%, transparent);
-  --dream-immersive-far: color-mix(in oklab, var(--dream-surface) 16%, transparent);
-  --dream-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 48%, transparent);
-  --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 70%, transparent);
+  --dream-immersive-edge: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-immersive-mid: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-immersive-far: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) var(--dream-overlay-opacity), transparent);
+  --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) var(--dream-overlay-opacity), transparent);
   --dream-immersive-composer: color-mix(in oklab, var(--dream-surface-raised) 88%, var(--dream-accent) 5%);
   --dream-immersive-line: color-mix(in oklab, var(--dream-line) 82%, transparent);
-  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 82%, transparent);
-  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 74%, transparent);
-  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 60%, transparent);
+  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
+  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) var(--dream-overlay-opacity), transparent);
 }
 
 html.codex-dream-skin body {
@@ -116,7 +117,7 @@ html.codex-dream-skin main.main-surface > header.app-header-tint {
    main surface and needs its own dark-theme legibility layer. */
 html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] {
   color: var(--dream-text) !important;
-  background: color-mix(in oklab, var(--dream-sidebar) 90%, transparent) !important;
+  background: color-mix(in oklab, var(--dream-sidebar) var(--dream-overlay-opacity), transparent) !important;
   border-bottom: 1px solid var(--dream-line-soft) !important;
   box-shadow: 0 1px 12px color-mix(in oklab, var(--dream-canvas) 72%, transparent) !important;
   backdrop-filter: blur(16px) saturate(.9) !important;

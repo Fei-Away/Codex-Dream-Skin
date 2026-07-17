@@ -336,6 +336,7 @@ async function loadTheme(themeDir) {
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
     image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
+    overlayOpacity: normalizedUnit(raw.overlayOpacity, "overlayOpacity") ?? .58,
     art: {
       focusX: normalizedUnit(art.focusX, "art.focusX"),
       focusY: normalizedUnit(art.focusY, "art.focusY"),
@@ -985,6 +986,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       payloadBytes: Buffer.byteLength(loaded.payload),
       themeId: loaded.theme.id,
       appearance: loaded.theme.appearance,
+      overlayOpacity: loaded.theme.overlayOpacity,
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
     }));

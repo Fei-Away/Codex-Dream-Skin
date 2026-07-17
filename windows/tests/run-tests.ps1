@@ -615,6 +615,7 @@ try {
   if ($initialTheme.Theme.id -cne 'preset-romantic-rose' -or
     $initialTheme.Theme.name -cne '桥本有菜' -or
     $initialTheme.Theme.appearance -cne 'auto' -or
+    [double]$initialTheme.Theme.overlayOpacity -ne 0.58 -or
     $initialTheme.Theme.art.safeArea -cne 'left' -or
     $initialTheme.Theme.art.taskMode -cne 'ambient' -or
     [System.IO.Path]::GetExtension($initialTheme.ImagePath) -cne '.jpg') {
@@ -626,10 +627,15 @@ try {
     $preseededThemes[0].Name -cne '桥本有菜') {
     throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
   }
+  $null = Set-DreamSkinOverlayOpacity -Opacity 0.42 -StateRoot $themeStateRoot
+  if ((Get-DreamSkinOverlayOpacity -StateRoot $themeStateRoot) -ne 0.42) {
+    throw 'Global overlay opacity was not persisted in the active theme.'
+  }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
   if ($updatedTheme.Theme.name -cne '测试主题' -or
     $updatedTheme.Theme.id -cne 'custom' -or
+    [double]$updatedTheme.Theme.overlayOpacity -ne 0.42 -or
     $updatedTheme.Theme.art.safeArea -cne 'auto' -or
     $updatedTheme.Theme.art.taskMode -cne 'auto' -or
     -not (Test-DreamSkinThemePathWithin -Path $updatedTheme.ImagePath -Root $themePaths.Active)) {
@@ -646,6 +652,9 @@ try {
     throw 'Saved theme creation or discovery failed.'
   }
   $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot
+  if ((Get-DreamSkinOverlayOpacity -StateRoot $themeStateRoot) -ne 0.42) {
+    throw 'Switching saved themes did not preserve the global overlay opacity.'
+  }
 
   $outsideTheme = Join-Path $temporaryRoot 'outside-theme'
   New-Item -ItemType Directory -Path $outsideTheme | Out-Null
@@ -715,6 +724,7 @@ try {
     '.app-shell-main-content-top-fade',
     '.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary',
     '--dream-immersive-composer',
+    '--dream-overlay-opacity',
     'background-position: var(--dream-art-position)',
     '.dream-home-utility',
     ':has(.dream-home-utility) .composer-surface-chrome',
@@ -723,8 +733,11 @@ try {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '设置遮罩强度', '已保存主题', '完全恢复 Codex')) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
+  }
+  if (-not $traySource.Contains('[AllowEmptyCollection()][System.Windows.Forms.ToolStripItemCollection]$Items')) {
+    throw 'Tray menu builder rejects its initially empty item collection.'
   }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
     throw 'Tray pause/restore closures do not terminate cleanly.'
@@ -817,6 +830,10 @@ try {
   $managedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
   if ($managedPayloadTest.ExitCode -ne 0) { throw 'Managed theme payload validation failed.' }
+  $managedPayload = ($managedPayloadTest.Output -join "`n") | ConvertFrom-Json
+  if ([double]$managedPayload.overlayOpacity -ne 0.42) {
+    throw 'Node injector dropped the managed overlay opacity from the renderer payload.'
+  }
   $oversizedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $oversizedTheme)
   if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }

@@ -10,6 +10,7 @@
   "quote": "MAKE SOMETHING WONDERFUL",
   "image": "dream-reference.jpg",
   "appearance": "auto",
+  "overlayOpacity": 0.58,
   "art": {
     "focusX": 0.72,
     "focusY": 0.45,

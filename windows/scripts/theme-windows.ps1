@@ -183,6 +183,35 @@ function Write-DreamSkinTheme {
   Write-DreamSkinUtf8FileAtomically -Path $themePath -Content ($json + "`r`n")
 }
 
+function Get-DreamSkinOverlayOpacity {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  try {
+    $theme = (Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata).Theme
+    if ($null -ne $theme.overlayOpacity) {
+      $value = [double]$theme.overlayOpacity
+      if ($value -ge 0 -and $value -le 1) { return $value }
+    }
+  } catch {}
+  return [double]0.58
+}
+
+function Set-DreamSkinOverlayOpacity {
+  param(
+    [Parameter(Mandatory = $true)][double]$Opacity,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  if ([double]::IsNaN($Opacity) -or [double]::IsInfinity($Opacity) -or $Opacity -lt 0 -or $Opacity -gt 1) {
+    throw 'Overlay opacity must be between 0 and 1.'
+  }
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $loaded = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata
+  $loaded.Theme | Add-Member -NotePropertyName overlayOpacity `
+    -NotePropertyValue ([Math]::Round($Opacity, 2)) -Force
+  Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $loaded.Theme
+  return [double]$loaded.Theme.overlayOpacity
+}
+
 function Initialize-DreamSkinThemeStore {
   param(
     [Parameter(Mandatory = $true)][string]$SkillRoot,
@@ -253,6 +282,7 @@ function Set-DreamSkinActiveTheme {
   $source = [System.IO.Path]::GetFullPath($ImagePath)
   Assert-DreamSkinImageFile -Path $source
   $extension = [System.IO.Path]::GetExtension($source).ToLowerInvariant()
+  $overlayOpacity = Get-DreamSkinOverlayOpacity -StateRoot $StateRoot
   $oldImage = $null
   try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
   if ($null -eq $Theme) {
@@ -260,6 +290,7 @@ function Set-DreamSkinActiveTheme {
       id = 'custom'
       name = '自定义主题'
       appearance = 'auto'
+      overlayOpacity = $overlayOpacity
       art = [pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }
       palette = [pscustomobject]@{}
     }
@@ -280,6 +311,7 @@ function Set-DreamSkinActiveTheme {
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
     if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
     if (-not $Theme.appearance) { $Theme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force }
+    $Theme | Add-Member -NotePropertyName overlayOpacity -NotePropertyValue $overlayOpacity -Force
     if (-not $Theme.art) {
       $Theme | Add-Member -NotePropertyName art -NotePropertyValue `
         ([pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }) -Force
@@ -372,6 +404,8 @@ function Use-DreamSkinSavedTheme {
   }
   $saved = Read-DreamSkinTheme -ThemeDirectory $directory
   $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  $theme | Add-Member -NotePropertyName overlayOpacity `
+    -NotePropertyValue (Get-DreamSkinOverlayOpacity -StateRoot $StateRoot) -Force
   return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme -StateRoot $StateRoot
 }
 
