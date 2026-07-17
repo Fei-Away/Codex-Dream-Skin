@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param()
+param([switch]$EngineOnly)
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
@@ -10,6 +10,155 @@ $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-t
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
+  $runtimeSourceName = 'runtime source ' + (-join @([char]0x6D4B, [char]0x8BD5))
+  $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
+  $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
+  New-Item -ItemType Directory -Path $runtimeSourceRoot | Out-Null
+  foreach ($directoryName in @('assets', 'scripts')) {
+    Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
+      -Recurse -Force -ErrorAction Stop
+  }
+
+  $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
+  $sourcePrefix = $runtimeSourceRoot.TrimEnd('\') + '\'
+  $runtimeSourceFiles = @(
+    Get-ChildItem -LiteralPath (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts') `
+      -Recurse -File -Force
+  )
+  $runtimeEngineFiles = @(
+    Get-ChildItem -LiteralPath (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts') `
+      -Recurse -File -Force
+  )
+  if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
+    -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
+    -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
+    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
+    throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
+  }
+  foreach ($sourceFile in $runtimeSourceFiles) {
+    $relative = $sourceFile.FullName.Substring($sourcePrefix.Length)
+    $installedFile = Join-Path $engine.Root $relative
+    if (-not (Test-Path -LiteralPath $installedFile -PathType Leaf) -or
+      (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile.FullName).Hash -cne
+      (Get-FileHash -Algorithm SHA256 -LiteralPath $installedFile).Hash) {
+      throw "Installed runtime hash does not match its source: $relative"
+    }
+  }
+
+  [System.IO.File]::WriteAllText((Join-Path $engine.Root 'stale-runtime.txt'), 'stale')
+  [System.IO.File]::WriteAllText((Join-Path $runtimeSourceRoot 'scripts\runtime-update.test'), 'updated')
+  $realRuntimeCleanup = (Get-Command Remove-DreamSkinRuntimeTree -CommandType Function).ScriptBlock
+  $previousWarningPreference = $WarningPreference
+  $runtimeCleanupFailure = @{ Triggered = $false }
+  try {
+    $WarningPreference = 'Stop'
+    function Remove-DreamSkinRuntimeTree {
+      param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$StateRoot
+      )
+      if ([System.IO.Path]::GetFileName($Path) -like '.engine-backup-*') {
+        $runtimeCleanupFailure.Triggered = $true
+        throw 'forced runtime backup cleanup failure'
+      }
+      & $realRuntimeCleanup -Path $Path -StateRoot $StateRoot
+    }
+
+    $runtimeUpdateReportedFailure = $false
+    try {
+      $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
+    } catch {
+      $runtimeUpdateReportedFailure = $true
+    }
+    if (-not $runtimeCleanupFailure.Triggered -or $runtimeUpdateReportedFailure -or
+      (Test-Path -LiteralPath (Join-Path $engine.Root 'stale-runtime.txt')) -or
+      (Read-DreamSkinUtf8File -Path (Join-Path $engine.Root 'scripts\runtime-update.test')) -cne 'updated') {
+      throw 'Runtime reinstall did not commit cleanly when old-engine cleanup failed.'
+    }
+  } finally {
+    $WarningPreference = $previousWarningPreference
+    Set-Item -Path Function:\Remove-DreamSkinRuntimeTree -Value $realRuntimeCleanup
+  }
+  foreach ($runtimeBackup in Get-ChildItem -LiteralPath $runtimeStateRoot -Directory -Force |
+    Where-Object { $_.Name -like '.engine-backup-*' }) {
+    Remove-DreamSkinRuntimeTree -Path $runtimeBackup.FullName -StateRoot $runtimeStateRoot
+  }
+
+  $invalidRuntimeRoot = Join-Path $temporaryRoot 'invalid-runtime-source'
+  New-Item -ItemType Directory -Path $invalidRuntimeRoot | Out-Null
+  foreach ($directoryName in @('assets', 'scripts')) {
+    Copy-Item -LiteralPath (Join-Path $runtimeSourceRoot $directoryName) -Destination $invalidRuntimeRoot `
+      -Recurse -Force -ErrorAction Stop
+  }
+  Remove-Item -LiteralPath (Join-Path $invalidRuntimeRoot 'scripts\start-dream-skin.ps1') -Force
+  $invalidRuntimeRejected = $false
+  try {
+    $null = Install-DreamSkinRuntimeEngine -SkillRoot $invalidRuntimeRoot -StateRoot $runtimeStateRoot
+  } catch {
+    $invalidRuntimeRejected = $true
+  }
+  if (-not $invalidRuntimeRejected -or
+    -not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
+    -not (Test-Path -LiteralPath (Join-Path $engine.Root 'scripts\runtime-update.test') -PathType Leaf) -or
+    @(Get-ChildItem -LiteralPath $runtimeStateRoot -Force | Where-Object {
+      $_.Name -like '.engine-staging-*' -or $_.Name -like '.engine-backup-*'
+    }).Count -ne 0) {
+    throw 'An invalid runtime source changed the installed engine or left transaction artifacts.'
+  }
+
+  $nestedStateRoot = Join-Path $runtimeSourceRoot 'scripts\nested-state'
+  $nestedStateRejected = $false
+  try {
+    $null = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $nestedStateRoot
+  } catch {
+    $nestedStateRejected = $true
+  }
+  if (-not $nestedStateRejected -or (Test-Path -LiteralPath $nestedStateRoot)) {
+    throw 'Runtime install allowed its state root to recurse into the copied source tree.'
+  }
+
+  $installSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\install-dream-skin.ps1')
+  $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
+  $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
+  if ($trayGuardIndex -lt 0 -or $engineInstallIndex -le $trayGuardIndex) {
+    throw 'Installer does not reject an active source-bound tray before replacing the runtime engine.'
+  }
+  foreach ($requiredShortcutBinding in @(
+    '$startScript = $engine.Start',
+    '$restoreScript = $engine.Restore',
+    '$trayScript = $engine.Tray',
+    '$shortcut.WorkingDirectory = $engine.Root',
+    '$restore.WorkingDirectory = $engine.Root',
+    '$tray.WorkingDirectory = $engine.Root'
+  )) {
+    if (-not $installSource.Contains($requiredShortcutBinding)) {
+      throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
+    }
+  }
+
+  Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
+  foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {
+    $tokens = $null
+    $parseErrors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile(
+      $installedScript.FullName, [ref]$tokens, [ref]$parseErrors
+    ) | Out-Null
+    if ($parseErrors.Count -gt 0) {
+      throw "Installed runtime script failed to parse after its source checkout was removed: $($installedScript.Name)"
+    }
+  }
+  if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
+    throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
+  }
+  Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
+
+  if ($EngineOnly) {
+    Write-Host 'PASS: managed runtime staging, replacement, invalid-source guard, and source-independent shortcuts.'
+    return
+  }
+
   $atomicReplacePath = Join-Path $temporaryRoot 'atomic-replace.txt'
   [System.IO.File]::WriteAllText($atomicReplacePath, 'before')
   Write-DreamSkinUtf8FileAtomically -Path $atomicReplacePath -Content 'after'
