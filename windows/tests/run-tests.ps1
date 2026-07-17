@@ -171,7 +171,7 @@ try {
     -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
     throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
   }
-  Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
+  Remove-Item -LiteralPath $invalidRuntimeRoot -Recurse -Force
 
   if ($EngineOnly) {
     Write-Host 'PASS: managed runtime staging, replacement, invalid-source guard, and source-independent shortcuts.'
@@ -781,6 +781,13 @@ try {
     -not $startSource.Contains('Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot')) {
     throw 'Start does not preserve an existing pause marker when startup rolls back.'
   }
+  if (-not $startSource.Contains('Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId')) {
+    throw 'Start does not reject an active theme that changed after import confirmation.'
+  }
+  $verifySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
+  if (-not $verifySource.Contains('Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId')) {
+    throw 'Verify does not bind live validation to the theme selected by the importer.'
+  }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
   foreach ($requiredRendererBehavior in @('dream-home-utility', 'artMetadata', 'detectShellAppearance')) {
@@ -857,6 +864,12 @@ try {
 
   $packagePath = Join-Path $repositoryRoot 'examples\theme-package\kimi-sakura-dawn.dreamskin'
   $installedImportScript = Join-Path $engine.Root 'scripts\import-theme-package.ps1'
+  $installedImportSource = Read-DreamSkinUtf8File -Path $installedImportScript
+  if (-not $installedImportSource.Contains("'--expected-content-hash', `$expectedContentHash") -or
+    -not $installedImportSource.Contains("'-ExpectedThemeId'") -or
+    -not $installedImportSource.Contains('$installed.Json.packageId')) {
+    throw 'Installed importer does not bind confirmation, start, and verification to one package identity.'
+  }
   $importState = Join-Path $temporaryRoot 'import-state'
   $importOutput = @(& $installedImportScript `
     -File $packagePath -DryRun -NoPrompt -StateRoot (Join-Path $temporaryRoot 'import-state'))
@@ -877,7 +890,7 @@ try {
     $repeatReport.apply.status -cne 'selected-awaiting-runtime') {
     throw 'Windows .dreamskin repeat/apply did not preserve idempotency and separate live status.'
   }
-  $selected = Read-DreamSkinTheme -ThemeDirectory (Join-Path $importState 'theme')
+  $selected = Read-DreamSkinTheme -ThemeDirectory (Join-Path $importState 'active-theme')
   if ($selected.Theme.id -cne 'dev.codex-dream-skin.kimi-sakura-dawn') {
     throw 'Windows .dreamskin apply did not select the installed saved theme.'
   }

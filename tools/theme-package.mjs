@@ -7,7 +7,7 @@ import { importThemePackage } from "../lib/theme-package/import-core.mjs";
 import { inspectPackage, packSource, publicReport } from "../lib/theme-package/package-operations.mjs";
 
 function usage() {
-  return "Usage: theme-package.mjs validate <source-dir> | pack <source-dir> --output <file.dreamskin> | inspect <file.dreamskin> [--platform <macos|windows> --dream-skin-version <semver>] | import <file.dreamskin> --platform <macos|windows> --dream-skin-version <semver> (--dry-run | --install --state-root <dir> [--replace])";
+  return "Usage: theme-package.mjs validate <source-dir> | pack <source-dir> --output <file.dreamskin> | inspect <file.dreamskin> [--platform <macos|windows> --dream-skin-version <semver>] | import <file.dreamskin> --platform <macos|windows> --dream-skin-version <semver> (--dry-run | --install --state-root <dir> [--replace] [--expected-content-hash <sha256>])";
 }
 
 function compatibilityArgs(args) {
@@ -28,7 +28,7 @@ function importArgs(args) {
       options[argument] = true;
       continue;
     }
-    if (["--platform", "--dream-skin-version", "--state-root"].includes(argument)) {
+    if (["--platform", "--dream-skin-version", "--state-root", "--expected-content-hash"].includes(argument)) {
       const value = args[index + 1];
       if (!value || value.startsWith("--") || options[argument]) {
         throw new ThemePackageError("CLI_USAGE", usage());
@@ -44,7 +44,9 @@ function importArgs(args) {
   if (
     dryRun === install || !options["--platform"] || !options["--dream-skin-version"]
     || (install && !options["--state-root"])
-    || (dryRun && (options["--state-root"] || options["--replace"]))
+    || (dryRun && (options["--state-root"] || options["--replace"] || options["--expected-content-hash"]))
+    || (options["--expected-content-hash"]
+      && !/^[0-9a-f]{64}$/.test(options["--expected-content-hash"]))
   ) throw new ThemePackageError("CLI_USAGE", usage());
   return {
     platform: options["--platform"],
@@ -52,6 +54,7 @@ function importArgs(args) {
     mode: dryRun ? "dry-run" : "install",
     stateRoot: options["--state-root"] ?? null,
     replace: Boolean(options["--replace"]),
+    expectedContentHash: options["--expected-content-hash"] ?? null,
   };
 }
 

@@ -69,28 +69,28 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
-PACKAGE_ID="$(json_field "$DRY_REPORT" packageId)"
-PACKAGE_VERSION="$(json_field "$DRY_REPORT" packageVersion)"
-THEME_NAME="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
-  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
-  process.stdin.on("end", () => { try { process.stdout.write(JSON.parse(text).runtimeTheme.name || ""); } catch {} });
+SUMMARY_FIELDS="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
+  let text = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk) => { text += chunk; });
+  process.stdin.on("end", () => {
+    const report = JSON.parse(text);
+    process.stdout.write([
+      report.packageId,
+      report.packageVersion,
+      report.contentHash,
+      report.runtimeTheme.name,
+      report.author?.name || "",
+      (report.targets || []).join(", "),
+      report.preview?.available ? "已提供" : "未提供",
+      (report.warnings || []).map((warning) => warning.message || String(warning)).join("\n"),
+    ].join("\u001f"));
+  });
 ')"
-AUTHOR_NAME="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
-  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
-  process.stdin.on("end", () => { try { process.stdout.write(JSON.parse(text).author?.name || ""); } catch {} });
-')"
-TARGETS="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
-  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
-  process.stdin.on("end", () => { try { process.stdout.write((JSON.parse(text).targets || []).join(", ")); } catch {} });
-')"
-PREVIEW_STATUS="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
-  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
-  process.stdin.on("end", () => { try { process.stdout.write(JSON.parse(text).preview?.available ? "已提供" : "未提供"); } catch {} });
-')"
-WARNING_TEXT="$(/usr/bin/printf '%s' "$DRY_REPORT" | "$NODE" -e '
-  let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", c => text += c);
-  process.stdin.on("end", () => { try { process.stdout.write((JSON.parse(text).warnings || []).map(w => w.message || String(w)).join("\n")); } catch {} });
-')"
+IFS="$(/usr/bin/printf '\037')" read -r \
+  PACKAGE_ID PACKAGE_VERSION CONTENT_HASH THEME_NAME AUTHOR_NAME TARGETS PREVIEW_STATUS WARNING_TEXT <<EOF
+$SUMMARY_FIELDS
+EOF
 
 if [ "$NO_PROMPT" = "false" ]; then
   CHOICE="$(/usr/bin/osascript - "$THEME_NAME" "$PACKAGE_ID" "$PACKAGE_VERSION" "$AUTHOR_NAME" "$TARGETS" "$PREVIEW_STATUS" "$WARNING_TEXT" <<'APPLESCRIPT' 2>/dev/null || true
@@ -110,7 +110,7 @@ elif [ "$APPLY_EXPLICIT" = "false" ]; then
   APPLY_NOW="false"
 fi
 
-INSTALL_ARGS=(--install --state-root "$STATE_ROOT")
+INSTALL_ARGS=(--install --state-root "$STATE_ROOT" --expected-content-hash "$CONTENT_HASH")
 [ "$REPLACE" = "false" ] || INSTALL_ARGS+=(--replace)
 if ! INSTALL_REPORT="$(run_import "${INSTALL_ARGS[@]}")"; then
   ERROR_CODE="$(json_field "$INSTALL_REPORT" code)"
@@ -123,7 +123,8 @@ end run
 APPLESCRIPT
 )"
     [ "$CONFIRM" = "替换" ] || exit 0
-    INSTALL_REPORT="$(run_import --install --state-root "$STATE_ROOT" --replace)" || {
+    INSTALL_REPORT="$(run_import --install --state-root "$STATE_ROOT" --replace \
+      --expected-content-hash "$CONTENT_HASH")" || {
       /usr/bin/printf '%s\n' "$INSTALL_REPORT"
       alert_user "主题替换失败：$(json_field "$INSTALL_REPORT" message)"
       exit 1

@@ -119,6 +119,7 @@ theme-name.dreamskin  # ZIP v1
 
 - 包内容哈希覆盖规范化 manifest/theme 与所有声明资源，不依赖 ZIP 时间戳或条目顺序。
 - 相同 `packageId + packageVersion + contentHash` 直接返回已安装。
+- 平台确认页记录候选 `contentHash`；安装阶段必须重新完整验证并匹配该哈希，否则以候选已变化失败，不安装后来替换的文件。
 - 相同 `packageId` 但其他标识不同进入人工冲突，不自动按版本号升级或降级。
 - 安装事务只使用同一状态根内的 staging/backup/final 目录，确保原子 rename 可用。
 - 导入日志不得记录完整用户路径；可记录包 ID、版本、短哈希、错误码和平台。

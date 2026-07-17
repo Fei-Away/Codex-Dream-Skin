@@ -82,6 +82,7 @@ if ($DryRun) {
 }
 
 $applyAfterInstall = [bool]$Apply
+$expectedContentHash = "$($inspection.Json.contentHash)"
 if (-not $NoPrompt) {
   Add-Type -AssemblyName System.Windows.Forms
   $targetText = @($inspection.Json.targets) -join ', '
@@ -102,9 +103,15 @@ if (-not $NoPrompt) {
 
 $fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
 Assert-DreamSkinNoReparseComponents -Path $fullStateRoot
+$installed = $null
+$applyStatus = 'not-requested'
+$applyMessage = $null
 $operationLock = Enter-DreamSkinOperationLock
 try {
-  $installArguments = @('--install', '--state-root', $fullStateRoot)
+  $installArguments = @(
+    '--install', '--state-root', $fullStateRoot,
+    '--expected-content-hash', $expectedContentHash
+  )
   if ($Replace) { $installArguments += '--replace' }
   $installed = Invoke-DreamSkinThemePackageImport -ModeArguments $installArguments
   if ($installed.ExitCode -ne 0 -and $installed.Json.code -eq 'CONFLICT_CONFIRMATION_REQUIRED' -and
@@ -117,7 +124,8 @@ try {
     )
     if ($replaceChoice -ne [System.Windows.Forms.DialogResult]::Yes) { return }
     $installed = Invoke-DreamSkinThemePackageImport -ModeArguments @(
-      '--install', '--state-root', $fullStateRoot, '--replace'
+      '--install', '--state-root', $fullStateRoot, '--replace',
+      '--expected-content-hash', $expectedContentHash
     )
   }
   if ($installed.ExitCode -ne 0) {
@@ -125,49 +133,63 @@ try {
     exit 1
   }
 
-  $applyStatus = 'not-requested'
   if ($applyAfterInstall) {
-    $themeDirectory = Join-Path (Join-Path $fullStateRoot 'themes') "$($installed.Json.packageId)"
-    $null = Use-DreamSkinSavedTheme -ThemeDirectory $themeDirectory -StateRoot $fullStateRoot
-    $applyStatus = 'selected-awaiting-runtime'
+    try {
+      $themeDirectory = Join-Path (Join-Path $fullStateRoot 'themes') "$($installed.Json.packageId)"
+      $null = Use-DreamSkinSavedTheme -ThemeDirectory $themeDirectory -StateRoot $fullStateRoot
+      $applyStatus = 'selected-awaiting-runtime'
+    } catch {
+      $applyStatus = 'failed-after-install'
+      $applyMessage = 'The theme was installed, but it could not be selected for application.'
+    }
   }
 } finally {
   Exit-DreamSkinOperationLock -Mutex $operationLock
 }
 
-if ($applyAfterInstall) {
+if ($applyAfterInstall -and $applyStatus -ne 'failed-after-install') {
   $defaultStateRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
   if (Test-DreamSkinPathEqual -Left $fullStateRoot -Right $defaultStateRoot) {
-    $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
-    $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
-    $verifyScript = Join-Path $PSScriptRoot 'verify-dream-skin.ps1'
-    $startArguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $startScript, '-Port', "$Port")
-    if (-not $NoPrompt) { $startArguments += '-PromptRestart' }
-    $startResult = Invoke-DreamSkinNative -FilePath $powershell -ArgumentList $startArguments
-    $verifyResult = if ($startResult.ExitCode -eq 0) {
-      Invoke-DreamSkinNative -FilePath $powershell -ArgumentList @(
-        '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $verifyScript, '-Port', "$Port"
+    try {
+      $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
+      $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
+      $verifyScript = Join-Path $PSScriptRoot 'verify-dream-skin.ps1'
+      $startArguments = @(
+        '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $startScript,
+        '-Port', "$Port", '-ExpectedThemeId', "$($installed.Json.packageId)"
       )
-    } else {
-      [pscustomobject]@{ ExitCode = $startResult.ExitCode; Output = $startResult.Output }
-    }
-    if ($verifyResult.ExitCode -eq 0) {
-      $applyStatus = 'applied'
-    } else {
+      if (-not $NoPrompt) { $startArguments += '-PromptRestart' }
+      $startResult = Invoke-DreamSkinNative -FilePath $powershell -ArgumentList $startArguments
+      $verifyResult = if ($startResult.ExitCode -eq 0) {
+        Invoke-DreamSkinNative -FilePath $powershell -ArgumentList @(
+          '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $verifyScript,
+          '-Port', "$Port", '-ExpectedThemeId', "$($installed.Json.packageId)"
+        )
+      } else {
+        [pscustomobject]@{ ExitCode = $startResult.ExitCode; Output = $startResult.Output }
+      }
+      if ($verifyResult.ExitCode -eq 0) {
+        $applyStatus = 'applied'
+      } else {
+        $applyStatus = 'failed-after-install'
+        $applyMessage = 'The theme was installed, but the selected theme could not be started and verified.'
+      }
+    } catch {
       $applyStatus = 'failed-after-install'
+      $applyMessage = 'The theme was installed, but the selected theme could not be started and verified.'
     }
   }
 }
 
-$installed.Json | Add-Member -NotePropertyName apply -NotePropertyValue ([pscustomobject]@{
-  status = $applyStatus
-}) -Force
+$applyResult = [ordered]@{ status = $applyStatus }
+if ($applyMessage) { $applyResult.message = $applyMessage }
+$installed.Json | Add-Member -NotePropertyName apply -NotePropertyValue ([pscustomobject]$applyResult) -Force
 $finalReport = $installed.Json | ConvertTo-Json -Depth 12
 
 if ($applyStatus -eq 'failed-after-install') {
   if (-not $NoPrompt) {
     [void][System.Windows.Forms.MessageBox]::Show(
-      '主题已安装并选中，但当前未能通过 Codex 实时应用验证。可稍后从托盘重新应用。',
+      '主题已安装，但未能完成选择或 Codex 实时应用验证。可稍后从托盘重新应用。',
       'Codex Dream Skin',
       [System.Windows.Forms.MessageBoxButtons]::OK,
       [System.Windows.Forms.MessageBoxIcon]::Warning

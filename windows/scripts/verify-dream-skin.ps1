@@ -1,18 +1,24 @@
 [CmdletBinding()]
 param(
   [int]$Port = 9335,
-  [string]$ScreenshotPath
+  [string]$ScreenshotPath,
+  [string]$ExpectedThemeId
 )
 
 $ErrorActionPreference = 'Stop'
 $PortExplicit = $PSBoundParameters.ContainsKey('Port')
 $injector = Join-Path $PSScriptRoot 'injector.mjs'
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
+. (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
 $operationLock = Enter-DreamSkinOperationLock
 $verifyExitCode = 1
 try {
   $StatePath = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin\state.json'
+  $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+  if ($ExpectedThemeId) {
+    $null = Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId
+  }
   $state = Read-DreamSkinState -Path $StatePath
   if (-not $PortExplicit -and $null -ne $state -and $state.port) { $Port = [int]$state.port }
   Assert-DreamSkinPort -Port $Port
@@ -43,6 +49,9 @@ try {
   if ($ScreenshotPath) { $arguments += @('--screenshot', $ScreenshotPath) }
   & $node.Path @arguments
   $verifyExitCode = $LASTEXITCODE
+  if ($verifyExitCode -eq 0 -and $ExpectedThemeId) {
+    $null = Assert-DreamSkinActiveThemeId -StateRoot $StateRoot -ExpectedThemeId $ExpectedThemeId
+  }
 } finally {
   Exit-DreamSkinOperationLock -Mutex $operationLock
 }

@@ -124,6 +124,24 @@ try {
   await fs.mkdir(activeDirectory, { recursive: true });
   await fs.writeFile(path.join(activeDirectory, "keep.txt"), "active theme must stay unchanged\n");
   const activeBefore = await fileSnapshot(activeDirectory);
+  const staleConfirmation = reportFor(runCli(
+    "import",
+    changedPackage,
+    "--platform",
+    "macos",
+    "--dream-skin-version",
+    "1.3.0",
+    "--install",
+    "--state-root",
+    stateRoot,
+    "--expected-content-hash",
+    dryRun.contentHash,
+  ), 1);
+  assert.equal(staleConfirmation.code, "PACKAGE_CONFIRMATION_STALE");
+  assert.equal(staleConfirmation.persistentChanges, false);
+  assert.deepEqual(await fileSnapshot(activeDirectory), activeBefore);
+  assert.equal(await fs.lstat(path.join(stateRoot, "themes")).catch(() => null), null);
+
   const installed = reportFor(runCli(
     "import",
     golden,
@@ -134,6 +152,8 @@ try {
     "--install",
     "--state-root",
     stateRoot,
+    "--expected-content-hash",
+    dryRun.contentHash,
   ));
   assert.deepEqual(installed.install, {
     status: "installed",
@@ -253,6 +273,59 @@ try {
   );
   assert.deepEqual(await fileSnapshot(rollbackState), rollbackBefore);
   await assertNoTransactionArtifacts(rollbackState);
+
+  const cleanupState = path.join(temporaryRoot, "cleanup-state");
+  reportFor(runCli(
+    "import",
+    golden,
+    "--platform",
+    "macos",
+    "--dream-skin-version",
+    "1.3.0",
+    "--install",
+    "--state-root",
+    cleanupState,
+  ));
+  const cleanupPrepared = path.join(temporaryRoot, "prepared-cleanup");
+  await fs.mkdir(cleanupPrepared, { mode: 0o700 });
+  const cleanupCandidate = await prepareThemePackage({
+    packagePath: changedPackage,
+    platform: "macos",
+    dreamSkinVersion: "1.3.0",
+    stagingDirectory: cleanupPrepared,
+  });
+  const cleanupFileSystem = {
+    ...fs,
+    async rm(target, options) {
+      if (path.basename(target).startsWith(`.${dryRun.packageId}.backup-`)) {
+        const error = new Error("injected backup cleanup failure");
+        error.code = "EACCES";
+        throw error;
+      }
+      return fs.rm(target, options);
+    },
+  };
+  await assert.rejects(
+    installPreparedTheme({
+      stateRoot: cleanupState,
+      preparedDirectory: cleanupPrepared,
+      report: cleanupCandidate.report,
+      compiledTheme: cleanupCandidate.compiledTheme,
+      platform: "macos",
+      replace: true,
+      fileSystem: cleanupFileSystem,
+    }),
+    (error) => error instanceof ThemePackageError
+      && error.code === "INSTALL_RECOVERY_REQUIRED"
+      && error.persistentChanges === true,
+  );
+  const cleanupThemes = path.join(cleanupState, "themes");
+  const cleanupEntries = await fs.readdir(cleanupThemes);
+  assert.equal(cleanupEntries.filter((name) => name.includes(".backup-")).length, 1);
+  assert.equal(
+    JSON.parse(await fs.readFile(path.join(cleanupThemes, dryRun.packageId, "import.json"))).packageVersion,
+    "1.0.1",
+  );
 
   const symlinkState = path.join(temporaryRoot, "symlink-state");
   const outside = path.join(temporaryRoot, "outside-themes");

@@ -102,6 +102,19 @@ function Get-DreamSkinThemePaths {
   }
 }
 
+function Assert-DreamSkinActiveThemeId {
+  param(
+    [Parameter(Mandatory = $true)][string]$StateRoot,
+    [Parameter(Mandatory = $true)][string]$ExpectedThemeId
+  )
+  $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $activeTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
+  if ($activeTheme.Theme.id -cne $ExpectedThemeId) {
+    throw "The active Dream Skin theme changed before verification: expected $ExpectedThemeId."
+  }
+  return $activeTheme
+}
+
 function Test-DreamSkinThemePathWithin {
   param([string]$Path, [string]$Root)
   if (-not $Path -or -not $Root) { return $false }
