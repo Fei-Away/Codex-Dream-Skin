@@ -17,6 +17,25 @@ trap '/bin/rm -rf "$TMP"' EXIT
   --exclude 'runtime/' \
   "$ROOT/" "$ENGINE/"
 
+# Keep the customer ZIP self-contained: bundle prompt docs and referenced
+# images, then translate repository paths for the hidden standalone engine.
+"$ROOT/scripts/prepare-standalone-docs.sh" "$ENGINE"
+STANDALONE_README="$ENGINE/README.md"
+if [ -f "$STANDALONE_README" ]; then
+  temporary="${STANDALONE_README}.standalone"
+  /usr/bin/sed \
+    -e 's#\.\./docs/#docs/#g' \
+    -e 's#\.\./windows/#https://github.com/Fei-Away/Codex-Dream-Skin/tree/main/windows/#g' \
+    "$STANDALONE_README" > "$temporary"
+  /bin/mv "$temporary" "$STANDALONE_README"
+fi
+PRESET_README="$ENGINE/presets/README.md"
+if [ -f "$PRESET_README" ]; then
+  temporary="${PRESET_README}.standalone"
+  /usr/bin/sed -e 's#\.\./\.\./docs/#../docs/#g' "$PRESET_README" > "$temporary"
+  /bin/mv "$temporary" "$PRESET_README"
+fi
+
 /usr/bin/printf '%s\n' \
   '#!/bin/bash' \
   'set -euo pipefail' \

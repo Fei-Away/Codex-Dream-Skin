@@ -10,10 +10,32 @@
 
 set +e
 
+menu_text() {
+  LC_ALL=C /usr/bin/printf '%s' "$1" \
+    | LC_ALL=C /usr/bin/tr '\000-\037\177|' ' ' \
+    | /usr/bin/cut -c1-120
+}
+
+swiftbar_attribute_path_safe() {
+  case "$1" in
+    ''|*'|'*|*'"'*|*'\'*) return 1 ;;
+  esac
+  if LC_ALL=C /usr/bin/printf '%s' "$1" | LC_ALL=C /usr/bin/grep -q '[[:cntrl:]]'; then
+    return 1
+  fi
+  return 0
+}
+
 ENGINE="${CODEX_DREAM_SKIN_ENGINE:-$HOME/.codex/codex-dream-skin-studio}"
 if [ ! -d "$ENGINE/scripts" ]; then
   HERE="$(cd "$(dirname "$0")" && pwd -P)"
   [ -d "$HERE/../scripts" ] && ENGINE="$(cd "$HERE/.." && pwd -P)"
+fi
+if ! swiftbar_attribute_path_safe "$ENGINE"; then
+  echo "Skin ? | sfimage=paintpalette.fill"
+  echo "---"
+  echo "Engine path contains unsupported SwiftBar characters"
+  exit 0
 fi
 
 SCRIPTS="$ENGINE/scripts"
@@ -33,7 +55,7 @@ IMAGES_DIR="$STATE_ROOT/images"
 /bin/mkdir -p "$THEMES_ROOT" "$IMAGES_DIR" 2>/dev/null
 
 if [ ! -x "$START" ] && [ ! -x "$APPLY" ]; then
-  echo "Skin ?"
+  echo "Skin ? | sfimage=paintpalette.fill"
   echo "---"
   echo "Engine missing"
   exit 0
@@ -59,11 +81,12 @@ if [ -x "$STATUS" ]; then
     *) TITLE="Skin 关" ;;
   esac
 fi
+THEME_MENU_LINE="$(menu_text "$THEME_LINE")"
 
-echo "$TITLE"
+echo "$TITLE | sfimage=paintpalette.fill"
 echo "---"
-if [ -n "$THEME_LINE" ]; then
-  echo "当前: $THEME_LINE | color=#888888"
+if [ -n "$THEME_MENU_LINE" ]; then
+  /usr/bin/printf '%s\n' "当前: $THEME_MENU_LINE | color=#888888"
 else
   echo "当前: (未设置) | color=#888888"
 fi
@@ -86,11 +109,15 @@ if [ -d "$THEMES_ROOT" ]; then
     [ -d "$dir" ] || continue
     [ -f "$dir/theme.json" ] || continue
     tid="$(/usr/bin/basename "$dir")"
-    tname="$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("name") or sys.argv[2])' "$dir/theme.json" "$tid" 2>/dev/null)"
+    case "$tid" in *[!A-Za-z0-9_-]*|'') continue ;; esac
+    [ "${#tid}" -le 80 ] || continue
+    tname="$(/usr/bin/plutil -extract name raw -o - "$dir/theme.json" 2>/dev/null)"
     [ -n "$tname" ] || tname="$tid"
     mark=""
     [ "$tname" = "$THEME_LINE" ] && mark=" ✓"
-    echo "-- $tname$mark | bash=\"$SWITCH\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
+    tname="$(menu_text "$tname")"
+    /usr/bin/printf '%s\n' \
+      "-- $tname$mark | bash=\"$SWITCH\" param1=\"--id\" param2=\"$tid\" terminal=false refresh=true"
     theme_count=$((theme_count + 1))
   done
 fi
@@ -110,7 +137,10 @@ if [ -d "$IMAGES_DIR" ]; then
       *) continue ;;
     esac
     base="$(/usr/bin/basename "$img")"
-    echo "-- $base | bash=\"$LOAD_IMG\" param1=\"--from-library\" param2=\"$base\" terminal=false refresh=true"
+    swiftbar_attribute_path_safe "$base" || continue
+    display_base="$(menu_text "$base")"
+    /usr/bin/printf '%s\n' \
+      "-- $display_base | bash=\"$LOAD_IMG\" param1=\"--from-library\" param2=\"$base\" terminal=false refresh=true"
     img_count=$((img_count + 1))
   done
 fi

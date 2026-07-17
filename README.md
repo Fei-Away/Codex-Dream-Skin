@@ -41,9 +41,43 @@
   </sub>
 </p>
 
-## 效果预览
+## 实测精选预设：桥本有菜
 
-一张图，一种心情。下面都是可落地的主题示意效果：
+下面这套「桥本有菜 / Arina Hashimoto」已经在真实 Codex 首页分别验证浅色和暗色外观。用户提供的源 PNG 为 `1672 × 941`，主题包在保持源图近 16:9 构图的前提下派生导出 `2560 × 1440` JPEG，并不代表增加了源图细节。截图中的侧栏、卡片、项目选择和输入框都是 Codex 原生控件。
+
+<p align="center">
+  <img src="docs/images/presets/romantic-rose-light.jpg" alt="桥本有菜主题浅色实机效果" width="900"><br>
+  <sub>浅色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/presets/romantic-rose-dark.jpg" alt="桥本有菜主题暗色实机效果" width="900"><br>
+  <sub>暗色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
+</p>
+
+从仓库安装并一键切换（macOS）：
+
+```bash
+cd macos
+./scripts/install-dream-skin-macos.sh --no-launch
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-romantic-rose
+```
+
+Windows 使用本地主题仓库与系统托盘，并会预置同一套「桥本有菜」。首次从仓库使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\scripts\install-dream-skin.ps1
+powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
+```
+
+启动后可直接从「已保存主题 → 桥本有菜」切换；不需要跨目录手动导入。托盘里的「更换背景图」仍可导入你自己的纯背景，保存后继续一键切换。
+
+> 可下载的用户源图是 [`docs/images/presets/romantic-rose-source.png`](./docs/images/presets/romantic-rose-source.png)（`1672 × 941`）；macOS 一键预设使用 [`macos/presets/preset-romantic-rose/background.jpg`](./macos/presets/preset-romantic-rose/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；公开再分发前请确认人物与素材权利。
+
+## 概念效果图（不可直接导入）
+
+下面八张图用于表达可实现的视觉方向，但它们是带界面的概念效果图，不是可直接使用的主题背景。需要同类效果时，先按[参考生图提示词](./docs/reference-background-prompt-guide.md)生成无 UI 的 `2560 × 1440` 素材；八种风格的详细拆解见[概念图提示词](./docs/background-generation-prompts.md)。
 
 <p align="center">
   <img src="docs/images/gallery/skin-01.jpg" alt="粉系定制" width="900"><br>
@@ -76,8 +110,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/gallery/skin-07.jpg" alt="初音未来" width="900"><br>
-  <sub>初音未来</sub>
+  <img src="docs/images/gallery/skin-07.jpg" alt="青蓝虚拟歌姬" width="900"><br>
+  <sub>青蓝虚拟歌姬</sub>
 </p>
 
 <p align="center">
@@ -88,7 +122,9 @@
 ## 它能做什么
 
 - **真·可交互**：侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去
-- **可换图**：换一张喜欢的图，就能变成你的主题
+- **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰
+- **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
+- **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
 - **可恢复**：一键还原官方外观
 - **可自动加载**：macOS 可随用户会话自动启动 Codex 并持续加载主题，也可随时关闭
 - **可自动更新加载**：主题图片、配置、样式或注入脚本变化后，当前 Codex 会自动重新载入最新版本
@@ -110,7 +146,14 @@
 - Mac：[`macos/README.md`](./macos/README.md)
 - Windows：[`windows/SKILL.md`](./windows/SKILL.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
+- 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
+- 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - 项目记录：[`docs/PROJECT.md`](./docs/PROJECT.md)
+
+## 反馈与贡献
+
+- **Issue：** 请用 [Issue 模板](./.github/ISSUE_TEMPLATE/)（Bug / 功能）；已关闭空白 Issue。提交前建议先跑 Verify / Restore 自检。
+- **PR：** 请按 [PR 模板](./.github/pull_request_template.md) 写清改动，并勾选对应自测（如 `macos/tests/run-tests.sh`、verify / restore）。
 
 ## 安全边界
 
@@ -122,7 +165,7 @@
 
 - 见 [`macos/LICENSE`](./macos/LICENSE)（MIT）与 [`macos/NOTICE.md`](./macos/NOTICE.md)
 - 非 OpenAI 官方产品；Codex 及相关权利归其权利人
-- 效果图中的人物 / IP 形象仅作主题示意；商用或公开再分发请自行确认肖像权与商标授权
+- 随仓库预设及效果图中的人物 / IP 素材仅作主题示意；商用或公开再分发请自行确认肖像、素材与商标权利
 
 ---
 

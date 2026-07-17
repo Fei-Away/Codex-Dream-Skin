@@ -1,9 +1,16 @@
 # Runtime notes
 
-- The skin launches the Store-installed `ChatGPT.exe` with `--remote-debugging-port=<port>` and injects through CDP.
-- The default production port is `9335`; test instances may use another port plus an isolated `--user-data-dir`.
-- CDP is bound to loopback. Do not expose it on a LAN interface.
-- The injector polls page targets and reinjects after document loads. In-page route changes use a debounced observer plus a low-frequency safety check to avoid CPU churn during streamed tasks.
-- `%LOCALAPPDATA%\CodexDreamSkin\state.json` records the port and daemon PID. Logs stay in the same directory.
-- If Codex is already running without the chosen debugging port, close it first or explicitly use `-RestartExisting`.
-- Store updates are supported because the launcher queries `Get-AppxPackage OpenAI.Codex` on every launch.
+- The skin discovers the current `OpenAI.Codex` package on every run, requires a non-development `Store` signature kind, and launches its `ChatGPT.exe` with an explicit `--remote-debugging-address=127.0.0.1` and selected port.
+- Node.js 22 or newer is required for the built-in WebSocket client. The runtime's real `process.execPath` and version are recorded in state, even when PATH points at a shim.
+- The preferred port is `9335`; the default launcher scans up to 100 ports when it is occupied. An explicit occupied port is rejected.
+- CDP is accepted only when its listener PID resolves to the exact Store `ChatGPT.exe`, every WebSocket URL is loopback and same-port, `/json/version` exposes a valid Browser ID, and the renderer has expected Codex shell markers.
+- Loopback prevents access from the LAN, but CDP does not authenticate other processes running as the same Windows user. Treat the themed session as a local debugging session, run only trusted local software, and restore when it is no longer needed.
+- The injector keeps the original Browser WebSocket open as an identity anchor. It reinjects after renderer loads while that anchor remains alive, but exits instead of attaching when the browser closes or the port is reused. Target failures use capped exponential backoff and rate-limited logging.
+- `%LOCALAPPDATA%\CodexDreamSkin\state.json` records the Browser ID, registered Appx full/family names, port, injector and Node paths, PID, and process start time. Schema 3 cleanup requires all recorded process identity fields to match. Legacy state lacks some fields and is stopped only when the PID still exposes `node.exe`, the exact injector script, watch mode, and saved port; otherwise the state is moved to `state.stale-*.json` without stopping the process.
+- If Codex is already running without the chosen debugging port, the shortcut asks before restart; CLI callers must close it or explicitly pass `-RestartExisting`.
+- Restore does not require Node to remain installed: it preflights config backups, closes Codex to clear live DOM and CDP, stops only the verified recorded injector, applies requested config changes, then reopens the official app without debug flags.
+- A live recorded injector whose PID no longer matches the saved Node path, injector command line, port, Browser ID, or start time causes start/restore to abort with state preserved; it is never silently archived and replaced.
+- The managed theme root rejects junctions and symbolic links before initialization, import, save, switch, pause, or state writes. Windows uses the bundled Node image-metadata helper to enforce the same 16 MB, 16384px, and 50MP limits before an import is copied.
+- `config.toml` is read from raw bytes as strict UTF-8, written without BOM through same-directory atomic replacement, and backed up byte-for-byte. Install requires Codex to be closed; writes stage the temporary file first, then abort if the destination bytes changed immediately before replacement. Quoted keys and table-header comments are supported; escaped target keys, multiline strings/arrays, dotted target keys, or duplicate target keys fail before writing. Completed restore backups are retained as `config.restored-*.toml` so reinstall captures a fresh baseline.
+- A per-user named mutex prevents concurrent install, start, restore, and verify operations from racing state, ports, or config writes.
+- Store updates are supported because the launcher queries `Get-AppxPackage OpenAI.Codex` on every launch. State paths are eligible for automatic cleanup only after their Appx full name, family name, install root, and executable are matched against a currently registered package; an active unverified old path requires manual closure.

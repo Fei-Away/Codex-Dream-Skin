@@ -43,59 +43,28 @@ trap request_stop INT TERM HUP
 
 autoload_enabled() {
   [ -f "$AUTOLOAD_STATE_PATH" ] || return 1
-  /usr/bin/python3 - "$AUTOLOAD_STATE_PATH" <<'PY'
-import json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        value = json.load(f)
-    raise SystemExit(0 if value.get("enabled") is True and value.get("paused") is not True else 1)
-except Exception:
-    raise SystemExit(1)
-PY
+  /usr/bin/grep -Eq '"enabled"[[:space:]]*:[[:space:]]*true' "$AUTOLOAD_STATE_PATH" || return 1
+  ! /usr/bin/grep -Eq '"paused"[[:space:]]*:[[:space:]]*true' "$AUTOLOAD_STATE_PATH"
 }
 
 saved_port() {
   [ -f "$STATE_PATH" ] || return 0
-  /usr/bin/python3 - "$STATE_PATH" <<'PY'
-import json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        value = json.load(f).get("port")
-    if value:
-        print(value, end="")
-except Exception:
-    pass
-PY
+  /usr/bin/sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$STATE_PATH" | /usr/bin/head -n1
 }
 
 write_auto_state() {
   local enabled="$1"
   local paused="${2:-false}"
-  /usr/bin/python3 - "$AUTOLOAD_STATE_PATH" "$enabled" "$paused" <<'PY'
-import json, os, sys, tempfile
-
-path, enabled, paused = sys.argv[1:]
-value = {
-    "schemaVersion": 1,
-    "enabled": enabled == "true",
-    "paused": paused == "true",
-    "updatedAt": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat().replace("+00:00", "Z"),
-}
-directory = os.path.dirname(path)
-os.makedirs(directory, mode=0o700, exist_ok=True)
-fd, temporary = tempfile.mkstemp(prefix="autoload.", dir=directory)
-try:
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(value, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.chmod(temporary, 0o600)
-    os.replace(temporary, path)
-finally:
-    try:
-        os.unlink(temporary)
-    except FileNotFoundError:
-        pass
-PY
+  ensure_state_root
+  local temporary
+  temporary="$(/usr/bin/mktemp "$STATE_ROOT/autoload.XXXXXX")" || return 1
+  /usr/bin/printf '{\n  "schemaVersion": 1,\n  "enabled": %s,\n  "paused": %s,\n  "updatedAt": "%s"\n}\n' \
+    "$enabled" "$paused" "$(/bin/date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$temporary" || {
+      /bin/rm -f "$temporary"
+      return 1
+    }
+  /bin/chmod 600 "$temporary"
+  /bin/mv -f "$temporary" "$AUTOLOAD_STATE_PATH"
 }
 
 start_codex_direct() {

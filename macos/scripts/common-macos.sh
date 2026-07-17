@@ -44,9 +44,52 @@ fail() {
   exit 1
 }
 
+notify_user() {
+  local message="$*"
+  /usr/bin/osascript - "$message" <<'APPLESCRIPT' >/dev/null 2>&1 || true
+on run argv
+  display notification (item 1 of argv) with title "Codex Dream Skin"
+end run
+APPLESCRIPT
+}
+
+alert_user() {
+  local message="$*"
+  /usr/bin/osascript - "$message" <<'APPLESCRIPT' >/dev/null 2>&1 || true
+on run argv
+  display alert "Codex Dream Skin" message (item 1 of argv)
+end run
+APPLESCRIPT
+}
+
 ensure_state_root() {
   /bin/mkdir -p "$STATE_ROOT"
   /bin/chmod 700 "$STATE_ROOT"
+}
+
+# Seed bundled preset packs into the user's themes/ library so a fresh install
+# ships with ready-to-use skins. Idempotent (each preset is refreshed in place)
+# and scoped to preset-* ids, so user-made custom-* packs are never touched.
+seed_bundled_presets() {
+  local presets_root="$PROJECT_ROOT/presets"
+  [ -d "$presets_root" ] || return 0
+  local themes_root="$STATE_ROOT/themes"
+  /bin/mkdir -p "$themes_root"
+  local src id dest entry
+  for src in "$presets_root"/preset-*/; do
+    [ -d "$src" ] || continue
+    [ -f "${src}theme.json" ] || continue
+    id="$(/usr/bin/basename "$src")"
+    dest="$themes_root/$id"
+    /bin/rm -rf "$dest"
+    /bin/mkdir -p "$dest"
+    /bin/chmod 700 "$dest"
+    for entry in "$src"*; do
+      [ -f "$entry" ] || continue
+      /bin/cp "$entry" "$dest/"
+    done
+    /bin/chmod 600 "$dest"/* 2>/dev/null || true
+  done
 }
 
 discover_codex_app() {
@@ -55,7 +98,9 @@ discover_codex_app() {
   local executable_name=""
   local configured="${CODEX_APP_BUNDLE:-}"
 
-  for candidate in "$configured" "/Applications/ChatGPT.app" "$HOME/Applications/ChatGPT.app"; do
+  for candidate in "$configured" \
+    "/Applications/ChatGPT.app" "$HOME/Applications/ChatGPT.app" \
+    "/Applications/Codex.app" "$HOME/Applications/Codex.app"; do
     [ -n "$candidate" ] || continue
     [ -f "$candidate/Contents/Info.plist" ] || continue
     identifier="$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$candidate/Contents/Info.plist" 2>/dev/null || true)"
@@ -138,6 +183,43 @@ process_started_at() {
   /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
 }
 
+recorded_injector_process_matches() {
+  local pid="$1"
+  local expected_start="${2:-}"
+  local expected_node="${3:-}"
+  local expected_injector="${4:-}"
+  local expected_port="${5:-}"
+  local command_line=""
+  local command_lower=""
+  local node_lower=""
+  local injector_lower=""
+  local actual_start=""
+
+  # A recorded PID is only safe to signal when the complete launch identity
+  # was persisted.  Do not fall back to the current process paths: a stale or
+  # hand-edited state file must fail closed instead of authorizing a reused PID.
+  [ -n "$expected_start" ] && [ -n "$expected_node" ] && [ -n "$expected_injector" ] || return 1
+  case "$expected_port" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  /bin/kill -0 "$pid" 2>/dev/null || return 1
+  command_line="$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)"
+  [ -n "$command_line" ] || return 1
+  command_lower="$(printf '%s' "$command_line" | /usr/bin/tr '[:upper:]' '[:lower:]')"
+  injector_lower="$(printf '%s' "$expected_injector" | /usr/bin/tr '[:upper:]' '[:lower:]')"
+  node_lower="$(printf '%s' "$expected_node" | /usr/bin/tr '[:upper:]' '[:lower:]')"
+  case "$command_lower" in "$node_lower "*) ;; *) return 1 ;; esac
+  # The watcher launch shape is deliberately matched as tokens.  In
+  # particular, `--port 93410` must never satisfy a saved `9341` identity.
+  case "$command_lower" in
+    *"$injector_lower --watch --port $expected_port --theme-dir "*) ;;
+    *) return 1 ;;
+  esac
+  actual_start="$(process_started_at "$pid")"
+  [ -n "$actual_start" ] && [ "$actual_start" = "$expected_start" ] || return 1
+  return 0
+}
+
 stop_codex() {
   local allow_force="${1:-false}"
   local deadline
@@ -193,18 +275,14 @@ pid_is_codex_descendant() {
 
 port_belongs_to_codex() {
   local port="$1"
-  local found_direct="false"
+  local found="false"
   local pid
-  local command_line
   while IFS= read -r pid; do
     [ -n "$pid" ] || continue
-    command_line="$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)"
-    case "$command_line" in
-      "$CODEX_EXE"*) found_direct="true" ;;
-      *) pid_is_codex_descendant "$pid" || return 1 ;;
-    esac
+    found="true"
+    pid_is_codex_descendant "$pid" || return 1
   done < <(listener_pids "$port")
-  [ "$found_direct" = "true" ]
+  [ "$found" = "true" ]
 }
 
 # Cheap: can we talk to a loopback DevTools HTTP endpoint?
@@ -216,23 +294,8 @@ cdp_http_ready() {
 
 verified_cdp_endpoint() {
   local port="$1"
-  # Prefer identity check, but accept loopback CDP if HTTP is healthy and a
-  # ChatGPT/Codex process is listening (path case / helper PIDs can fail belongs).
-  if port_belongs_to_codex "$port"; then
-    cdp_http_ready "$port" || return 1
-    return 0
-  fi
-  cdp_http_ready "$port" || return 1
-  # Fallback: listener must still be ChatGPT-related.
-  local pid command_line
-  while IFS= read -r pid; do
-    [ -n "$pid" ] || continue
-    command_line="$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)"
-    case "$command_line" in
-      *ChatGPT*|*Codex*|*codex*) return 0 ;;
-    esac
-  done < <(listener_pids "$port")
-  return 1
+  port_belongs_to_codex "$port" || return 1
+  cdp_http_ready "$port"
 }
 
 select_available_port() {
@@ -255,15 +318,7 @@ wait_for_cdp() {
   local deadline=$((SECONDS + 45))
   local last_note=0
   while [ "$SECONDS" -lt "$deadline" ]; do
-    # Fast path: HTTP up is enough to proceed once process identity is soft-ok.
-    if cdp_http_ready "$port"; then
-      if verified_cdp_endpoint "$port" || cdp_http_ready "$port"; then
-        # If HTTP is up and ChatGPT is running, accept.
-        if codex_is_running || verified_cdp_endpoint "$port"; then
-          return 0
-        fi
-      fi
-    fi
+    verified_cdp_endpoint "$port" && return 0
     if [ $((SECONDS - last_note)) -ge 8 ]; then
       last_note=$SECONDS
       printf 'Waiting for Codex debug port %s… (%ss)\n' "$port" "$SECONDS" >&2
@@ -282,6 +337,24 @@ state_field() {
   ' "$STATE_PATH" "$key"
 }
 
+restore_runtime_context_from_state() {
+  [ -f "$STATE_PATH" ] || return 0
+  local value=""
+
+  value="$(state_field codexBundle 2>/dev/null || true)"
+  # Only trust cached paths that still exist — Codex.app was renamed to
+  # ChatGPT.app (26.707), so a stale bundle/exe must not hijack launch.
+  if [ -n "$value" ] && [ -d "$value" ]; then CODEX_BUNDLE="$value"; fi
+  value="$(state_field codexExe 2>/dev/null || true)"
+  if [ -n "$value" ] && [ -x "$value" ]; then CODEX_EXE="$value"; fi
+  value="$(state_field codexVersion 2>/dev/null || true)"
+  [ -z "$value" ] || CODEX_VERSION="$value"
+  value="$(state_field codexTeamId 2>/dev/null || true)"
+  [ -z "$value" ] || CODEX_TEAM_ID="$value"
+
+  export CODEX_BUNDLE CODEX_EXE CODEX_VERSION CODEX_TEAM_ID
+}
+
 write_state() {
   local port="$1"
   local injector_pid="$2"
@@ -297,9 +370,9 @@ write_state() {
     const [file, version, port, pid, startedAt, injector, node, nodeVersion, bundle, exe, appVersion, teamId, root, themeDir, codexPid, arch] = process.argv.slice(1);
     const state = {
       schemaVersion: 4,
-      session: "active",
       platform: `darwin-${arch}`,
       skinVersion: version,
+      injectorProtocol: 2,
       port: Number(port),
       injectorPid: Number(pid),
       injectorStartedAt: startedAt,
@@ -324,57 +397,84 @@ write_state() {
 stop_recorded_injector() {
   [ -f "$STATE_PATH" ] || return 0
   local pid
+  local saved_port
   local saved_start
   local saved_node
   local saved_injector
-  local actual_start
-  local command_line
-  pid="$(state_field injectorPid 2>/dev/null || true)"
+  if ! pid="$(state_field injectorPid 2>/dev/null)" || [ -z "${pid:-}" ]; then
+    printf 'Dream Skin state is damaged or missing its injector PID; state was preserved.\n' >&2
+    return 1
+  fi
   # Already paused / no daemon
-  if [ -z "${pid:-}" ] || [ "$pid" = "0" ]; then
+  if [ "$pid" = "0" ]; then
     /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
     return 0
+  fi
+  case "$pid" in
+    *[!0-9]*|??????????*)
+      printf 'Recorded Dream Skin injector PID is invalid; state was preserved.\n' >&2
+      return 1
+      ;;
+  esac
+  while [ "${pid#0}" != "$pid" ]; do pid="${pid#0}"; done
+  if [ -z "$pid" ]; then
+    /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  # Load and validate every recorded identity field before probing or
+  # signalling the PID.  Missing fields are not treated as a harmless legacy
+  # state: preserving the evidence is safer than guessing which process is
+  # allowed to receive TERM/KILL.
+  saved_port="$(state_field port 2>/dev/null || true)"
+  saved_start="$(state_field injectorStartedAt 2>/dev/null || true)"
+  saved_node="$(state_field nodePath 2>/dev/null || true)"
+  saved_injector="$(state_field injectorPath 2>/dev/null || true)"
+  case "$saved_port" in
+    ''|*[!0-9]*)
+      printf 'Recorded Dream Skin injector port is missing or invalid; state was preserved.\n' >&2
+      return 1
+      ;;
+  esac
+  [ "$saved_port" -ge 1024 ] && [ "$saved_port" -le 65535 ] || {
+    printf 'Recorded Dream Skin injector port is out of range; state was preserved.\n' >&2
+    return 1
+  }
+  if [ -z "$saved_start" ] || [ -z "$saved_node" ] || [ -z "$saved_injector" ]; then
+    printf 'Recorded Dream Skin injector identity is incomplete; state was preserved.\n' >&2
+    return 1
   fi
   /bin/kill -0 "$pid" 2>/dev/null || {
     /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
     return 0
   }
-  saved_start="$(state_field injectorStartedAt 2>/dev/null || true)"
-  saved_node="$(state_field nodePath 2>/dev/null || true)"
-  saved_injector="$(state_field injectorPath 2>/dev/null || true)"
-  # Soft identity check (macOS path case: /Users/Fei vs /Users/fei)
-  local node_ok="true" inj_ok="true"
-  if [ -n "$saved_node" ] && [ -n "${NODE:-}" ]; then
-    [ "$(printf '%s' "$saved_node" | /usr/bin/tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$NODE" | /usr/bin/tr '[:upper:]' '[:lower:]')" ] || node_ok="false"
-  fi
-  if [ -n "$saved_injector" ] && [ -n "${INJECTOR:-}" ]; then
-    [ "$(printf '%s' "$saved_injector" | /usr/bin/tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$INJECTOR" | /usr/bin/tr '[:upper:]' '[:lower:]')" ] || inj_ok="false"
-  fi
-  # If identity clearly wrong but process looks like our injector, still stop by cmdline.
-  command_line="$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)"
-  case "$command_line" in
-    *injector.mjs*--watch*) ;;
-    *)
-      if [ "$node_ok" = "true" ] && [ "$inj_ok" = "true" ]; then
-        :
-      else
-        # Stale PID that is not our injector — ignore
-        return 0
-      fi
-      ;;
-  esac
-  if [ -n "$saved_start" ]; then
-    actual_start="$(process_started_at "$pid")"
-    if [ -n "$actual_start" ] && [ "$actual_start" != "$saved_start" ]; then
-      # PID recycled — do not kill stranger
+  if ! recorded_injector_process_matches "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port"; then
+    # The process may have exited between the initial kill -0 probe and the
+    # identity check. A dead (or already reaped) recorded PID is safe to
+    # forget; a live PID with mismatched identity is never signalled.
+    if ! /bin/kill -0 "$pid" 2>/dev/null || [ -z "$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)" ]; then
+      /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
       return 0
     fi
+    printf 'Recorded injector PID %s is live but its identity does not match; refusing to signal it.\n' "$pid" >&2
+    return 1
   fi
   /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
   /bin/kill -TERM "$pid" 2>/dev/null || true
   local deadline=$((SECONDS + 6))
   while /bin/kill -0 "$pid" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.2; done
-  /bin/kill -KILL "$pid" 2>/dev/null || true
+  if recorded_injector_process_matches "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port"; then
+    /bin/kill -KILL "$pid" 2>/dev/null || true
+  fi
+  deadline=$((SECONDS + 2))
+  while recorded_injector_process_matches "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port" \
+    && [ "$SECONDS" -lt "$deadline" ]; do
+    /bin/sleep 0.1
+  done
+  if recorded_injector_process_matches "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port"; then
+    printf 'Could not stop the recorded Dream Skin injector (PID %s).\n' "$pid" >&2
+    return 1
+  fi
   return 0
 }
 
@@ -390,7 +490,7 @@ launch_injector_daemon() {
   /usr/bin/nohup "$NODE" "$INJECTOR" --watch --port "$port" --theme-dir "$THEME_DIR" \
     >>"$INJECTOR_LOG" 2>>"$INJECTOR_ERROR_LOG" &
   pid="$!"
-  /bin/sleep 0.4
+  /bin/sleep 0.08
   if [ -n "$pid" ] && /bin/kill -0 "$pid" 2>/dev/null; then
     printf '%s\n' "$pid"
     return 0
@@ -409,7 +509,7 @@ launch_injector_daemon() {
     fi
     # Also detect the nohup node process by command line
     pid="$(/bin/ps -axo pid=,command= | /usr/bin/awk -v inj="$INJECTOR" -v port="$port" '
-      index($0, inj) && index($0, "--watch") && index($0, port) { print $1; exit }
+      index($0, inj) && index($0, "--watch") && index($0, "--port " port " --theme-dir ") { print $1; exit }
     ')"
     if [ -n "$pid" ] && /bin/kill -0 "$pid" 2>/dev/null; then
       printf '%s\n' "$pid"
@@ -434,30 +534,25 @@ ensure_node_runtime() {
     : "${CODEX_TEAM_ID:=}"
     return 0
   fi
-  local candidate
+  local candidate cand_bundle
   for candidate in \
-    "/Applications/Codex.app/Contents/Resources/cua_node/bin/node" \
     "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node" \
+    "/Applications/Codex.app/Contents/Resources/cua_node/bin/node" \
+    "$HOME/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node" \
     "$HOME/Applications/Codex.app/Contents/Resources/cua_node/bin/node"
   do
     if [ -x "$candidate" ]; then
       NODE="$candidate"
       NODE_VERSION="$("$NODE" --version 2>/dev/null || echo unknown)"
       export NODE NODE_VERSION
-      : "${CODEX_BUNDLE:=/Applications/Codex.app}"
-      : "${CODEX_EXE:=/Applications/Codex.app/Contents/MacOS/ChatGPT}"
+      # Derive the bundle from the chosen node so CODEX_* matches the app that
+      # actually exists on disk (Codex.app vs renamed ChatGPT.app).
+      cand_bundle="${candidate%/Contents/Resources/cua_node/bin/node}"
+      : "${CODEX_BUNDLE:=$cand_bundle}"
+      : "${CODEX_EXE:=$cand_bundle/Contents/MacOS/ChatGPT}"
       : "${CODEX_VERSION:=}"
       : "${CODEX_TEAM_ID:=}"
-      # Soft-fill from state if present
-      if [ -f "$STATE_PATH" ]; then
-        eval "$(/usr/bin/python3 -c 'import json,sys
-try:
-  s=json.load(open(sys.argv[1]))
-  for k,env in [("codexBundle","CODEX_BUNDLE"),("codexExe","CODEX_EXE"),("codexVersion","CODEX_VERSION"),("codexTeamId","CODEX_TEAM_ID")]:
-    v=s.get(k) or ""
-    if v: print(f"export {env}={json.dumps(v)}")
-except Exception: pass' "$STATE_PATH" 2>/dev/null || true)"
-      fi
+      restore_runtime_context_from_state
       return 0
     fi
   done
@@ -470,33 +565,34 @@ except Exception: pass' "$STATE_PATH" 2>/dev/null || true)"
 hot_reapply_theme() {
   local port="${1:-9341}"
   local timeout_ms="${2:-8000}"
+  local inj_pid=""
+  local injector_protocol=""
+  local started_at=""
+  local codex_pid=""
 
-  cdp_http_ready "$port" || return 1
+  # A generic HTTP listener is not enough for a hot re-apply: only use the
+  # endpoint already verified as belonging to the official Codex process.
+  verified_cdp_endpoint "$port" || return 1
   ensure_node_runtime || return 1
 
-  stop_recorded_injector 2>/dev/null || true
-  # Kill any leftover watch injectors for this theme injector path
-  local old
-  while IFS= read -r old; do
-    [ -n "$old" ] || continue
-    /bin/kill -TERM "$old" 2>/dev/null || true
-  done < <(/bin/ps -axo pid=,command= | /usr/bin/awk -v inj="$INJECTOR" '
-    index($0, inj) && index($0, "--watch") { print $1 }
-  ')
-  /bin/sleep 0.15
-
-  local inj_pid
-  inj_pid="$(launch_injector_daemon "$port")"
-  /bin/sleep 0.25
-  /bin/kill -0 "$inj_pid" 2>/dev/null || return 1
-
-  # One-shot reloads theme files from disk (watch may still be starting).
-  if ! "$NODE" "$INJECTOR" --once --port "$port" --theme-dir "$THEME_DIR" --timeout-ms "$timeout_ms" >/dev/null 2>&1; then
-    # Soft: keep watch running even if once flaked
-    :
+  injector_protocol="$(state_field injectorProtocol 2>/dev/null || true)"
+  if [ "$injector_protocol" = "2" ]; then
+    inj_pid="$(/bin/ps -axo pid=,command= | /usr/bin/awk -v inj="$INJECTOR" -v port="$port" '
+      index($0, inj) && index($0, "--watch") && index($0, "--port " port " --theme-dir ") { print $1; exit }
+    ')"
+  fi
+  if ! "$NODE" "$INJECTOR" --once --port "$port" --theme-dir "$THEME_DIR" \
+    --timeout-ms "$timeout_ms" >/dev/null 2>&1; then
+    return 1
   fi
 
-  local started_at codex_pid
+  # A current watcher reloads theme files itself. Start one only when absent.
+  if [ -n "$inj_pid" ] && /bin/kill -0 "$inj_pid" 2>/dev/null; then
+    return 0
+  fi
+  stop_recorded_injector 2>/dev/null || return 1
+  inj_pid="$(launch_injector_daemon "$port")"
+  /bin/kill -0 "$inj_pid" 2>/dev/null || return 1
   started_at="$(process_started_at "$inj_pid")"
   codex_pid="$(codex_main_pids 2>/dev/null | /usr/bin/head -n 1)"
   [ -n "$started_at" ] || started_at="$(/bin/date)"

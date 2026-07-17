@@ -1,0 +1,193 @@
+name: "Bug report / 缺陷反馈"
+description: "Something broke — install, inject, theme, menu bar, restore… / 安装、注入、换肤、菜单栏、恢复等出问题"
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill every required field — incomplete reports may be closed.
+        感谢反馈！请尽量填全必填项；信息过少的 Issue 可能会被关闭。
+
+        **Please try self-check first / 请先自检：**
+        - **macOS:** Desktop `Codex Dream Skin - Verify.command`, or `~/.codex/codex-dream-skin-studio/scripts/verify-dream-skin-macos.sh` / `doctor-macos.sh`. If needed, try **Restore** then re-apply.
+        - **Windows:** `scripts/verify-dream-skin.ps1`, then `scripts/restore-dream-skin.ps1` if you need a clean slate.
+        - Search existing issues / 先搜一下是否已有相同 Issue。
+
+        **Do not paste / 请勿粘贴：** API keys, `auth.json`, relay tokens, private chat content.
+        **不要贴：** API Key、`auth.json`、中转密钥、隐私对话内容。
+
+        This project only themes via **loopback CDP**. It does **not** modify official `.app` / `app.asar` / WindowsApps, and does **not** rewrite API Base URL / keys.
+        本项目仅通过 **本机回环 CDP** 换肤，**不修改**官方安装包与签名，**不会**改写 API Base URL / Key。
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform / 平台
+      description: Where did this happen? / 出问题的系统
+      options:
+        - macOS
+        - Windows
+        - Both / 双平台
+        - Unsure / 不确定
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS version / 系统版本
+      description: e.g. macOS 15.5 / Windows 11 23H2
+      placeholder: "macOS 15.x · Apple Silicon"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: CPU / 架构
+      options:
+        - Apple Silicon (arm64)
+        - Intel Mac (x86_64)
+        - Windows x64
+        - Windows ARM
+        - Other / 其他
+        - Unsure / 不确定
+    validations:
+      required: true
+
+  - type: input
+    id: codex_version
+    attributes:
+      label: Codex Desktop version / source / Codex 桌面版版本或来源
+      description: App version if known, or install source (official site / App Store / other). / 能看到的版本号，或安装来源（官网 / App Store 等）
+      placeholder: "e.g. Codex 0.x · official download"
+    validations:
+      required: true
+
+  - type: input
+    id: dream_skin_version
+    attributes:
+      label: Dream Skin version / 皮肤工具版本
+      description: |
+        macOS: `macos/VERSION` in the repo, or client ZIP release notes (e.g. 1.1.1).
+        Windows: commit / download date if no version file.
+        macOS 见仓库 `macos/VERSION` 或客户包说明；Windows 可写下载日期或 commit。
+      placeholder: "1.1.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Problem category / 问题类型
+      options:
+        - Install failed / 安装失败
+        - Skin not applied / 启动后无皮肤
+        - Layout broken / white screen / 布局异常或白屏
+        - Customize image / theme switch / 换图或主题切换
+        - Menu bar (SwiftBar) / 菜单栏
+        - Verify / doctor failed / 校验或 doctor 失败
+        - Restore failed / 恢复失败
+        - Hot reapply / CDP / 热切换或 CDP
+        - After Codex app update / Codex 更新后失效
+        - Other / 其他
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: self_check
+    attributes:
+      label: Self-check / 自检
+      description: Check what you already tried / 勾选你已做过的步骤
+      options:
+        - label: Ran Verify / doctor (or Windows verify script) / 已运行 Verify 或 doctor
+          required: false
+        - label: Tried Restore, then re-apply / 已尝试完全恢复后再应用
+          required: false
+        - label: Official Codex still opens without the skin tools / 不用皮肤工具时官方 Codex 仍可正常打开
+          required: false
+        - label: Searched existing issues / 已搜索现有 Issue
+          required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      description: Numbered steps help a lot / 请尽量分步骤
+      placeholder: |
+        1. Install via …
+        2. Start / customize …
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / 期望结果
+      placeholder: "Theme applies; sidebar stays clickable…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / 实际结果
+      placeholder: "No banner; injector exits; error dialog…"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: modified_official
+    attributes:
+      label: Modified official Codex install? / 是否改过官方 Codex 安装？
+      description: e.g. patched asar, unsigned rebuild, third-party cracked package / 是否改过 asar、签名或使用非官方魔改包
+      options:
+        - "No — official app only / 否，仅官方安装"
+        - "Yes / 是"
+        - "Unsure / 不确定"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Verify / doctor output（recommended）/ 日志与校验输出（强烈建议）
+      description: |
+        **macOS logs:** `~/Library/Application Support/CodexDreamSkinStudio`
+        **Windows logs:** `%LOCALAPPDATA%\CodexDreamSkin`
+        Paste **relevant** lines only; redact secrets. / 只贴相关片段，打码密钥。
+      placeholder: |
+        ```
+        paste verify / doctor / last log lines here
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / video / 截图或录屏
+      description: Drag images here. Avoid private chat content. / 可直接拖拽图片；避免隐私对话内容。
+      placeholder: "Attach below / 在下方附加"
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context / 其他信息
+      description: Menu bar installed? paused? custom theme name? CDP port errors? / 是否装了菜单栏、是否暂停过、主题名、CDP 端口占用等
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation / 确认
+      options:
+        - label: I did not paste API keys or secrets / 我未粘贴 API Key 或其它密钥
+          required: true
+        - label: I understand this is an unofficial theme tool (loopback CDP only) / 我理解这是非官方换肤工具（仅本机 CDP）
+          required: true

@@ -1,0 +1,92 @@
+name: "Feature request / 功能建议"
+description: "Suggest an improvement for Codex Dream Skin / 为换肤工具提改进建议"
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share an idea that fits this project’s scope: **external theming** for Codex Desktop via loopback CDP — not API relays, not patching the official app.
+        欢迎提建议。本项目范围是：通过 **本机 CDP** 给 Codex 桌面端做 **外部换肤**，不包含中转配置、不修改官方安装包。
+
+        Please check [README](https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/README.md) and [CHANGELOG](https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/macos/CHANGELOG.md) first.
+        提交前可先看 README 与 CHANGELOG，避免重复已有能力。
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Target platform / 目标平台
+      options:
+        - macOS
+        - Windows
+        - Both / 双平台
+        - Docs / repo only / 仅文档或仓库
+        - Unsure / 不确定
+    validations:
+      required: true
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary / 一句话概括
+      description: Short title-style summary / 简短概括你想要的能力
+      placeholder: "e.g. Export / import theme packs · 支持主题包导入导出"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case / 要解决的问题或场景
+      description: What is painful today? / 现在哪里不方便？
+      placeholder: "When I … I have to …"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution / 期望方案
+      description: How should it work? / 你希望怎么用？
+      placeholder: "Add a menu item that …"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered / 考虑过的替代方案
+      description: Optional / 可选
+      placeholder: "Workaround I use now: …"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this to you? / 对你有多重要
+      options:
+        - Nice to have / 有更好
+        - Would use often / 会经常用
+        - Blocking my workflow / 阻塞我的使用
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check / 范围确认
+      description: This helps filter out-of-scope requests / 帮助过滤超出项目范围的请求
+      options:
+        - label: This is about theming / UX of Dream Skin, not API keys or model relays / 这是换肤或皮肤工具体验，不是 API / 中转配置
+          required: true
+        - label: I am not asking to modify official Codex binaries / asar / 我不是在要求修改官方 Codex 二进制或 asar
+          required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context / 补充
+      description: Mockups, references, related issues / 示意、参考、相关 Issue
+    validations:
+      required: false

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -Eeuo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-macos.sh"
 
 record_start_error() {
@@ -51,33 +51,36 @@ if codex_is_running && [ "$DEBUG_READY" = "false" ]; then
   stop_codex true
 fi
 
+if [ -f "$STATE_PATH" ]; then
+  stop_recorded_injector
+  /bin/rm -f "$STATE_PATH"
+fi
+
+INJECTOR_PID=""
 if [ "$DEBUG_READY" = "false" ]; then
   PORT="$(select_available_port "$PORT")"
   printf 'Launching Codex with skin debug port %s…\n' "$PORT" >&2
   launch_codex_with_cdp "$PORT"
+  # Start probing immediately instead of waiting for the native window to finish loading.
+  if [ "$FOREGROUND_INJECTOR" != "true" ]; then
+    INJECTOR_PID="$(launch_injector_daemon "$PORT")"
+  fi
   # Some builds open the window slowly; also try activating the app once.
   /usr/bin/open -na "$CODEX_BUNDLE" --args --remote-debugging-address=127.0.0.1 --remote-debugging-port="$PORT" >/dev/null 2>&1 || true
   if ! wait_for_cdp "$PORT"; then
-    # Last resort: if something already listens and answers HTTP, continue.
-    if cdp_http_ready "$PORT"; then
-      printf 'CDP HTTP is up on %s; continuing with soft verification.\n' "$PORT" >&2
-    else
-      fail "Codex did not expose a loopback CDP endpoint on port $PORT within 45 seconds. See $APP_LOG and $APP_ERROR_LOG"
-    fi
+    [ -z "$INJECTOR_PID" ] || /bin/kill -TERM "$INJECTOR_PID" 2>/dev/null || true
+    fail "Codex did not expose a verified loopback CDP endpoint on port $PORT within 45 seconds. See $APP_LOG and $APP_ERROR_LOG"
   fi
-fi
-
-if [ -f "$STATE_PATH" ]; then
-  stop_recorded_injector
-  /bin/rm -f "$STATE_PATH"
 fi
 
 if [ "$FOREGROUND_INJECTOR" = "true" ]; then
   exec "$NODE" "$INJECTOR" --watch --port "$PORT" --theme-dir "$THEME_DIR"
 fi
 
-INJECTOR_PID="$(launch_injector_daemon "$PORT")"
-/bin/sleep 0.8
+if [ -z "$INJECTOR_PID" ]; then
+  INJECTOR_PID="$(launch_injector_daemon "$PORT")"
+fi
+/bin/sleep 0.15
 /bin/kill -0 "$INJECTOR_PID" 2>/dev/null || fail "The injector exited during startup. See $INJECTOR_ERROR_LOG"
 INJECTOR_STARTED_AT="$(process_started_at "$INJECTOR_PID")"
 [ -n "$INJECTOR_STARTED_AT" ] || fail "Could not record the injector process start time."
@@ -85,29 +88,48 @@ CODEX_PID="$(codex_main_pids | /usr/bin/head -n 1)"
 write_state "$PORT" "$INJECTOR_PID" "$INJECTOR_STARTED_AT" "$CODEX_PID"
 
 # Soft verify: keep the injector even if secondary selectors differ by Codex version.
-set +e
-"$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 20000 >/tmp/dream-skin-verify.$$.json 2>/dev/null
-verify_code=$?
-set -e
+VERIFY_OUTPUT="$(/usr/bin/mktemp "${TMPDIR:-/tmp}/dream-skin-verify.XXXXXX")"
+/bin/chmod 600 "$VERIFY_OUTPUT"
+cleanup_verify_output() { /bin/rm -f "$VERIFY_OUTPUT"; }
+trap cleanup_verify_output EXIT
+if "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 20000 >"$VERIFY_OUTPUT" 2>/dev/null; then
+  verify_code=0
+else
+  verify_code=$?
+fi
 if [ "$verify_code" -ne 0 ]; then
   # One more force inject before giving up
   "$NODE" "$INJECTOR" --once --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 15000 >/dev/null 2>&1 || true
-  set +e
-  "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >/tmp/dream-skin-verify.$$.json 2>/dev/null
-  verify_code=$?
-  set -e
+  if "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >"$VERIFY_OUTPUT" 2>/dev/null; then
+    verify_code=0
+  else
+    verify_code=$?
+  fi
 fi
 if [ "$verify_code" -ne 0 ]; then
   # If CSS markers are present, treat as soft success (do not kill injector).
-  if /usr/bin/grep -q '"installed": true' /tmp/dream-skin-verify.$$.json 2>/dev/null; then
+  if /usr/bin/grep -q '"installed": true' "$VERIFY_OUTPUT" 2>/dev/null; then
     printf 'Codex Dream Skin Studio %s is active (soft verify) on port %s.\n' "$SKIN_VERSION" "$PORT"
-    /bin/rm -f /tmp/dream-skin-verify.$$.json
+    cleanup_verify_output
+    trap - EXIT
     exit 0
   fi
-  /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || /bin/kill -TERM "$INJECTOR_PID" 2>/dev/null || true
-  /bin/rm -f "$STATE_PATH" /tmp/dream-skin-verify.$$.json
+  # The watcher is normally launched directly (launchctl is only a fallback),
+  # so a successful `launchctl remove` does not prove that the recorded PID
+  # stopped.  Verify the PID/path/start-time tuple before deleting state; if
+  # it cannot be stopped safely, preserve the state as evidence and fail
+  # closed instead of leaving an orphan watcher that can reinject later.
+  if ! stop_recorded_injector; then
+    cleanup_verify_output
+    trap - EXIT
+    fail "Injection verification failed and the recorded injector could not be stopped safely; state was preserved. See $INJECTOR_ERROR_LOG"
+  fi
+  /bin/rm -f "$STATE_PATH"
+  cleanup_verify_output
+  trap - EXIT
   fail "Injection verification failed. The injector was stopped; see $INJECTOR_ERROR_LOG"
 fi
-/bin/rm -f /tmp/dream-skin-verify.$$.json
+cleanup_verify_output
+trap - EXIT
 
 printf 'Codex Dream Skin Studio %s is active on loopback port %s.\n' "$SKIN_VERSION" "$PORT"

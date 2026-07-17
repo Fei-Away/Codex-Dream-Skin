@@ -22,58 +22,33 @@ bootout_agent() {
 write_auto_state() {
   local enabled="$1"
   local paused="${2:-false}"
-  /usr/bin/python3 - "$AUTOLOAD_STATE_PATH" "$enabled" "$paused" <<'PY'
-import json, os, sys, tempfile
-from datetime import datetime, timezone
-
-path, enabled, paused = sys.argv[1:]
-value = {
-    "schemaVersion": 1,
-    "enabled": enabled == "true",
-    "paused": paused == "true",
-    "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+  ensure_state_root
+  local temporary
+  temporary="$(/usr/bin/mktemp "$STATE_ROOT/autoload.XXXXXX")" || fail "Could not create automatic-loading state file."
+  if ! /usr/bin/printf '{\n  "schemaVersion": 1,\n  "enabled": %s,\n  "paused": %s,\n  "updatedAt": "%s"\n}\n' \
+    "$enabled" "$paused" "$(/bin/date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$temporary"; then
+    /bin/rm -f "$temporary"
+    fail "Could not write automatic-loading state."
+  fi
+  /bin/chmod 600 "$temporary"
+  /bin/mv -f "$temporary" "$AUTOLOAD_STATE_PATH"
 }
-os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-fd, temporary = tempfile.mkstemp(prefix="autoload.", dir=os.path.dirname(path))
-try:
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(value, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.chmod(temporary, 0o600)
-    os.replace(temporary, path)
-finally:
-    try:
-        os.unlink(temporary)
-    except FileNotFoundError:
-        pass
-PY
+
+read_json_field() {
+  [ -f "$1" ] || return 0
+  /usr/bin/sed -n \
+    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p' \
+    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
+    -e 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+    "$1" 2>/dev/null | /usr/bin/head -n1
 }
 
 state_value() {
-  /usr/bin/python3 - "$AUTOLOAD_STATE_PATH" "$1" 2>/dev/null <<'PY' || true
-import json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        value = json.load(f).get(sys.argv[2])
-    if value is not None:
-        print(str(value).lower() if isinstance(value, bool) else value, end="")
-except Exception:
-    pass
-PY
+  read_json_field "$AUTOLOAD_STATE_PATH" "$1"
 }
 
 state_port() {
-  [ -f "$STATE_PATH" ] || return 0
-  /usr/bin/python3 - "$STATE_PATH" 2>/dev/null <<'PY' || true
-import json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        value = json.load(f).get("port")
-    if value:
-        print(value, end="")
-except Exception:
-    pass
-PY
+  read_json_field "$STATE_PATH" port
 }
 
 codex_running_for_status() {
@@ -238,32 +213,12 @@ status_auto_load() {
   /usr/bin/curl --noproxy '*' --silent --fail --max-time 1 \
     "http://127.0.0.1:${port}/json/version" >/dev/null 2>&1 && cdp="true"
   if [ -f "$STATE_PATH" ]; then
-    pid="$(/usr/bin/python3 - "$STATE_PATH" 2>/dev/null <<'PY' || true
-import json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        value = json.load(f).get("injectorPid")
-    if value:
-        print(value, end="")
-except Exception:
-    pass
-PY
-)"
+    pid="$(read_json_field "$STATE_PATH" injectorPid)"
     [ -n "${pid:-}" ] && [ "$pid" != "0" ] && /bin/kill -0 "$pid" 2>/dev/null && injector="true"
   fi
   if [ "$json" = "true" ]; then
-    /usr/bin/python3 - "$enabled" "$paused" "$loaded" "$codex" "$cdp" "$injector" "$port" <<'PY'
-import json, sys
-print(json.dumps({
-    "enabled": sys.argv[1] == "true",
-    "paused": sys.argv[2] == "true",
-    "agentLoaded": sys.argv[3] == "true",
-    "codexRunning": sys.argv[4] == "true",
-    "cdpReady": sys.argv[5] == "true",
-    "injectorAlive": sys.argv[6] == "true",
-    "port": int(sys.argv[7]),
-}, ensure_ascii=False))
-PY
+    printf '{"enabled":%s,"paused":%s,"agentLoaded":%s,"codexRunning":%s,"cdpReady":%s,"injectorAlive":%s,"port":%s}\n' \
+      "$enabled" "$paused" "$loaded" "$codex" "$cdp" "$injector" "$port"
     return 0
   fi
   printf 'enabled=%s\n' "$enabled"

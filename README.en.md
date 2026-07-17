@@ -42,9 +42,55 @@
   </sub>
 </p>
 
-## Gallery
+## Tested featured preset: Arina Hashimoto
 
-One image, one mood. Real theme previews you can ship:
+“Arina Hashimoto / 桥本有菜” has been verified on the real Codex home screen in
+both light and dark appearances. The user-provided source PNG is `1672 × 941`;
+the preset's `2560 × 1440` JPEG is a standardized derived export that preserves
+the source's near-16:9 composition and does not add source detail. The sidebar,
+cards, project picker, and composer
+shown below are native Codex controls.
+
+<p align="center">
+  <img src="docs/images/presets/romantic-rose-light.jpg" alt="Arina Hashimoto theme tested in light appearance" width="900"><br>
+  <sub>Light · real injected screenshot; unsent input hidden during capture (preview only)</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/presets/romantic-rose-dark.jpg" alt="Arina Hashimoto theme tested in dark appearance" width="900"><br>
+  <sub>Dark · real injected screenshot; unsent input hidden during capture (preview only)</sub>
+</p>
+
+Install from the repo and switch in one command on macOS:
+
+```bash
+cd macos
+./scripts/install-dream-skin-macos.sh --no-launch
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-romantic-rose
+```
+
+Windows has a persistent local theme store and system-tray controls, and seeds
+the same Arina Hashimoto preset. For the first repo-based setup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\scripts\install-dream-skin.ps1
+powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
+```
+
+After launch, switch directly through **已保存主题 → 桥本有菜**; no cross-folder
+manual import is required. **更换背景图** still imports your own UI-free
+wallpaper, which can then be saved for one-click switching.
+
+> The downloadable user source is [`docs/images/presets/romantic-rose-source.png`](./docs/images/presets/romantic-rose-source.png) (`1672 × 941`); the macOS one-click preset uses the normalized derived [`background.jpg`](./macos/presets/preset-romantic-rose/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; confirm likeness and asset rights before redistributing it.
+
+## Concept gallery (not importable backgrounds)
+
+These eight images communicate achievable visual directions, but they are
+interface mockups rather than usable theme backgrounds. Generate a UI-free
+`2560 × 1440` image with the copy-ready [reference prompt guide](./docs/reference-background-prompt-guide.en.md)
+before importing a similar look. See the [concept prompt breakdown](./docs/background-generation-prompts.md)
+for the eight individual styles.
 
 <p align="center">
   <img src="docs/images/gallery/skin-01.jpg" alt="Pink Custom" width="900"><br>
@@ -77,8 +123,8 @@ One image, one mood. Real theme previews you can ship:
 </p>
 
 <p align="center">
-  <img src="docs/images/gallery/skin-07.jpg" alt="Hatsune Miku" width="900"><br>
-  <sub>Hatsune Miku</sub>
+  <img src="docs/images/gallery/skin-07.jpg" alt="Cyan Virtual Singer" width="900"><br>
+  <sub>Cyan Virtual Singer</sub>
 </p>
 
 <p align="center">
@@ -89,7 +135,9 @@ One image, one mood. Real theme previews you can ship:
 ## What it does
 
 - **Real UI** — Sidebar, cards, project picker, and input stay native. Not a fake full-window screenshot.
-- **Swappable art** — Drop in an image you like and it becomes your theme.
+- **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable.
+- **Swappable art** — Drop in a UI-free image you like and it becomes your theme.
+- **Saved themes** — Switch local themes from the macOS menu bar or Windows system tray.
 - **Restorable** — One-click restore to the stock look.
 - **Safer path** — Local-loopback CDP inject only. No official binary or signature changes.
 
@@ -107,7 +155,14 @@ More detail:
 - Mac: [`macos/README.md`](./macos/README.md)
 - Windows: [`windows/SKILL.md`](./windows/SKILL.md)
 - Paths: [`docs/platforms.md`](./docs/platforms.md)
+- Copy-ready reference prompt guide: [`docs/reference-background-prompt-guide.en.md`](./docs/reference-background-prompt-guide.en.md)
+- Eight concept prompt breakdowns: [`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - Project notes: [`docs/PROJECT.md`](./docs/PROJECT.md)
+
+## Feedback & contributions
+
+- **Issues:** Use the [issue templates](./.github/ISSUE_TEMPLATE/) (bug / feature). Blank issues are disabled. Please try Verify / Restore self-checks before filing bugs.
+- **PRs:** Follow the [PR template](./.github/pull_request_template.md) — describe the change and tick the self-checks you actually ran (e.g. `macos/tests/run-tests.sh`, verify / restore).
 
 ## Safety
 
@@ -119,7 +174,7 @@ More detail:
 
 - See [`macos/LICENSE`](./macos/LICENSE) (MIT) and [`macos/NOTICE.md`](./macos/NOTICE.md)
 - Unofficial; Codex and related rights belong to their owners.
-- People / IP art in previews is illustrative only — clear rights before commercial redistribution.
+- People / IP material in bundled presets and previews is illustrative only — clear likeness, asset, and trademark rights before commercial redistribution.
 
 ---
 

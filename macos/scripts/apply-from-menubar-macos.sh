@@ -16,18 +16,30 @@ LOG_OUT="${STATE_ROOT}/menubar-apply.log"
 
 progress() {
   printf '[progress] %s\n' "$*" >>"$LOG_OUT" 2>/dev/null
-  /usr/bin/osascript -e "display notification \"$*\" with title \"Codex Dream Skin\"" >/dev/null 2>&1 &
+  /usr/bin/osascript - "$*" >/dev/null 2>&1 <<'APPLESCRIPT' &
+on run argv
+  display notification (item 1 of argv) with title "Codex Dream Skin"
+end run
+APPLESCRIPT
 }
 
 alert() {
-  /usr/bin/osascript -e "display alert \"Codex Dream Skin\" message \"$1\"" >/dev/null 2>&1 || true
+  /usr/bin/osascript - "$1" >/dev/null 2>&1 <<'APPLESCRIPT' || true
+on run argv
+  display alert "Codex Dream Skin" message (item 1 of argv)
+end run
+APPLESCRIPT
 }
 
 confirm() {
   local message="$1"
   local ok_label="${2:-继续}"
-  /usr/bin/osascript <<APPLESCRIPT >/dev/null 2>&1
-display dialog "$(printf '%s' "$message" | /usr/bin/sed 's/"/\\"/g')" buttons {"取消", "$ok_label"} default button "$ok_label" with title "Codex Dream Skin"
+  /usr/bin/osascript - "$message" "$ok_label" >/dev/null 2>&1 <<'APPLESCRIPT'
+on run argv
+  set promptText to item 1 of argv
+  set okLabel to item 2 of argv
+  display dialog promptText buttons {"取消", okLabel} default button okLabel with title "Codex Dream Skin"
+end run
 APPLESCRIPT
 }
 

@@ -17,6 +17,18 @@ It does **not** grant rights to:
 
 `assets/portal-hero.png` is original abstract geometric art generated for this open-source repository (no characters). Replace it with your own image before shipping a branded theme to customers.
 
+## Arina Hashimoto reference material
+
+The following user/maintainer-supplied files are excluded from the MIT software license:
+
+- `presets/preset-romantic-rose/background.jpg`
+- `../windows/assets/dream-reference.jpg`
+- `../docs/images/presets/romantic-rose-source.png`
+- `../docs/images/presets/romantic-rose-light.jpg`
+- `../docs/images/presets/romantic-rose-dark.jpg`
+
+They are included at the maintainer's direction as a local theme preset, source archive, and real runtime previews. They are not official OpenAI/Codex artwork. Their inclusion does not certify or grant third-party likeness, model-output, or redistribution rights. Downstream redistribution and commercial use require an independent rights review; the two runtime screenshots are documentation previews and must never be imported as wallpapers.
+
 ## Runtime
 
 This project does not redistribute Node.js. At runtime it validates and uses the Node.js executable already signed and bundled inside the user's official Codex desktop application.

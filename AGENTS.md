@@ -1,30 +1,34 @@
-# Agent notes — Codex Dream Skin
+# Repository Guidelines
 
-Instructions for AI / human maintainers working in this repo.
+## Project Structure & Module Organization
 
-## Changelog (required)
+- `macos/` is the primary product: shell launchers, `scripts/` runtime logic, `assets/` CSS/injection payloads, `menubar/` SwiftBar integration, and `tests/` checks.
+- `windows/` contains PowerShell launch/install/restore scripts, Node CDP injection, platform assets, references, and Windows-specific tests.
+- `docs/` holds platform notes, project history, promotional copy, and preview images. Files under `docs/images/gallery/` are composites, not theme backgrounds.
+- `.github/` contains issue and pull-request templates. Keep platform behavior documented in `docs/platforms.md`.
 
-- Keep **`macos/CHANGELOG.md`** as the user-facing release notes (Chinese is fine; match existing tone).
-- On any user-visible macOS change (features, UX, safety, install paths, visual shell), **update the changelog in the same PR/commit** when possible.
-- Bump **`macos/VERSION`** when shipping a release-worthy set of changes:
-  - **patch** `x.y.Z` — fixes, small hardening, copy
-  - **minor** `x.Y.0` — new capabilities (menu bar, hot switch, auto light/dark, etc.)
-  - **major** `X.0.0` — breaking install paths / security model / remove public APIs
-- Prefer a new `## x.y.z — YYYY-MM-DD` section; use `## Unreleased` only if you intentionally batch before tagging.
-- Write for **users**, not as a dump of commit hashes:
-  - **新增 / 改进 / 修复 / 说明** (or English Added / Changed / Fixed)
-  - Short bullets; link to docs paths if needed
-  - Call out security-relevant behavior (CDP loopback, no asar edits, no silent API hijack)
-- Do **not** replace a detailed git commit message with only “update changelog”; keep commits descriptive **and** keep CHANGELOG in sync for releases.
+## Build, Test, and Development Commands
 
-## Scope reminders
+- `cd macos && npm test`: run shell/JavaScript syntax, payload, configuration round-trip, signature, and doctor checks.
+- `macos/scripts/doctor-macos.sh`: validate the installed Codex app, signed bundled Node runtime, theme payload, and optional live session.
+- `macos/scripts/build-release.sh`: test and build the macOS release ZIP plus SHA-256 file.
+- `macos/scripts/build-client-release.sh <output.zip>`: create the customer-facing double-click package.
+- `powershell -File windows/tests/run-tests.ps1`: run Windows configuration and static regression checks.
 
-- External theme via **loopback CDP**; never modify official `.app` / `app.asar` / signatures.
-- `docs/images/gallery/*` are **preview composites**, not pure banner assets for `theme/`.
-- Pure backgrounds go through customize / `images/` / `themes/`; inject reads active `theme.json` + image.
-- CSS: dark portal base + optional light shell via `data-dream-shell`; do not force `appearanceTheme=dark` on install.
-- Prefer hot reapply when CDP is already up; full restart only when required.
+Do not bypass failing checks. Document platform-only test blockers in the PR.
 
-## Windows
+## Coding Style & Naming Conventions
 
-- When Windows gains parity features, add or extend a changelog under `windows/` (or a root CHANGELOG section) using the same user-facing style; keep platform labels clear.
+Use two-space indentation in shell, PowerShell, JavaScript, JSON, and CSS. Shell entry points use `set -euo pipefail`; Node files use ESM. Follow existing kebab-case script names such as `start-dream-skin-macos.sh`. Prefer existing platform helpers over new dependencies. Keep comments short and focused on safety or non-obvious behavior.
+
+## Testing Guidelines
+
+Tests must cover changed install, start, inject, verify, pause, and restore behavior. For renderer or CSS changes, run live verification and inspect both home and task routes. Configuration tests must include Chinese/non-ASCII project names and prove unrelated TOML content survives install/restore. Never rewrite `config.toml` through an encoding-dependent API; require strict UTF-8, atomic writes, and a recoverable backup.
+
+## Commit & Pull Request Guidelines
+
+Prefer `type(scope): summary`, for example `fix(windows): preserve UTF-8 config on restore`. Complete the PR template with platform, rationale, actual test results, linked issues, and screenshots for visual changes. Do not include private chats, API keys, `auth.json`, or customer data.
+
+## Security & Release Notes
+
+CDP must remain loopback-only. Never modify official `.app`, WindowsApps, `app.asar`, signatures, API keys, or Base URLs. Update `macos/CHANGELOG.md` for user-visible macOS changes and bump `macos/VERSION` for release-worthy work. Maintain a clearly labeled Windows changelog as parity features and fixes ship.

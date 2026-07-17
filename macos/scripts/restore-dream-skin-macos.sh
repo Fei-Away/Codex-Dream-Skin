@@ -29,7 +29,10 @@ if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   PORT="$(state_field port)" || fail "Could not read the saved CDP port; state was preserved."
 fi
 
-[ -f "$STATE_PATH" ] && stop_recorded_injector
+if [ -f "$STATE_PATH" ]; then
+  stop_recorded_injector \
+    || fail "Could not stop the recorded injector; restore state was preserved."
+fi
 # Always remove the themed Codex launchd babysitter so quitting Codex stays quit.
 release_codex_launchd_job || true
 CODEX_RUNNING="false"
@@ -45,6 +48,12 @@ elif [ "$CODEX_RUNNING" = "true" ] && [ "$RESTART_CODEX" = "false" ]; then
 fi
 
 if [ "$RESTORE_BASE_THEME" = "true" ]; then
+  if [ "$CODEX_RUNNING" = "true" ]; then
+    [ "$RESTART_CODEX" = "true" ] \
+      || fail "Close Codex or pass --restart-codex before restoring config.toml."
+    stop_codex true
+    CODEX_RUNNING="false"
+  fi
   "$NODE" "$SCRIPT_DIR/theme-config.mjs" restore "$CONFIG_PATH" "$THEME_BACKUP_PATH"
 fi
 

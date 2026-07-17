@@ -1,0 +1,22 @@
+# Issue template config / Issue 模板配置
+# Blank issues are disabled — please pick a template.
+# 已关闭空白 Issue，请选择下方模板提交。
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: 中文 README / Chinese README
+    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/README.md
+    about: 安装说明、安全边界、效果预览 · Install guide, security boundary, previews
+  - name: macOS 使用说明 / macOS README
+    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/macos/README.md
+    about: 安装路径、定制、Verify / Restore · Install paths, customize, verify & restore
+  - name: Windows 使用说明 / Windows README
+    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/README.md
+    about: Windows 安装、启动、校验、恢复 · Install, start, verify, restore on Windows
+  - name: 平台路径对照 / Platform paths
+    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/docs/platforms.md
+    about: macOS / Windows 路径与能力矩阵 · Paths and capability matrix
+  - name: Changelog (macOS)
+    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/macos/CHANGELOG.md
+    about: 已知修复与版本说明 · Known fixes and version notes
