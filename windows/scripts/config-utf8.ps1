@@ -88,6 +88,18 @@ function Write-DreamSkinUtf8FileAtomically {
   }
 }
 
+function Remove-DreamSkinAtomicArtifact {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  if ([System.IO.File]::Exists($Path)) {
+    [System.IO.File]::Delete($Path)
+  }
+}
+
 function Write-DreamSkinBytesAtomically {
   [CmdletBinding()]
   param(
@@ -117,8 +129,17 @@ function Write-DreamSkinBytesAtomically {
       [System.IO.File]::Move($temporary, $fullPath)
     }
   } finally {
-    if ([System.IO.File]::Exists($temporary)) { [System.IO.File]::Delete($temporary) }
-    if ([System.IO.File]::Exists($replacementBackup)) { [System.IO.File]::Delete($replacementBackup) }
+    foreach ($artifact in @($temporary, $replacementBackup)) {
+      try {
+        Remove-DreamSkinAtomicArtifact -Path $artifact
+      } catch {
+        try {
+          Write-Warning "Could not remove temporary atomic config artifact '$artifact': $($_.Exception.Message)"
+        } catch {
+          # Cleanup must never mask the result of the atomic write.
+        }
+      }
+    }
   }
 }
 

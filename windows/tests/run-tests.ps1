@@ -23,6 +23,55 @@ try {
   }
   Remove-Item -LiteralPath $atomicReplacePath -Force
 
+  $realAtomicCleanup = (Get-Command Remove-DreamSkinAtomicArtifact -CommandType Function).ScriptBlock
+  $previousWarningPreference = $WarningPreference
+  $cleanupFailure = @{ Triggered = $false }
+  try {
+    $WarningPreference = 'Stop'
+    function Remove-DreamSkinAtomicArtifact {
+      param([Parameter(Mandatory = $true)][string]$Path)
+      if ($Path -like '*.replace-backup') {
+        $cleanupFailure.Triggered = $true
+        throw 'forced atomic replacement-backup cleanup failure'
+      }
+      if ([System.IO.File]::Exists($Path)) {
+        [System.IO.File]::Delete($Path)
+      }
+    }
+
+    $cleanupFailurePath = Join-Path $temporaryRoot 'atomic-cleanup-failure.txt'
+    [System.IO.File]::WriteAllText($cleanupFailurePath, 'before')
+    $cleanupFailureReported = $false
+    try {
+      Write-DreamSkinUtf8FileAtomically -Path $cleanupFailurePath -Content 'after'
+    } catch {
+      $cleanupFailureReported = $true
+    }
+    if (-not $cleanupFailure.Triggered -or $cleanupFailureReported -or
+      (Read-DreamSkinUtf8File -Path $cleanupFailurePath) -cne 'after') {
+      throw 'A committed atomic write was reported as failed when cleanup failed.'
+    }
+
+    $cleanupConfigPath = Join-Path $temporaryRoot 'cleanup-failure-config.toml'
+    $cleanupBackupPath = Join-Path $temporaryRoot 'cleanup-failure-config.before.toml'
+    $cleanupOriginal = "model = `"gpt-5`"`r`n`r`n[desktop]`r`nappearanceTheme = `"system`"`r`n"
+    [System.IO.File]::WriteAllText(
+      $cleanupConfigPath,
+      $cleanupOriginal,
+      [System.Text.UTF8Encoding]::new($false, $true)
+    )
+    $cleanupOriginalBytes = [System.IO.File]::ReadAllBytes($cleanupConfigPath)
+    Install-DreamSkinBaseTheme -ConfigPath $cleanupConfigPath -BackupPath $cleanupBackupPath
+    if (-not (Test-Path -LiteralPath $cleanupBackupPath) -or
+      -not (Test-DreamSkinBytesEqual -Left $cleanupOriginalBytes `
+        -Right ([System.IO.File]::ReadAllBytes($cleanupBackupPath)))) {
+      throw 'Atomic cleanup failure removed or changed the durable pre-install config backup.'
+    }
+  } finally {
+    $WarningPreference = $previousWarningPreference
+    Set-Item -Path Function:\Remove-DreamSkinAtomicArtifact -Value $realAtomicCleanup
+  }
+
   $configPath = Join-Path $temporaryRoot 'config.toml'
   $backupPath = Join-Path $temporaryRoot 'config.before-dream-skin.toml'
   $projectName = -join @([char]0x4EE3, [char]0x7801, [char]0x9879, [char]0x76EE, [char]0x7532)
