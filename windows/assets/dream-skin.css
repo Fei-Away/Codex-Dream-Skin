@@ -97,7 +97,7 @@ html.codex-dream-skin aside.app-shell-left-panel [class*="text-token"] {
 html.codex-dream-skin main.main-surface {
   position: relative;
   isolation: isolate;
-  overflow: hidden !important;
+  overflow: visible !important;
   color: var(--dream-text) !important;
   background: var(--dream-surface) !important;
   border-color: var(--dream-line-soft) !important;
@@ -105,7 +105,6 @@ html.codex-dream-skin main.main-surface {
 }
 
 html.codex-dream-skin main.main-surface > header.app-header-tint {
-  position: relative;
   z-index: 20;
   color: var(--dream-text) !important;
   background: color-mix(in oklab, var(--dream-surface) 94%, transparent) !important;
