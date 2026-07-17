@@ -110,9 +110,9 @@ try {
       $arguments = @('--remote-debugging-address=127.0.0.1', "--remote-debugging-port=$Port")
       if ($ProfilePath) {
         New-Item -ItemType Directory -Force -Path $ProfilePath | Out-Null
-        $arguments += ConvertTo-DreamSkinProcessArgument -Value "--user-data-dir=$ProfilePath"
+        $arguments += "--user-data-dir=$ProfilePath"
       }
-      Start-Process -FilePath $codex.Executable -ArgumentList $arguments | Out-Null
+      $null = Start-DreamSkinCodex -Codex $codex -Arguments $arguments
       $launchedWithCdp = $true
     }
 
@@ -137,7 +137,7 @@ try {
       if ($launchedWithCdp) {
         Write-Warning 'Dream Skin launch failed; reopening Codex without a debugging port.'
       }
-      try { Start-Process -FilePath $codex.Executable | Out-Null } catch {
+      try { $null = Start-DreamSkinCodex -Codex $codex } catch {
         Write-Warning 'Launch rollback could not reopen Codex automatically.'
       }
     }
@@ -154,7 +154,7 @@ try {
     if ($launchedWithCdp) {
       try {
         Stop-DreamSkinCodex -Codex $codex -AllowForce
-        Start-Process -FilePath $codex.Executable | Out-Null
+        $null = Start-DreamSkinCodex -Codex $codex
       } catch {
         Write-Warning 'State validation rollback could not fully restart Codex; close Codex to ensure its CDP port is closed.'
       }
@@ -267,7 +267,7 @@ try {
     if ($launchedWithCdp) {
       try {
         Stop-DreamSkinCodex -Codex $codex -AllowForce
-        Start-Process -FilePath $codex.Executable | Out-Null
+        $null = Start-DreamSkinCodex -Codex $codex
       } catch {
         Write-Warning 'Startup rollback could not fully restart Codex; close Codex to ensure its CDP port is closed.'
       }

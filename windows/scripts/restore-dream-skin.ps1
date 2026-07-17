@@ -164,13 +164,13 @@ try {
       if ($null -eq $relaunchCodex -or -not (Test-Path -LiteralPath $relaunchCodex.Executable)) {
         throw 'Codex cannot be reopened because its current executable is unavailable.'
       }
-      Start-Process -FilePath $relaunchCodex.Executable | Out-Null
+      $null = Start-DreamSkinCodex -Codex $relaunchCodex
     }
   } catch {
     $restoreError = $_
     if ($shouldCloseCodex -and -not $NoRelaunch -and $null -ne $relaunchCodex -and
       (Get-DreamSkinCodexProcesses -Codex $codex).Count -eq 0 -and (Test-Path -LiteralPath $relaunchCodex.Executable)) {
-      try { Start-Process -FilePath $relaunchCodex.Executable | Out-Null } catch {
+      try { $null = Start-DreamSkinCodex -Codex $relaunchCodex } catch {
         Write-Warning 'Restore failed and Codex could not be reopened automatically.'
       }
     }

@@ -163,6 +163,29 @@ try {
     throw 'Quoted desktop keys or a table-header comment were not restored exactly.'
   }
 
+  $nestedConfigPath = Join-Path $temporaryRoot 'config-nested-themes.toml'
+  $nestedBackupPath = Join-Path $temporaryRoot 'config-nested-themes.before.toml'
+  $nestedTables = "[desktop.appearanceDarkChromeTheme]`r`naccent = `"#112233`"`r`n`r`n[desktop.appearanceDarkChromeTheme.fonts]`r`ncode = `"Cascadia Code`"`r`n`r`n[desktop.appearanceDarkChromeTheme.semanticColors]`r`ndiffAdded = `"#234567`"`r`n`r`n[desktop.appearanceLightChromeTheme]`r`naccent = `"#abcdef`"`r`n`r`n[desktop.appearanceLightChromeTheme.fonts]`r`nui = `"Microsoft YaHei UI`"`r`n`r`n[desktop.appearanceLightChromeTheme.semanticColors]`r`ndiffRemoved = `"#fedcba`"`r`n`r`n[`"desktop`".layout]`r`ndensity = `"compact`"`r`n"
+  $nestedOriginal = "[desktop]`r`nappearanceTheme = `"system`"`r`nappearanceLightCodeThemeId = `"github-light`"`r`n`r`n$nestedTables"
+  [System.IO.File]::WriteAllText($nestedConfigPath, $nestedOriginal, $utf8NoBom)
+  Install-DreamSkinBaseTheme -ConfigPath $nestedConfigPath -BackupPath $nestedBackupPath
+  $nestedInstalled = Read-DreamSkinUtf8File -Path $nestedConfigPath
+  $nestedDesktop = Get-DreamSkinDesktopSection -Content $nestedInstalled
+  if (-not $nestedDesktop.Body.Contains('appearanceTheme = "system"') -or
+    -not $nestedDesktop.Body.Contains('appearanceLightCodeThemeId = "codex"')) {
+    throw 'Install did not update scalar appearance settings beside nested desktop theme tables.'
+  }
+  if ([regex]::IsMatch($nestedDesktop.Body, '(?m)^[\t ]*appearanceLightChromeTheme[\t ]*=')) {
+    throw 'Install wrote an inline light chrome theme beside the equivalent nested table.'
+  }
+  if (-not $nestedInstalled.Contains($nestedTables)) {
+    throw 'Install changed native Codex chrome theme or unrelated nested desktop tables.'
+  }
+  Restore-DreamSkinBaseTheme -ConfigPath $nestedConfigPath -BackupPath $nestedBackupPath
+  if ((Read-DreamSkinUtf8File -Path $nestedConfigPath) -cne $nestedOriginal) {
+    throw 'Nested desktop theme tables were not preserved through install and restore.'
+  }
+
   $singleLineArrayPath = Join-Path $temporaryRoot 'config-single-line-array.toml'
   $singleLineArrayBackup = Join-Path $temporaryRoot 'config-single-line-array.before.toml'
   $singleLineArray = "labels = [`"name[1]`", `"#tag]`"]`r`n"
@@ -176,8 +199,10 @@ try {
     'desktop.appearanceTheme = "system"',
     'desktop = { appearanceTheme = "system" }',
     '[[desktop]]',
+    '[[desktop.layout]]',
     '[desktop.appearanceTheme]',
-    '["desktop".layout]',
+    '[desktop.appearanceLightCodeThemeId]',
+    "[desktop]`r`nappearanceLightChromeTheme = { accent = `"#ffffff`" }`r`n`r`n[desktop.appearanceLightChromeTheme]`r`naccent = `"#000000`"",
     '["desk\u0074op".layout]',
     '["desk\u0074op"]',
     "note = `"`"`"fake`r`n[desktop]`r`nappearanceTheme = `"dark`"`r`n`"`"`"",
@@ -304,6 +329,23 @@ try {
   if ($quotedProfile -cne '"--user-data-dir=C:\Dream Skin\Profile\\"') {
     throw 'Process argument quoting did not protect spaces and a trailing backslash.'
   }
+  $argumentLine = ConvertTo-DreamSkinArgumentLine -Arguments @(
+    '--remote-debugging-address=127.0.0.1',
+    '--user-data-dir=C:\Dream Skin\Profile\',
+    ''
+  )
+  if ($argumentLine -cne '--remote-debugging-address=127.0.0.1 "--user-data-dir=C:\Dream Skin\Profile\\" ""') {
+    throw 'Packaged-app argument line quoting failed.'
+  }
+  Initialize-DreamSkinPackageLauncher
+  if (-not ('CodexDreamSkin.PackageLauncher' -as [type])) {
+    throw 'Packaged-app activation helper did not compile.'
+  }
+  $invalidActivationRejected = $false
+  try { $null = Start-DreamSkinCodex -Codex ([pscustomobject]@{ AppUserModelId = 'invalid app' }) } catch {
+    $invalidActivationRejected = $true
+  }
+  if (-not $invalidActivationRejected) { throw 'An invalid AppUserModelId reached package activation.' }
 
   $statePath = Join-Path $temporaryRoot 'state.json'
   $state = [pscustomobject]@{
@@ -348,13 +390,34 @@ try {
     IsDevelopmentMode = $false
     Version = [version]'1.2.3.4'
   }
-  $fakeInstall = ConvertTo-DreamSkinCodexInstall -Package $fakePackage
+  $fakeManifest = [pscustomobject]@{
+    Package = [pscustomobject]@{
+      Applications = [pscustomobject]@{
+        Application = @(
+          [pscustomobject]@{ Id = 'Other'; Executable = 'other\Other.exe' },
+          [pscustomobject]@{ Id = 'App'; Executable = 'app/ChatGPT.exe' }
+        )
+      }
+    }
+  }
+  $fakeInstall = ConvertTo-DreamSkinCodexInstall -Package $fakePackage -Manifest $fakeManifest
   if ($null -eq $fakeInstall -or $fakeInstall.PackageFullName -cne $fakePackage.PackageFullName -or
+    $fakeInstall.AppUserModelId -cne 'OpenAI.Codex_test!App' -or
     -not (Test-DreamSkinPathEqual -Left $fakeInstall.Executable -Right $fakeExecutable)) {
     throw 'Registered Appx package identity conversion failed.'
   }
+  $fakeManifest.Package.Applications.Application[1].Id = 'Invalid App'
+  if ($null -ne (ConvertTo-DreamSkinCodexInstall -Package $fakePackage -Manifest $fakeManifest)) {
+    throw 'An invalid packaged-app application ID was accepted.'
+  }
+  $fakeManifest.Package.Applications.Application[1].Id = 'App'
+  $fakeManifest.Package.Applications.Application += [pscustomobject]@{ Id = 'Duplicate'; Executable = 'app\ChatGPT.exe' }
+  if ($null -ne (ConvertTo-DreamSkinCodexInstall -Package $fakePackage -Manifest $fakeManifest)) {
+    throw 'An ambiguous packaged-app manifest was accepted.'
+  }
+  $fakeManifest.Package.Applications.Application = @($fakeManifest.Package.Applications.Application[0..1])
   $fakePackage.SignatureKind = 'Developer'
-  if ($null -ne (ConvertTo-DreamSkinCodexInstall -Package $fakePackage)) {
+  if ($null -ne (ConvertTo-DreamSkinCodexInstall -Package $fakePackage -Manifest $fakeManifest)) {
     throw 'A non-Store Appx package was accepted as official Codex.'
   }
   $fakePackage.SignatureKind = 'Store'
@@ -379,7 +442,8 @@ try {
   }
   $resolvedInstall = Resolve-DreamSkinCodexInstallFromState -State $verifiedPackageState `
     -RegisteredInstalls @($fakeInstall)
-  if ($null -eq $resolvedInstall -or -not $resolvedInstall.RegisteredPackageVerified) {
+  if ($null -eq $resolvedInstall -or -not $resolvedInstall.RegisteredPackageVerified -or
+    $resolvedInstall.AppUserModelId -cne $fakeInstall.AppUserModelId) {
     throw 'State package identity did not resolve against the registered Appx package.'
   }
   $verifiedPackageState.codexPackageFamilyName = 'OpenAI.Codex_wrong'
@@ -523,7 +587,15 @@ try {
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
     throw 'Complete restore does not stop a separately launched tray process.'
   }
+  if ($restoreSource.Contains('Start-Process -FilePath $relaunchCodex.Executable') -or
+    -not $restoreSource.Contains('Start-DreamSkinCodex -Codex $relaunchCodex')) {
+    throw 'Restore still executes the WindowsApps path instead of activating the registered package.'
+  }
   $startSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\start-dream-skin.ps1')
+  if ($startSource.Contains('Start-Process -FilePath $codex.Executable') -or
+    -not $startSource.Contains('Start-DreamSkinCodex -Codex $codex')) {
+    throw 'Start still executes the WindowsApps path instead of activating the registered package.'
+  }
   $stateReadIndex = $startSource.IndexOf('$previousState = Read-DreamSkinState', [System.StringComparison]::Ordinal)
   $restartPromptIndex = $startSource.IndexOf('$restartAuthorized = Confirm-DreamSkinRestart', [System.StringComparison]::Ordinal)
   $recordedStopIndex = $startSource.IndexOf('$recordedInjectorStopped = Stop-DreamSkinRecordedInjector', [System.StringComparison]::Ordinal)
