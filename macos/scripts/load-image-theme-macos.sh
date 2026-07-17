@@ -80,7 +80,7 @@ ensure_node_runtime
 
 # Reject decompression bombs before `sips -Z` rasterizes the full source image.
 "$NODE" "$SCRIPT_DIR/check-image-dimensions.mjs" "$IMAGE" \
-  || fail "Image exceeds the safe pixel budget (max 16384 px per side / 50 megapixels)."
+  || fail "Image dimensions are invalid or exceed the safe pixel budget (max 16384 px per side / 50 megapixels)."
 
 image_name="background.jpg"
 temporary="$THEME_DIR/.background.$$.tmp.jpg"

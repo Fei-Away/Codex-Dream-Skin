@@ -72,6 +72,11 @@ if ! "$NODE" "$ROOT/scripts/check-image-dimensions.mjs" "$CID_TMP/ok.png" >/dev/
   printf 'check-image-dimensions rejected a valid 1600x900 image.\n' >&2
   /bin/rm -rf "$CID_TMP"; exit 1
 fi
+/usr/bin/printf 'not-an-image' > "$CID_TMP/invalid.png"
+if "$NODE" "$ROOT/scripts/check-image-dimensions.mjs" "$CID_TMP/invalid.png" >/dev/null 2>&1; then
+  printf 'check-image-dimensions accepted an image whose dimensions could not be determined safely.\n' >&2
+  /bin/rm -rf "$CID_TMP"; exit 1
+fi
 /bin/rm -rf "$CID_TMP"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.

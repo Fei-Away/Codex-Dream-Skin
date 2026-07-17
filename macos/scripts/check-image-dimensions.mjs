@@ -6,8 +6,8 @@
 // container header only (PNG/JPEG/WebP) and falls back to `sips -g` metadata for
 // formats the header parser does not recognize (HEIC/TIFF); it never decodes.
 //
-// Exit 0 = within caps or dimensions undeterminable (later checks still apply),
-// 1 = over caps, 2 = usage / unreadable file.
+// Exit 0 = dimensions are known and within caps,
+// 1 = over caps, 2 = usage / unreadable or undetermined dimensions.
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -60,7 +60,12 @@ if (!dimensions) {
   }
 }
 
-if (dimensions && overCaps(dimensions.width, dimensions.height)) {
+if (!dimensions) {
+  console.error("Could not determine image dimensions without rasterizing the source.");
+  process.exit(2);
+}
+
+if (overCaps(dimensions.width, dimensions.height)) {
   console.error(
     `Image is ${dimensions.width}×${dimensions.height}px, over the `
     + `${MAX_IMAGE_DIMENSION}px-per-side / ${MAX_IMAGE_PIXELS / 1_000_000}-megapixel safety limit.`,
