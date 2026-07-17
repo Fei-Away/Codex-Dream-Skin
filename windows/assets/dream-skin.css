@@ -105,12 +105,27 @@ html.codex-dream-skin main.main-surface {
 }
 
 html.codex-dream-skin main.main-surface > header.app-header-tint {
-  position: relative;
-  z-index: 20;
+  /* Preserve Codex's native fixed header geometry and side-panel controls. */
   color: var(--dream-text) !important;
   background: color-mix(in oklab, var(--dream-surface) 94%, transparent) !important;
   border-color: var(--dream-line-soft) !important;
   backdrop-filter: blur(12px) saturate(1.05) !important;
+}
+
+/* Wide art also reaches the native application menu, which sits outside the
+   main surface and needs its own dark-theme legibility layer. */
+html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] {
+  color: var(--dream-text) !important;
+  background: color-mix(in oklab, var(--dream-sidebar) 90%, transparent) !important;
+  border-bottom: 1px solid var(--dream-line-soft) !important;
+  box-shadow: 0 1px 12px color-mix(in oklab, var(--dream-canvas) 72%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(.9) !important;
+}
+
+html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] button,
+html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] svg {
+  color: var(--dream-text) !important;
+  text-shadow: 0 1px 2px color-mix(in oklab, var(--dream-canvas) 82%, transparent) !important;
 }
 
 #codex-dream-skin-chrome {
