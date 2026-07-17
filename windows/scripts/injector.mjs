@@ -151,14 +151,16 @@ class CdpSession {
     this.listeners.set(method, listeners);
   }
 
-  send(method, params = {}) {
+  send(method, params = {}, timeoutMs = this.timeoutMs) {
     if (this.closed) return Promise.reject(new Error("CDP session is closed"));
+    const requestedTimeoutMs = Number.isFinite(timeoutMs) ? timeoutMs : this.timeoutMs;
+    const commandTimeoutMs = Math.max(1, Math.min(this.timeoutMs, requestedTimeoutMs));
     return new Promise((resolve, reject) => {
       const id = this.nextId++;
       const timer = setTimeout(() => {
         if (!this.pending.delete(id)) return;
-        reject(new Error("CDP " + method + " timed out after " + this.timeoutMs + "ms"));
-      }, this.timeoutMs);
+        reject(new Error("CDP " + method + " timed out after " + commandTimeoutMs + "ms"));
+      }, commandTimeoutMs);
       const settle = (callback) => (value) => {
         clearTimeout(timer);
         callback(value);
@@ -177,13 +179,13 @@ class CdpSession {
     });
   }
 
-  async evaluate(expression) {
+  async evaluate(expression, timeoutMs = this.timeoutMs) {
     const response = await this.send("Runtime.evaluate", {
       expression,
       awaitPromise: true,
       returnByValue: true,
       userGesture: false
-    });
+    }, timeoutMs);
     if (response.exceptionDetails) {
       const detail = response.exceptionDetails.exception?.description ?? response.exceptionDetails.text;
       throw new Error("Renderer evaluation failed: " + detail);
@@ -284,7 +286,7 @@ async function removeFromSession(session) {
   })()`);
 }
 
-async function verifySession(session) {
+async function verifySession(session, timeoutMs = session.timeoutMs) {
   return session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
@@ -296,6 +298,29 @@ async function verifySession(session) {
         height: Math.round(rect.height)
       };
     };
+    const isActuallyVisible = (node) => {
+      if (!node?.isConnected || node.getClientRects().length === 0) return false;
+      const rect = node.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      for (let current = node; current instanceof Element; current = current.parentElement) {
+        const computed = getComputedStyle(current);
+        if (
+          computed.display === "none" ||
+          computed.visibility === "hidden" ||
+          computed.visibility === "collapse" ||
+          Number.parseFloat(computed.opacity) <= 0
+        ) {
+          return false;
+        }
+      }
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      if (centerX < 0 || centerY < 0 || centerX >= innerWidth || centerY >= innerHeight) {
+        return false;
+      }
+      const centerOwner = document.elementFromPoint(centerX, centerY);
+      return Boolean(centerOwner && (centerOwner === node || node.contains(centerOwner)));
+    };
     const root = document.documentElement;
     const state = window.__CODEX_MIKU_SKIN_STATE__;
     const chrome = document.getElementById("codex-miku-skin-chrome");
@@ -304,6 +329,9 @@ async function verifySession(session) {
     const nativeHome = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
     const home = document.querySelector(".miku-home");
     const suggestions = home?.querySelector('[class~="group/home-suggestions"]') ?? null;
+    const suggestionButtons = suggestions ? [...suggestions.querySelectorAll("button")] : [];
+    const homeScenario = Boolean(nativeHome || home || suggestions);
+    const visibleSuggestionCount = suggestionButtons.filter(isActuallyVisible).length;
     const sidebar = document.querySelector("aside.app-shell-left-panel") || document.querySelector("aside");
     const composer = main?.querySelector(".composer-surface-chrome") || null;
     const outputHost = document.querySelector('[data-pip-obstacle="thread-summary-panel"]');
@@ -383,7 +411,9 @@ async function verifySession(session) {
       sidebar: box(sidebar),
       composer: box(composer),
       home: box(home),
-      suggestionCount: suggestions ? suggestions.querySelectorAll("button").length : null,
+      homeScenario,
+      suggestionCount: suggestions ? suggestionButtons.length : null,
+      visibleSuggestionCount: suggestions ? visibleSuggestionCount : null,
       diff: box(document.querySelector(".miku-diff-surface")),
       terminal: box(document.querySelector(".miku-terminal")),
       dialog: box(document.querySelector(".miku-dialog")),
@@ -403,18 +433,27 @@ async function verifySession(session) {
       result.chromePointerEvents === "none" &&
       result.artPresent &&
       Boolean(result.main) &&
+      (!result.homeScenario || (
+        result.suggestionCount === 4 &&
+        result.visibleSuggestionCount === 4
+      )) &&
       !result.horizontalOverflow;
     return result;
-  })()`);
+  })()`, timeoutMs);
 }
 
 async function waitForVerifiedSession(session, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastResult;
-  while (Date.now() < deadline) {
-    lastResult = await verifySession(session);
+  while (true) {
+    const remainingBeforeVerify = deadline - Date.now();
+    if (remainingBeforeVerify <= 0) break;
+    lastResult = await verifySession(session, remainingBeforeVerify);
     if (lastResult.pass) return lastResult;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const retryDelayMs = Math.min(500, Math.max(0, deadline - Date.now()));
+    if (retryDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    }
   }
   return lastResult;
 }
@@ -450,9 +489,7 @@ async function runOneShot(options) {
       }
       const verified = options.mode === "remove"
         ? await session.evaluate("!document.documentElement.classList.contains('codex-miku-skin')")
-        : (options.reload || options.mode === "once")
-          ? await waitForVerifiedSession(session, options.timeoutMs)
-          : await verifySession(session);
+        : await waitForVerifiedSession(session, options.timeoutMs);
       results.push({
         targetId: target.id,
         renderer: "app://",

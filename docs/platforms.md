@@ -1,6 +1,6 @@
 # 平台对照
 
-## Windows：Miku Stage 2.0.4
+## Windows：Miku Stage 2.0.5
 
 | 用途 | 路径 / 状态 |
 | --- | --- |
@@ -13,6 +13,7 @@
 | Auto Hook | 当前用户 Limited 计划任务，AtLogOn |
 | 设计/静态契约 | 14 项；不代表 14 路由已验收 |
 | Dark 路由基线 | 2.0.3 组件 01–13 已通过 live contract + 截图视觉复核 |
+| Codex 更新兼容性 | `26.715.2305.0` Home 与当前任务壳/输出面板已复核：4 张原生建议卡真实可见，sidebar/composer/修改摘要/thread summary output/插画正常，无横向溢出；其他路由未外推 |
 | 全状态矩阵 | 组件 14 仍为 Partial |
 | Light | home + settings-general 视觉 smoke 通过；未做全路由签收 |
 | 静态门禁 | windows/tests/test-windows-skin.ps1 |

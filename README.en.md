@@ -8,6 +8,10 @@ A reversible Hatsune Miku skin for the Windows Codex desktop app. It reuses the 
 
 ![Miku Stage hero](windows/assets/miku-stage-hero.png)
 
+## How the fourteen component boards are applied
+
+The fourteen external 1672×941 / 1619×971 PNG files are component specification boards containing annotations, states, and examples; they are not runtime controls that can be mounted directly. At runtime, `windows/assets/renderer-inject.js` marks the native Codex DOM elements that currently exist as components 01–14, then `windows/assets/miku-stage.css` applies the matching sectional styles. Only components present on the current route are shown. The specification boards must never be used as a full-page background that covers native interactions.
+
 ## Windows quick start
 
     powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\scripts\install-miku-skin.ps1 -EnableAutoHook

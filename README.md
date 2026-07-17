@@ -19,6 +19,10 @@ Windows Codex 的可逆初音未来主题皮肤。它复用 Codex Dream Skin 的
 
 组件与状态验收见 windows/references/qa-inventory.md。14 张设计板的尺寸和哈希保存在 windows/references/component-spec-manifest.json。
 
+## 14 张组件规范板如何应用
+
+外部的 14 张 1672×941 / 1619×971 PNG 是带有标注、状态和示例的组件规范板，不是可直接挂载的运行时控件。运行时由 `windows/assets/renderer-inject.js` 把当前存在的原生 Codex DOM 标记为 01–14，再由 `windows/assets/miku-stage.css` 对应分区应用样式。只有当前路由真实存在的组件才会显示；禁止把规范板当作整页背景覆盖原生交互。
+
 ## 安装与启动
 
 在 PowerShell 中执行：

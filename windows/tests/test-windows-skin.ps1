@@ -220,11 +220,14 @@ Assert-Contains $cdpOpenMethod.Groups['body'].Value 'setTimeout\([\s\S]{0,360}\}
 Assert-Contains $cdpOpenMethod.Groups['body'].Value 'clearTimeout\(timer\)' 'CDP WebSocket open must clear its timeout when the socket settles.'
 $cdpSendMethod = [regex]::Match(
   $injector,
-  '(?s)send\(method,\s*params\s*=\s*\{\}\)\s*\{(?<body>.*?)\r?\n\s*async evaluate\(expression\)'
+  '(?s)send\(method,\s*params\s*=\s*\{\},\s*timeoutMs\s*=\s*this\.timeoutMs\)\s*\{(?<body>.*?)\r?\n\s*async evaluate\(expression,\s*timeoutMs\s*=\s*this\.timeoutMs\)'
 )
 Assert-True $cdpSendMethod.Success 'Could not locate the CDP command send method.'
-Assert-Contains $cdpSendMethod.Groups['body'].Value 'setTimeout\([\s\S]{0,280}\},\s*this\.timeoutMs\)' 'Every pending CDP command must reject after the session timeout.'
+Assert-Contains $cdpSendMethod.Groups['body'].Value 'Number\.isFinite\(timeoutMs\)\s*\?\s*timeoutMs\s*:\s*this\.timeoutMs' 'CDP command timeout must fall back to the session timeout for a non-finite override.'
+Assert-Contains $cdpSendMethod.Groups['body'].Value 'const commandTimeoutMs\s*=\s*Math\.max\(1,\s*Math\.min\(this\.timeoutMs,\s*requestedTimeoutMs\)\)' 'CDP command timeout must be clamped to the remaining caller budget and the session timeout.'
+Assert-Contains $cdpSendMethod.Groups['body'].Value 'setTimeout\([\s\S]{0,320}\},\s*commandTimeoutMs\)' 'Every pending CDP command must reject after its bounded command timeout.'
 Assert-Contains $cdpSendMethod.Groups['body'].Value 'pending\.delete\(id\)' 'Timed-out CDP commands must be removed from the pending map.'
+Assert-Contains $injector 'async evaluate\(expression,\s*timeoutMs\s*=\s*this\.timeoutMs\)[\s\S]{0,280}this\.send\("Runtime\.evaluate",[\s\S]{0,220}\},\s*timeoutMs\)' 'Renderer evaluation must forward its remaining caller budget to the CDP command.'
 Assert-Contains $injector 'async function connectTarget\(target,\s*timeoutMs\)\s*\{\s*return new CdpSession\(target,\s*timeoutMs\)\.open\(\);\s*\}' 'connectTarget must construct each CDP session with the requested timeout.'
 Assert-True ([regex]::Matches(
   $injector,
@@ -244,6 +247,29 @@ Assert-True (-not [regex]::IsMatch($captureBody, 'Input\.dispatchKeyEvent|Input\
 Assert-Contains $injector 'const matchedComponentIds\s*=' 'Live verification does not collect actual DOM component IDs.'
 Assert-Contains $injector 'const missingRequiredComponents\s*=\s*requiredComponents\.filter\([\s\S]{0,180}!matchedComponentIds\.includes\(item\.id\)' 'Required component coverage is not derived from actual DOM matches.'
 Assert-Contains $injector 'sidebar\?\.querySelector\(''\[role="separator"\]\[data-miku-component~="10"\]''\)' 'Live verification does not detect a sidebar separator misclassified as component 10.'
+$visibleHelperMatch = [regex]::Match(
+  $injector,
+  '(?s)const isActuallyVisible\s*=\s*\(node\)\s*=>\s*\{(?<body>.*?)\r?\n\s*\};\s*\r?\n\s*const root'
+)
+Assert-True $visibleHelperMatch.Success 'Could not locate the actual-visibility verifier used for home suggestion cards.'
+$visibleHelperBody = $visibleHelperMatch.Groups['body'].Value
+Assert-Contains $visibleHelperBody '!node\?\.isConnected' 'Actual visibility must reject detached suggestion cards.'
+Assert-Contains $visibleHelperBody 'node\.getClientRects\(\)\.length\s*===\s*0' 'Actual visibility must reject suggestion cards without layout boxes.'
+Assert-Contains $visibleHelperBody 'rect\.width\s*<=\s*0\s*\|\|\s*rect\.height\s*<=\s*0' 'Actual visibility must reject zero-size suggestion cards.'
+Assert-Contains $visibleHelperBody 'for\s*\(let current\s*=\s*node;\s*current instanceof Element;\s*current\s*=\s*current\.parentElement\)' 'Actual visibility must inspect the suggestion card and all element ancestors.'
+Assert-Contains $visibleHelperBody 'getComputedStyle\(current\)' 'Actual visibility must inspect computed styles along the ancestor chain.'
+Assert-Contains $visibleHelperBody 'computed\.display\s*===\s*"none"' 'Actual visibility must reject display:none suggestion cards or ancestors.'
+Assert-Contains $visibleHelperBody 'computed\.visibility\s*===\s*"hidden"' 'Actual visibility must reject visibility:hidden suggestion cards or ancestors.'
+Assert-Contains $visibleHelperBody 'computed\.visibility\s*===\s*"collapse"' 'Actual visibility must reject visibility:collapse suggestion cards or ancestors.'
+Assert-Contains $visibleHelperBody 'Number\.parseFloat\(computed\.opacity\)\s*<=\s*0' 'Actual visibility must reject fully transparent suggestion cards or ancestors.'
+Assert-Contains $visibleHelperBody 'const centerX\s*=\s*rect\.left\s*\+\s*rect\.width\s*/\s*2' 'Actual visibility must calculate the suggestion card horizontal center.'
+Assert-Contains $visibleHelperBody 'const centerY\s*=\s*rect\.top\s*\+\s*rect\.height\s*/\s*2' 'Actual visibility must calculate the suggestion card vertical center.'
+Assert-Contains $visibleHelperBody 'centerX\s*<\s*0[\s\S]{0,120}centerX\s*>=\s*innerWidth[\s\S]{0,120}centerY\s*>=\s*innerHeight' 'Actual visibility must reject suggestion-card centers outside the viewport.'
+Assert-Contains $visibleHelperBody 'document\.elementFromPoint\(centerX,\s*centerY\)' 'Actual visibility must hit-test the suggestion card center point.'
+Assert-Contains $visibleHelperBody 'centerOwner\s*===\s*node\s*\|\|\s*node\.contains\(centerOwner\)' 'Actual visibility must reject a suggestion card whose center point is occluded.'
+Assert-Contains $injector 'const homeScenario\s*=\s*Boolean\(nativeHome\s*\|\|\s*home\s*\|\|\s*suggestions\)' 'Home verification must activate when any native or decorated home signal is present.'
+Assert-Contains $injector 'const visibleSuggestionCount\s*=\s*suggestionButtons\.filter\(isActuallyVisible\)\.length' 'Visible suggestion count must be derived by applying the actual-visibility verifier to native buttons.'
+Assert-Contains $injector 'visibleSuggestionCount:\s*suggestions\s*\?\s*visibleSuggestionCount\s*:\s*null' 'Live verification result must expose visibleSuggestionCount when the suggestion group exists.'
 $passMatch = [regex]::Match(
   $injector,
   'result\.pass\s*=\s*(?<expression>[\s\S]*?);\s*return result;'
@@ -252,6 +278,48 @@ Assert-True $passMatch.Success 'Could not locate the live verification pass expr
 $passExpression = $passMatch.Groups['expression'].Value
 Assert-Contains $passExpression 'result\.missingRequiredComponents\.length\s*===\s*0' 'Live verification pass no longer depends on required DOM component coverage.'
 Assert-Contains $passExpression '!\s*result\.sidebarSeparatorMisclassified' 'Live verification pass no longer rejects sidebar separator component-10 misclassification.'
+$homePassMatch = [regex]::Match(
+  $passExpression,
+  '\(\s*!result\.homeScenario\s*\|\|\s*\((?<requirements>[\s\S]*?)\)\s*\)'
+)
+Assert-True $homePassMatch.Success 'Live verification pass must include a conditional home-scene contract.'
+$homePassRequirements = $homePassMatch.Groups['requirements'].Value
+Assert-True ([regex]::Matches(
+  $homePassRequirements,
+  'result\.suggestionCount\s*===\s*4'
+).Count -eq 1) 'When a home scene is present, live verification must require exactly four native suggestion cards.'
+Assert-True ([regex]::Matches(
+  $homePassRequirements,
+  'result\.visibleSuggestionCount\s*===\s*4'
+).Count -eq 1) 'When a home scene is present, live verification must require exactly four actually visible suggestion cards.'
+$verifySessionMatch = [regex]::Match(
+  $injector,
+  '(?ms)^async function verifySession\(session,\s*timeoutMs\s*=\s*session\.timeoutMs\)\s*\{(?<body>.*?)^\}'
+)
+Assert-True $verifySessionMatch.Success 'Could not locate the timeout-aware live verification function.'
+Assert-Contains $verifySessionMatch.Groups['body'].Value 'session\.evaluate\([\s\S]*?timeoutMs\);' 'Live verification must forward the caller remaining budget to Runtime.evaluate.'
+$waitForVerifiedSessionMatch = [regex]::Match(
+  $injector,
+  '(?ms)^async function waitForVerifiedSession\(session,\s*timeoutMs\)\s*\{(?<body>.*?)^\}'
+)
+Assert-True $waitForVerifiedSessionMatch.Success 'Could not locate the bounded verification retry helper.'
+$waitForVerifiedSessionBody = $waitForVerifiedSessionMatch.Groups['body'].Value
+Assert-Contains $waitForVerifiedSessionBody 'const deadline\s*=\s*Date\.now\(\)\s*\+\s*timeoutMs' 'Verification retries must share one caller-provided deadline.'
+Assert-Contains $waitForVerifiedSessionBody 'const remainingBeforeVerify\s*=\s*deadline\s*-\s*Date\.now\(\)' 'Verification must calculate the remaining budget before each Runtime.evaluate call.'
+Assert-Contains $waitForVerifiedSessionBody 'if\s*\(remainingBeforeVerify\s*<=\s*0\)\s*break' 'Verification must stop before issuing a command after its deadline.'
+Assert-Contains $waitForVerifiedSessionBody 'verifySession\(session,\s*remainingBeforeVerify\)' 'Verification must pass the remaining deadline budget into Runtime.evaluate.'
+Assert-Contains $waitForVerifiedSessionBody 'const retryDelayMs\s*=\s*Math\.min\(500,\s*Math\.max\(0,\s*deadline\s*-\s*Date\.now\(\)\)\)' 'Verification retry sleep must be capped at 500ms and the remaining overall deadline.'
+Assert-Contains $waitForVerifiedSessionBody 'if\s*\(retryDelayMs\s*>\s*0\)[\s\S]{0,140}setTimeout\(resolve,\s*retryDelayMs\)' 'Verification may sleep only for a positive remaining retry delay.'
+Assert-True (-not [regex]::IsMatch(
+  $waitForVerifiedSessionBody,
+  'setTimeout\(resolve,\s*500\)'
+)) 'Verification must not use a fixed retry sleep that can exceed the overall deadline.'
+$runOneShotMatch = [regex]::Match(
+  $injector,
+  '(?s)async function runOneShot\(options\)\s*\{(?<body>.*?)\r?\n\}\s*\r?\n\s*async function runWatch'
+)
+Assert-True $runOneShotMatch.Success 'Could not locate the one-shot injector path.'
+Assert-Contains $runOneShotMatch.Groups['body'].Value 'const verified\s*=\s*options\.mode\s*===\s*"remove"\s*\?\s*await session\.evaluate\([\s\S]*?\)\s*:\s*await waitForVerifiedSession\(session,\s*options\.timeoutMs\)\s*;' 'Ordinary --verify mode must use the bounded verification wait so delayed SPA component markers do not cause a false failure.'
 
 $startPath = Join-Path $ScriptsRoot 'start-miku-skin.ps1'
 $start = Get-Content -LiteralPath $startPath -Raw

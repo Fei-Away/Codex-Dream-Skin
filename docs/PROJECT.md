@@ -10,7 +10,7 @@
 
 ## 2. 当前状态
 
-Windows manifest 当前版本为 **2.0.4**。
+Windows manifest 当前版本为 **2.0.5**。
 
 ### 已实现
 
@@ -25,6 +25,7 @@ Windows manifest 当前版本为 **2.0.4**。
 - 普通 Restore 只暂停并清理当前官方 Codex 会话，Hook 保持注册并在该进程退出后的下一次启动自动恢复；永久关闭必须显式使用 `-DisableAutoHook` 或 unregister 脚本。
 - 14 项设计契约、PNG、Node/PowerShell 语法、loopback 和官方包不变性静态测试。这些测试不声明当前 DOM selector 已命中或真实控件已通过交互验收。
 - 2.0.3 保留并复验了 Dark 路由基线：home、task/output、Diff、terminal、popover、Settings、Plugins、Scheduled tasks、Quick Chat、Profile、Appearance 和 Pets，对应组件 01–13。
+- 2.0.5 已在 `OpenAI.Codex 26.715.2305.0` 上重验 Home 与当前任务壳/输出面板：4 张原生建议卡全部真实可见且无遮挡，原生 sidebar/composer、当前修改摘要、thread summary output、插画、14 项 manifest 与无横向溢出检查通过；其他路由仍沿用 2.0.3 基线，不外推为本次重验结果。
 
 ### 部分实现
 
@@ -65,6 +66,7 @@ Windows manifest 当前版本为 **2.0.4**。
       ├─ manifest 校验 → CSS / renderer / art payload
       ├─ Runtime.evaluate
       ├─ Page.loadEventFired 重注入
+      ├─ Home 四建议卡存在 / 可见 / 中心点无遮挡检查
       └─ Page.captureScreenshot
 
     renderer-inject.js
@@ -76,7 +78,7 @@ Windows manifest 当前版本为 **2.0.4**。
 ## 4. 关键契约
 
 - assets/miku-stage-theme.json 必须有 14 个唯一的 01–14 component、dark/light token、CSS 与 art 路径。
-- 当前 manifest 版本必须为 2.0.4，安装后引擎与工作树版本一致。
+- 当前 manifest 版本必须为 2.0.5，安装后引擎与工作树版本一致。
 - assets/miku-stage.css 必须有 14 个顺序一致的 section marker。
 - Home 的组件 03 owner 是包含 `home-icon` 的内层 `[role="main"]`；Diff 的组件 04 owner 优先使用右侧 `data-tab-id="diff"` tabpanel，不依赖易变的宽泛容器。
 - Settings General 必须命中真实的 `.miku-settings-card`；2.0.3 基线为 5 个原生卡片。

@@ -20,6 +20,15 @@
 
 本文的 Verified 是 **2.0.3 当前实现的 Dark 路由基线**：对应 live contract 通过且截图已由主控逐张视觉复核。它不表示组件 14 中列出的每个 hover、disabled、loading 等通用状态都已人工触发。
 
+## 2.0.5 Codex 更新兼容性重验
+
+- 验收日期：2026-07-17（Asia/Shanghai）。
+- Codex Store package：`OpenAI.Codex 26.715.2305.0`。
+- 仅重验 Home、当前任务壳/修改摘要、thread summary output panel 与自动启动链路，不把结果外推到 Settings、Plugins、Scheduled tasks、独立 Diff tab、terminal、Quick Chat、Profile、Appearance 或 Pets。
+- Home live contract：4/4 原生建议卡存在；正式 verify：`suggestionCount=4`、`visibleSuggestionCount=4`，且 composer、Miku art、14 项 manifest、装饰层 `pointer-events:none` 与无横向溢出均通过。
+- 当前任务 verify：原生 sidebar、composer、change summary 与 thread summary output 分别命中组件 01、02、04、11，marker 在 SPA 恢复后通过有限重试收敛；`outputPanelMarked=true`，无缺失必需组件。
+- 本地 Git-ignored 视觉证据：`runtime/qa/codex-26.715.2305-miku-recheck.png`、`runtime/qa/codex-26.715.2305-verified-visible.png`、`runtime/qa/final-installed-2.0.5.png`；前两张已人工复核为 4 张建议卡完整显示，后一张已复核当前任务壳、composer 与 output panel 的最终安装态。
+
 ## 2.0.3 基线元数据
 
 - 验收日期：2026-07-16（Asia/Shanghai）。
@@ -38,7 +47,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 01 | App shell + sidebar | Static Pass | Verified | Home 与 task-output Dark contract 通过；`task-output-final-open.png` 已复核 shell、selected row、account footer 与侧栏 divider；resize separator 归属 01 而非 10 | Codex 更新后重跑路由基线；全状态扩展归入 14 |
 | 02 | Task conversation + composer | Static Pass | Verified | task-output Dark contract 通过；`task-output-final-open.png` 已复核任务正文、修改卡、typed composer、附件与发送区 | Codex 更新后重跑；通用 disabled/loading 变体归入 14 |
-| 03 | New-task empty state | Static Pass | Verified | Home Dark contract 通过；`home-contract-final.png` 已复核四建议卡、composer、插画与无横向溢出；owner 锁定内层 `[role="main"]` | 小窗口/减少建议卡作为后续响应式回归 |
+| 03 | New-task empty state | Static Pass | Verified | 2.0.3 Home Dark contract 通过；`26.715.2305.0` 已用 `codex-26.715.2305-verified-visible.png` 复核四张原生建议卡真实可见且无遮挡、composer、插画与无横向溢出；owner 锁定内层 `[role="main"]` | 小窗口/减少建议卡作为后续响应式回归 |
 | 04 | Change summary + Diff | Static Pass | Verified | Diff Dark contract 通过；`diff-contract-final.png` 已复核原生 Diff、增删语义、行号、代码可读性和无插画；owner 为稳定右侧 Diff tabpanel | Codex 更新后重跑；罕见 inline/error 变体归入 14 |
 | 05 | Settings + controls | Static Pass | Verified | Settings General Dark contract 通过，5 个原生 `.miku-settings-card` 命中；`settings-general-dark-contract-final.png` 已复核卡片、search、switch/select 和焦点边界 | 其他 Settings 子页在 Codex 更新后抽样重验 |
 | 06 | Plugins marketplace | Static Pass | Verified | Plugins Dark contract 通过；`plugins-focus-fixed.png` 已复核 tabs、search focus、安装条与卡片层级 | available/installed 数据变化后重跑 |
@@ -46,7 +55,7 @@
 | 08 | Quick chat panel | Static Pass | Verified | Quick Chat Dark contract 通过；`quick-chat-contract.png` 已复核 dialog owner、overlay、recent list、composer 与层级 | minimized/error 变体出现时重验 |
 | 09 | Task/account popovers | Static Pass | Verified | Popover Dark contract 通过；`account-popover-contract-final.png` 已复核 account menu、usage、键盘焦点、层级与不裁切 | task hover-card 内容变化时抽样重验 |
 | 10 | Split launcher + terminal | Static Pass | Verified | Terminal Dark contract 通过；`terminal-contract-final.png` 已复核 split divider、terminal tab、等宽文本、cursor 与无主题装饰 | 后续补长时 running/error 输出回归 |
-| 11 | Output/process panel | Static Pass | Verified | task-output Dark contract 通过；`task-output-final-open.png` 已复核 350–370px output panel、source rows、surface 层级；`thread-summary-panel` host 命中 11 | process failed/stopped 数据出现时重验 |
+| 11 | Output/process panel | Static Pass | Verified | task-output Dark contract 通过；`task-output-final-open.png` 已复核 350–370px output panel、source rows、surface 层级；`26.715.2305.0` 最终安装态再次确认 `thread-summary-panel` host 命中 11 | process failed/stopped 数据出现时重验 |
 | 12 | Profile analytics | Static Pass | Verified | Profile Dark contract 通过；`profile-installed.png` 已复核 profile header、metrics、heatmap、insights 与 plugin ranking | empty/error 数据变体归入 14 |
 | 13 | Appearance + Pets | Static Pass | Verified | Appearance/Pets Dark contracts 通过；`appearance-installed.png` 与 `pets-installed.png` 已复核真实控件、theme preview、pet grid 和原图 | 新增原生控件后抽样重验 |
 | 14 | States + tokens | Static Pass | Partial | Dark 路由已覆盖部分 default/selected/focus/success 状态；Light Home/Settings 有 smoke 证据 | hover、disabled、loading、empty、error、warning、unread 与 reduced-motion 未逐项人工触发 |

@@ -1,5 +1,12 @@
 # Windows changelog
 
+## 2.0.5 - 2026-07-17
+
+- Revalidated the native Home route after the Microsoft Store Codex update to `OpenAI.Codex 26.715.2305.0`: all four native suggestion cards, the native composer, and the Miku illustration remain present with no horizontal overflow.
+- Hardened live verification so Home can pass only when exactly four native suggestion cards are rendered, visible through their ancestor chain, inside the viewport, and unobstructed at their center point. The verifier now reports `homeScenario` and `visibleSuggestionCount` without removing existing fields.
+- Made ordinary `--verify` use the same bounded retry loop as injection/reload, so asynchronous Codex SPA hydration cannot create a false failure while native component markers are still settling.
+- Kept the compatibility claim deliberately narrow: this update rechecks Home, the active task shell/change summary, the thread summary output panel, and automatic startup on the new package; the broader Dark route matrix remains the previously recorded baseline until each route is revisited.
+
 ## 2.0.4 - 2026-07-17
 
 - Fixed Windows Store launch failures by activating the current OpenAI.Codex package through its dynamically discovered AUMID and `IApplicationActivationManager`, while still passing the loopback-only CDP flags. The launcher no longer attempts to execute the access-controlled WindowsApps binary directly.
