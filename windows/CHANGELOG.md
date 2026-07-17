@@ -13,6 +13,8 @@
 
 ### 修复
 
+- Windows PowerShell 5.1 在中文系统区域设置下现在可正确解析全部 PowerShell 脚本；发行脚本统一携带 UTF-8 BOM，避免非 ASCII 菜单文字被按本地 ANSI 代码页误读。
+- 系统托盘可在菜单清空后重新构建项目；空的强类型 `ToolStripItemCollection` 现在显式允许绑定，不再触发 `ParameterBindingValidationException`。
 - 渲染层现在只在检测到完整 Codex 主界面壳层时启用皮肤；宠物等透明辅助窗口会主动清理主题背景与装饰节点，避免出现遮挡宠物的矩形背景框。
 - 16:9 及更宽图像现在作为侧栏与主区共享的单张整窗背景；首页、任务、插件、计划任务和 Pull Requests 路由使用同一透明顶栏与连续表面，不再在卡片或任务层重复裁切图片。
 - 移除主区原生顶部渐隐和 composer 后方底部渐隐；浅色与深色 composer 均只保留一个可读表面，避免出现双层输入框或不连续底板。

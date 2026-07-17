@@ -1,8 +1,29 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
+
+$powerShellFiles = @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.ps1' -File)
+foreach ($powerShellFile in $powerShellFiles) {
+  $sourceBytes = [System.IO.File]::ReadAllBytes($powerShellFile.FullName)
+  if ($sourceBytes.Length -lt 3 -or $sourceBytes[0] -ne 0xEF -or
+    $sourceBytes[1] -ne 0xBB -or $sourceBytes[2] -ne 0xBF) {
+    throw "Windows PowerShell source is missing a UTF-8 BOM: $($powerShellFile.FullName)"
+  }
+
+  $parseTokens = $null
+  $parseErrors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile(
+    $powerShellFile.FullName,
+    [ref]$parseTokens,
+    [ref]$parseErrors
+  ) | Out-Null
+  if ($parseErrors.Count -gt 0) {
+    throw "Windows PowerShell 5.1 could not parse $($powerShellFile.FullName): $($parseErrors[0].Message)"
+  }
+}
+
 . (Join-Path $Root 'scripts\common-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
 
@@ -10,6 +31,24 @@ $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-t
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
+  Add-Type -AssemblyName System.Windows.Forms
+  function Test-DreamSkinEmptyTrayItems {
+    param(
+      [Parameter(Mandatory = $true)]
+      [AllowEmptyCollection()]
+      [System.Windows.Forms.ToolStripItemCollection]$Items
+    )
+    return $Items.Count
+  }
+  $emptyTrayMenu = [System.Windows.Forms.ContextMenuStrip]::new()
+  try {
+    if ((Test-DreamSkinEmptyTrayItems -Items $emptyTrayMenu.Items) -ne 0) {
+      throw 'An empty tray item collection did not bind as an empty collection.'
+    }
+  } finally {
+    $emptyTrayMenu.Dispose()
+  }
+
   $atomicReplacePath = Join-Path $temporaryRoot 'atomic-replace.txt'
   [System.IO.File]::WriteAllText($atomicReplacePath, 'before')
   Write-DreamSkinUtf8FileAtomically -Path $atomicReplacePath -Content 'after'
@@ -576,6 +615,10 @@ try {
   foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
+  if (-not $traySource.Contains('[AllowEmptyCollection()]') -or
+    -not $traySource.Contains('[System.Windows.Forms.ToolStripItemCollection]$Items')) {
+    throw 'Tray item binding does not accept an empty typed ToolStripItemCollection.'
+  }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
     throw 'Tray pause/restore closures do not terminate cleanly.'
   }
@@ -648,12 +691,12 @@ try {
 
   $node = Get-DreamSkinNodeRuntime
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
-    '-e', 'process.stderr.write("dream-skin-stderr-probe\n"); process.exit(7)')
+    '-e', "process.stderr.write('dream-skin-stderr-probe\n'); process.exit(7)")
   if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
     throw 'Native stderr was not captured with its real exit code under Stop preference.'
   }
   $discardedProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
-    '-e', 'process.stderr.write("ignored-warning\n"); process.stdout.write("kept-output")') -DiscardStderr
+    '-e', "process.stderr.write('ignored-warning\n'); process.stdout.write('kept-output')") -DiscardStderr
   if ($discardedProbe.ExitCode -ne 0 -or ($discardedProbe.Output -join '') -cne 'kept-output') {
     throw 'Native stderr discard changed stdout or the real exit code.'
   }

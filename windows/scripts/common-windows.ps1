@@ -1,4 +1,4 @@
-. (Join-Path $PSScriptRoot 'config-utf8.ps1')
+﻿. (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
 function Enter-DreamSkinOperationLock {
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
