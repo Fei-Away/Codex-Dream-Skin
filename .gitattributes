@@ -1,0 +1,16 @@
+* text=auto
+.gitattributes text eol=lf
+.editorconfig text eol=lf
+
+# macOS launchers must stay executable after a Windows checkout or package build.
+*.sh text eol=lf
+*.command text eol=lf
+
+# Keep artwork out of text normalization and text diffs.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
