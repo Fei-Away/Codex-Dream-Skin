@@ -211,7 +211,9 @@ fi
   const theme = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
   if (theme.id !== "preset-switch-fixture" || theme.name !== "切换测试") process.exit(1);
 ' "$SWITCH_STATE/theme/theme.json"
-[ -z "$(/usr/bin/find "$SWITCH_STATE" -maxdepth 1 -name '.theme-switch.*' -print -quit)" ]
+[ -f "$SWITCH_STATE/.theme-switch.lock" ]
+[ ! -L "$SWITCH_STATE/.theme-switch.lock" ]
+[ -z "$(/usr/bin/find "$SWITCH_STATE" -maxdepth 1 -type d -name '.theme-switch.??????' -print -quit)" ]
 
 RUNTIME_HOME="$TMP/runtime-home"
 RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
@@ -815,13 +817,22 @@ IMPORT_INSTALL_REPORT="$(HOME="$IMPORT_HOME" NODE="$NODE" \
   });
 '
 IMPORT_SWITCH_LOCK="$IMPORT_HOME/Library/Application Support/CodexDreamSkinStudio/.theme-switch.lock"
-/bin/mkdir "$IMPORT_SWITCH_LOCK"
-/usr/bin/printf '%s\n' "$$" > "$IMPORT_SWITCH_LOCK/pid"
+IMPORT_SWITCH_READY="$TMP/theme-switch-lock-ready"
+/usr/bin/lockf -t 0 -k "$IMPORT_SWITCH_LOCK" /bin/sh -c '
+  /usr/bin/touch "$1"
+  /bin/sleep 2
+' _ "$IMPORT_SWITCH_READY" &
+IMPORT_SWITCH_HOLDER_PID=$!
+for _attempt in 1 2 3 4 5 6 7 8 9 10; do
+  [ -f "$IMPORT_SWITCH_READY" ] && break
+  /bin/sleep 0.1
+done
+[ -f "$IMPORT_SWITCH_READY" ] || fail 'Could not establish the competing macOS theme switch test lock.'
 if HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
   --id dev.codex-dream-skin.kimi-sakura-dawn --no-apply >/dev/null 2>&1; then
   fail 'macOS theme switch ignored another live switch operation.'
 fi
-/bin/rm -rf "$IMPORT_SWITCH_LOCK"
+wait "$IMPORT_SWITCH_HOLDER_PID"
 HOME="$IMPORT_HOME" NODE="$NODE" "$ROOT/scripts/switch-theme-macos.sh" \
   --id dev.codex-dream-skin.kimi-sakura-dawn \
   --expected-content-hash 0849c3b462e38fe0639941df5a8e1c6832e1a182d4ddd632464bbbf0d6ddc785 \

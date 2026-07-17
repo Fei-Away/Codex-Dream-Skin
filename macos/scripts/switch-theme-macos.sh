@@ -31,24 +31,22 @@ esac
 
 ensure_state_root
 SWITCH_LOCK="$STATE_ROOT/.theme-switch.lock"
-if ! /bin/mkdir "$SWITCH_LOCK" 2>/dev/null; then
-  [ ! -L "$SWITCH_LOCK" ] || fail "Theme switch lock must not be a symbolic link."
-  LOCK_PID="$(/bin/cat "$SWITCH_LOCK/pid" 2>/dev/null || true)"
-  case "$LOCK_PID" in
-    ''|*[!0-9]*) LOCK_PID="" ;;
-  esac
-  if [ -n "$LOCK_PID" ] && /bin/kill -0 "$LOCK_PID" 2>/dev/null; then
-    fail "Another theme switch is already running."
-  fi
-  /bin/rm -rf "$SWITCH_LOCK"
-  /bin/mkdir "$SWITCH_LOCK" 2>/dev/null || fail "Another theme switch is already running."
+# Keep one regular lock file and let the kernel own lock lifetime. Unlike a
+# mkdir + PID protocol, this has no visible "directory exists but PID is not
+# written yet" window for a competing importer to mistake as stale.
+if [ -L "$SWITCH_LOCK" ] || { [ -e "$SWITCH_LOCK" ] && [ ! -f "$SWITCH_LOCK" ]; }; then
+  fail "Theme switch lock must be a regular file."
 fi
-/usr/bin/printf '%s\n' "$$" > "$SWITCH_LOCK/pid"
-/bin/chmod 700 "$SWITCH_LOCK"
+(umask 077; set -o noclobber; : > "$SWITCH_LOCK") 2>/dev/null || true
+[ -f "$SWITCH_LOCK" ] && [ ! -L "$SWITCH_LOCK" ] \
+  || fail "Theme switch lock must be a regular file."
+/bin/chmod 600 "$SWITCH_LOCK"
+exec 9<>"$SWITCH_LOCK" || fail "Could not open the theme switch lock."
+/usr/bin/lockf -s -t 0 9 || fail "Another theme switch is already running."
+
 stage=""
 cleanup_switch() {
   [ -z "$stage" ] || /bin/rm -rf "$stage"
-  /bin/rm -rf "$SWITCH_LOCK"
 }
 trap cleanup_switch EXIT
 
