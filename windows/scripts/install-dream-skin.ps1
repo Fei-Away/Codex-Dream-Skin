@@ -35,7 +35,11 @@ try {
     (Get-DreamSkinCodexProcesses -Codex $savedPathCandidate).Count -gt 0) {
     throw 'The saved Codex path is still running but no longer matches a registered Store package. Close it manually before installing.'
   }
-  $null = Initialize-DreamSkinThemeStore -SkillRoot $SkillRoot -StateRoot $StateRoot
+  if (Test-DreamSkinTrayActive) {
+    throw 'Exit the Codex Dream Skin tray before reinstalling so every shortcut can move to the new runtime safely.'
+  }
+  $engine = Install-DreamSkinRuntimeEngine -SkillRoot $SkillRoot -StateRoot $StateRoot
+  $null = Initialize-DreamSkinThemeStore -SkillRoot $engine.Root -StateRoot $StateRoot
   $ConfigPath = Join-Path $HOME '.codex\config.toml'
   $BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
   Install-DreamSkinBaseTheme -ConfigPath $ConfigPath -BackupPath $BackupPath
@@ -45,16 +49,16 @@ try {
     $desktop = [Environment]::GetFolderPath('Desktop')
     $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
     $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
-    $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
-    $restoreScript = Join-Path $PSScriptRoot 'restore-dream-skin.ps1'
-    $trayScript = Join-Path $PSScriptRoot 'tray-dream-skin.ps1'
+    $startScript = $engine.Start
+    $restoreScript = $engine.Restore
+    $trayScript = $engine.Tray
     $portArgument = if ($PortExplicit) { " -Port $Port" } else { '' }
 
     foreach ($folder in @($desktop, $startMenu)) {
       $shortcut = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin.lnk'))
       $shortcut.TargetPath = $powershell
       $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$startScript`"$portArgument -PromptRestart"
-      $shortcut.WorkingDirectory = $SkillRoot
+      $shortcut.WorkingDirectory = $engine.Root
       $shortcut.Description = 'Launch the official Codex app with Codex Dream Skin'
       $shortcut.Save()
     }
@@ -62,7 +66,7 @@ try {
     $restore = $shell.CreateShortcut((Join-Path $desktop 'Codex Dream Skin - Restore.lnk'))
     $restore.TargetPath = $powershell
     $restore.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$restoreScript`"$portArgument -RestoreBaseTheme -PromptRestart"
-    $restore.WorkingDirectory = $SkillRoot
+    $restore.WorkingDirectory = $engine.Root
     $restore.Description = 'Restore the official Codex appearance and close the CDP session'
     $restore.Save()
 
@@ -70,7 +74,7 @@ try {
       $tray = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))
       $tray.TargetPath = $powershell
       $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$trayScript`"$portArgument"
-      $tray.WorkingDirectory = $SkillRoot
+      $tray.WorkingDirectory = $engine.Root
       $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
       $tray.Save()
     }
@@ -80,7 +84,7 @@ try {
   }
 
   if ($NoShortcuts) {
-    Write-Host 'Codex Dream Skin base theme installed. Run start-dream-skin.ps1 to launch it.'
+    Write-Host "Codex Dream Skin base theme installed at $($engine.Root). Run $($engine.Start) to launch it."
   } else {
     Write-Host 'Codex Dream Skin installed. The launch shortcut asks before restarting an open Codex window.'
   }
