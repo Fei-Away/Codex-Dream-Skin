@@ -73,6 +73,15 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 
 启动后可直接从「已保存主题 → 桥本有菜」切换；不需要跨目录手动导入。托盘里的「更换背景图」仍可导入你自己的纯背景，保存后继续一键切换。
 
+Windows 也可以校验并安装你有权使用的 Codex v2 自定义桌宠包；仓库不附带第三方角色素材：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\scripts\manage-pet-package.ps1 `
+  -PackagePath C:\absolute\path\to\my-pet
+```
+
+包格式、更新与移除说明见 [`windows/references/custom-pets.md`](./windows/references/custom-pets.md)。
+
 > 可下载的用户源图是 [`docs/images/presets/romantic-rose-source.png`](./docs/images/presets/romantic-rose-source.png)（`1672 × 941`）；macOS 一键预设使用 [`macos/presets/preset-romantic-rose/background.jpg`](./macos/presets/preset-romantic-rose/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；公开再分发前请确认人物与素材权利。
 
 ## 概念效果图（不可直接导入）
@@ -125,6 +134,7 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 - **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰
 - **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
 - **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
+- **自定义桌宠包**：Windows 可严格校验、安全安装、更新和移除用户自备的 Codex v2 桌宠包
 - **可恢复**：一键还原官方外观
 - **相对安全**：本机回环 CDP 注入，不改官方二进制与签名
 

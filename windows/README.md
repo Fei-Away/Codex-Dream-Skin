@@ -72,6 +72,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。图片上限为 16 MB；宽或高不能超过 16384 像素，总像素不能超过 5000 万。
 
+## 自定义桌宠包
+
+Codex 自己负责桌宠窗口、拖动、置顶和动画运行时；Dream Skin 可以校验并安装用户自备的 v2 桌宠包。仓库不附带第三方角色素材。
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\manage-pet-package.ps1 `
+  -PackagePath C:\absolute\path\to\my-pet
+```
+
+安装后打开 **Codex 设置 > Pets**，点击 **Refresh**，再选择桌宠。更新同一 ID 的包时增加 `-Replace`；移除时使用 `-Remove <id>`。包格式、透明图集尺寸和完整安全边界见 [`references/custom-pets.md`](./references/custom-pets.md)。
+
 ## 恢复与卸载快捷方式
 
 恢复官方外观；如果 Codex 正在运行，确认后关闭并重新打开：
@@ -103,6 +114,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-
 | 注入器错误日志 | `%LOCALAPPDATA%\CodexDreamSkin\injector-error.log` |
 | 验证日志 | `%LOCALAPPDATA%\CodexDreamSkin\verify.log` |
 | Codex 配置 | `%USERPROFILE%\.codex\config.toml` |
+| 自定义桌宠 | `%CODEX_HOME%\pets\<id>` 或 `%USERPROFILE%\.codex\pets\<id>` |
 
 更完整的平台路径说明见 [`../docs/platforms.md`](../docs/platforms.md)。
 

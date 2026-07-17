@@ -30,6 +30,7 @@
 | 源码（本整理包） | `Codex-Dream-Skin/windows/` |
 | 状态 / 日志 | `%LOCALAPPDATA%\CodexDreamSkin` |
 | Codex 配置 | `%USERPROFILE%\.codex\config.toml` |
+| 自定义桌宠 | `%CODEX_HOME%\pets\<id>` 或 `%USERPROFILE%\.codex\pets\<id>` |
 | 默认 CDP 端口 | 首选 `9335`，冲突时自动选空闲口（Mac 包默认从 `9341` 起） |
 
 ## 能力矩阵
@@ -42,6 +43,7 @@
 | 实机 verify / 截图 | ✅ | ✅ |
 | 用户选图定制 | ✅ | ✅（系统托盘「更换背景图」） |
 | 本地主题保存 / 切换 | ✅（菜单栏） | ✅（系统托盘） |
+| 自定义 v2 桌宠包 | ❌ | ✅（校验 / 安装 / 更新 / 移除，不附带角色素材） |
 | 官方签名校验 | ✅ | Store 签名类型 + 包身份 |
 | 客户部署提示词 | ✅ | ❌（可用 Mac 文案改写） |
 | 打客户 ZIP | ✅ `build-client-release.sh` | 手动压缩 `windows/` |

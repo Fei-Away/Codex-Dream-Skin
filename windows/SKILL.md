@@ -1,6 +1,6 @@
 ---
 name: codex-dream-skin
-description: Apply, launch, verify, repair, update, or restore a full decorative skin for the Windows Codex desktop app. Use when the user asks for a Codex theme that goes beyond official color settings, wants the pink-purple Dream/Fiona-style interface, needs the skin reapplied after a Codex update, or needs a safe rollback without modifying WindowsApps or app.asar.
+description: Apply, launch, verify, repair, update, or restore a full decorative skin for the Windows Codex desktop app, or validate and manage a Codex v2 custom desktop-pet package. Use when the user asks for a Codex theme beyond official color settings, needs the skin reapplied after an update, wants a Windows custom pet installed or removed, or needs a safe rollback without modifying WindowsApps or app.asar.
 ---
 
 # Codex Dream Skin
@@ -14,10 +14,12 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 3. Run `scripts/verify-dream-skin.ps1 -ScreenshotPath <absolute-path>` after launch. Treat a missing continuous wallpaper, home shell, native composer, sidebar layer, or injection marker as failure. The native suggestion count is responsive and may be two to four.
 4. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
 5. Run `scripts/restore-dream-skin.ps1` to remove the live skin, close the saved CDP session, and reopen Codex normally. Add `-RestoreBaseTheme` to restore only saved appearance keys, `-RecoverConfigBackup` for explicit byte-for-byte recovery of a damaged config, or `-Uninstall` to delete shortcuts. A completed config restore archives that install's backup so a later install captures a fresh baseline.
+6. Optional: validate and install a Codex v2 custom desktop-pet package with `scripts/manage-pet-package.ps1 -PackagePath <directory>`, then refresh it from Codex **Settings > Pets**. See `references/custom-pets.md` for the manifest, atlas, update, removal, and rights requirements.
 
 ## Guardrails
 
 - Preserve the official executable, package signature, user threads, pets, plugins, and authentication state.
+- Custom-pet tools only manage the explicitly selected package under `%CODEX_HOME%\pets` or `%USERPROFILE%\.codex\pets`. They never select a pet, rewrite `config.toml`, or bundle third-party character art.
 - Theme images must be UI-free wallpapers. Never import a README screenshot, fake window, sidebar, card, composer, logo, or text baked into the bitmap.
 - Paint one continuous 16:9 wallpaper across the full Codex window. Let the sidebar, main area, header, and composer act as coordinated readability layers; keep the home route expressive and task routes quieter.
 - `appearance: auto` follows the native computed `color-scheme` first and the system appearance only as a fallback. Image brightness may tune color and composition, but must not flip the user's shell mode; explicit `light` and `dark` remain authoritative.
@@ -38,6 +40,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 
 ```powershell
 powershell -NoProfile -File tests\run-tests.ps1
+powershell -NoProfile -File tests\pet-package.test.ps1
 node --check scripts\injector.mjs
 node --check assets\renderer-inject.js
 ```
@@ -52,7 +55,9 @@ node --check assets\renderer-inject.js
 - `assets/dream-reference.jpg`: pure 2560 × 1440 Arina Hashimoto wallpaper seeded as the default and as a saved theme; it contains no Codex UI.
 - `assets/theme.json`: shared adaptive theme contract for the seeded preset.
 - `scripts/theme-windows.ps1`: persistent active/saved theme store, safe image import, pause state, and preset seeding.
+- `scripts/manage-pet-package.ps1`: validate, transactionally install/update, or remove one Codex v2 custom pet package.
 - `scripts/tray-dream-skin.ps1`: Windows Forms tray for apply, pause, import, save, switch, and complete restore.
+- `references/custom-pets.md`: v2 manifest/atlas contract, Hatch Pet handoff, rights boundary, and Codex refresh steps.
 - `references/qa-inventory.md`: required functional and visual signoff coverage.
 - `references/runtime-notes.md`: troubleshooting and update behavior.
 - `tests/run-tests.ps1`: configuration, state, recovery, payload, and CDP validation regression checks.

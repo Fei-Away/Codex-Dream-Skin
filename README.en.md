@@ -82,6 +82,18 @@ After launch, switch directly through **已保存主题 → 桥本有菜**; no c
 manual import is required. **更换背景图** still imports your own UI-free
 wallpaper, which can then be saved for one-click switching.
 
+Windows can also validate and install a Codex v2 custom pet package whose art
+you are allowed to use. The repository does not bundle third-party character
+art:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\scripts\manage-pet-package.ps1 `
+  -PackagePath C:\absolute\path\to\my-pet
+```
+
+See [`windows/references/custom-pets.md`](./windows/references/custom-pets.md)
+for the package contract, updates, and removal.
+
 > The downloadable user source is [`docs/images/presets/romantic-rose-source.png`](./docs/images/presets/romantic-rose-source.png) (`1672 × 941`); the macOS one-click preset uses the normalized derived [`background.jpg`](./macos/presets/preset-romantic-rose/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; confirm likeness and asset rights before redistributing it.
 
 ## Concept gallery (not importable backgrounds)
@@ -138,6 +150,7 @@ for the eight individual styles.
 - **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable.
 - **Swappable art** — Drop in a UI-free image you like and it becomes your theme.
 - **Saved themes** — Switch local themes from the macOS menu bar or Windows system tray.
+- **Custom pet packages** — On Windows, strictly validate, safely install, update, and remove a user-provided Codex v2 pet package.
 - **Restorable** — One-click restore to the stock look.
 - **Safer path** — Local-loopback CDP inject only. No official binary or signature changes.
 

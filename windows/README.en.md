@@ -72,6 +72,17 @@ Open `Codex Dream Skin - Tray` to:
 
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
 
+## Custom pet packages
+
+Codex owns the pet window, dragging, always-on-top behavior, and animation runtime. Dream Skin can validate and install a user-provided v2 pet package. The repository does not bundle third-party character art.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\manage-pet-package.ps1 `
+  -PackagePath C:\absolute\path\to\my-pet
+```
+
+After installation, open **Codex Settings > Pets**, choose **Refresh**, and select the pet. Add `-Replace` to update a package with the same ID, or use `-Remove <id>` to remove it. See [`references/custom-pets.md`](./references/custom-pets.md) for the package contract, transparent-atlas dimensions, and complete safety boundaries.
+
 ## Restore and remove shortcuts
 
 Restore the stock appearance. If Codex is running, confirm its closure and relaunch:
@@ -103,6 +114,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-
 | Injector error log | `%LOCALAPPDATA%\CodexDreamSkin\injector-error.log` |
 | Verification log | `%LOCALAPPDATA%\CodexDreamSkin\verify.log` |
 | Codex configuration | `%USERPROFILE%\.codex\config.toml` |
+| Custom pets | `%CODEX_HOME%\pets\<id>` or `%USERPROFILE%\.codex\pets\<id>` |
 
 See [`../docs/platforms.md`](../docs/platforms.md) for the complete platform path reference.
 
