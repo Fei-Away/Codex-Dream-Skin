@@ -4,13 +4,8 @@
   const CHROME_ID = "codex-dream-skin-chrome";
   const ROOT_CLASSES = [
     "codex-dream-skin",
-    "dream-theme-light",
     "dream-theme-dark",
     "dream-art-wide",
-    "dream-art-standard",
-    "dream-focus-left",
-    "dream-focus-center",
-    "dream-focus-right",
     "dream-safe-left",
     "dream-safe-center",
     "dream-safe-right",
@@ -22,12 +17,18 @@
   const ROOT_PROPERTIES = [
     "--dream-art",
     "--dream-art-position",
-    "--dream-focus-x",
-    "--dream-focus-y",
     "--dream-accent",
     "--dream-accent-ink",
     "--dream-image-luma",
   ];
+  const LEGACY_PROFILE_CLASSES = [
+    "dream-theme-light",
+    "dream-art-standard",
+    "dream-focus-left",
+    "dream-focus-center",
+    "dream-focus-right",
+  ];
+  const LEGACY_PROFILE_PROPERTIES = ["--dream-focus-x", "--dream-focus-y"];
   const HOME_UTILITY_CLASS = "dream-home-utility";
   const installToken = {};
   let samplingNativeShell = false;
@@ -277,8 +278,10 @@
 
   const clearSkinDom = () => {
     const root = document.documentElement;
-    root?.classList.remove(...ROOT_CLASSES);
-    for (const property of ROOT_PROPERTIES) root?.style.removeProperty(property);
+    root?.classList.remove(...ROOT_CLASSES, ...LEGACY_PROFILE_CLASSES);
+    for (const property of [...ROOT_PROPERTIES, ...LEGACY_PROFILE_PROPERTIES]) {
+      root?.style.removeProperty(property);
+    }
     document.querySelectorAll(".dream-home").forEach((node) => node.classList.remove("dream-home"));
     document.querySelectorAll(".dream-task").forEach((node) => node.classList.remove("dream-task"));
     document.querySelectorAll(".dream-home-shell").forEach((node) => node.classList.remove("dream-home-shell"));
@@ -299,13 +302,10 @@
       : config.taskMode;
     const accent = config.accent || `rgb(${profile.accent.join(" ")})`;
     const accentInk = luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
-    root.classList.toggle("dream-theme-light", appearance === "light");
+    root.classList.remove(...LEGACY_PROFILE_CLASSES);
+    for (const property of LEGACY_PROFILE_PROPERTIES) root.style.removeProperty(property);
     root.classList.toggle("dream-theme-dark", appearance === "dark");
     root.classList.toggle("dream-art-wide", profile.aspect >= 1.75);
-    root.classList.toggle("dream-art-standard", profile.aspect < 1.75);
-    for (const value of ["left", "center", "right"]) {
-      root.classList.toggle(`dream-focus-${value}`, focus === value);
-    }
     for (const value of ["left", "center", "right", "none"]) {
       root.classList.toggle(`dream-safe-${value}`, safeArea === value);
     }
@@ -314,8 +314,6 @@
     }
     root.style.setProperty("--dream-art", `url("${artUrl}")`);
     root.style.setProperty("--dream-art-position", `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`);
-    root.style.setProperty("--dream-focus-x", String(focusX));
-    root.style.setProperty("--dream-focus-y", String(focusY));
     root.style.setProperty("--dream-accent", accent);
     root.style.setProperty("--dream-accent-ink", accentInk);
     root.style.setProperty("--dream-image-luma", profile.luma.toFixed(3));

@@ -13,6 +13,21 @@ const buildPayload = (config = {}) => template
   .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
   .replace("__DREAM_THEME_JSON__", JSON.stringify(config));
 const payload = buildPayload();
+const legacyProfileClasses = [
+  "dream-theme-light",
+  "dream-art-standard",
+  "dream-focus-left",
+  "dream-focus-center",
+  "dream-focus-right",
+];
+const legacyProfileProperties = ["--dream-focus-x", "--dream-focus-y"];
+
+for (const className of legacyProfileClasses) {
+  assert.equal(css.includes(`.${className}`), false, `${className} has no Windows CSS consumer.`);
+}
+for (const property of legacyProfileProperties) {
+  assert.equal(css.includes(property), false, `${property} has no Windows CSS consumer.`);
+}
 
 assert.doesNotMatch(
   css,
@@ -31,8 +46,11 @@ function createFixture({
   analysisFixture = null,
 }) {
   const nodes = new Map();
-  const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
-  const rootStyles = new Map(staleSkin ? [["--dream-art", "url(\"blob:stale\")"]] : []);
+  const rootClasses = new Set(staleSkin ? ["codex-dream-skin", ...legacyProfileClasses] : []);
+  const rootStyles = new Map(staleSkin ? [
+    ["--dream-art", "url(\"blob:stale\")"],
+    ...legacyProfileProperties.map((property) => [property, ".5"]),
+  ] : []);
   const revokedUrls = [];
   const observers = [];
   let objectUrlCount = 0;
@@ -229,6 +247,15 @@ function createFixture({
   };
 }
 
+function assertNoLegacyProfileState(fixture, label) {
+  for (const className of legacyProfileClasses) {
+    assert.equal(fixture.rootClasses.has(className), false, `${label} must not inject ${className}.`);
+  }
+  for (const property of legacyProfileProperties) {
+    assert.equal(fixture.rootStyles.has(property), false, `${label} must not inject ${property}.`);
+  }
+}
+
 const main = createFixture({ shellPresent: true });
 const mainResult = vm.runInNewContext(payload, main.context);
 assert.equal(mainResult.installed, true);
@@ -237,7 +264,7 @@ assert.equal(main.rootStyles.get("--dream-art"), 'url("blob:fixture-1")');
 assert.equal(main.nodes.has("codex-dream-skin-style"), true);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), true);
 assert.equal(main.rootClasses.has("dream-theme-dark"), true);
-assert.equal(main.rootClasses.has("dream-art-standard"), true);
+assertNoLegacyProfileState(main, "Default profile");
 assert.equal(main.rootClasses.has("dream-task-ambient"), true);
 assert.equal(main.routeClasses.has("dream-task"), true);
 assert.equal(main.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
@@ -266,6 +293,7 @@ assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), false);
 assert.equal(auxiliary.rootStyles.has("--dream-art"), false);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), false);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), false);
+assertNoLegacyProfileState(auxiliary, "Auxiliary cleanup");
 
 auxiliary.setShellPresent(true);
 auxiliary.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
@@ -285,9 +313,8 @@ const configuredPayload = buildPayload({
 });
 const configuredResult = vm.runInNewContext(configuredPayload, configured.context);
 assert.equal(configuredResult.adaptive, true);
-assert.equal(configured.rootClasses.has("dream-theme-light"), true);
 assert.equal(configured.rootClasses.has("dream-theme-dark"), false);
-assert.equal(configured.rootClasses.has("dream-focus-left"), true);
+assertNoLegacyProfileState(configured, "Explicit light/focus profile");
 assert.equal(configured.rootClasses.has("dream-safe-right"), true);
 assert.equal(configured.rootClasses.has("dream-task-off"), true);
 assert.equal(configured.rootStyles.get("--dream-art-position"), "15% 80%");
@@ -315,7 +342,7 @@ const analyzed = createFixture({
 vm.runInNewContext(payload, analyzed.context);
 await Promise.resolve();
 assert.equal(analyzed.rootClasses.has("dream-theme-dark"), true);
-assert.equal(analyzed.rootClasses.has("dream-theme-light"), false);
+assertNoLegacyProfileState(analyzed, "Analyzed wide profile");
 assert.equal(analyzed.rootClasses.has("dream-art-wide"), true);
 assert.equal(analyzed.rootClasses.has("dream-task-banner"), true);
 assert.equal(analyzed.rootClasses.has("dream-safe-left"), true);
@@ -327,7 +354,7 @@ const standardArt = createFixture({
 });
 vm.runInNewContext(payload, standardArt.context);
 await Promise.resolve();
-assert.equal(standardArt.rootClasses.has("dream-art-standard"), true);
+assertNoLegacyProfileState(standardArt, "Standard-aspect profile");
 assert.equal(standardArt.rootClasses.has("dream-task-ambient"), true);
 assert.equal(standardArt.rootClasses.has("dream-task-banner"), false);
 
@@ -343,8 +370,8 @@ assert.equal(mediumWide.rootClasses.has("dream-task-banner"), false);
 
 const nativeLight = createFixture({ shellPresent: true, shellAppearance: "light" });
 vm.runInNewContext(payload, nativeLight.context);
-assert.equal(nativeLight.rootClasses.has("dream-theme-light"), true);
 assert.equal(nativeLight.rootClasses.has("dream-theme-dark"), false);
+assertNoLegacyProfileState(nativeLight, "Native light profile");
 
 const nativeComputedDark = createFixture({
   shellPresent: true,
@@ -354,7 +381,7 @@ const nativeComputedDark = createFixture({
 });
 vm.runInNewContext(payload, nativeComputedDark.context);
 assert.equal(nativeComputedDark.rootClasses.has("dream-theme-dark"), true);
-assert.equal(nativeComputedDark.rootClasses.has("dream-theme-light"), false);
+assertNoLegacyProfileState(nativeComputedDark, "Native computed dark profile");
 nativeComputedDark.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
 assert.equal(nativeComputedDark.rootClasses.has("dream-theme-dark"), true);
 const nativeObserver = nativeComputedDark.observers[0];
@@ -366,6 +393,11 @@ assert.equal(nativeObserver.takeRecords().length, 0,
 const metadataWide = createFixture({ shellPresent: true });
 vm.runInNewContext(buildPayload({ artMetadata: { ratio: 16 / 9 } }), metadataWide.context);
 assert.equal(metadataWide.rootClasses.has("dream-art-wide"), true);
-assert.equal(metadataWide.rootClasses.has("dream-art-standard"), false);
+assertNoLegacyProfileState(metadataWide, "Metadata-wide profile");
 
-console.log("PASS: renderer applies adaptive theme metadata and preserves transparent auxiliary windows.");
+const legacyReinjection = createFixture({ shellPresent: true, staleSkin: true });
+vm.runInNewContext(payload, legacyReinjection.context);
+assert.equal(legacyReinjection.rootClasses.has("dream-theme-dark"), true);
+assertNoLegacyProfileState(legacyReinjection, "Legacy reinjection cleanup");
+
+console.log("PASS: renderer applies only CSS-backed profile state and cleans legacy no-op markers.");

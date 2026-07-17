@@ -1,5 +1,11 @@
 # Windows Changelog
 
+## Unreleased
+
+### 修复
+
+- 渲染器不再注入 CSS 从未消费的 `dream-theme-light`、`dream-art-standard`、`dream-focus-*` class 与 `--dream-focus-*` 变量；现有的明暗、宽图、安全区、任务模式和二维焦点行为保持不变，旧版本遗留的无效标记仍会在热重注入或恢复时清理。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增
