@@ -734,6 +734,11 @@ html.codex-dream-skin:is([data-dream-art-safe="center"], [data-dream-art-safe-ar
   height: 38px;
   display: grid !important;
   place-items: center;
+  /* The inner svg is display:block and fills the grid column track, so horizontal
+     alignment is governed by justify-content, not place-items. The generic button
+     rule sets justify-content:flex-start; force it back to center or the icon
+     renders ~8px left of center. */
+  justify-content: center !important;
   margin: 0 auto;
   border: 1px solid rgb(var(--ds-accent-rgb) / .24);
   border-radius: 50%;
