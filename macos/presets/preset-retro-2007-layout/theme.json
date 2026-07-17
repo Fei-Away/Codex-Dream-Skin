@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-retro-2007-layout",
+  "name": "Codex 2007 完整复古壳",
+  "brandSubtitle": "CODEX 2007",
+  "tagline": "经典蓝白桌面风格，保留 Codex 的工作流。",
+  "projectPrefix": "项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "ONLINE",
+  "quote": "优化 KV 读写成本",
+  "image": "background.jpg",
+  "appearance": "light",
+  "layoutMode": "qq2007",
+  "art": {
+    "safeArea": "none",
+    "taskMode": "off"
+  },
+  "colors": {
+    "background": "#e9f3fd",
+    "panel": "#fbfcfe",
+    "panelAlt": "#dbeffc",
+    "accent": "#2e73bd",
+    "accentAlt": "#609eea",
+    "secondary": "#4f8fca",
+    "highlight": "#ffffff",
+    "text": "#18385f",
+    "muted": "#55708f",
+    "line": "rgba(86, 137, 190, .42)"
+  },
+  "prompts": [
+    {
+      "id": "review",
+      "label": "代码审查",
+      "text": "请审查当前改动，重点关注正确性、安全性、边界情况、兼容性和潜在回归；按优先级列出问题，并给出文件与行号。"
+    },
+    {
+      "id": "bug",
+      "label": "定位并修复 Bug",
+      "text": "请定位并修复这个问题。先复现并分析根因，再给出最小改动方案，最后运行相关测试验证。"
+    },
+    {
+      "id": "refactor",
+      "label": "重构并保持现有行为",
+      "text": "请在保持现有行为和对外接口不变的前提下重构这部分代码，优先提升可读性、可维护性和测试覆盖率。"
+    },
+    {
+      "id": "tests",
+      "label": "补充测试",
+      "text": "请为本次改动补充或完善测试，覆盖正常流程、边界情况和失败路径，并实际运行测试。"
+    },
+    {
+      "id": "explain",
+      "label": "解释这段代码",
+      "text": "请解释这段代码的工作流程、关键数据流、依赖关系和可能的风险；先给结论，再展开细节。"
+    },
+    {
+      "id": "pr",
+      "label": "生成 PR 描述",
+      "text": "请整理当前改动，生成标准 PR 描述，包括背景、变更内容、验证结果、风险和后续事项。"
+    },
+    {
+      "id": "visual-qa",
+      "label": "对照截图检查",
+      "text": "请对照参考截图逐项检查布局、间距、字体、颜色、溢出和响应式表现，并直接修复可验证的问题。"
+    }
+  ]
+}

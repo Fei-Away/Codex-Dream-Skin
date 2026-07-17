@@ -8,6 +8,29 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const macosRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(macosRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(macosRoot, "assets", "dream-skin.css"), "utf8");
+const retroTheme = JSON.parse(await fs.readFile(
+  path.join(macosRoot, "presets", "preset-retro-2007-layout", "theme.json"),
+  "utf8",
+));
+
+assert.match(
+  template,
+  /data-retro-composer-action="prompts"/,
+  "The retro composer must expose the common Prompt picker from the A button.",
+);
+assert.match(
+  template,
+  /RETRO_PROMPT_STORAGE_KEY/,
+  "Prompt customization must be scoped to localStorage instead of native Codex settings.",
+);
+assert.match(template, /window\.localStorage/);
+assert.match(
+  css,
+  /\.retro-prompt-menu[\s\S]{0,500}position:\s*fixed !important;/,
+  "The Prompt picker must escape the composer clipping context and use a fixed overlay.",
+);
+assert.equal(retroTheme.prompts.length, 7, "The retro preset should ship useful default Prompts.");
+assert.equal(new Set(retroTheme.prompts.map((prompt) => prompt.id)).size, 7);
 
 assert.doesNotMatch(
   css,

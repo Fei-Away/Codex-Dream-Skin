@@ -342,6 +342,30 @@ async function loadTheme(themeDir) {
     "highlight", "text", "muted", "line",
   ];
   const appearance = choice(raw.appearance, "appearance", ["auto", "light", "dark"]);
+  const layoutMode = choice(raw.layoutMode, "layoutMode", ["default", "qq2007"]);
+  const prompts = (() => {
+    if (raw.prompts === undefined) return undefined;
+    if (!Array.isArray(raw.prompts)) throw new Error(`${configPath} has an invalid prompts field`);
+    const ids = new Set();
+    return raw.prompts.slice(0, 24).map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error(`${configPath} has an invalid prompts[${index}] field`);
+      }
+      const id = text(item.id, `prompt-${index + 1}`, 80, `prompts[${index}].id`);
+      const label = text(item.label, `Prompt ${index + 1}`, 48, `prompts[${index}].label`);
+      if (
+        typeof item.text !== "string"
+        || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u2028\u2029]/u.test(item.text)
+      ) {
+        throw new Error(`${configPath} has an invalid prompts[${index}].text field`);
+      }
+      const promptText = Array.from(item.text.replace(/\r\n?/g, "\n").trim()).slice(0, 1400).join("");
+      if (!promptText) throw new Error(`${configPath} has an empty prompts[${index}].text field`);
+      if (ids.has(id)) throw new Error(`${configPath} has duplicate prompt id: ${id}`);
+      ids.add(id);
+      return { id, label, text: promptText };
+    });
+  })();
   if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
     throw new Error(`${configPath} has an invalid art field`);
   }
@@ -363,6 +387,7 @@ async function loadTheme(themeDir) {
     statusText: text(raw.statusText, "DREAM SKIN ONLINE", 80, "statusText"),
     quote: text(raw.quote, "MAKE SOMETHING WONDERFUL", 80, "quote"),
     image: raw.image,
+    layoutMode: layoutMode ?? "default",
     colorMode: rawColors ? "explicit" : "auto",
     explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
     colors: {
@@ -379,6 +404,7 @@ async function loadTheme(themeDir) {
     },
   };
   if (appearance !== undefined) theme.appearance = appearance;
+  if (prompts !== undefined) theme.prompts = prompts;
   if (Object.values(art).some((value) => value !== undefined)) {
     theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
   }
@@ -497,7 +523,7 @@ async function removeFromSession(session) {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
-    document.documentElement?.classList.remove('codex-dream-skin');
+    document.documentElement?.classList.remove('codex-dream-skin', 'dream-retro-2007', 'dream-retro-2007-layout');
     document.documentElement?.style.removeProperty('--dream-skin-art');
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();

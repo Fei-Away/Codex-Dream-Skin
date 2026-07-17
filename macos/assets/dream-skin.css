@@ -1076,3 +1076,1901 @@ html.codex-dream-skin [data-message-author-role] { border-radius: 16px; }
     animation-iteration-count: 1 !important;
   }
 }
+
+/*
+ * QQ 2007 layout mode
+ *
+ * This is deliberately a shell around the native Codex DOM.  The renderer
+ * keeps the native sidebar, thread, composer and buttons alive, while this
+ * layer supplies the old desktop application's title bar, toolbar, right
+ * buddy panel and dock.  Keeping the native nodes in place is what makes the
+ * theme reversible and preserves normal Codex navigation.
+ */
+html.codex-dream-skin.dream-retro-2007-layout {
+  color-scheme: light !important;
+  --ds-bg: #e9f3fd;
+  --ds-panel: #fbfcfe;
+  --ds-panel-2: #dbeffc;
+  --ds-green: #2e73bd;
+  --ds-lime: #609eea;
+  --ds-cyan: #4f8fca;
+  --ds-purple: #7d91b7;
+  --ds-text: #17385f;
+  --ds-muted: #55708f;
+  --ds-line: rgba(86, 137, 190, .42);
+  --ds-bg-rgb: 233 243 253;
+  --ds-panel-rgb: 251 252 254;
+  --ds-panel-2-rgb: 219 239 252;
+  --ds-text-rgb: 23 56 95;
+  --ds-muted-rgb: 85 112 143;
+  --ds-accent-rgb: 46 115 189;
+  --ds-secondary-rgb: 96 158 234;
+  --ds-highlight-rgb: 255 255 255;
+  --ds-accent: #2e73bd;
+  --ds-accent-soft: #609eea;
+  --ds-secondary: #4f8fca;
+  --ds-highlight: #ffffff;
+  --ds-on-accent: #ffffff;
+  --retro-titlebar-h: 47px;
+  --retro-toolbar-h: 59px;
+  --retro-content-top: 114px;
+  --retro-dock-h: 34px;
+  --retro-content-bottom: 44px;
+  --retro-mac-title-inset: 82px;
+  --retro-composer-height: 178px;
+  --retro-composer-bottom-gap: 6px;
+  --retro-history-reserve: 192px;
+  --retro-left-width: clamp(280px, 22.36vw, 322px);
+  --retro-right-width: clamp(230px, 18.54vw, 267px);
+  --retro-left-gap: clamp(10px, .70vw, 12px);
+  --retro-right-gap: clamp(8px, .63vw, 10px);
+  --retro-blue-deep: #0b4996;
+  --retro-blue: #1e6bd1;
+  --retro-blue-light: #dbeffc;
+  --retro-border: #8fb7df;
+  --retro-shadow: rgba(49, 105, 161, .30);
+  --retro-ink: #18385f;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout,
+html.codex-dream-skin.dream-retro-2007-layout body {
+  background: #e9f3fd !important;
+  color: var(--retro-ink) !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout body {
+  min-width: 720px !important;
+  overflow: hidden !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout [data-retro-settings-surface="true"] {
+  box-sizing: border-box !important;
+  padding-top: calc(var(--retro-toolbar-h) + 1px) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout #dream-skin-chrome {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .dream-retro-native-env-hidden {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout #codex-retro-shell,
+html.codex-dream-skin.dream-retro-2007-layout #codex-retro-shell * {
+  box-sizing: border-box;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout #codex-retro-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  color: var(--retro-ink);
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout[data-retro-friends-hidden="true"] {
+  --retro-right-width: 0px;
+  --retro-right-gap: 0px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout[data-retro-friends-hidden="true"] .retro-friends-panel {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout #codex-retro-shell button {
+  font: inherit;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-titlebar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--retro-titlebar-h);
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 var(--retro-mac-title-inset);
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-app-region: drag;
+  user-select: none;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 74% -44%, rgba(255, 255, 255, .34), transparent 27%),
+    linear-gradient(180deg, #3b8be0 0%, #1e6bd1 47%, #1458b5 100%);
+  border-bottom: 1px solid #0a438d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .50), 0 1px 2px rgba(14, 69, 132, .55);
+  text-shadow: 0 1px 1px rgba(0, 39, 94, .58);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-titlebar-logo {
+  display: none;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-titlebar-label {
+  max-width: calc(100% - var(--retro-mac-title-inset) - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: .1px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-window-buttons {
+  display: none;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-window-buttons i {
+  width: 20px;
+  height: 20px;
+  display: block;
+  border: 1px solid rgba(255, 255, 255, .82);
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(63, 137, 222, .28));
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, .60), 0 1px 1px rgba(0, 42, 92, .44);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-window-buttons i:nth-child(1)::after {
+  content: "–";
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-window-buttons i:nth-child(2)::after {
+  content: "□";
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-window-buttons i:nth-child(3) {
+  border-color: #ffa4a4;
+  background: linear-gradient(180deg, #f38181, #cf2d2d);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-window-buttons i:nth-child(3)::after {
+  content: "×";
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-window-buttons i::after {
+  display: block;
+  color: #ffffff;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  text-shadow: 0 1px 1px rgba(0, 40, 88, .50);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar {
+  position: absolute;
+  inset: var(--retro-titlebar-h) 0 auto;
+  height: var(--retro-toolbar-h);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 13px 6px;
+  overflow: hidden;
+  pointer-events: auto;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(218, 237, 252, .94) 58%, rgba(192, 221, 247, .96));
+  border-bottom: 1px solid #8eb5dc;
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 3px rgba(36, 91, 145, .22);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .90), rgba(110, 174, 236, .58), rgba(255, 255, 255, .90));
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button {
+  min-width: 75px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 3px 11px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #17385f;
+  background: transparent;
+  cursor: pointer;
+  text-shadow: 0 1px 0 #ffffff;
+  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button[hidden] {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar .retro-settings-back {
+  min-width: 96px;
+  color: #164f8c;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button:focus-visible {
+  border-color: #8bb8e3;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(175, 215, 248, .72));
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 2px rgba(47, 102, 157, .25);
+  outline: none;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button:active {
+  background: linear-gradient(180deg, rgba(155, 199, 239, .75), rgba(239, 248, 255, .92));
+  box-shadow: inset 0 1px 3px rgba(58, 115, 172, .28);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar-separator {
+  width: 1px;
+  height: 30px;
+  flex: 0 0 1px;
+  margin: 0 3px;
+  background: linear-gradient(180deg, transparent, #9bbbd9 25%, #9bbbd9 75%, transparent);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button span {
+  min-width: 27px;
+  color: #2769ae;
+  font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
+  font-size: 25px;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px 0 #ffffff, 0 0 1px rgba(22, 75, 132, .55);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button b {
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel {
+  position: fixed !important;
+  left: 8px !important;
+  top: var(--retro-content-top) !important;
+  bottom: var(--retro-content-bottom) !important;
+  width: var(--retro-left-width) !important;
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  z-index: 20 !important;
+  overflow: hidden !important;
+  padding-top: 0 !important;
+  color: #18385f !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f5fbff 54%, #e2f1fc 100%) !important;
+  border: 1px solid #9abfe2 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px var(--retro-shadow), inset 0 1px 0 #ffffff !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel > * {
+  background: transparent !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel nav {
+  padding-top: 4px !important;
+  background: transparent !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel
+  [class*="group/nav-section-title"] {
+  width: calc(100% + 8px) !important;
+  min-height: 31px !important;
+  margin-left: -8px !important;
+  padding-left: 16px !important;
+  padding-right: 0 !important;
+  background: linear-gradient(180deg, #eef8ff, #d9edf9) !important;
+  border-top: 1px solid #c3dced !important;
+  border-bottom: 1px solid #a9c9e3 !important;
+  box-shadow: inset 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel
+  [class*="group/nav-section-title"] [class*="section-toggle"] {
+  border-radius: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel button,
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel a {
+  min-height: 31px !important;
+  border-radius: 4px !important;
+  color: #1b3f69 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel [data-retro-label] {
+  font-size: 0 !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel button[data-retro-label]::after,
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel a[data-retro-label]::after {
+  content: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel [data-retro-label]
+  [data-retro-label] {
+  font-size: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel [data-retro-label]
+  [data-retro-label]::after {
+  content: attr(data-retro-label);
+  color: #1b3f69;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel button:hover,
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel a:hover,
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel [aria-current="page"] {
+  color: #103e79 !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .92), rgba(166, 211, 247, .72)) !important;
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 2px rgba(59, 112, 169, .18) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel svg {
+  color: #4b87c2 !important;
+  stroke: currentColor !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel [class*="text-token-foreground"],
+html.codex-dream-skin.dream-retro-2007-layout aside.app-shell-left-panel [class*="text-token-input-placeholder-foreground"] {
+  color: #1b3f69 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface {
+  position: fixed !important;
+  left: calc(8px + var(--retro-left-width) + var(--retro-left-gap)) !important;
+  right: calc(8px + var(--retro-right-width) + var(--retro-right-gap)) !important;
+  top: var(--retro-content-top) !important;
+  bottom: var(--retro-content-bottom) !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  z-index: 10 !important;
+  overflow: hidden !important;
+  color: #18385f !important;
+  background: #fbfcfe !important;
+  border: 1px solid #91b8df !important;
+  border-radius: 9px !important;
+  box-shadow: 0 2px 8px var(--retro-shadow), inset 0 1px 0 #ffffff !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint {
+  position: relative !important;
+  z-index: 4 !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  color: #18385f !important;
+  background: linear-gradient(180deg, #ffffff 0%, #e6f3fd 100%) !important;
+  border-bottom: 1px solid #b5d1e9 !important;
+  box-shadow: inset 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint > div[aria-hidden="true"],
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint > div[data-test-id="header-shell-slot"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint > div[data-testid="app-shell-header-context-menu-surface"] {
+  position: absolute !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: 40px !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  pointer-events: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] > div {
+  width: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] > div:first-child > div {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] > div:first-child {
+  flex: 1 1 auto !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] > div:last-child {
+  flex: 0 0 auto !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] > div:last-child > div {
+  width: auto !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] * {
+  color: #18385f !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] [data-app-action-thread-title],
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] [data-thread-title] {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint
+  > div[data-testid="app-shell-header-context-menu-surface"] button {
+  pointer-events: auto !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] .app-shell-main-content-frame {
+  margin-top: 0 !important;
+  border-top: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint button,
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"] > header.app-header-tint svg {
+  color: #264b75 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) > :not(header.app-header-tint) {
+  color: #18385f !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) [role="main"] {
+  background: #fbfcfe !important;
+}
+
+/*
+ * Codex can keep its native electron-dark token variables on the root while
+ * the retro shell is active.  Rebind the shared tokens and the concrete
+ * utility classes used by message cards so history stays a readable QQ2007
+ * light surface instead of inheriting a black diff panel.
+ */
+html.codex-dream-skin.dream-retro-2007-layout {
+  --color-background-surface: #fbfcfe !important;
+  --color-background-surface-under: #e9f3fd !important;
+  --color-background-panel: #edf6fd !important;
+  --color-background-elevated-primary: #fbfcfe !important;
+  --color-background-elevated-primary-opaque: #fbfcfe !important;
+  --color-background-elevated-secondary: #edf6fd !important;
+  --color-background-elevated-secondary-opaque: #edf6fd !important;
+  --color-background-dropdown: #eaf4fc !important;
+  --color-background-dropdown-opaque: #eaf4fc !important;
+  --color-background-control: #edf6fd !important;
+  --color-background-control-opaque: #edf6fd !important;
+  --color-background-editor-opaque: #ebf4fb !important;
+  --color-background-button-primary: #2f75c3 !important;
+  --color-background-button-primary-active: #2865aa !important;
+  --color-background-button-primary-hover: #5b9fe3 !important;
+  --color-background-button-primary-inactive: #8abcf0 !important;
+  --color-text-foreground: #18385f !important;
+  --color-text-foreground-secondary: #55708f !important;
+  --color-text-foreground-tertiary: #6d88a5 !important;
+  --color-text-accent: #2e73bd !important;
+  --color-text-on-accent: #ffffff !important;
+  --color-text-button-primary: #ffffff !important;
+  --color-text-button-secondary: #315a83 !important;
+  --color-text-button-tertiary: #55708f !important;
+  --color-icon-primary: #2e73bd !important;
+  --color-icon-secondary: #55708f !important;
+  --color-icon-tertiary: #7892ad !important;
+  --color-border: #b5d1e9 !important;
+  --color-border-heavy: #91b8df !important;
+  --color-border-light: #d5e7f5 !important;
+  --color-border-focus: #6ca7da !important;
+  --color-simple-scrim: rgba(86, 137, 190, .16) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="bg-token-dropdown-background"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="bg-token-main-surface-primary"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="bg-token-main-surface-secondary"] {
+  background: #eaf4fc !important;
+  background-image: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="bg-token-list-hover-background"] {
+  background: #dbeffc !important;
+  background-image: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="bg-token-input-background"] {
+  background: #f6f9fe !important;
+  background-image: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-foreground"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-text-primary"] {
+  color: #18385f !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-foreground-secondary"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-foreground-tertiary"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-text-secondary"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-text-tertiary"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-description-foreground"],
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="text-token-input-placeholder-foreground"] {
+  color: #55708f !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell)
+  [class*="border-token-border"] {
+  border-color: #b5d1e9 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) .thread-scroll-container {
+  scrollbar-color: #9fc3e3 #edf6fd !important;
+  scrollbar-width: thin !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"]
+  .thread-scroll-container > div[class*="min-h-full"][class*="shrink-0"][class*="justify-start"] {
+  transform: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main[class~="main-surface"]
+  .thread-scroll-container > div[class*="min-h-full"][class*="shrink-0"][class*="justify-start"]
+  > div[data-mcp-app-portal-target="true"] {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+/* The composer is a fixed child of the fixed main surface.  Reserve its
+   actual height inside the history scroller so the last message can never
+   finish underneath the input panel. */
+html.codex-dream-skin.dream-retro-2007-layout
+  main.main-surface:not(.dream-skin-home-shell):has(.composer-surface-chrome)
+  .thread-scroll-container {
+  scroll-padding-bottom: var(--retro-history-reserve) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout
+  main.main-surface:not(.dream-skin-home-shell):has(.composer-surface-chrome)
+  .thread-scroll-container > div[class*="min-h-full"][class*="shrink-0"][class*="justify-start"]
+  > div[data-mcp-app-portal-target="true"] {
+  padding-bottom: var(--retro-history-reserve) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) .thread-scroll-container::-webkit-scrollbar {
+  width: 10px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) .thread-scroll-container::-webkit-scrollbar-thumb {
+  border: 2px solid #edf6fd;
+  border-radius: 8px;
+  background: #9fc3e3;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) article,
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) [data-message-author-role] {
+  border-radius: 4px !important;
+  color: #18385f !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) [class*="_markdown"] {
+  color: #1b3f69 !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.72 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) [class*="_markdown"] h1,
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) [class*="_markdown"] h2,
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) [class*="_markdown"] h3 {
+  color: #164b88 !important;
+  font-weight: 700 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) pre {
+  border: 1px solid #b4cfe6 !important;
+  border-radius: 5px !important;
+  background: #ebf4fb !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .92) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface:not(.dream-skin-home-shell) code {
+  color: #18385f !important;
+  background: #e9f2fa !important;
+  border-color: #c6dbea !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome {
+  position: sticky !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  bottom: 0 !important;
+  height: var(--retro-composer-height) !important;
+  z-index: 25 !important;
+  min-height: var(--retro-composer-height) !important;
+  max-height: var(--retro-composer-height) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  color: #18385f !important;
+  background: #f6f9fe !important;
+  border: 1px solid #9fbfe0 !important;
+  border-radius: 9px !important;
+  box-shadow: 0 1px 5px rgba(55, 105, 157, .22), inset 0 1px 0 #ffffff !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout
+  main.main-surface:not(.dream-skin-home-shell)
+  .thread-scroll-container .sticky:has(.composer-surface-chrome) {
+  padding-bottom: var(--retro-composer-bottom-gap) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout
+  main.main-surface:not(.dream-skin-home-shell)
+  .thread-scroll-container .sticky:has(.composer-surface-chrome)
+  > div[class*="max-w-"][class*="px-toolbar"] {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome::before {
+  content: "" !important;
+  position: absolute;
+  inset: 0 0 auto;
+  height: 34px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #ffffff, #e9f4fd);
+  border-bottom: 1px solid #c0d8ec;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome textarea,
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [contenteditable="true"],
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome p.placeholder {
+  color: #385b7f !important;
+  background: transparent !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+  font-size: 14px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome p.placeholder::after {
+  color: #6d88a5 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome button:not([class~="bg-token-foreground"]) {
+  color: #385b7f !important;
+  background: transparent !important;
+  border-radius: 4px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome button:not([class~="bg-token-foreground"]):hover {
+  color: #124f91 !important;
+  background: #dceefb !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome button[class~="bg-token-foreground"] {
+  min-width: 78px !important;
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #78b5f1, #2f75c3) !important;
+  border: 1px solid #2865aa !important;
+  border-radius: 5px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .52), 0 1px 2px rgba(34, 87, 143, .22) !important;
+  text-shadow: 0 1px 1px rgba(20, 59, 103, .48) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell {
+  background: linear-gradient(180deg, #fbfcfe, #edf7fe) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell .dream-skin-home {
+  background: transparent !important;
+  color: #18385f !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell
+  .dream-skin-home > div:first-child > div:first-child {
+  background: linear-gradient(180deg, #fafdff, #e4f2fc) !important;
+  background-image: none !important;
+  border: 1px solid #9abfe2 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(49, 105, 161, .22), inset 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell
+  .dream-skin-home > div:first-child > div:first-child > div:first-child {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell
+  .dream-skin-home .group\/home-suggestions button,
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell
+  .dream-skin-home .group\/home-suggestions button * {
+  color: #315a83 !important;
+  text-shadow: 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell
+  .dream-skin-home .group\/home-suggestions button:hover {
+  background: linear-gradient(180deg, #ffffff, #d9ecfb) !important;
+  border-color: #8fb7df !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell .dream-skin-home [data-feature="game-source"] {
+  color: #244c78 !important;
+  text-shadow: 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell .dream-skin-home [data-feature="game-source"]::before,
+html.codex-dream-skin.dream-retro-2007-layout main.main-surface.dream-skin-home-shell .dream-skin-home [data-feature="game-source"]::after {
+  color: #6a88a8 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friends-panel {
+  position: fixed;
+  top: var(--retro-content-top);
+  right: 8px;
+  bottom: var(--retro-content-bottom);
+  width: var(--retro-right-width);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden auto;
+  pointer-events: auto;
+  color: #18385f;
+  background: linear-gradient(180deg, #fafdff 0%, #edf7fe 58%, #dceefb 100%);
+  border: 1px solid #91b8df;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--retro-shadow), inset 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friends-panel > header {
+  position: sticky;
+  top: 0;
+  height: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 9px;
+  color: #18385f;
+  background: linear-gradient(180deg, #ffffff, #d9ecfb);
+  border-bottom: 1px solid #a9c8e4;
+  box-shadow: inset 0 1px 0 #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friends-panel > header strong {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-panel-close {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-right: 4px;
+  padding: 0;
+  border: 1px solid #789fc3;
+  border-radius: 50%;
+  color: #214f7e;
+  background: #eef8ff;
+  cursor: pointer;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  text-align: center;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-panel-close:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-panel-close:focus-visible {
+  color: #103e79;
+  background: #d5ebfa;
+  border-color: #4f8fca;
+  outline: none;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-panel-close:active {
+  background: #b8d9f1;
+  box-shadow: inset 0 1px 2px rgba(58, 115, 172, .28);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-panel-tools {
+  color: #487aa9;
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-assistant-card {
+  padding: 12px 10px 10px;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, .90) 0 2px, transparent 3px),
+    radial-gradient(circle at 76% 30%, rgba(255, 255, 255, .78) 0 2px, transparent 3px),
+    linear-gradient(180deg, #f1f9ff, #dbeffc);
+  border-bottom: 1px solid #c0d9ed;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-mascot {
+  width: 136px;
+  height: 153px;
+  position: relative;
+  margin: 2px auto 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-mascot::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 12px;
+  width: 96px;
+  height: 86px;
+  border: 3px solid #294b9b;
+  border-radius: 47% 53% 44% 56% / 48% 46% 54% 52%;
+  background: linear-gradient(145deg, #a2caff 4%, #5d7ae8 54%, #2944aa 100%);
+  box-shadow:
+    -20px 8px 0 -8px #7695f2,
+    20px 7px 0 -8px #7695f2,
+    -10px -13px 0 -11px #8aabff,
+    14px -14px 0 -13px #8aabff,
+    inset 10px 8px 14px rgba(255, 255, 255, .36),
+    inset -8px -10px 15px rgba(15, 38, 128, .35),
+    0 2px 5px rgba(40, 80, 143, .38);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-mascot::after {
+  content: "";
+  position: absolute;
+  left: 45px;
+  top: 91px;
+  width: 46px;
+  height: 49px;
+  border: 3px solid #294b9b;
+  border-radius: 42% 42% 48% 48%;
+  background: linear-gradient(180deg, #6789ed, #2e48ad);
+  box-shadow:
+    -22px 30px 0 -15px #2f50ba,
+    22px 30px 0 -15px #2f50ba,
+    -9px 55px 0 -14px #2f50ba,
+    9px 55px 0 -14px #2f50ba,
+    inset 5px 6px 7px rgba(255, 255, 255, .24);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-mascot span {
+  position: absolute;
+  z-index: 1;
+  left: 31px;
+  top: 43px;
+  width: 74px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #152861;
+  border-radius: 10px 10px 14px 14px;
+  background: linear-gradient(180deg, #20255f, #080f2f);
+  color: #8fe8ff;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-align: center;
+  text-shadow: 0 0 5px #36c6ff;
+  transform: none;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-online {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 2px 8px;
+  color: #3d6b3a;
+  font-size: 12px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-online i,
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-row i {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border: 1px solid #4a8b35;
+  border-radius: 50%;
+  color: transparent;
+  background: #72b54e;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .72);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-online b {
+  color: #3f6489;
+  font-weight: 700;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-online em {
+  margin-left: auto;
+  padding: 1px 4px;
+  color: #ffffff;
+  background: #ed9e27;
+  border-radius: 3px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgba(137, 72, 0, .35);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-assistant-card p {
+  margin: 0;
+  padding: 9px 8px;
+  color: #456486;
+  background: rgba(255, 255, 255, .68);
+  border: 1px solid #a7c8e5;
+  border-radius: 5px;
+  font-size: 13px;
+  line-height: 1.65;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-quick-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  margin: 9px 1px 0;
+  padding: 0 1px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-quick-actions button {
+  width: 31px;
+  height: 31px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #386b9d;
+  background: linear-gradient(180deg, #ffffff, #d7ecfb);
+  border: 1px solid #99bfdf;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 2px rgba(57, 108, 160, .18);
+  cursor: pointer;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-quick-actions button:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-quick-actions button:focus-visible {
+  color: #164f89;
+  background: linear-gradient(180deg, #ffffff, #bcdff7);
+  border-color: #6fa7d4;
+  outline: none;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-quick-actions button:active {
+  background: linear-gradient(180deg, #c5e2f8, #f3faff);
+  box-shadow: inset 0 1px 2px rgba(57, 108, 160, .22);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-quick-actions button span {
+  font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
+  font-size: 17px;
+  line-height: 1;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-list {
+  flex: 1;
+  padding-bottom: 8px;
+  background: rgba(238, 248, 255, .66);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-list > header {
+  height: 31px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  color: #365d84;
+  background: linear-gradient(180deg, #eaf6ff, #cfe8fa);
+  border-bottom: 1px solid #b0cfe6;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-list > header em {
+  color: #718ba5;
+  font-style: normal;
+  font-weight: 400;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-list > header b {
+  margin-left: auto;
+  color: #527ca4;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-row {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(170, 204, 231, .56);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-row:hover {
+  background: rgba(255, 255, 255, .76);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-row b {
+  color: #31567d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-friend-row i {
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-avatar {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #82acd1;
+  border-radius: 4px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #f3ae4a, #c46e36);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, .72);
+  font-weight: 800;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-avatar-two {
+  background: linear-gradient(135deg, #7baef3, #3868bc);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-dock {
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--retro-dock-h);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 10px;
+  pointer-events: none;
+  color: #ffffff;
+  background: linear-gradient(180deg, #78b5ef 0%, #5793df 48%, #3977c7 100%);
+  border-top: 1px solid #2c65ad;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .62), 0 -1px 3px rgba(37, 91, 147, .28);
+  text-shadow: 0 1px 1px rgba(18, 63, 116, .48);
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-dock > span:not(.retro-dock-spacer) {
+  min-width: 15px;
+  font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
+  font-size: 17px;
+  text-align: center;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-dock .retro-dock-spacer {
+  flex: 1;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-dock small {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 1050px) {
+  html.codex-dream-skin.dream-retro-2007-layout {
+    --retro-left-width: 270px;
+    --retro-right-width: 220px;
+    --retro-left-gap: 12px;
+  }
+
+  /* A file preview can be wider than the remaining chat column on small
+     windows. Let the conversation keep a usable width until the preview is
+     reopened from its native tab/header control. */
+  html.codex-dream-skin.dream-retro-2007-layout
+    main.main-surface > div[class*="isolate"][class*="overflow-hidden"]
+    > [class*="ml-auto"][class*="shrink-0"] {
+    display: none !important;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout
+    main.main-surface > div[class*="isolate"][class*="overflow-hidden"]
+    > [class*="z-[41]"] {
+    display: none !important;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout
+    main.main-surface > div[class*="isolate"][class*="overflow-hidden"]
+    > .app-shell-main-content-viewport {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button {
+    min-width: 58px;
+    padding-inline: 5px;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button span {
+    min-width: 22px;
+    font-size: 21px;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button b {
+    font-size: 12px;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar-separator {
+    margin-inline: 0;
+  }
+}
+
+@media (max-width: 820px) {
+  html.codex-dream-skin.dream-retro-2007-layout {
+    --retro-left-width: 238px;
+    --retro-right-width: 0px;
+    --retro-right-gap: 0px;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-friends-panel {
+    display: none;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-toolbar button[data-retro-action="focus-composer"] b {
+    display: none;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout main.main-surface {
+    right: 8px !important;
+  }
+}
+
+/*
+ * QQ 2007 composer
+ *
+ * The native Codex editor stays the source of truth for text, files,
+ * permissions, model selection, dictation and send/stop.  Only its visual
+ * bands are rearranged here, so the composer remains usable after a native
+ * route update or a theme restore.
+ */
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  isolation: isolate !important;
+  box-sizing: border-box !important;
+  height: var(--retro-composer-height) !important;
+  min-height: var(--retro-composer-height) !important;
+  max-height: var(--retro-composer-height) !important;
+  overflow: hidden !important;
+  border: 1px solid #9fbfe0 !important;
+  border-radius: 8px !important;
+  background: #f6f9fe !important;
+  box-shadow:
+    0 1px 5px rgba(55, 105, 157, .22),
+    inset 0 0 0 1px #9fbfe0,
+    inset 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome::before {
+  content: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar {
+  position: relative;
+  z-index: 30;
+  flex: 0 0 34px !important;
+  min-height: 34px !important;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 8px;
+  color: #315a83;
+  background: linear-gradient(180deg, #ffffff 0%, #edf7fe 46%, #d9ecfb 100%);
+  border-bottom: 1px solid #b3d0e8;
+  box-shadow: inset 0 1px 0 #ffffff;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button {
+  height: 28px !important;
+  min-width: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  padding: 0 7px !important;
+  color: #315a83 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button:focus-visible {
+  color: #124f91 !important;
+  background: #d3eaf9 !important;
+  border-color: #9dc3e2 !important;
+  outline: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button:active {
+  background: #b9dbf3 !important;
+  box-shadow: inset 0 1px 2px rgba(47, 99, 151, .22) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button b {
+  color: inherit !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button i {
+  color: #557da2 !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-tool-icon {
+  width: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2366a4 !important;
+  font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif !important;
+  font-size: 19px !important;
+  line-height: 1 !important;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar .retro-composer-toolbar-spacer {
+  flex: 1 1 auto;
+  min-width: 4px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar .retro-composer-lightning {
+  width: 28px !important;
+  padding: 0 !important;
+  color: #4e789f !important;
+  font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif !important;
+  font-size: 23px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome > div[class*="z-10"][class*="flex-col"] {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_attachmentsDefault_"] {
+  box-sizing: border-box !important;
+  flex: 0 0 auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  max-height: 70px !important;
+  min-height: 40px !important;
+  overflow: auto !important;
+  padding: 5px 8px 4px !important;
+  background: #eaf4fc !important;
+  border-bottom: 1px solid #c0d8ec !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_attachmentsDefault_"]:empty {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_attachmentsDefault_"] img {
+  max-width: 116px !important;
+  max-height: 54px !important;
+  object-fit: cover !important;
+  border: 1px solid #9fbfe0 !important;
+  border-radius: 4px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"] {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: minmax(44px, 1fr) auto !important;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 8px 7px !important;
+  gap: 0 8px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-span-full"][class~="row-start-1"] {
+  grid-column: 1 / -1 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-span-full"][class~="row-start-1"] > [class*="overflow-y-auto"] {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 6px 10px 3px !important;
+  overflow: auto !important;
+  scrollbar-color: #9fc3e3 #edf6fd !important;
+  scrollbar-width: thin !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  [class*="_root_"] {
+  display: block !important;
+  min-height: 44px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [contenteditable="true"],
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome textarea {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  color: #385b7f !important;
+  background: transparent !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [contenteditable="true"] > p,
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome p.placeholder {
+  min-height: 22px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #385b7f !important;
+  line-height: 22px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome p.placeholder::after {
+  color: #6d88a5 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-1"][class~="row-start-2"] {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  align-self: end !important;
+  min-width: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-3"][class~="row-start-2"] {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  align-self: end !important;
+  min-width: 0 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  [data-retro-native-add-file] {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-bottom-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  margin-right: 2px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-bottom-tools button {
+  width: 27px !important;
+  height: 27px !important;
+  min-width: 27px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  color: #2e6ca8 !important;
+  background: linear-gradient(180deg, #ffffff, #d9edf9) !important;
+  border: 1px solid #9fc3e3 !important;
+  border-radius: 4px !important;
+  box-shadow: inset 0 1px 0 #ffffff !important;
+  cursor: pointer !important;
+  font-family: Tahoma, "Microsoft YaHei", sans-serif !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-bottom-tools button:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-composer-bottom-tools button:focus-visible {
+  color: #124f91 !important;
+  background: linear-gradient(180deg, #ffffff, #bcdff7) !important;
+  border-color: #6fa7d4 !important;
+  outline: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-3"][class~="row-start-2"] button {
+  height: 28px !important;
+  min-height: 28px !important;
+  border-radius: 4px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-3"][class~="row-start-2"] button[class~="bg-token-foreground"] {
+  min-width: 78px !important;
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #78b5f1, #2f75c3) !important;
+  border: 1px solid #2865aa !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .52), 0 1px 2px rgba(34, 87, 143, .22) !important;
+  text-shadow: 0 1px 1px rgba(20, 59, 103, .48) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-3"][class~="row-start-2"] button[class~="bg-token-foreground"] svg {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-3"][class~="row-start-2"] button[class~="bg-token-foreground"] > * {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-3"][class~="row-start-2"] button[class~="bg-token-foreground"]::after {
+  content: "发送(S)";
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_footer_"]
+  > [class~="col-start-3"][class~="row-start-2"] button[class~="bg-token-foreground"][aria-label="Stop"]::after {
+  content: "停止";
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome[data-retro-composer-overflow="true"]
+  [class*="_footer_"] > [class~="col-span-full"][class~="row-start-1"] > [class*="overflow-y-auto"] {
+  scrollbar-color: #7da9d2 #edf6fd !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_attachmentsDefault_"]::-webkit-scrollbar,
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="overflow-y-auto"]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="_attachmentsDefault_"]::-webkit-scrollbar-thumb,
+html.codex-dream-skin.dream-retro-2007-layout .composer-surface-chrome [class*="overflow-y-auto"]::-webkit-scrollbar-thumb {
+  border: 2px solid #edf6fd;
+  border-radius: 8px;
+  background: #9fc3e3;
+}
+
+/* The prompt picker lives on body instead of inside the clipped composer. */
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-menu,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-menu * {
+  box-sizing: border-box !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-menu {
+  position: fixed !important;
+  z-index: 2147483600 !important;
+  width: min(336px, calc(100vw - 16px)) !important;
+  max-height: min(430px, calc(100vh - 16px)) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  color: #244b75 !important;
+  background: #f7fbff !important;
+  border: 1px solid #8fb7df !important;
+  border-radius: 7px !important;
+  box-shadow: 0 5px 16px rgba(34, 78, 121, .28), inset 0 1px 0 #ffffff !important;
+  font-family: Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  pointer-events: auto !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-header {
+  flex: 0 0 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 7px 0 12px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #eaf5fd 48%, #d5eafa 100%) !important;
+  border-bottom: 1px solid #b2d0e9 !important;
+  box-shadow: inset 0 1px 0 #ffffff !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+  color: #244b75 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-title strong {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 14px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-menu button {
+  margin: 0 !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-menu button:disabled {
+  cursor: default !important;
+  opacity: .42 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-close,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-back {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 25px !important;
+  height: 25px !important;
+  padding: 0 !important;
+  color: #4d7197 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-back {
+  font-size: 13px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-close:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-close:focus-visible,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-back:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-back:focus-visible {
+  color: #124f91 !important;
+  background: #d4eafa !important;
+  border-color: #9fc3e3 !important;
+  outline: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  padding: 5px !important;
+  scrollbar-color: #9fc3e3 #edf6fd !important;
+  scrollbar-width: thin !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-list::-webkit-scrollbar-thumb {
+  border: 2px solid #f7fbff;
+  border-radius: 8px;
+  background: #9fc3e3;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-item,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-main {
+  width: 100% !important;
+  min-height: 49px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 7px 9px !important;
+  color: #315a83 !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-item:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-item:focus-visible,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-main:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-main:focus-visible {
+  color: #124f91 !important;
+  background: #e0f0fb !important;
+  border-color: #a9cce8 !important;
+  outline: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-item:active,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-main:active {
+  background: #cbe5f7 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-item-main,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-main {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-item-label {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: inherit !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-item-preview {
+  width: 100% !important;
+  overflow: hidden !important;
+  color: #6a86a3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-empty {
+  padding: 20px 12px !important;
+  color: #6a86a3 !important;
+  text-align: center !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-footer {
+  flex: 0 0 43px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  padding: 5px 7px !important;
+  background: #eaf5fc !important;
+  border-top: 1px solid #b7d4eb !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-footer button {
+  min-height: 28px !important;
+  padding: 0 9px !important;
+  color: #315a83 !important;
+  background: linear-gradient(180deg, #ffffff, #d9edf9) !important;
+  border: 1px solid #9fc3e3 !important;
+  border-radius: 4px !important;
+  box-shadow: inset 0 1px 0 #ffffff !important;
+  font-size: 12px !important;
+  line-height: 26px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-footer button:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-footer button:focus-visible {
+  color: #124f91 !important;
+  background: linear-gradient(180deg, #ffffff, #bcdff7) !important;
+  border-color: #6fa7d4 !important;
+  outline: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-footer .retro-prompt-primary {
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #78b5f1, #2f75c3) !important;
+  border-color: #2865aa !important;
+  text-shadow: 0 1px 1px rgba(20, 59, 103, .48) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-row {
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 3px !important;
+  margin-bottom: 3px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-main {
+  flex: 1 1 auto !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-manage-controls {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-control {
+  width: 27px !important;
+  min-height: 27px !important;
+  padding: 0 !important;
+  color: #4d7197 !important;
+  background: #eaf5fc !important;
+  border: 1px solid #afd0e8 !important;
+  border-radius: 4px !important;
+  font-size: 11px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-control:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-control:focus-visible {
+  color: #124f91 !important;
+  background: #d3eaf9 !important;
+  outline: none !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-control.retro-prompt-danger:hover,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-control.retro-prompt-danger:focus-visible {
+  color: #a04444 !important;
+  border-color: #d69b9b !important;
+  background: #f8e5e5 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-form {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  padding: 10px 11px 7px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-field {
+  display: block !important;
+  margin: 0 0 9px !important;
+  color: #315a83 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-field > span {
+  display: block !important;
+  margin-bottom: 4px !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-field input,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-field textarea {
+  width: 100% !important;
+  padding: 6px 7px !important;
+  color: #315a83 !important;
+  background: #ffffff !important;
+  border: 1px solid #9fc3e3 !important;
+  border-radius: 4px !important;
+  box-shadow: inset 0 1px 2px rgba(49, 90, 131, .08) !important;
+  font: 13px/1.45 Tahoma, "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif !important;
+  resize: vertical !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-field input:focus,
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-field textarea:focus {
+  border-color: #5f9ed5 !important;
+  outline: 2px solid rgba(95, 158, 213, .2) !important;
+}
+
+html.codex-dream-skin.dream-retro-2007-layout .retro-prompt-error {
+  min-height: 18px !important;
+  color: #a04444 !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 820px) {
+  html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar {
+    padding-inline: 5px;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button {
+    gap: 3px !important;
+    padding-inline: 5px !important;
+    font-size: 12px !important;
+  }
+
+  html.codex-dream-skin.dream-retro-2007-layout .retro-composer-toolbar button b {
+    font-size: 12px !important;
+  }
+}

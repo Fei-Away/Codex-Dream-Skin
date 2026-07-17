@@ -3,6 +3,53 @@
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
+  const RETRO_SHELL_ID = "codex-retro-shell";
+  const RETRO_SHELL_VERSION = "4";
+  const RETRO_COMPOSER_VERSION = "2";
+  const RETRO_PROMPT_STORAGE_KEY = "codex-dream-skin:prompts:v1";
+  const RETRO_PROMPT_LIMIT = 24;
+  const RETRO_PROMPT_DEFAULTS = [
+    {
+      id: "review",
+      label: "代码审查",
+      text: "请审查当前改动，重点关注正确性、安全性、边界情况、兼容性和潜在回归；按优先级列出问题，并给出文件与行号。",
+    },
+    {
+      id: "bug",
+      label: "定位并修复 Bug",
+      text: "请定位并修复这个问题。先复现并分析根因，再给出最小改动方案，最后运行相关测试验证。",
+    },
+    {
+      id: "refactor",
+      label: "重构并保持现有行为",
+      text: "请在保持现有行为和对外接口不变的前提下重构这部分代码，优先提升可读性、可维护性和测试覆盖率。",
+    },
+    {
+      id: "tests",
+      label: "补充测试",
+      text: "请为本次改动补充或完善测试，覆盖正常流程、边界情况和失败路径，并实际运行测试。",
+    },
+    {
+      id: "explain",
+      label: "解释这段代码",
+      text: "请解释这段代码的工作流程、关键数据流、依赖关系和可能的风险；先给结论，再展开细节。",
+    },
+    {
+      id: "pr",
+      label: "生成 PR 描述",
+      text: "请整理当前改动，生成标准 PR 描述，包括背景、变更内容、验证结果、风险和后续事项。",
+    },
+    {
+      id: "visual-qa",
+      label: "对照截图检查",
+      text: "请对照参考截图逐项检查布局、间距、字体、颜色、溢出和响应式表现，并直接修复可验证的问题。",
+    },
+  ];
+  const RETRO_NATIVE_ENV_CLASS = "dream-retro-native-env-hidden";
+  const RETRO_ENV_ATTR = "data-retro-environment";
+  const RETRO_FRIENDS_HIDDEN_ATTR = "data-retro-friends-hidden";
+  const RETRO_SETTINGS_ATTR = "data-retro-settings";
+  const RETRO_SETTINGS_SURFACE_ATTR = "data-retro-settings-surface";
   const SHELL_ATTR = "data-dream-shell";
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
@@ -12,6 +59,7 @@
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
   const THEME = themeConfig && typeof themeConfig === "object" ? themeConfig : {};
+  const RETRO_LAYOUT = THEME.layoutMode === "qq2007";
   const ART = THEME.art && typeof THEME.art === "object" ? THEME.art : {};
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
     ? THEME.artMetadata : null;
@@ -36,6 +84,8 @@
   let analysisTimer = null;
   let samplingNativeShell = false;
   let rootObserver = null;
+  let routeObserver = null;
+  let lastRetroRouteSignature = "";
   const now = () => typeof performance === "object" && typeof performance.now === "function"
     ? performance.now() : Date.now();
   const metrics = {
@@ -65,14 +115,20 @@
 
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.rootObserver) previous.rootObserver.disconnect();
+  if (previous?.routeObserver) previous.routeObserver.disconnect();
   if (previous?.resizeObserver) previous.resizeObserver.disconnect();
   if (previous?.timer) clearInterval(previous.timer);
+  if (previous?.routeTimer) clearInterval(previous.routeTimer);
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
   if (previous?.scheduler?.frame != null && typeof cancelAnimationFrame === "function") {
     cancelAnimationFrame(previous.scheduler.frame);
   }
   if (previous?.analysisTimer) clearTimeout(previous.analysisTimer);
   if (previous?.resizeHandler) window.removeEventListener("resize", previous.resizeHandler);
+  if (previous?.routeActionHandler && typeof document.removeEventListener === "function") {
+    document.removeEventListener("click", previous.routeActionHandler);
+  }
+  if (previous?.promptMenuCleanup) previous.promptMenuCleanup();
   if (previous?.mediaHandler && previous?.mediaQuery) {
     try { previous.mediaQuery.removeEventListener("change", previous.mediaHandler); } catch {}
   }
@@ -526,6 +582,920 @@
   let chromeParts = null;
   let observedShellMain = null;
   let resizeObserver = null;
+  const hiddenNativeEnvironmentLayers = new Set();
+  let retroShell = null;
+  let retroComposer = null;
+  let retroPromptMenu = null;
+  let retroPromptAnchor = null;
+  let retroPromptOutsideHandler = null;
+  let retroPromptItems = null;
+  let retroPromptMode = "list";
+  let retroPromptEditingId = null;
+  let nativeEnvironmentShown = false;
+  const retroSidebarLabels = new Map([
+    ["New chat", "新建任务"],
+    ["Pull requests", "拉取请求"],
+    ["Sites", "站点"],
+    ["Scheduled", "已安排"],
+    ["Plugins", "插件"],
+    ["Pinned", "置顶"],
+    ["Projects", "项目"],
+    ["Show more", "展开显示"],
+  ]);
+
+  const syncRetroSidebarLabels = () => {
+    if (!RETRO_LAYOUT) return;
+    for (const candidate of document.querySelectorAll("aside.app-shell-left-panel button, aside.app-shell-left-panel a")) {
+      const text = (candidate.textContent || "").replace(/\s+/g, " ").trim();
+      const label = retroSidebarLabels.get(text);
+      if (label) {
+        candidate.setAttribute("data-retro-label", label);
+        const labelNode = [...candidate.querySelectorAll("span, div")].find((node) =>
+          node.children.length === 0 && (node.textContent || "").replace(/\s+/g, " ").trim() === text);
+        labelNode?.setAttribute("data-retro-label", label);
+      }
+    }
+  };
+
+  const isRetroVisible = (node) => {
+    if (!node || !node.isConnected) return false;
+    const rect = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    return rect.width > 0 && rect.height > 0 && style.display !== "none" &&
+      style.visibility !== "hidden" && style.opacity !== "0";
+  };
+
+  const retroActionLabel = (node) => [
+    node.getAttribute("aria-label"),
+    node.getAttribute("title"),
+    node.textContent,
+  ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+
+  const findNativeAction = (patterns) => {
+    const candidates = [...document.querySelectorAll("button, a, [role=button], [role=link], [role=menuitem]")];
+    return candidates.find((candidate) => {
+      return !candidate.closest(`#${RETRO_SHELL_ID}`) && isRetroVisible(candidate) &&
+        patterns.some((pattern) => pattern.test(retroActionLabel(candidate)));
+    }) || null;
+  };
+
+  const clickNativeAction = (patterns) => {
+    const target = findNativeAction(patterns);
+    if (!target) return false;
+    target.click();
+    return true;
+  };
+
+  const focusNativeComposer = () => {
+    const composer = document.querySelector(".composer-surface-chrome");
+    const target = composer?.querySelector("textarea, [contenteditable=\"true\"]");
+    if (!target) return false;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "nearest" });
+    return true;
+  };
+
+  const retroSettingsLabels = new Set([
+    "General", "Profile", "Appearance", "Voice", "Configuration", "Personalization",
+    "Pets", "Keyboard shortcuts", "Usage & billing", "Account", "Appshots",
+    "Browser", "Computer use", "Hooks", "Connections", "Git", "Environments", "Worktrees",
+    "Archived chats",
+  ]);
+
+  const isRetroSettingsRoute = () => {
+    if (!document.body) return false;
+    const actions = [...document.querySelectorAll(
+      "button, a, [aria-label], [role=button], [role=link], [role=menuitem], [role=tab]",
+    )];
+    const hasBack = actions.some((candidate) => !candidate.closest(`#${RETRO_SHELL_ID}`) && isRetroVisible(candidate) &&
+      /^(back to app|返回应用)$/i.test(retroActionLabel(candidate)));
+    if (hasBack) return true;
+    const hasSettingsNavigation = actions.some((candidate) => {
+      if (candidate.closest(`#${RETRO_SHELL_ID}`) || !isRetroVisible(candidate)) return false;
+      const label = (candidate.getAttribute("aria-label") || candidate.textContent || "")
+        .replace(/\s+/g, " ").trim();
+      return retroSettingsLabels.has(label);
+    });
+    if (hasSettingsNavigation) return true;
+    return [...document.querySelectorAll("h1, h2, h3")].some((candidate) =>
+      isRetroVisible(candidate) && /^(environments|环境)$/i.test((candidate.textContent || "").trim()));
+  };
+
+  const retroRouteSignature = () => {
+    const settings = RETRO_LAYOUT && isRetroSettingsRoute();
+    const hasMain = Boolean(document.querySelector("main.main-surface"));
+    return `${settings ? "settings" : "app"}|${hasMain ? "main" : "surface"}`;
+  };
+
+  const syncRetroSettingsSurface = (settings) => {
+    const root = document.documentElement;
+    if (!root || !document.body) return;
+    if (!settings) {
+      root.removeAttribute(RETRO_SETTINGS_ATTR);
+      document.querySelectorAll(`[${RETRO_SETTINGS_SURFACE_ATTR}]`).forEach((candidate) => {
+        candidate.removeAttribute(RETRO_SETTINGS_SURFACE_ATTR);
+      });
+      return;
+    }
+    setAttribute(root, RETRO_SETTINGS_ATTR, "true");
+    const appRoot = [...document.body.children].find((candidate) =>
+      candidate.id !== RETRO_SHELL_ID && candidate.id !== CHROME_ID && candidate.nodeName !== "STYLE");
+    for (const candidate of document.querySelectorAll(`[${RETRO_SETTINGS_SURFACE_ATTR}]`)) {
+      if (candidate !== appRoot) candidate.removeAttribute(RETRO_SETTINGS_SURFACE_ATTR);
+    }
+    if (appRoot) setAttribute(appRoot, RETRO_SETTINGS_SURFACE_ATTR, "true");
+  };
+
+  const syncRetroSettingsControls = (shell, settings) => {
+    const back = shell?.querySelector('[data-retro-action="settings-back"]');
+    if (!back) return;
+    back.hidden = !settings;
+    back.setAttribute("aria-hidden", String(!settings));
+    back.tabIndex = settings ? 0 : -1;
+  };
+
+  const retroSessionTitle = () => {
+    const selectors = [
+      'main.main-surface > header.app-header-tint [data-app-action-thread-title]',
+      'main.main-surface > header.app-header-tint [data-thread-title]',
+      '[data-app-action-thread-title]',
+      '[data-thread-title]',
+    ];
+    for (const selector of selectors) {
+      for (const candidate of document.querySelectorAll(selector)) {
+        const text = (candidate.textContent || candidate.getAttribute("aria-label") || candidate.getAttribute("title") || "")
+          .replace(/\s+/g, " ").trim();
+        if (text && !/^(Codex|\.\.\.|⌄)$/i.test(text)) return text;
+      }
+    }
+    return "当前会话名称";
+  };
+
+  const syncRetroTitle = (shell) => {
+    const title = retroSessionTitle();
+    const label = shell?.querySelector(".retro-titlebar-label");
+    setTextContent(label, `Codex 2007 - ${title}`);
+    if (label) label.title = title;
+  };
+
+  const syncRetroFriendsPanel = (shell) => {
+    const hidden = document.documentElement?.getAttribute(RETRO_FRIENDS_HIDDEN_ATTR) === "true";
+    const toggle = shell?.querySelector('[data-retro-action="chat"]');
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", String(!hidden));
+      toggle.setAttribute("aria-label", hidden ? "显示聊天好友" : "隐藏聊天好友");
+      toggle.title = hidden ? "显示 Codex 好友" : "隐藏 Codex 好友";
+    }
+    const close = shell?.querySelector('[data-retro-action="close-friends"]');
+    if (close) {
+      close.setAttribute("aria-label", "关闭 Codex 好友");
+      close.title = "关闭 Codex 好友";
+    }
+  };
+
+  const toggleRetroFriendsPanel = () => {
+    const root = document.documentElement;
+    if (!root) return;
+    const hidden = root.getAttribute(RETRO_FRIENDS_HIDDEN_ATTR) === "true";
+    setAttribute(root, RETRO_FRIENDS_HIDDEN_ATTR, String(!hidden));
+    syncRetroFriendsPanel(retroShell);
+  };
+
+  const retroComposerTarget = (composer) =>
+    composer?.querySelector("textarea, [contenteditable=\"true\"]") || null;
+
+  const retroComposerText = (composer) => {
+    const target = retroComposerTarget(composer);
+    if (!target) return "";
+    return String("value" in target ? target.value : target.innerText || target.textContent || "")
+      .replace(/\u200b/g, "")
+      .trim();
+  };
+
+  const cleanRetroPromptValue = (value, max, singleLine = false) => {
+    if (typeof value !== "string") return "";
+    const normalized = value
+      .replace(/\r\n?/g, "\n")
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u2028\u2029]/g, "");
+    const trimmed = singleLine ? normalized.replace(/\s+/g, " ").trim() : normalized.trim();
+    return Array.from(trimmed).slice(0, max).join("");
+  };
+
+  const normalizeRetroPrompts = (value) => {
+    if (!Array.isArray(value)) return null;
+    const seen = new Set();
+    const prompts = [];
+    value.slice(0, RETRO_PROMPT_LIMIT).forEach((candidate, index) => {
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return;
+      const id = cleanRetroPromptValue(candidate.id, 80, true) || `prompt-${index + 1}`;
+      const label = cleanRetroPromptValue(candidate.label, 48, true) || `Prompt ${index + 1}`;
+      const text = cleanRetroPromptValue(candidate.text, 1400);
+      if (!text || seen.has(id)) return;
+      seen.add(id);
+      prompts.push({ id, label, text });
+    });
+    return prompts;
+  };
+
+  const cloneRetroPrompts = (prompts) => prompts.map((prompt) => ({ ...prompt }));
+
+  const retroPromptStorage = () => {
+    try { return window.localStorage; } catch { return null; }
+  };
+
+  const retroPromptStorageKey = () =>
+    `${RETRO_PROMPT_STORAGE_KEY}:${cleanRetroPromptValue(String(THEME.id || "custom"), 80, true) || "custom"}`;
+
+  const baseRetroPrompts = () => {
+    const configured = normalizeRetroPrompts(THEME.prompts);
+    return cloneRetroPrompts(configured?.length ? configured : RETRO_PROMPT_DEFAULTS);
+  };
+
+  const loadRetroPrompts = () => {
+    const storage = retroPromptStorage();
+    if (!storage) return baseRetroPrompts();
+    try {
+      const raw = storage.getItem(retroPromptStorageKey());
+      if (!raw) return baseRetroPrompts();
+      const stored = normalizeRetroPrompts(JSON.parse(raw));
+      return stored ?? baseRetroPrompts();
+    } catch {
+      return baseRetroPrompts();
+    }
+  };
+
+  const saveRetroPrompts = (prompts) => {
+    const normalized = normalizeRetroPrompts(prompts) || [];
+    retroPromptItems = normalized;
+    const storage = retroPromptStorage();
+    if (!storage) return false;
+    try {
+      storage.setItem(retroPromptStorageKey(), JSON.stringify(normalized));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const getRetroPrompts = () => {
+    if (!retroPromptItems) retroPromptItems = loadRetroPrompts();
+    return retroPromptItems;
+  };
+
+  const retroPromptById = (id) => getRetroPrompts().find((prompt) => prompt.id === id) || null;
+
+  const nextRetroPromptId = () => {
+    let id = `prompt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    let suffix = 1;
+    while (retroPromptById(id)) id = `prompt-${Date.now().toString(36)}-${suffix++}`;
+    return id;
+  };
+
+  const insertRetroComposerText = (value, { append = false } = {}) => {
+    const composer = document.querySelector(".composer-surface-chrome");
+    const target = retroComposerTarget(composer);
+    if (!target) return false;
+    const text = String(value ?? "");
+    target.focus({ preventScroll: true });
+    if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) {
+      const start = append ? target.value.length : target.selectionStart ?? target.value.length;
+      const end = append ? target.value.length : target.selectionEnd ?? start;
+      target.setRangeText(text, start, end, "end");
+      target.dispatchEvent(new InputEvent("input", {
+        bubbles: true,
+        inputType: "insertText",
+        data: text,
+      }));
+      return true;
+    }
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    let inserted = false;
+    try {
+      inserted = document.execCommand("insertText", false, text);
+    } catch {}
+    if (!inserted) {
+      const paragraph = target.querySelector("p:last-child") || target;
+      const fallback = document.createTextNode(text);
+      const fallbackRange = document.createRange();
+      fallbackRange.selectNodeContents(paragraph);
+      fallbackRange.collapse(false);
+      fallbackRange.insertNode(fallback);
+      fallbackRange.setStartAfter(fallback);
+      fallbackRange.collapse(true);
+      selection?.removeAllRanges();
+      selection?.addRange(fallbackRange);
+    }
+    target.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertText",
+      data: text,
+    }));
+    return true;
+  };
+
+  const retroPromptNode = (tagName, className, text) => {
+    const node = document.createElement(tagName);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
+  const retroPromptActionButton = (action, label, promptId = "", className = "") => {
+    const button = retroPromptNode("button", className, label);
+    button.type = "button";
+    button.dataset.retroPromptAction = action;
+    if (promptId) button.dataset.retroPromptId = promptId;
+    button.setAttribute("aria-label", label);
+    return button;
+  };
+
+  const positionRetroPromptMenu = () => {
+    if (!retroPromptMenu || !retroPromptAnchor?.getBoundingClientRect) return;
+    const anchorRect = retroPromptAnchor.getBoundingClientRect();
+    const menuRect = retroPromptMenu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || 1024;
+    const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 768;
+    const margin = 8;
+    const left = clamp(anchorRect.left, margin, Math.max(margin, viewportWidth - menuRect.width - margin));
+    let top = anchorRect.top - menuRect.height - 6;
+    if (top < margin) {
+      top = Math.min(viewportHeight - menuRect.height - margin, anchorRect.bottom + 6);
+    }
+    retroPromptMenu.style.left = `${Math.round(left)}px`;
+    retroPromptMenu.style.top = `${Math.round(Math.max(margin, top))}px`;
+  };
+
+  const closeRetroPromptMenu = () => {
+    if (retroPromptOutsideHandler) {
+      document.removeEventListener("click", retroPromptOutsideHandler);
+      retroPromptOutsideHandler = null;
+    }
+    retroPromptMenu?.remove();
+    retroPromptMenu = null;
+    retroPromptAnchor = null;
+    retroPromptMode = "list";
+    retroPromptEditingId = null;
+  };
+
+  const insertRetroPrompt = (prompt) => {
+    if (!prompt) return false;
+    const composer = retroComposer || document.querySelector(".composer-surface-chrome");
+    const target = retroComposerTarget(composer);
+    if (!target) return false;
+    const current = String("value" in target ? target.value : target.innerText || target.textContent || "");
+    const prefix = current.trim() ? "\n\n" : "";
+    const inserted = insertRetroComposerText(`${prefix}${prompt.text}`, { append: true });
+    if (inserted) syncRetroComposerState(composer);
+    return inserted;
+  };
+
+  const renderRetroPromptMenu = () => {
+    if (!retroPromptMenu) return;
+    retroPromptMenu.textContent = "";
+    const title = retroPromptMode === "list" ? "常用 Prompt"
+      : retroPromptMode === "manage" ? "管理 Prompt"
+        : retroPromptEditingId ? "编辑 Prompt" : "新建 Prompt";
+    const header = retroPromptNode("div", "retro-prompt-header");
+    const headerTitle = retroPromptNode("div", "retro-prompt-title");
+    if (retroPromptMode !== "list") {
+      headerTitle.appendChild(retroPromptActionButton("back", "返回" , "", "retro-prompt-back"));
+    }
+    headerTitle.appendChild(retroPromptNode("strong", "", title));
+    header.appendChild(headerTitle);
+    const close = retroPromptActionButton("close", "关闭", "", "retro-prompt-close");
+    close.textContent = "×";
+    header.appendChild(close);
+    retroPromptMenu.appendChild(header);
+
+    if (retroPromptMode === "list") {
+      const list = retroPromptNode("div", "retro-prompt-list");
+      const prompts = getRetroPrompts();
+      if (!prompts.length) {
+        list.appendChild(retroPromptNode("div", "retro-prompt-empty", "还没有保存的 Prompt，点击下方新建。"));
+      }
+      for (const prompt of prompts) {
+        const item = retroPromptActionButton("insert", "", prompt.id, "retro-prompt-item");
+        const main = retroPromptNode("span", "retro-prompt-item-main");
+        main.appendChild(retroPromptNode("strong", "retro-prompt-item-label", prompt.label));
+        main.appendChild(retroPromptNode(
+          "small",
+          "retro-prompt-item-preview",
+          prompt.text.replace(/\s+/g, " ").trim(),
+        ));
+        item.appendChild(main);
+        item.setAttribute("title", prompt.text);
+        list.appendChild(item);
+      }
+      retroPromptMenu.appendChild(list);
+      const footer = retroPromptNode("div", "retro-prompt-footer");
+      footer.appendChild(retroPromptActionButton("manage", "⚙ 管理 Prompt"));
+      footer.appendChild(retroPromptActionButton("new", "＋ 新建 Prompt", "", "retro-prompt-primary"));
+      retroPromptMenu.appendChild(footer);
+    } else if (retroPromptMode === "manage") {
+      const list = retroPromptNode("div", "retro-prompt-list retro-prompt-manage-list");
+      const prompts = getRetroPrompts();
+      if (!prompts.length) {
+        list.appendChild(retroPromptNode("div", "retro-prompt-empty", "暂无 Prompt，点击下方新建。"));
+      }
+      prompts.forEach((prompt, index) => {
+        const row = retroPromptNode("div", "retro-prompt-manage-row");
+        const main = retroPromptActionButton("edit", "", prompt.id, "retro-prompt-manage-main");
+        main.appendChild(retroPromptNode("strong", "retro-prompt-item-label", prompt.label));
+        main.appendChild(retroPromptNode("small", "retro-prompt-item-preview", prompt.text.replace(/\s+/g, " ").trim()));
+        row.appendChild(main);
+        const controls = retroPromptNode("span", "retro-prompt-manage-controls");
+        const up = retroPromptActionButton("up", "上移", prompt.id, "retro-prompt-control");
+        const down = retroPromptActionButton("down", "下移", prompt.id, "retro-prompt-control");
+        up.disabled = index === 0;
+        down.disabled = index === prompts.length - 1;
+        controls.appendChild(up);
+        controls.appendChild(down);
+        controls.appendChild(retroPromptActionButton("delete", "删除", prompt.id, "retro-prompt-control retro-prompt-danger"));
+        row.appendChild(controls);
+        list.appendChild(row);
+      });
+      retroPromptMenu.appendChild(list);
+      const footer = retroPromptNode("div", "retro-prompt-footer");
+      footer.appendChild(retroPromptActionButton("new", "＋ 新建 Prompt", "", "retro-prompt-primary"));
+      retroPromptMenu.appendChild(footer);
+    } else {
+      const current = retroPromptById(retroPromptEditingId);
+      const form = retroPromptNode("div", "retro-prompt-form");
+      const labelField = retroPromptNode("label", "retro-prompt-field");
+      labelField.appendChild(retroPromptNode("span", "", "名称"));
+      const labelInput = retroPromptNode("input");
+      labelInput.type = "text";
+      labelInput.maxLength = 48;
+      labelInput.value = current?.label || "";
+      labelInput.dataset.retroPromptField = "label";
+      labelInput.placeholder = "例如：检查安全问题";
+      labelField.appendChild(labelInput);
+      form.appendChild(labelField);
+      const textField = retroPromptNode("label", "retro-prompt-field");
+      textField.appendChild(retroPromptNode("span", "", "Prompt 内容"));
+      const textInput = retroPromptNode("textarea");
+      textInput.rows = 7;
+      textInput.maxLength = 1400;
+      textInput.value = current?.text || "";
+      textInput.dataset.retroPromptField = "text";
+      textInput.placeholder = "输入点击后要填入输入框的内容";
+      textField.appendChild(textInput);
+      form.appendChild(textField);
+      form.appendChild(retroPromptNode("div", "retro-prompt-error"));
+      retroPromptMenu.appendChild(form);
+      const footer = retroPromptNode("div", "retro-prompt-footer retro-prompt-form-actions");
+      footer.appendChild(retroPromptActionButton("cancel", "取消"));
+      footer.appendChild(retroPromptActionButton("save", "保存", "", "retro-prompt-primary"));
+      retroPromptMenu.appendChild(footer);
+    }
+    positionRetroPromptMenu();
+  };
+
+  const saveRetroPromptForm = () => {
+    const labelField = retroPromptMenu?.querySelector('[data-retro-prompt-field="label"]');
+    const textField = retroPromptMenu?.querySelector('[data-retro-prompt-field="text"]');
+    const error = retroPromptMenu?.querySelector(".retro-prompt-error");
+    const label = cleanRetroPromptValue(labelField?.value || "", 48, true);
+    const text = cleanRetroPromptValue(textField?.value || "", 1400);
+    if (!label || !text) {
+      if (error) error.textContent = "请填写名称和 Prompt 内容。";
+      return;
+    }
+    const prompts = getRetroPrompts();
+    if (retroPromptEditingId) {
+      const index = prompts.findIndex((prompt) => prompt.id === retroPromptEditingId);
+      if (index >= 0) prompts[index] = { id: retroPromptEditingId, label, text };
+    } else {
+      prompts.push({ id: nextRetroPromptId(), label, text });
+    }
+    saveRetroPrompts(prompts);
+    retroPromptMode = "manage";
+    retroPromptEditingId = null;
+    renderRetroPromptMenu();
+  };
+
+  const openRetroPromptMenu = (anchor) => {
+    closeRetroPromptMenu();
+    retroPromptItems = loadRetroPrompts();
+    retroPromptAnchor = anchor;
+    retroPromptMenu = retroPromptNode("div", "retro-prompt-menu");
+    retroPromptMenu.setAttribute("role", "dialog");
+    retroPromptMenu.setAttribute("aria-label", "常用 Prompt");
+    retroPromptMenu.addEventListener("click", handleRetroPromptMenuClick);
+    document.body?.appendChild(retroPromptMenu);
+    renderRetroPromptMenu();
+    retroPromptOutsideHandler = (event) => {
+      const target = event.target;
+      if (retroPromptMenu?.contains(target) || retroPromptAnchor?.contains(target)) return;
+      closeRetroPromptMenu();
+    };
+    document.addEventListener("click", retroPromptOutsideHandler);
+    positionRetroPromptMenu();
+  };
+
+  const toggleRetroPromptMenu = (anchor) => {
+    if (retroPromptMenu && retroPromptAnchor === anchor) closeRetroPromptMenu();
+    else openRetroPromptMenu(anchor);
+  };
+
+  const handleRetroPromptMenuClick = (event) => {
+    const target = event.target.closest("[data-retro-prompt-action]");
+    if (!target || !retroPromptMenu?.contains(target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const action = target.dataset.retroPromptAction;
+    const id = target.dataset.retroPromptId;
+    if (action === "close") return closeRetroPromptMenu();
+    if (action === "back") {
+      retroPromptMode = "list";
+      retroPromptEditingId = null;
+      return renderRetroPromptMenu();
+    }
+    if (action === "insert") {
+      if (insertRetroPrompt(retroPromptById(id))) closeRetroPromptMenu();
+      return;
+    }
+    if (action === "manage") {
+      retroPromptMode = "manage";
+      return renderRetroPromptMenu();
+    }
+    if (action === "new" || action === "edit") {
+      retroPromptMode = "edit";
+      retroPromptEditingId = action === "edit" ? id : null;
+      return renderRetroPromptMenu();
+    }
+    if (action === "cancel") {
+      retroPromptMode = "manage";
+      retroPromptEditingId = null;
+      return renderRetroPromptMenu();
+    }
+    if (action === "save") return saveRetroPromptForm();
+    if (action === "delete") {
+      saveRetroPrompts(getRetroPrompts().filter((prompt) => prompt.id !== id));
+      return renderRetroPromptMenu();
+    }
+    if (action === "up" || action === "down") {
+      const prompts = getRetroPrompts();
+      const index = prompts.findIndex((prompt) => prompt.id === id);
+      const next = action === "up" ? index - 1 : index + 1;
+      if (index >= 0 && next >= 0 && next < prompts.length) {
+        [prompts[index], prompts[next]] = [prompts[next], prompts[index]];
+        saveRetroPrompts(prompts);
+        renderRetroPromptMenu();
+      }
+    }
+  };
+
+  const retroComposerHasAttachments = (composer) => {
+    const host = composer?.querySelector('[class*="_attachmentsDefault_"]');
+    return Boolean(host && (host.children.length > 0 || host.textContent?.trim()));
+  };
+
+  const syncRetroComposerState = (composer) => {
+    if (!RETRO_LAYOUT || !composer) return;
+    const root = document.documentElement;
+    const hasAttachments = retroComposerHasAttachments(composer);
+    const text = retroComposerText(composer);
+    const editor = retroComposerTarget(composer);
+    const editorScroller = composer.querySelector('[class*="_footer_"] [class*="overflow-y-auto"]');
+    const overflowing = Boolean((editorScroller || editor) &&
+      (editorScroller || editor).scrollHeight > (editorScroller || editor).clientHeight + 2);
+    const baseState = hasAttachments ? (text ? "mixed" : "attachments") : (text ? "text" : "empty");
+    const state = overflowing ? `${baseState}-scroll` : baseState;
+    const height = hasAttachments ? 214 : 178;
+    const reserve = hasAttachments ? 228 : 192;
+    setStyleProperty(root, "--retro-composer-height", `${height}px`);
+    setStyleProperty(root, "--retro-history-reserve", `${reserve}px`);
+    setAttribute(composer, "data-retro-composer-state", state);
+    setAttribute(composer, "data-retro-composer-has-attachments", String(hasAttachments));
+    setAttribute(composer, "data-retro-composer-overflow", String(overflowing));
+  };
+
+  const createRetroComposerToolbar = () => {
+    const toolbar = document.createElement("div");
+    toolbar.className = "retro-composer-toolbar";
+    toolbar.dataset.retroComposerToolbar = RETRO_COMPOSER_VERSION;
+    toolbar.setAttribute("role", "toolbar");
+    toolbar.setAttribute("aria-label", "输入工具");
+    toolbar.innerHTML = `
+      <div class="retro-composer-toolbar-group">
+        <button type="button" data-retro-composer-action="emoji" aria-label="表情" title="表情">
+          <span class="retro-composer-tool-icon" aria-hidden="true">☺</span><b>表情</b>
+        </button>
+        <button type="button" data-retro-composer-action="image" aria-label="图片" title="选择图片">
+          <span class="retro-composer-tool-icon" aria-hidden="true">▧</span><b>图片</b>
+        </button>
+        <button type="button" data-retro-composer-action="attach" aria-label="附加" title="附加文件">
+          <span class="retro-composer-tool-icon" aria-hidden="true">∞</span><b>附加</b><i aria-hidden="true">⌄</i>
+        </button>
+      </div>
+      <span class="retro-composer-toolbar-spacer" aria-hidden="true"></span>
+      <button type="button" class="retro-composer-lightning" data-retro-composer-action="lightning" aria-label="输入快捷操作" title="输入快捷操作">
+        <span aria-hidden="true">ϟ</span>
+      </button>`;
+    return toolbar;
+  };
+
+  const createRetroComposerBottomTools = () => {
+    const tools = document.createElement("div");
+    tools.className = "retro-composer-bottom-tools";
+    tools.dataset.retroComposerBottomTools = RETRO_COMPOSER_VERSION;
+    tools.setAttribute("role", "group");
+    tools.setAttribute("aria-label", "编辑工具");
+    tools.innerHTML = `
+      <button type="button" data-retro-composer-action="prompts" aria-label="常用 Prompt" title="常用 Prompt">A</button>
+      <button type="button" data-retro-composer-action="emoji" aria-label="表情" title="表情">☺</button>`;
+    return tools;
+  };
+
+  const bindRetroComposerEvents = (composer) => {
+    if (!composer || composer.dataset.retroComposerEventsBound === RETRO_COMPOSER_VERSION) return;
+    composer.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-retro-composer-action]");
+      if (!target || !composer.contains(target)) return;
+      event.preventDefault();
+      const action = target.dataset.retroComposerAction;
+      if (action === "emoji") insertRetroComposerText("🙂");
+      if (action === "prompts") toggleRetroPromptMenu(target);
+      if (action === "image" || action === "attach") {
+        composer.querySelector('button[aria-label="Add files and more"]')?.click();
+      }
+      if (action === "format") focusNativeComposer();
+      if (action === "lightning") focusNativeComposer();
+      syncRetroComposerState(composer);
+    });
+    composer.addEventListener("input", () => syncRetroComposerState(composer));
+    composer.addEventListener("change", () => syncRetroComposerState(composer));
+    composer.dataset.retroComposerEventsBound = RETRO_COMPOSER_VERSION;
+  };
+
+  const teardownRetroComposer = () => {
+    closeRetroPromptMenu();
+    document.querySelectorAll("[data-retro-composer-toolbar], [data-retro-composer-bottom-tools]")
+      .forEach((node) => node.remove());
+    document.querySelectorAll("[data-retro-native-add-file]")
+      .forEach((node) => node.removeAttribute("data-retro-native-add-file"));
+    document.documentElement?.style.removeProperty("--retro-composer-height");
+    document.documentElement?.style.removeProperty("--retro-history-reserve");
+    retroComposer = null;
+  };
+
+  const ensureRetroComposer = () => {
+    if (!RETRO_LAYOUT) {
+      teardownRetroComposer();
+      return null;
+    }
+    const composer = document.querySelector(".composer-surface-chrome");
+    if (!composer) {
+      teardownRetroComposer();
+      return null;
+    }
+    let toolbar = composer.querySelector("[data-retro-composer-toolbar]");
+    if (toolbar && toolbar.dataset.retroComposerToolbar !== RETRO_COMPOSER_VERSION) {
+      toolbar.remove();
+      toolbar = null;
+    }
+    if (!toolbar) {
+      toolbar = createRetroComposerToolbar();
+      composer.insertBefore(toolbar, composer.firstElementChild);
+    }
+    let bottomTools = composer.querySelector("[data-retro-composer-bottom-tools]");
+    if (bottomTools && bottomTools.dataset.retroComposerBottomTools !== RETRO_COMPOSER_VERSION) {
+      bottomTools.remove();
+      bottomTools = null;
+    }
+    if (!bottomTools) {
+      const leftCell = composer.querySelector('[class~="col-start-1"][class~="row-start-2"]');
+      const actionHost = [...(leftCell?.querySelectorAll("div") || [])].find((node) =>
+        node.classList.contains("min-w-0") && node.classList.contains("items-center")) || leftCell;
+      if (actionHost) {
+        bottomTools = createRetroComposerBottomTools();
+        actionHost.insertBefore(bottomTools, actionHost.firstElementChild);
+      }
+    }
+    for (const button of composer.querySelectorAll('button[aria-label="Add files and more"]')) {
+      button.setAttribute("data-retro-native-add-file", "true");
+    }
+    bindRetroComposerEvents(composer);
+    syncRetroComposerState(composer);
+    retroComposer = composer;
+    return composer;
+  };
+
+  const syncRetroStatusBar = (shell) => {
+    const status = shell?.querySelector("[data-retro-status]");
+    if (!status) return;
+    const composer = document.querySelector(".composer-surface-chrome");
+    const composerText = [...(composer?.querySelectorAll("button") ?? [])]
+      .map((candidate) => (candidate.innerText || candidate.textContent || "").replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    const model = composerText.find((text) => /(?:Luna|GPT|Claude|模型|Max)/i.test(text));
+    const time = new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date());
+    status.textContent = `安全　${model || "在线"}　${time}`;
+    status.title = model ? `当前模型：${model}` : "当前会话在线";
+  };
+
+  const collectNativeEnvironmentLayers = () => {
+    const layers = new Set();
+    const headers = [...document.querySelectorAll("header")].filter((candidate) =>
+      /^Environment$/i.test((candidate.textContent || "").trim()));
+    for (const header of headers) {
+      const layer = header.closest("div.pointer-events-none.absolute") ||
+        header.closest('div[class*="pointer-events-none"][class*="absolute"]');
+      if (layer) layers.add(layer);
+    }
+    for (const layer of document.querySelectorAll('[data-pip-obstacle="thread-summary-panel"]')) {
+      const hasEnvironment = [...layer.querySelectorAll("span, button")].some((candidate) =>
+        /^Environment$/i.test((candidate.textContent || "").trim()));
+      if (hasEnvironment) layers.add(layer);
+    }
+    return [...layers];
+  };
+
+  const syncNativeEnvironmentLayer = () => {
+    if (nativeEnvironmentShown || document.documentElement?.getAttribute(RETRO_ENV_ATTR) === "shown") {
+      nativeEnvironmentShown = true;
+      return;
+    }
+    for (const layer of collectNativeEnvironmentLayers()) {
+      layer.classList.add(RETRO_NATIVE_ENV_CLASS);
+      hiddenNativeEnvironmentLayers.add(layer);
+    }
+  };
+
+  const restoreNativeEnvironmentLayers = () => {
+    for (const layer of hiddenNativeEnvironmentLayers) layer.classList.remove(RETRO_NATIVE_ENV_CLASS);
+    for (const layer of document.querySelectorAll(`.${RETRO_NATIVE_ENV_CLASS}`)) {
+      layer.classList.remove(RETRO_NATIVE_ENV_CLASS);
+    }
+    hiddenNativeEnvironmentLayers.clear();
+  };
+
+  const teardownRetroShell = () => {
+    teardownRetroComposer();
+    restoreNativeEnvironmentLayers();
+    document.querySelectorAll("[data-retro-label]").forEach((candidate) => {
+      candidate.removeAttribute("data-retro-label");
+    });
+    nativeEnvironmentShown = false;
+    document.documentElement?.removeAttribute(RETRO_ENV_ATTR);
+    document.documentElement?.removeAttribute(RETRO_FRIENDS_HIDDEN_ATTR);
+    document.documentElement?.removeAttribute(RETRO_SETTINGS_ATTR);
+    document.querySelectorAll(`[${RETRO_SETTINGS_SURFACE_ATTR}]`).forEach((candidate) => {
+      candidate.removeAttribute(RETRO_SETTINGS_SURFACE_ATTR);
+    });
+    document.getElementById(RETRO_SHELL_ID)?.remove();
+    retroShell = null;
+  };
+
+  const bindRetroShellEvents = (shell) => {
+    if (!shell || shell.dataset.retroEventsBound === "true") return;
+    shell.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-retro-action]");
+      if (!target) return;
+      event.preventDefault();
+      const action = target.dataset.retroAction;
+      const actions = {
+        "new-chat": [/^new chat$/i, /^新建任务$/],
+        scheduled: [/^scheduled$/i, /^已安排$/],
+        plugins: [/^plugins$/i, /^插件$/],
+        sites: [/^sites$/i, /^站点$/],
+        "pull-requests": [/^pull requests?$/i, /^拉取请求$/],
+        "open-settings": [/^settings(?:\s+⌘,)?$/i, /^设置$/],
+      };
+      if (action === "settings-back") {
+        const nativeBack = findNativeAction([/^back to app$/i, /^返回应用$/]);
+        if (nativeBack) {
+          nativeBack.click();
+        } else {
+          const fallback = [...document.querySelectorAll(
+            'button[aria-label="Back"], a[aria-label="Back"], [role="link"]',
+          )].find((candidate) => isRetroVisible(candidate) &&
+            /^(back|返回)$/i.test(retroActionLabel(candidate)));
+          fallback?.click();
+        }
+        return;
+      }
+      if (actions[action]) clickNativeAction(actions[action]);
+      if (action === "focus-composer") focusNativeComposer();
+      if (action === "chat" || action === "close-friends") toggleRetroFriendsPanel();
+      if (action === "show-environment") {
+        if (!collectNativeEnvironmentLayers().length) return;
+        nativeEnvironmentShown = true;
+        document.documentElement?.setAttribute(RETRO_ENV_ATTR, "shown");
+        restoreNativeEnvironmentLayers();
+        target.hidden = true;
+        target.setAttribute("aria-hidden", "true");
+      }
+    });
+    shell.dataset.retroEventsBound = "true";
+  };
+
+  const ensureRetroShell = (home, settings = false) => {
+    if (!RETRO_LAYOUT || !document.body) return null;
+    let shell = document.getElementById(RETRO_SHELL_ID);
+    if (shell && shell.dataset.retroShellVersion !== RETRO_SHELL_VERSION) {
+      shell.remove();
+      shell = null;
+    }
+    if (!shell || shell.parentElement !== document.body) {
+      shell?.remove();
+      shell = document.createElement("div");
+      shell.id = RETRO_SHELL_ID;
+      shell.dataset.retroShellVersion = RETRO_SHELL_VERSION;
+      shell.setAttribute("data-retro-route", settings ? "settings" : home ? "home" : "task");
+      shell.innerHTML = `
+        <div class="retro-titlebar" aria-hidden="true">
+          <span class="retro-titlebar-logo">C</span>
+          <span class="retro-titlebar-label">Codex 2007 - 当前会话名称</span>
+          <span class="retro-window-buttons"><i></i><i></i><i></i></span>
+        </div>
+        <nav class="retro-toolbar" aria-label="Codex 2007 工具栏">
+          <button type="button" class="retro-settings-back" data-retro-action="settings-back" aria-label="返回应用" title="返回应用" hidden><span>↩</span><b>返回应用</b></button>
+          <button type="button" data-retro-action="new-chat" aria-label="新建任务" title="新建任务"><span>✎</span><b>新建任务</b></button>
+          <button type="button" data-retro-action="scheduled" aria-label="已安排" title="已安排"><span>◷</span><b>已安排</b></button>
+          <span class="retro-toolbar-separator" aria-hidden="true"></span>
+          <button type="button" data-retro-action="focus-composer" aria-label="当前会话" title="聚焦当前会话"><span>▣</span><b>当前会话</b></button>
+          <button type="button" data-retro-action="plugins" aria-label="插件" title="插件"><span>✣</span><b>插件</b></button>
+          <button type="button" data-retro-action="sites" aria-label="站点" title="站点"><span>▤</span><b>站点</b></button>
+          <button type="button" data-retro-action="pull-requests" aria-label="拉取请求" title="拉取请求"><span>⑂</span><b>拉取请求</b></button>
+          <button type="button" data-retro-action="chat" aria-label="显示聊天好友" title="显示 Codex 好友" aria-controls="codex-retro-friends-panel"><span>☏</span><b>聊天</b></button>
+        </nav>
+        <aside id="codex-retro-friends-panel" class="retro-friends-panel" aria-label="Codex 好友">
+          <header>
+            <strong><button type="button" class="retro-panel-close" data-retro-action="close-friends">×</button>Codex 好友</strong>
+            <span class="retro-panel-tools">↗⌄</span>
+          </header>
+          <section class="retro-assistant-card">
+            <div class="retro-mascot" aria-hidden="true"><span>›_‹</span></div>
+            <div class="retro-online"><i></i><b>Codex 小蓝</b><em>LV 07</em></div>
+            <p>代码有问题？找我！<br>我是你的智能伙伴 Codex<br>陪你写代码、改 Bug、查文档，超可靠哦！</p>
+            <div class="retro-quick-actions" aria-label="常用功能">
+              <button type="button" data-retro-action="focus-composer" title="当前任务"><span>▣</span></button>
+              <button type="button" data-retro-action="sites" title="项目"><span>▤</span></button>
+              <button type="button" data-retro-action="scheduled" title="已安排"><span>★</span></button>
+              <button type="button" data-retro-action="open-settings" title="设置"><span>⚙</span></button>
+              <button type="button" data-retro-action="show-environment" title="Environment"><span>☁</span></button>
+            </div>
+          </section>
+          <section class="retro-friend-list">
+            <header><span>⌄</span>我的好友 <em>（2/8）</em><b>⌃</b></header>
+            <div class="retro-friend-row"><span class="retro-avatar retro-avatar-one">A</span><b>Asta Xie</b><i>●</i></div>
+            <div class="retro-friend-row"><span class="retro-avatar retro-avatar-two">C</span><b>Codex 小蓝</b><i>●</i></div>
+          </section>
+      </aside>
+        <footer class="retro-dock" aria-hidden="true">
+          <span>◉</span><span>●</span><span>★</span><span>✉</span><span>▣</span><span>◈</span>
+          <span class="retro-dock-spacer"></span><small data-retro-status>安全　在线　00:00</small>
+        </footer>`;
+      document.body.appendChild(shell);
+    }
+    bindRetroShellEvents(shell);
+    shell.dataset.retroRoute = settings ? "settings" : home ? "home" : "task";
+    retroShell = shell;
+    syncRetroTitle(shell);
+    syncRetroFriendsPanel(shell);
+    syncRetroSettingsControls(shell, settings);
+    nativeEnvironmentShown = document.documentElement?.getAttribute(RETRO_ENV_ATTR) === "shown";
+    if (nativeEnvironmentShown) restoreNativeEnvironmentLayers();
+    const friendList = shell.querySelector(".retro-friend-list");
+    const quickActionsHost = shell.querySelector(".retro-assistant-card") || friendList;
+    let quickActions = shell.querySelector(".retro-quick-actions");
+    if (!quickActions && quickActionsHost) {
+      friendList.querySelector('[data-retro-action="show-environment"]')?.remove();
+      quickActions = document.createElement("div");
+      quickActions.className = "retro-quick-actions";
+      quickActions.setAttribute("aria-label", "常用功能");
+      quickActions.innerHTML = `
+        <button type="button" data-retro-action="focus-composer" title="当前任务"><span>▣</span></button>
+        <button type="button" data-retro-action="sites" title="项目"><span>▤</span></button>
+        <button type="button" data-retro-action="scheduled" title="已安排"><span>★</span></button>
+        <button type="button" data-retro-action="open-settings" title="设置"><span>⚙</span></button>
+        <button type="button" data-retro-action="show-environment" title="Environment"><span>☁</span></button>`;
+      quickActionsHost.appendChild(quickActions);
+    }
+    const environmentButton = quickActions?.querySelector('[data-retro-action="show-environment"]');
+    if (environmentButton) {
+      const environmentAvailable = nativeEnvironmentShown || collectNativeEnvironmentLayers().length > 0;
+      environmentButton.hidden = nativeEnvironmentShown;
+      environmentButton.disabled = !environmentAvailable;
+      environmentButton.setAttribute("aria-hidden", String(nativeEnvironmentShown));
+      environmentButton.setAttribute("aria-disabled", String(!environmentAvailable));
+      environmentButton.title = environmentAvailable ? "Environment" : "Environment 暂不可用";
+    }
+    syncRetroStatusBar(shell);
+    syncNativeEnvironmentLayer();
+    return shell;
+  };
 
   const ensureStyle = (root) => {
     let style = document.getElementById(STYLE_ID);
@@ -552,6 +1522,8 @@
     applyTheme(root, shell);
     applyArtMetadata(root);
     root.classList.add("codex-dream-skin");
+    root.classList.remove("dream-retro-2007");
+    root.classList.toggle("dream-retro-2007-layout", RETRO_LAYOUT);
     return shell;
   };
 
@@ -561,6 +1533,7 @@
     if (!root) return;
     shell ||= root.getAttribute(SHELL_ATTR) || resolvedShell();
     const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
+    const settings = RETRO_LAYOUT && isRetroSettingsRoute();
     const homeIndicator = document.querySelector('[data-testid="home-icon"]');
     const home = homeIndicator?.closest('[role="main"]') ||
       [...document.querySelectorAll('[role="main"]')].find((candidate) =>
@@ -578,7 +1551,19 @@
     }
     for (const candidate of homeUtilityBars) candidate.classList.add("dream-skin-home-utility");
 
-    if (!shellMain || !document.body) return;
+    if (!document.body) return;
+    if (RETRO_LAYOUT) {
+      syncRetroSettingsSurface(settings);
+      ensureRetroShell(Boolean(home), settings);
+      if (shellMain) {
+        ensureRetroComposer();
+        syncRetroSidebarLabels();
+      } else {
+        teardownRetroComposer();
+      }
+    }
+    else teardownRetroShell();
+    if (!shellMain) return;
     if (observedShellMain !== shellMain) {
       resizeObserver?.disconnect();
       resizeObserver?.observe(shellMain);
@@ -640,14 +1625,17 @@
     if (!root) return;
     metrics.ensureCalls += 1;
     const shell = rootPass ? applyRootState(root) : null;
-    if (route) syncRouteState(shell, { layout });
+    if (route) {
+      syncRouteState(shell, { layout });
+      if (RETRO_LAYOUT) lastRetroRouteSignature = retroRouteSignature();
+    }
   };
 
   const cleanup = () => {
     const state = window[STATE_KEY];
     if (state?.installToken !== installToken) return false;
     window[DISABLED_KEY] = true;
-    document.documentElement?.classList.remove("codex-dream-skin");
+    document.documentElement?.classList.remove("codex-dream-skin", "dream-retro-2007", "dream-retro-2007-layout");
     document.documentElement?.removeAttribute(SHELL_ATTR);
     for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
     document.documentElement?.style.removeProperty("--dream-skin-art");
@@ -657,10 +1645,13 @@
     document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
+    teardownRetroShell();
     state?.observer?.disconnect();
     state?.rootObserver?.disconnect();
+    state?.routeObserver?.disconnect();
     state?.resizeObserver?.disconnect();
     if (state?.timer) clearInterval(state.timer);
+    if (state?.routeTimer) clearInterval(state.routeTimer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (state?.scheduler?.frame != null && typeof cancelAnimationFrame === "function") {
       cancelAnimationFrame(state.scheduler.frame);
@@ -702,9 +1693,23 @@
     }
   };
   const observer = new MutationObserver(() => scheduleEnsure({ route: true }));
+  const routeActionHandler = (event) => {
+    const target = event.target instanceof Element
+      ? event.target.closest("button, a, [role=button], [role=link], [role=menuitem]")
+      : null;
+    if (!target || target.closest(`#${RETRO_SHELL_ID}`)) return;
+    const label = retroActionLabel(target);
+    if (!/^(settings(?:\s+⌘,)?|back to app|返回应用)$/i.test(label)) return;
+    queueMicrotask(() => ensure({ root: false, route: true, layout: true }));
+  };
   rootObserver = new MutationObserver(() => {
     if (samplingNativeShell) return;
     scheduleEnsure({ root: true, route: true });
+  });
+  routeObserver = new MutationObserver(() => {
+    const signature = retroRouteSignature();
+    if (signature === lastRetroRouteSignature) return;
+    scheduleEnsure({ route: true, layout: true });
   });
   const resizeHandler = () => scheduleEnsure({ route: true, layout: true });
   if (typeof ResizeObserver === "function") {
@@ -723,6 +1728,9 @@
     cleanup,
     observer,
     rootObserver,
+    routeObserver,
+    routeActionHandler,
+    routeTimer: null,
     resizeObserver,
     timer: null,
     scheduler,
@@ -737,6 +1745,7 @@
     version: VERSION,
     themeId: THEME.id || "custom",
     detectShellMode,
+    promptMenuCleanup: closeRetroPromptMenu,
   };
   const firstEnsureStartedAt = now();
   ensure({ layout: !previous || !document.getElementById(CHROME_ID) });
@@ -747,6 +1756,17 @@
     childList: true,
     subtree: true,
   });
+  lastRetroRouteSignature = retroRouteSignature();
+  routeObserver.observe(document.body || document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class", "style", "hidden", "aria-hidden", "aria-current", "data-state"],
+    characterData: true,
+    childList: true,
+    subtree: true,
+  });
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("click", routeActionHandler);
+  }
   rootObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode", "style"],
@@ -763,6 +1783,13 @@
   if (mediaHandler && mediaQuery) {
     mediaQuery.addEventListener("change", mediaHandler);
   }
+  const routeTimer = setInterval(() => {
+    const signature = retroRouteSignature();
+    if (signature === lastRetroRouteSignature) return;
+    lastRetroRouteSignature = signature;
+    ensure({ root: false, route: true, layout: true });
+  }, 500);
+  window[STATE_KEY].routeTimer = routeTimer;
   const analysisPromise = artAnalysis ? Promise.resolve(null) : analyzeArt();
   window[STATE_KEY].analysisTimer = analysisTimer;
   analysisPromise.then((analysis) => {
