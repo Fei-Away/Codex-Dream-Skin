@@ -711,6 +711,7 @@ try {
   foreach ($requiredCss in @(
     'background-image: var(--dream-art)',
     'main.main-surface > header.app-header-tint',
+    '[class~="group/application-menu-top-bar"]',
     '.app-shell-main-content-top-fade',
     '.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary',
     '--dream-immersive-composer',
