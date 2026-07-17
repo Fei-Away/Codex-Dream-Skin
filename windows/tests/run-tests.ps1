@@ -687,6 +687,13 @@ try {
   $surfacePayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $surfaceTheme)
   if ($surfacePayloadTest.ExitCode -ne 0) { throw 'Theme surface palette was not preserved in the payload.' }
+  $surfacePayloadResult = ($surfacePayloadTest.Output -join "`n") | ConvertFrom-Json
+  if (-not $surfacePayloadResult.paletteMappedToPayload -or
+    $surfacePayloadResult.rendererPalette.surface -cne 'rgb(255 250 240 / .68)' -or
+    $surfacePayloadResult.rendererPalette.surfaceRaised -cne 'rgb(255 250 240 / .88)' -or
+    $surfacePayloadResult.rendererPalette.sidebar -cne 'rgb(255 250 240 / .76)') {
+    throw 'Theme surface palette was not mapped into the generated renderer configuration.'
+  }
   $surfaceThemeJson.palette.surface = 'url(https://invalid.example)'
   Write-DreamSkinUtf8FileAtomically -Path $surfaceThemePath `
     -Content ($surfaceThemeJson | ConvertTo-Json -Depth 10)

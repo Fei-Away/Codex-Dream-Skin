@@ -980,6 +980,9 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
     if (unresolved) {
       throw new Error("Payload placeholders were not fully replaced");
     }
+    const rendererPalette = loaded.theme.palette;
+    const paletteMappedToPayload = Object.entries(rendererPalette).every(([key, value]) =>
+      loaded.payload.includes(`${JSON.stringify(key)}:${JSON.stringify(value)}`));
     console.log(JSON.stringify({
       pass: true,
       version: SKIN_VERSION,
@@ -988,6 +991,8 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
+      rendererPalette,
+      paletteMappedToPayload,
     }));
   } else if (options.mode === "watch") await runWatch(options);
   else await runOneShot(options);
