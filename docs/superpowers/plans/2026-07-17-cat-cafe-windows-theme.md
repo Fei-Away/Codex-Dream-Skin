@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a bundled Windows light theme named `一杯猫 · 暖阳咖啡店` using the supplied 2048 × 1152 cat-cafe PNG and warm translucent surfaces.
+**Goal:** Add a bundled Windows light theme named `一杯猫 · 暖阳咖啡店` using the supplied 2912 × 1632 cat-cafe PNG and warm translucent surfaces.
 
 **Architecture:** Extend the validated palette with optional surface colors, apply them as root CSS variables, and seed a second bundled saved theme without changing the current default. Reuse the existing theme store, injector, tray, pause, switch, and restore paths.
 
@@ -136,7 +136,7 @@ Run the full Windows test. Expected: FAIL because `preset-cat-cafe` is absent.
 
 - [ ] **Step 4: Copy and validate the artwork**
 
-Copy the source byte-for-byte to `cat-cafe.png`. Require identical SHA-256 hashes and use the existing metadata helper to confirm PNG, 2048 × 1152, under 16 MB and 50 MP.
+Copy the source byte-for-byte to `cat-cafe.png`. Require identical SHA-256 hashes and use the existing metadata helper to confirm PNG, 2912 × 1632, under 16 MB and 50 MP.
 
 - [ ] **Step 5: Seed without replacing the default**
 

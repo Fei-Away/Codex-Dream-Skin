@@ -70,6 +70,8 @@ Open `Codex Dream Skin - Tray` to:
 - Pause or resume the skin.
 - Reapply the theme or fully restore Codex.
 
+Fresh installs seed `桥本有菜` and `一杯猫 · 暖阳咖啡店` in Saved Themes. The cat-cafe preset is Windows-only and targets Codex's light appearance; after selecting it, use the tray to switch, pause, or restore the theme. Before publicly submitting or redistributing this preset, confirm that you have the rights to use and redistribute the artwork and related assets.
+
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
 
 ## Restore and remove shortcuts
