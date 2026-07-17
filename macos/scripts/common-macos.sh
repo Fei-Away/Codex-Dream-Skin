@@ -27,8 +27,13 @@ APP_ERROR_LOG="$STATE_ROOT/codex-launch-error.log"
 START_ERROR_LOG="$STATE_ROOT/start-error.log"
 CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
-EXPECTED_CODEX_TEAM_ID="${CODEX_EXPECTED_TEAM_ID:-2DC432GLL2}"
+EXPECTED_CODEX_TEAM_ID="2DC432GLL2"
+EXPECTED_CODEX_REQUIREMENT="anchor apple generic and certificate leaf[subject.OU] = \"$EXPECTED_CODEX_TEAM_ID\""
 SKIN_VERSION="1.2.0"
+DREAM_SKIN_VALIDATED_RUNTIME_PID=""
+DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE=""
+DREAM_SKIN_VALIDATED_RUNTIME_EXE=""
+DREAM_SKIN_VALIDATED_RUNTIME_NODE=""
 
 fail() {
   local message="$*"
@@ -229,6 +234,7 @@ discover_codex_app() {
   local executable_name=""
   local configured="${CODEX_APP_BUNDLE:-}"
 
+  CODEX_BUNDLE=""
   for candidate in "$configured" \
     "/Applications/ChatGPT.app" "$HOME/Applications/ChatGPT.app" \
     "/Applications/Codex.app" "$HOME/Applications/Codex.app"; do
@@ -268,15 +274,16 @@ require_signed_node_runtime() {
 
   RUNTIME_NODE="$CODEX_BUNDLE/Contents/Resources/cua_node/bin/node"
   [ -x "$RUNTIME_NODE" ] || fail "The signed Node.js runtime bundled with ChatGPT was not found: $RUNTIME_NODE"
-  /usr/bin/codesign --verify --strict "$RUNTIME_NODE" >/dev/null 2>&1 \
+  /usr/bin/codesign --verify --strict \
+    --test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$RUNTIME_NODE" >/dev/null 2>&1 \
     || fail "The Node.js runtime bundled with ChatGPT failed code-signature validation."
 
   CODEX_TEAM_ID="$(codesign_team_id "$CODEX_BUNDLE")"
   NODE_TEAM_ID="$(codesign_team_id "$RUNTIME_NODE")"
   [ "$CODEX_TEAM_ID" = "$EXPECTED_CODEX_TEAM_ID" ] \
     || fail "Unexpected ChatGPT signing team: ${CODEX_TEAM_ID:-missing}."
-  [ "$NODE_TEAM_ID" = "$CODEX_TEAM_ID" ] \
-    || fail "The bundled Node.js signer does not match the ChatGPT app signer."
+  [ "$NODE_TEAM_ID" = "$EXPECTED_CODEX_TEAM_ID" ] \
+    || fail "Unexpected bundled Node.js signing team: ${NODE_TEAM_ID:-missing}."
 
   local machine_arch
   local node_major
@@ -297,10 +304,12 @@ verify_macos_app_signature() {
   local verification_mode="${1:-deep}"
   case "$verification_mode" in deep|quick) ;; *) fail "Unknown runtime verification mode: $verification_mode" ;; esac
   if [ "$verification_mode" = "deep" ]; then
-    /usr/bin/codesign --verify --deep --strict "$CODEX_BUNDLE" >/dev/null 2>&1 \
+    /usr/bin/codesign --verify --deep --strict \
+      --test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$CODEX_BUNDLE" >/dev/null 2>&1 \
       || fail "The ChatGPT app signature is not valid. Restore or reinstall the official app before continuing."
   else
-    /usr/bin/codesign --verify --strict "$CODEX_BUNDLE" >/dev/null 2>&1 \
+    /usr/bin/codesign --verify --strict \
+      --test-requirement "=$EXPECTED_CODEX_REQUIREMENT" "$CODEX_BUNDLE" >/dev/null 2>&1 \
       || fail "The ChatGPT app signature is not valid. Restore or reinstall the official app before continuing."
   fi
 }
@@ -317,7 +326,7 @@ codex_main_pids() {
   while read -r pid command_line; do
     [ -n "$pid" ] || continue
     case "$command_line" in
-      "$CODEX_EXE"*) printf '%s\n' "$pid" ;;
+      "$CODEX_EXE"*) pid_is_codex_executable "$pid" && printf '%s\n' "$pid" ;;
     esac
   done < <(/bin/ps -axo pid=,command=)
 }
@@ -403,6 +412,31 @@ port_is_available() {
   [ -z "$(listener_pids "$1")" ]
 }
 
+canonical_existing_path() {
+  local input="$1"
+  local directory
+  local basename
+  [ -e "$input" ] || return 1
+  directory="$(cd "$(dirname "$input")" 2>/dev/null && pwd -P)" || return 1
+  basename="$(basename "$input")"
+  printf '%s/%s\n' "$directory" "$basename"
+}
+
+process_executable_path() {
+  /usr/sbin/lsof -a -p "$1" -d txt -Fn 2>/dev/null \
+    | /usr/bin/awk '/^n/{sub(/^n/, ""); print; exit}'
+}
+
+pid_is_codex_executable() {
+  local actual
+  local actual_canonical
+  local expected_canonical
+  actual="$(process_executable_path "$1")"
+  actual_canonical="$(canonical_existing_path "$actual" 2>/dev/null || true)"
+  expected_canonical="$(canonical_existing_path "$CODEX_EXE" 2>/dev/null || true)"
+  [ -n "$actual_canonical" ] && [ "$actual_canonical" = "$expected_canonical" ]
+}
+
 pid_is_codex_descendant() {
   local current="$1"
   local command_line=""
@@ -410,7 +444,9 @@ pid_is_codex_descendant() {
   local depth=0
   while [ "$current" -gt 1 ] 2>/dev/null && [ "$depth" -lt 32 ]; do
     command_line="$(/bin/ps -p "$current" -o command= 2>/dev/null || true)"
-    case "$command_line" in "$CODEX_EXE"*) return 0 ;; esac
+    case "$command_line" in
+      "$CODEX_EXE"*) pid_is_codex_executable "$current" && return 0 ;;
+    esac
     parent="$(/bin/ps -p "$current" -o ppid= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
     case "$parent" in ''|*[!0-9]*) return 1 ;; esac
     [ "$parent" -ne "$current" ] || return 1
@@ -482,24 +518,6 @@ state_field() {
     const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))[process.argv[2]];
     if (value !== undefined && value !== null) process.stdout.write(String(value));
   ' "$STATE_PATH" "$key"
-}
-
-restore_runtime_context_from_state() {
-  [ -f "$STATE_PATH" ] || return 0
-  local value=""
-
-  value="$(state_field codexBundle 2>/dev/null || true)"
-  # Only trust cached paths that still exist — Codex.app was renamed to
-  # ChatGPT.app (26.707), so a stale bundle/exe must not hijack launch.
-  if [ -n "$value" ] && [ -d "$value" ]; then CODEX_BUNDLE="$value"; fi
-  value="$(state_field codexExe 2>/dev/null || true)"
-  if [ -n "$value" ] && [ -x "$value" ]; then CODEX_EXE="$value"; fi
-  value="$(state_field codexVersion 2>/dev/null || true)"
-  [ -z "$value" ] || CODEX_VERSION="$value"
-  value="$(state_field codexTeamId 2>/dev/null || true)"
-  [ -z "$value" ] || CODEX_TEAM_ID="$value"
-
-  export CODEX_BUNDLE CODEX_EXE CODEX_VERSION CODEX_TEAM_ID
 }
 
 write_state() {
@@ -712,44 +730,21 @@ launch_injector_daemon() {
   fail "The injector did not start. See $INJECTOR_ERROR_LOG and $INJECTOR_LOG"
 }
 
-# Resolve Node quickly: prefer known Codex path, else full runtime check.
+# Resolve Node only through the discovered and signed official ChatGPT bundle.
 ensure_node_runtime() {
-  if [ -n "${NODE:-}" ] && [ -x "${NODE:-}" ]; then
-    if [ -z "${NODE_VERSION:-}" ]; then
-      NODE_VERSION="$("$NODE" --version 2>/dev/null || echo unknown)"
-      export NODE_VERSION
-    fi
-    # Fill CODEX_* if missing so write_state does not explode under set -u
-    : "${CODEX_BUNDLE:=}"
-    : "${CODEX_EXE:=}"
-    : "${CODEX_VERSION:=}"
-    : "${CODEX_TEAM_ID:=}"
+  if [ "$DREAM_SKIN_VALIDATED_RUNTIME_PID" = "$$" ] \
+    && [ -n "$DREAM_SKIN_VALIDATED_RUNTIME_NODE" ] \
+    && [ "${NODE:-}" = "$DREAM_SKIN_VALIDATED_RUNTIME_NODE" ] \
+    && [ "${CODEX_BUNDLE:-}" = "$DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE" ] \
+    && [ "${CODEX_EXE:-}" = "$DREAM_SKIN_VALIDATED_RUNTIME_EXE" ]; then
     return 0
   fi
-  local candidate cand_bundle
-  for candidate in \
-    "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node" \
-    "/Applications/Codex.app/Contents/Resources/cua_node/bin/node" \
-    "$HOME/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node" \
-    "$HOME/Applications/Codex.app/Contents/Resources/cua_node/bin/node"
-  do
-    if [ -x "$candidate" ]; then
-      NODE="$candidate"
-      NODE_VERSION="$("$NODE" --version 2>/dev/null || echo unknown)"
-      export NODE NODE_VERSION
-      # Derive the bundle from the chosen node so CODEX_* matches the app that
-      # actually exists on disk (Codex.app vs renamed ChatGPT.app).
-      cand_bundle="${candidate%/Contents/Resources/cua_node/bin/node}"
-      : "${CODEX_BUNDLE:=$cand_bundle}"
-      : "${CODEX_EXE:=$cand_bundle/Contents/MacOS/ChatGPT}"
-      : "${CODEX_VERSION:=}"
-      : "${CODEX_TEAM_ID:=}"
-      restore_runtime_context_from_state
-      return 0
-    fi
-  done
   discover_codex_app
-  require_macos_runtime
+  require_signed_node_runtime
+  DREAM_SKIN_VALIDATED_RUNTIME_PID="$$"
+  DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE="$CODEX_BUNDLE"
+  DREAM_SKIN_VALIDATED_RUNTIME_EXE="$CODEX_EXE"
+  DREAM_SKIN_VALIDATED_RUNTIME_NODE="$NODE"
 }
 
 # Fast path when CDP is already open: restart injector + one-shot inject.
@@ -767,8 +762,8 @@ hot_reapply_theme() {
 
   # A generic HTTP listener is not enough for a hot re-apply: only use the
   # endpoint already verified as belonging to the official Codex process.
-  verified_cdp_endpoint "$port" || return 1
   ensure_node_runtime || return 1
+  verified_cdp_endpoint "$port" || return 1
   [ -n "$operation_token" ] || operation_token="$(new_operation_token)"
   write_operation_state applying "正在应用已选主题" "$operation_token" || return 1
   operation_args=(--operation-token "$operation_token")

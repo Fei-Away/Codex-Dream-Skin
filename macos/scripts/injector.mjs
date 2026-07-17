@@ -908,27 +908,6 @@ async function waitForVerifiedSession(session, timeoutMs, expectedThemeId = null
 
 async function capture(session, outputPath) {
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  const bestEffortInput = async (method, params) => {
-    try {
-      await session.send(method, params, 750);
-    } catch {
-      // Screenshot capture is still valid when a renderer omits the Input domain.
-    }
-  };
-  await bestEffortInput("Input.dispatchKeyEvent", {
-    type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27,
-  });
-  await bestEffortInput("Input.dispatchKeyEvent", {
-    type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27,
-  });
-  const viewport = await session.evaluate("({ width: innerWidth, height: innerHeight })");
-  await bestEffortInput("Input.dispatchMouseEvent", {
-    type: "mouseMoved",
-    x: Math.round(viewport.width * 0.64),
-    y: Math.round(viewport.height * 0.62),
-    button: "none",
-  });
-  await new Promise((resolve) => setTimeout(resolve, 300));
   const result = await session.send("Page.captureScreenshot", {
     format: "png",
     fromSurface: true,

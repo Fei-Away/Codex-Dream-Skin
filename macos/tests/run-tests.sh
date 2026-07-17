@@ -41,6 +41,15 @@ if ! /usr/bin/grep -F -q 'flag: "wx"' "$ROOT/scripts/write-theme.mjs"; then
   printf 'Theme writes must create randomized temporary files exclusively.\n' >&2
   exit 1
 fi
+if /usr/bin/grep -E -q 'Input\.dispatch(KeyEvent|MouseEvent)' "$ROOT/scripts/injector.mjs"; then
+  printf 'Screenshot capture must not dispatch renderer input events.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -F -q 'CODEX_EXPECTED_TEAM_ID' "$ROOT/scripts/common-macos.sh" ||
+    [ "$(/usr/bin/grep -F -c -- '--test-requirement' "$ROOT/scripts/common-macos.sh")" -lt 3 ]; then
+  printf 'macOS runtime identity must use the fixed OpenAI signing requirement.\n' >&2
+  exit 1
+fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
@@ -216,33 +225,60 @@ RUNTIME_HOME="$TMP/runtime-home"
 RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
 RUNTIME_STATE="$RUNTIME_STATE_ROOT/state.json"
 STATE_EVAL_MARKER="$TMP/state-eval-marker"
-# Bundle/exe must exist for restore to trust them (Codex.app→ChatGPT.app rename),
-# so build a real bundle whose name still carries spaces/quotes. Shell-injection
-# probing moves to the version field, which restore accepts verbatim.
-EXPECTED_BUNDLE="$TMP/evil-root/Codex \"Skin\".app"
-EXPECTED_EXE="$EXPECTED_BUNDLE/Contents/MacOS/ChatGPT"
-EXPECTED_VERSION="1.1.2 \$(touch \"$STATE_EVAL_MARKER\") ; echo pwned"
-EXPECTED_TEAM_ID="TEAM'ID"
-/bin/mkdir -p "$RUNTIME_STATE_ROOT" "$EXPECTED_BUNDLE/Contents/MacOS"
-/usr/bin/printf '#!/bin/bash\ntrue\n' > "$EXPECTED_EXE"
-/bin/chmod +x "$EXPECTED_EXE"
+UNTRUSTED_BUNDLE="$TMP/evil-root/Codex \"Skin\".app"
+UNTRUSTED_EXE="$UNTRUSTED_BUNDLE/Contents/MacOS/ChatGPT"
+UNTRUSTED_VERSION="1.1.2 \$(touch \"$STATE_EVAL_MARKER\") ; echo pwned"
+UNTRUSTED_TEAM_ID="TEAM'ID"
+/bin/mkdir -p "$RUNTIME_STATE_ROOT" "$UNTRUSTED_BUNDLE/Contents/MacOS"
+/usr/bin/printf '#!/bin/bash\ntrue\n' > "$UNTRUSTED_EXE"
+/bin/chmod +x "$UNTRUSTED_EXE"
 "$NODE" -e '
   const fs = require("node:fs");
   const [file, codexBundle, codexExe, codexVersion, codexTeamId] = process.argv.slice(1);
   fs.writeFileSync(file, `${JSON.stringify({ codexBundle, codexExe, codexVersion, codexTeamId })}\n`);
-' "$RUNTIME_STATE" "$EXPECTED_BUNDLE" "$EXPECTED_EXE" "$EXPECTED_VERSION" "$EXPECTED_TEAM_ID"
-/usr/bin/env -u NODE -u NODE_VERSION HOME="$RUNTIME_HOME" /bin/bash -c '
+' "$RUNTIME_STATE" "$UNTRUSTED_BUNDLE" "$UNTRUSTED_EXE" "$UNTRUSTED_VERSION" "$UNTRUSTED_TEAM_ID"
+/usr/bin/env HOME="$RUNTIME_HOME" NODE="$UNTRUSTED_EXE" NODE_VERSION="untrusted" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
+  TRUSTED_BUNDLE="$2"
+  TRUSTED_EXE="$3"
+  TRUSTED_NODE="$4"
+  DISCOVER_CALLS=0
+  SIGNED_NODE_CALLS=0
+  discover_codex_app() {
+    DISCOVER_CALLS=$((DISCOVER_CALLS + 1))
+    CODEX_BUNDLE="$TRUSTED_BUNDLE"
+    CODEX_EXE="$TRUSTED_EXE"
+    CODEX_VERSION="trusted"
+  }
+  require_signed_node_runtime() {
+    SIGNED_NODE_CALLS=$((SIGNED_NODE_CALLS + 1))
+    NODE="$TRUSTED_NODE"
+    NODE_VERSION="v22.0.0"
+    CODEX_TEAM_ID="2DC432GLL2"
+  }
   ensure_node_runtime
-  [ "$CODEX_BUNDLE" = "$2" ]
-  [ "$CODEX_EXE" = "$3" ]
-  [ "$CODEX_VERSION" = "$4" ]
-  [ "$CODEX_TEAM_ID" = "$5" ]
-' _ "$ROOT" "$EXPECTED_BUNDLE" "$EXPECTED_EXE" "$EXPECTED_VERSION" "$EXPECTED_TEAM_ID"
+  ensure_node_runtime
+  [ "$DISCOVER_CALLS" -eq 1 ]
+  [ "$SIGNED_NODE_CALLS" -eq 1 ]
+  [ "$NODE" = "$TRUSTED_NODE" ]
+  [ "$CODEX_BUNDLE" = "$TRUSTED_BUNDLE" ]
+  [ "$CODEX_EXE" = "$TRUSTED_EXE" ]
+  [ "$CODEX_TEAM_ID" = "2DC432GLL2" ]
+' _ "$ROOT" "/trusted/ChatGPT.app" "/trusted/ChatGPT.app/Contents/MacOS/ChatGPT" "$NODE"
 [ ! -e "$STATE_EVAL_MARKER" ] || {
   printf 'Runtime state values were evaluated as shell code.\n' >&2
   exit 1
 }
+
+# A command-line prefix is insufficient: the process text executable must match.
+/usr/bin/env HOME="$RUNTIME_HOME" /bin/bash -c '
+  . "$1/scripts/common-macos.sh"
+  CODEX_EXE="/bin/bash"
+  pid_is_codex_executable "$$"
+  pid_is_codex_descendant "$$"
+  process_executable_path() { printf "/bin/zsh\n"; }
+  if pid_is_codex_executable "$$" || pid_is_codex_descendant "$$"; then exit 1; fi
+' _ "$ROOT"
 
 # A reused live PID must never be killed or treated as a successfully stopped
 # injector when its command identity does not match the recorded watcher.

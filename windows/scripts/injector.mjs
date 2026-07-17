@@ -68,6 +68,15 @@ function validatedDebuggerUrl(target, port) {
   return url.href;
 }
 
+function parseCdpMessage(data) {
+  try {
+    const message = JSON.parse(String(data));
+    return message && typeof message === "object" ? message : null;
+  } catch {
+    return null;
+  }
+}
+
 function browserIdFromVersion(version, port) {
   const url = validatedDebuggerUrl(version, port);
   const parsed = new URL(url);
@@ -124,10 +133,8 @@ class CdpSession {
   }
 
   onMessage(event) {
-    let message;
-    try {
-      message = JSON.parse(String(event.data));
-    } catch {
+    const message = parseCdpMessage(event.data);
+    if (!message) {
       this.close();
       return;
     }
@@ -629,16 +636,6 @@ async function waitForVerifiedSession(session, timeoutMs) {
 
 async function capture(session, outputPath) {
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  await session.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-  await session.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-  const viewport = await session.evaluate("({ width: innerWidth, height: innerHeight })");
-  await session.send("Input.dispatchMouseEvent", {
-    type: "mouseMoved",
-    x: Math.round(viewport.width * 0.64),
-    y: Math.round(viewport.height * 0.62),
-    button: "none",
-  });
-  await new Promise((resolve) => setTimeout(resolve, 300));
   const result = await session.send("Page.captureScreenshot", {
     format: "png",
     fromSurface: true,
@@ -970,6 +967,15 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
   if (!valid || browserId !== "test-browser" || !isValidCdpPageTarget(validPageTarget, options.port) ||
       invalidPageTargets.some((item) => isValidCdpPageTarget(item, options.port))) {
     throw new Error("CDP URL and target validation self-test failed");
+  }
+  const validMessage = parseCdpMessage('{"id":7,"result":{"ok":true}}');
+  const invalidMessages = ["{not-json", "null", '"text"', "42", "true"];
+  if (validMessage?.id !== 7 || validMessage.result?.ok !== true ||
+      invalidMessages.some((value) => parseCdpMessage(value) !== null)) {
+    throw new Error("CDP message validation self-test failed");
+  }
+  if (/dispatchKeyEvent|dispatchMouseEvent/.test(capture.toString())) {
+    throw new Error("Screenshot capture must not dispatch renderer input events");
   }
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
   } else if (options.mode === "check-payload") {

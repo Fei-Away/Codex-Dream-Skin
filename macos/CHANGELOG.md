@@ -15,6 +15,7 @@
 - watcher 在文档壳层出现后立即注入，按 CSS/主题/图片内容哈希热刷新并复用静态 payload；同一主题切换不再重复启动守护进程，减少原生界面闪现和后台轮询。
 - 主题切换先完整暂存图片，最后原子发布 `theme.json`；全新安装在没有活动主题时先启用通用的「午夜极光」，已有活动主题保持不变。
 - `load-image-theme-macos.sh` 可通过 `--appearance`、`--focus-x`、`--focus-y`、`--safe-area`、`--task-mode` 精确调节构图；旧主题缺省时使用安全自适应值。
+- 客户端发行包的说明版本改为读取 `VERSION`，避免发布文案与实际版本漂移。
 
 ### 修复
 
@@ -32,10 +33,12 @@
 - 浅色模式撰写器改为更通透的珍珠白表面，并修复占位文字被原生双重透明度削弱的问题；暗色模式继续使用单层实色表面。
 - 兼容 Codex Desktop 更名：官方桌面端在 26.707 从 `Codex.app` 更名为 `ChatGPT.app`（bundle id 仍是 com.openai.codex）。发现 / 启动流程现在两种名字都识别，且 `state.json` 缓存的旧 app 路径若已不存在则不再劫持启动——此前更新后会因指向旧 `Codex.app` 而启动失败
 - 菜单栏与 `status-dream-skin-macos.sh` 不再依赖 `/usr/bin/python3`（macOS 12.3+ 默认不预装）读取主题名与运行状态，改用纯 shell 解析；此前在未装 Xcode 命令行工具的机器上，主题名会退化成 id、`--json` 状态直接失效
+- 截图验证不再向 ChatGPT 派发 Escape、鼠标移动或额外等待 300ms，避免验证过程改变用户当前界面。
 
 ### 安全
 
 - CDP 端点必须由已验证的官方 Codex 可执行文件或其子进程监听；WebSocket 还会校验 loopback、page ID、路径、无重定向，并安全处理畸形消息和发送异常。
+- App 与 bundled Node 必须满足固定的 OpenAI Team ID 和 Apple signing requirement；热应用不再信任外部 `NODE` 或 `state.json` 中缓存的运行时身份，CDP 祖先还会核对进程的真实 executable path。
 - 主题配置与图片使用真实路径 containment，拒绝 symlink 越界、空文件、超过 16 MB、单边超过 16384 px 或超过 50 MP 的图片；主题展示文本拒绝换行和控制字符。
 - AppleScript 动态内容全部通过 argv 传递；SwiftBar 过滤主题 ID、文件名和菜单文本，避免主题元数据改变菜单属性或命令参数。
 - `config.toml` 只按严格 UTF-8 读取，拒绝 NUL、歧义多行 TOML、重复 `[desktop]`，通过用户级锁、原始字节核验和同目录原子替换保护中文配置与并发写入。
@@ -44,6 +47,7 @@
 ### 测试
 
 - 覆盖每套预设的可注入性与播种幂等、首页/任务 renderer、早期注入、主题原子切换、中文与 CRLF/BOM 配置往返、非法 UTF-8/NUL/TOML 拒绝、路径穿越、symlink 越界、控制字符和像素炸弹。
+- 增加固定签名要求、可信 bundled Node、真实 executable ancestry 和非交互截图的回归检查。
 
 ### 说明
 
