@@ -229,6 +229,27 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $presetTheme
     Copy-Item -LiteralPath (Join-Path $assetRoot 'theme.json') -Destination $presetTheme -Force
   }
+  $catCafeSource = Join-Path $SkillRoot 'presets\preset-cat-cafe'
+  $catCafeSourceTheme = Join-Path $catCafeSource 'theme.json'
+  $catCafeSourceImage = Join-Path $catCafeSource 'cat-cafe.png'
+  Assert-DreamSkinNoReparseComponents -Path $catCafeSource
+  Assert-DreamSkinNoReparseComponents -Path $catCafeSourceTheme
+  Assert-DreamSkinNoReparseComponents -Path $catCafeSourceImage
+  Assert-DreamSkinImageFile -Path $catCafeSourceImage
+  $catCafeDirectory = Join-Path $paths.Saved 'preset-cat-cafe'
+  $catCafeTheme = Join-Path $catCafeDirectory 'theme.json'
+  Assert-DreamSkinNoReparseComponents -Path $catCafeDirectory
+  Assert-DreamSkinNoReparseComponents -Path $catCafeTheme
+  if (-not (Test-Path -LiteralPath $catCafeTheme -PathType Leaf)) {
+    Ensure-DreamSkinManagedDirectory -Path $catCafeDirectory -Root $paths.Root
+    $catCafeImage = Join-Path $catCafeDirectory 'cat-cafe.png'
+    Assert-DreamSkinNoReparseComponents -Path $catCafeImage
+    Copy-Item -LiteralPath $catCafeSourceImage -Destination $catCafeImage -Force
+    Assert-DreamSkinNoReparseComponents -Path $catCafeImage
+    Assert-DreamSkinImageFile -Path $catCafeImage
+    Assert-DreamSkinNoReparseComponents -Path $catCafeTheme
+    Copy-Item -LiteralPath $catCafeSourceTheme -Destination $catCafeTheme -Force
+  }
   $null = Read-DreamSkinTheme -ThemeDirectory $paths.Active
   return $paths
 }

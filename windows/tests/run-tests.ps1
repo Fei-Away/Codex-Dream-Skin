@@ -472,10 +472,22 @@ try {
     throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
-  if ($preseededThemes.Count -ne 1 -or
-    $preseededThemes[0].Id -cne 'preset-romantic-rose' -or
-    $preseededThemes[0].Name -cne '桥本有菜') {
-    throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
+  $romanticPreset = @($preseededThemes | Where-Object { $_.Id -ceq 'preset-romantic-rose' })
+  $catCafePreset = @($preseededThemes | Where-Object { $_.Id -ceq 'preset-cat-cafe' })
+  $catCafeTheme = if ($catCafePreset.Count -eq 1) {
+    Read-DreamSkinTheme -ThemeDirectory $catCafePreset[0].Path
+  } else { $null }
+  if ($preseededThemes.Count -ne 2 -or
+    $romanticPreset.Count -ne 1 -or
+    $romanticPreset[0].Name -cne '桥本有菜' -or
+    $catCafePreset.Count -ne 1 -or
+    $catCafePreset[0].Name -cne '一杯猫 · 暖阳咖啡店' -or
+    $catCafeTheme.Theme.appearance -cne 'light' -or
+    $catCafeTheme.Theme.art.safeArea -cne 'center' -or
+    $catCafeTheme.Theme.art.taskMode -cne 'ambient' -or
+    $catCafeTheme.Theme.palette.accent -cne '#E99A72' -or
+    [System.IO.Path]::GetExtension($catCafeTheme.ImagePath) -cne '.png') {
+    throw 'The two bundled Windows themes were not preseeded with the expected contracts.'
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
@@ -489,11 +501,11 @@ try {
   $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   $idempotentTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
   if ($idempotentTheme.Theme.id -cne 'custom' -or
-    @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 1) {
+    @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 2) {
     throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled preset.'
   }
   $savedTheme = Save-DreamSkinCurrentTheme -Name '已保存主题' -StateRoot $themeStateRoot
-  if ($savedTheme.Theme.name -cne '已保存主题' -or @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 2) {
+  if ($savedTheme.Theme.name -cne '已保存主题' -or @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 3) {
     throw 'Saved theme creation or discovery failed.'
   }
   $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot

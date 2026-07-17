@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-cat-cafe",
+  "name": "一杯猫 · 暖阳咖啡店",
+  "image": "cat-cafe.png",
+  "appearance": "light",
+  "art": {"focusX": 0.5, "focusY": 0.5, "safeArea": "center", "taskMode": "ambient"},
+  "palette": {
+    "accent": "#E99A72",
+    "surface": "rgb(255 250 240 / .68)",
+    "surfaceRaised": "rgb(255 250 240 / .88)",
+    "sidebar": "rgb(255 250 240 / .76)"
+  }
+}
