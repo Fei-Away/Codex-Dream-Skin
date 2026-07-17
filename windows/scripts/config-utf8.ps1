@@ -110,7 +110,7 @@ function Write-DreamSkinBytesAtomically {
       Assert-DreamSkinFileUnchanged -Path $fullPath -ExpectedBytes $ExpectedBytes
     }
     if ([System.IO.File]::Exists($fullPath)) {
-      [System.IO.File]::Replace($temporary, $fullPath, $null)
+      [System.IO.File]::Replace($temporary, $fullPath, [NullString]::Value)
     } else {
       [System.IO.File]::Move($temporary, $fullPath)
     }
@@ -170,7 +170,7 @@ function Assert-DreamSkinTomlLineEditingSafe {
   if ($Content.Contains('"""') -or $Content.Contains("'''")) {
     throw 'Refusing to rewrite TOML containing multiline strings; use single-line values before installing Dream Skin.'
   }
-  foreach ($match in [regex]::Matches($Content, '(?m)^[^\r\n]*=[\t ]*\[[^\r\n]*$')) {
+  foreach ($match in [regex]::Matches($Content, '(?m)^[^\r\n]*=[\t ]*\[[^\r\n]*\r?$')) {
     if ((Get-DreamSkinTomlArrayBracketBalance -Line $match.Value) -ne 0) {
       throw 'Refusing to rewrite TOML containing multiline arrays; use single-line arrays before installing Dream Skin.'
     }
@@ -262,18 +262,18 @@ function Set-DreamSkinSectionSetting {
   param(
     [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Body,
     [Parameter(Mandatory = $true)][string]$Key,
-    [AllowNull()][string]$Line,
+    [AllowNull()][object]$Line,
     [Parameter(Mandatory = $true)][string]$NewLine
   )
 
   $keyToken = Get-DreamSkinTomlKeyTokenPattern -Key $Key
-  $pattern = "(?m)^[\t ]*$keyToken[\t ]*=.*(?:\r?\n)?"
+  $pattern = "(?m)^[\t ]*$keyToken[\t ]*=[^\r\n]*(?:\r?\n)?"
   $matcher = [regex]::new($pattern)
   if ($matcher.Matches($Body).Count -gt 1) {
     throw "Refusing to rewrite duplicate '$Key' entries in the [desktop] section."
   }
   if ($null -eq $Line) { return $matcher.Replace($Body, '', 1) }
-  $normalizedLine = $Line.TrimEnd("`r", "`n") + $NewLine
+  $normalizedLine = ([string]$Line).TrimEnd("`r", "`n") + $NewLine
   if ($matcher.IsMatch($Body)) {
     $literalReplacement = $normalizedLine.Replace('$', '$$')
     return $matcher.Replace($Body, $literalReplacement, 1)

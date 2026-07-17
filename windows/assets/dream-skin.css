@@ -145,6 +145,11 @@ html.codex-dream-skin .dream-task::before {
   mask-image: linear-gradient(to bottom, oklch(0 0 0) 0, oklch(0 0 0 / .92) 38%, transparent 88%);
 }
 
+html.codex-dream-skin body.dream-task::before {
+  position: fixed;
+  z-index: -1;
+}
+
 html.codex-dream-skin.dream-art-wide .dream-task::before {
   background-position: center top;
   background-size: 100% auto;

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
@@ -241,6 +241,14 @@ try {
   $quotedProfile = ConvertTo-DreamSkinProcessArgument -Value '--user-data-dir=C:\Dream Skin\Profile\'
   if ($quotedProfile -cne '"--user-data-dir=C:\Dream Skin\Profile\\"') {
     throw 'Process argument quoting did not protect spaces and a trailing backslash.'
+  }
+  $argumentLine = ConvertTo-DreamSkinProcessArgumentLine -Arguments @(
+    '--remote-debugging-address=127.0.0.1',
+    '--remote-debugging-port=9335',
+    '--user-data-dir=C:\Dream Skin\Profile\'
+  )
+  if ($argumentLine -cne '--remote-debugging-address=127.0.0.1 --remote-debugging-port=9335 "--user-data-dir=C:\Dream Skin\Profile\\"') {
+    throw 'Codex AppUserModelId activation did not preserve each raw launch argument.'
   }
 
   $statePath = Join-Path $temporaryRoot 'state.json'
@@ -519,8 +527,15 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Injector self-test failed.' }
   & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload --theme-dir $themePaths.Active *> $null
   if ($LASTEXITCODE -ne 0) { throw 'Managed theme payload validation failed.' }
-  & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload --theme-dir $oversizedTheme *> $null
-  if ($LASTEXITCODE -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }
+  $previousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload --theme-dir $oversizedTheme *> $null
+    $oversizedThemeExitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+  if ($oversizedThemeExitCode -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }
   & $node.Path (Join-Path $PSScriptRoot 'renderer-inject.test.mjs')
   if ($LASTEXITCODE -ne 0) { throw 'Renderer auxiliary-window regression test failed.' }
   & $node.Path (Join-Path $PSScriptRoot 'injector-bootstrap.test.mjs')

@@ -326,12 +326,10 @@
     const root = document.documentElement;
     if (!root || !document.body) return;
 
-    const shellMain = document.querySelector("main.main-surface");
-    const shellSidebar = document.querySelector("aside.app-shell-left-panel");
-    if (!shellMain || !shellSidebar) {
-      clearSkinDom();
-      return;
-    }
+    const shellMain = document.querySelector("main.main-surface") ||
+      document.querySelector("main") ||
+      document.querySelector('[role="main"]') ||
+      document.body;
 
     root.classList.add("codex-dream-skin");
     applyProfile(root);
@@ -348,7 +346,9 @@
     }
 
     const home = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
-    for (const candidate of document.querySelectorAll('[role="main"]')) {
+    const mainCandidates = [...document.querySelectorAll('[role="main"]')];
+    if (!mainCandidates.length) mainCandidates.push(shellMain);
+    for (const candidate of mainCandidates) {
       candidate.classList.toggle("dream-home", candidate === home);
       candidate.classList.toggle("dream-task", candidate !== home);
     }

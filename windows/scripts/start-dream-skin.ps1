@@ -110,9 +110,9 @@ try {
       $arguments = @('--remote-debugging-address=127.0.0.1', "--remote-debugging-port=$Port")
       if ($ProfilePath) {
         New-Item -ItemType Directory -Force -Path $ProfilePath | Out-Null
-        $arguments += ConvertTo-DreamSkinProcessArgument -Value "--user-data-dir=$ProfilePath"
+        $arguments += "--user-data-dir=$ProfilePath"
       }
-      Start-Process -FilePath $codex.Executable -ArgumentList $arguments | Out-Null
+      Start-DreamSkinCodexWithArguments -Codex $codex -Arguments $arguments | Out-Null
       $launchedWithCdp = $true
     }
 
@@ -137,7 +137,7 @@ try {
       if ($launchedWithCdp) {
         Write-Warning 'Dream Skin launch failed; reopening Codex without a debugging port.'
       }
-      try { Start-Process -FilePath $codex.Executable | Out-Null } catch {
+      try { Start-DreamSkinCodexWithArguments -Codex $codex | Out-Null } catch {
         Write-Warning 'Launch rollback could not reopen Codex automatically.'
       }
     }
@@ -154,7 +154,7 @@ try {
     if ($launchedWithCdp) {
       try {
         Stop-DreamSkinCodex -Codex $codex -AllowForce
-        Start-Process -FilePath $codex.Executable | Out-Null
+        Start-DreamSkinCodexWithArguments -Codex $codex | Out-Null
       } catch {
         Write-Warning 'State validation rollback could not fully restart Codex; close Codex to ensure its CDP port is closed.'
       }
@@ -225,9 +225,15 @@ try {
     }
     Write-DreamSkinState -Path $StatePath -State $state
 
-    $verifyOutput = @(& $node.Path $Injector --verify --port $Port --browser-id $cdpIdentity.BrowserId `
-      --timeout-ms 30000 2>&1)
-    $verifyExitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+      $ErrorActionPreference = 'Continue'
+      $verifyOutput = @(& $node.Path $Injector --verify --port $Port --browser-id $cdpIdentity.BrowserId `
+        --timeout-ms 30000 2>&1)
+      $verifyExitCode = $LASTEXITCODE
+    } finally {
+      $ErrorActionPreference = $previousErrorActionPreference
+    }
     Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verifyOutput -join "`r`n") + "`r`n")
     if ($verifyExitCode -ne 0) { throw "Dream Skin verification failed. See $VerifyPath" }
   } catch {
@@ -266,7 +272,7 @@ try {
     if ($launchedWithCdp) {
       try {
         Stop-DreamSkinCodex -Codex $codex -AllowForce
-        Start-Process -FilePath $codex.Executable | Out-Null
+        Start-DreamSkinCodexWithArguments -Codex $codex | Out-Null
       } catch {
         Write-Warning 'Startup rollback could not fully restart Codex; close Codex to ensure its CDP port is closed.'
       }

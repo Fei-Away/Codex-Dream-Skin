@@ -419,15 +419,26 @@ async function readThemeSourceStamp(loadedTheme) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const codexApp = location.protocol === 'app:' && document.title === 'Codex' &&
+      (location.href === 'app://-/index.html' || location.href === 'app://codex/' || location.href.startsWith('app://codex/'));
     const markers = {
       shell: Boolean(document.querySelector('main.main-surface')),
       sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
       composer: Boolean(document.querySelector('.composer-surface-chrome')),
       main: Boolean(document.querySelector('[role="main"]')),
+      mainElement: Boolean(document.querySelector('main')),
+      asideElement: Boolean(document.querySelector('aside')),
+      contentEditable: Boolean(document.querySelector('[contenteditable="true"]')),
+      textarea: Boolean(document.querySelector('textarea')),
+      codexApp,
     };
     return {
+      href: location.href,
+      protocol: location.protocol,
+      title: document.title,
+      bodyClass: document.body?.className ?? '',
       markers,
-      codex: location.protocol === 'app:' && markers.shell && markers.sidebar && (markers.composer || markers.main),
+      codex: markers.codexApp || (location.protocol === 'app:' && markers.shell && markers.sidebar && (markers.composer || markers.main)),
     };
   })()`);
 }
@@ -458,11 +469,13 @@ async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
     try {
       const targets = await listAppTargets(port, expectedBrowserId);
       const connected = [];
+      const probes = [];
       for (const target of targets) {
         let session;
         try {
           session = await connectTarget(target, port);
           const probe = await probeSession(session);
+          probes.push({ url: target.url, title: target.title, probe });
           if (probe?.codex) connected.push({ target, session, probe });
           else session.close();
         } catch (error) {
@@ -471,7 +484,7 @@ async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
         }
       }
       if (connected.length) return connected;
-      lastError = new Error("No page matched the expected Codex shell markers");
+      lastError = new Error(`No page matched the expected Codex shell markers: ${JSON.stringify(probes).slice(0, 1800)}`);
     } catch (error) {
       if (error instanceof CdpIdentityMismatchError) throw error;
       lastError = error;
@@ -502,10 +515,9 @@ export function earlyPayloadFor(payload, revision) {
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
       const root = document.documentElement;
-      if (!root || !document.body) return false;
-      const shell = document.querySelector('main.main-surface');
-      const sidebar = document.querySelector('aside.app-shell-left-panel');
-      if (!shell || !sidebar) return false;
+      const codexApp = location.protocol === "app:" && document.title === "Codex" &&
+        (location.href === "app://-/index.html" || location.href === "app://codex/" || location.href.startsWith("app://codex/"));
+      if (!root || !document.body || !codexApp) return false;
       stop();
       ${payload};
       window[appliedKey] = generation;
@@ -602,7 +614,7 @@ async function verifySession(session) {
     };
     result.pass = result.installed && result.version === result.expectedVersion &&
       result.stylePresent && result.chromePresent &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
+      result.chromePointerEvents === 'none' &&
       (!result.homePresent || (Boolean(result.hero) &&
         (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
     return result;

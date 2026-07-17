@@ -15,6 +15,7 @@ const payload = buildPayload();
 
 function createFixture({
   shellPresent,
+  modernMainPresent = false,
   staleSkin = false,
   homePresent = false,
   utilityPresent = false,
@@ -74,8 +75,10 @@ function createFixture({
       nodes.set(node.id, node);
     },
   };
+  const bodyClasses = new Set();
   const body = {
     className: "",
+    classList: makeClassList(bodyClasses),
     getAttribute() { return null; },
     appendChild(node) {
       node.parentElement = body;
@@ -86,6 +89,13 @@ function createFixture({
     classList: makeClassList(),
     getBoundingClientRect() {
       return { left: 290, top: 36, width: 990, height: 784 };
+    },
+  };
+  const modernMainClasses = new Set();
+  const modernMain = {
+    classList: makeClassList(modernMainClasses),
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 1280, height: 820 };
     },
   };
   const routeClasses = new Set();
@@ -143,6 +153,7 @@ function createFixture({
     getElementById(id) { return nodes.get(id) ?? null; },
     querySelector(selector) {
       if (selector === "main.main-surface") return hasShell ? shellMain : null;
+      if (selector === "main") return modernMainPresent ? modernMain : null;
       if (selector === "aside.app-shell-left-panel") return hasShell ? {} : null;
       if (selector === '[role="main"]:has([data-testid="home-icon"])') {
         return hasShell && homePresent ? routeMain : null;
@@ -215,6 +226,8 @@ function createFixture({
     observers,
     rootClasses,
     rootStyles,
+    bodyClasses,
+    modernMainClasses,
     revokedUrls,
     routeClasses,
     utilityClasses,
@@ -255,16 +268,22 @@ assert.equal(secondState.cleanup(), true);
 const auxiliary = createFixture({ shellPresent: false, staleSkin: true });
 const auxiliaryResult = vm.runInNewContext(payload, auxiliary.context);
 assert.equal(auxiliaryResult.installed, true);
-assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), false);
-assert.equal(auxiliary.rootStyles.has("--dream-art"), false);
-assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), false);
-assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), false);
+assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), true);
+assert.equal(auxiliary.rootStyles.has("--dream-art"), true);
+assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), true);
+assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), true);
+assert.equal(auxiliary.bodyClasses.has("dream-task"), true);
 
 auxiliary.setShellPresent(true);
 auxiliary.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
 assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), true);
+
+const modernMain = createFixture({ shellPresent: false, modernMainPresent: true });
+const modernMainResult = vm.runInNewContext(payload, modernMain.context);
+assert.equal(modernMainResult.installed, true);
+assert.equal(modernMain.modernMainClasses.has("dream-task"), true);
 
 const configured = createFixture({
   shellPresent: true,

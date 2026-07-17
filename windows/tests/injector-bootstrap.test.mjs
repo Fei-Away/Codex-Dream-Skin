@@ -9,22 +9,24 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
-function createFixture() {
+function createFixture({
+  href = "app://-/auxiliary.html",
+  title = "Codex",
+  bodyPresent = true,
+} = {}) {
   const observers = [];
   const timers = new Map();
   let nextTimer = 1;
-  const markers = { shell: false, sidebar: false };
+  let hasBody = bodyPresent;
+  const body = {};
   const context = {
     window: { installs: [] },
     document: {
       documentElement: {},
-      body: {},
-      querySelector(selector) {
-        if (selector === "main.main-surface") return markers.shell ? {} : null;
-        if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
-        return null;
-      },
+      get body() { return hasBody ? body : null; },
+      title,
     },
+    location: { protocol: "app:", href },
     MutationObserver: class {
       constructor(callback) {
         this.callback = callback;
@@ -41,24 +43,25 @@ function createFixture() {
     },
     clearTimeout(id) { timers.delete(id); },
   };
-  return { context, markers, observers };
+  return {
+    context,
+    observers,
+    setBodyPresent(value) { hasBody = value; },
+  };
 }
 
 const guarded = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("guarded")', "guarded"), guarded.context);
 assert.deepEqual(guarded.context.window.installs, [], "Auxiliary app targets must remain untouched.");
-guarded.markers.shell = true;
-guarded.observers[0].callback([]);
-assert.deepEqual(guarded.context.window.installs, [], "A main surface without the Codex sidebar is not sufficient.");
-guarded.markers.sidebar = true;
-guarded.observers[0].callback([]);
-assert.deepEqual(guarded.context.window.installs, ["guarded"], "The guarded payload should install once the shell is complete.");
 
-const generations = createFixture();
+const codex = createFixture({ href: "app://-/index.html" });
+vm.runInNewContext(earlyPayloadFor('window.installs.push("codex")', "codex"), codex.context);
+assert.deepEqual(codex.context.window.installs, ["codex"], "The Codex entry page should not wait for retired shell selectors.");
+
+const generations = createFixture({ href: "app://-/index.html", bodyPresent: false });
 vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);
 vm.runInNewContext(earlyPayloadFor('window.installs.push("new")', "new"), generations.context);
-generations.markers.shell = true;
-generations.markers.sidebar = true;
+generations.setBodyPresent(true);
 for (const observer of generations.observers) observer.callback([]);
 assert.deepEqual(
   generations.context.window.installs,

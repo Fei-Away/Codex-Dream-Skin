@@ -130,6 +130,90 @@ function Get-DreamSkinCodexInstall {
   return $installs[0]
 }
 
+function ConvertTo-DreamSkinProcessArgumentLine {
+  param([AllowEmptyCollection()][string[]]$Arguments = @())
+
+  return (@($Arguments) | ForEach-Object { ConvertTo-DreamSkinProcessArgument -Value $_ }) -join ' '
+}
+
+function Get-DreamSkinCodexAppUserModelId {
+  param([Parameter(Mandatory = $true)][object]$Codex)
+
+  if (-not $Codex.PackageFullName -or -not $Codex.PackageFamilyName) {
+    throw 'The verified Codex package identity is required for AppUserModelId activation.'
+  }
+  $package = @(Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop |
+    Where-Object { "$($_.PackageFullName)" -ceq "$($Codex.PackageFullName)" })
+  if ($package.Count -ne 1) {
+    throw 'The verified Codex package is no longer registered for AppUserModelId activation.'
+  }
+  $manifest = Get-AppxPackageManifest -Package $package[0]
+  foreach ($application in @($manifest.Package.Applications.Application)) {
+    $candidateExecutable = Join-Path "$($package[0].InstallLocation)" "$($application.Executable)"
+    if (Test-DreamSkinPathEqual -Left $candidateExecutable -Right $Codex.Executable) {
+      return "$($Codex.PackageFamilyName)!$($application.Id)"
+    }
+  }
+  throw 'The verified Codex executable has no AppUserModelId activation entry.'
+}
+
+function Initialize-DreamSkinApplicationActivationManager {
+  if ($null -ne ('DreamSkinActivation.Launcher' -as [type])) { return }
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace DreamSkinActivation
+{
+    [ComImport]
+    [Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IApplicationActivationManager
+    {
+        [PreserveSig]
+        int ActivateApplication(
+            [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+            [MarshalAs(UnmanagedType.LPWStr)] string arguments,
+            uint options,
+            out uint processId);
+    }
+
+    [ComImport]
+    [Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
+    internal class ApplicationActivationManager
+    {
+    }
+
+    public static class Launcher
+    {
+        public static uint ActivateApplication(string appUserModelId, string arguments)
+        {
+            var manager = (IApplicationActivationManager)new ApplicationActivationManager();
+            uint processId;
+            var result = manager.ActivateApplication(appUserModelId, arguments, 0, out processId);
+            if (result < 0)
+            {
+                Marshal.ThrowExceptionForHR(result);
+            }
+            return processId;
+        }
+    }
+}
+'@
+}
+
+function Start-DreamSkinCodexWithArguments {
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [AllowEmptyCollection()][string[]]$Arguments = @()
+  )
+
+  Initialize-DreamSkinApplicationActivationManager
+  $appUserModelId = Get-DreamSkinCodexAppUserModelId -Codex $Codex
+  $argumentLine = ConvertTo-DreamSkinProcessArgumentLine -Arguments $Arguments
+  return [DreamSkinActivation.Launcher]::ActivateApplication($appUserModelId, $argumentLine)
+}
+
 function Get-DreamSkinCodexStatePathCandidate {
   param([AllowNull()][object]$State)
   if ($null -eq $State -or -not $State.codexExe -or -not $State.codexPackageRoot) { return $null }

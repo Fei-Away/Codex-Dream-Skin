@@ -1,4 +1,4 @@
-if (-not (Get-Command Read-DreamSkinUtf8File -ErrorAction SilentlyContinue)) {
+﻿if (-not (Get-Command Read-DreamSkinUtf8File -ErrorAction SilentlyContinue)) {
   . (Join-Path $PSScriptRoot 'config-utf8.ps1')
 }
 
