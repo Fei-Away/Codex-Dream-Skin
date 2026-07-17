@@ -1,0 +1,296 @@
+{
+  "fixtureVersion": 1,
+  "cases": [
+    {
+      "name": "minimal-v1",
+      "accept": true,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png"
+      },
+      "portableTheme": {
+        "schemaVersion": 1,
+        "id": "custom",
+        "name": "Codex Dream Skin",
+        "image": "background.png",
+        "appearance": "auto",
+        "art": {
+          "focusX": null,
+          "focusY": null,
+          "safeArea": "auto",
+          "taskMode": "auto"
+        }
+      }
+    },
+    {
+      "name": "complete-v1-unicode",
+      "accept": true,
+      "theme": {
+        "schemaVersion": 1,
+        "id": "portable-rose",
+        "name": "跨平台玫瑰主题",
+        "image": "rose.WEBP",
+        "appearance": "dark",
+        "art": {
+          "focusX": 0,
+          "focusY": 1,
+          "safeArea": "right",
+          "taskMode": "off"
+        }
+      },
+      "portableTheme": {
+        "schemaVersion": 1,
+        "id": "portable-rose",
+        "name": "跨平台玫瑰主题",
+        "image": "rose.WEBP",
+        "appearance": "dark",
+        "art": {
+          "focusX": 0,
+          "focusY": 1,
+          "safeArea": "right",
+          "taskMode": "off"
+        }
+      }
+    },
+    {
+      "name": "null-focus-is-auto",
+      "accept": true,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.jpg",
+        "art": {
+          "focusX": null,
+          "focusY": null
+        }
+      },
+      "portableTheme": {
+        "schemaVersion": 1,
+        "id": "custom",
+        "name": "Codex Dream Skin",
+        "image": "background.jpg",
+        "appearance": "auto",
+        "art": {
+          "focusX": null,
+          "focusY": null,
+          "safeArea": "auto",
+          "taskMode": "auto"
+        }
+      }
+    },
+    {
+      "name": "platform-and-unknown-extensions",
+      "accept": true,
+      "theme": {
+        "schemaVersion": 1,
+        "id": "extended",
+        "name": "Extended theme",
+        "image": "background.jpeg",
+        "appearance": "light",
+        "art": {
+          "safeArea": "left",
+          "taskMode": "banner",
+          "futureFraming": "wide"
+        },
+        "colors": {
+          "accent": "#e25563"
+        },
+        "palette": {
+          "accent": "#e25563"
+        },
+        "communityMetadata": {
+          "author": "example"
+        }
+      },
+      "portableTheme": {
+        "schemaVersion": 1,
+        "id": "extended",
+        "name": "Extended theme",
+        "image": "background.jpeg",
+        "appearance": "light",
+        "art": {
+          "focusX": null,
+          "focusY": null,
+          "safeArea": "left",
+          "taskMode": "banner"
+        }
+      }
+    },
+    {
+      "name": "legacy-missing-version",
+      "accept": true,
+      "legacy": true,
+      "theme": {
+        "id": "legacy-windows",
+        "name": "Legacy Windows theme",
+        "image": "background.png"
+      },
+      "portableTheme": {
+        "schemaVersion": 1,
+        "id": "legacy-windows",
+        "name": "Legacy Windows theme",
+        "image": "background.png",
+        "appearance": "auto",
+        "art": {
+          "focusX": null,
+          "focusY": null,
+          "safeArea": "auto",
+          "taskMode": "auto"
+        }
+      }
+    },
+    {
+      "name": "unsupported-version",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 2,
+        "image": "background.png"
+      }
+    },
+    {
+      "name": "string-version",
+      "accept": false,
+      "theme": {
+        "schemaVersion": "1",
+        "image": "background.png"
+      }
+    },
+    {
+      "name": "array-root",
+      "accept": false,
+      "theme": []
+    },
+    {
+      "name": "forward-slash-path",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "../background.png"
+      }
+    },
+    {
+      "name": "backslash-path",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "nested\\background.png"
+      }
+    },
+    {
+      "name": "unsupported-image-extension",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.gif"
+      }
+    },
+    {
+      "name": "invalid-appearance",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png",
+        "appearance": "sepia"
+      }
+    },
+    {
+      "name": "invalid-art-null",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png",
+        "art": null
+      }
+    },
+    {
+      "name": "numeric-string-focus",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png",
+        "art": {
+          "focusX": "0.5"
+        }
+      }
+    },
+    {
+      "name": "focus-below-range",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png",
+        "art": {
+          "focusX": -0.01
+        }
+      }
+    },
+    {
+      "name": "focus-above-range",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png",
+        "art": {
+          "focusY": 1.01
+        }
+      }
+    },
+    {
+      "name": "invalid-safe-area",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png",
+        "art": {
+          "safeArea": "edge"
+        }
+      }
+    },
+    {
+      "name": "invalid-task-mode",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "background.png",
+        "art": {
+          "taskMode": "fullscreen"
+        }
+      }
+    },
+    {
+      "name": "invalid-name-control",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "name": "unsafe\nname",
+        "image": "background.png"
+      }
+    },
+    {
+      "name": "invalid-name-whitespace",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "name": "   ",
+        "image": "background.png"
+      }
+    },
+    {
+      "name": "nonportable-image-name",
+      "accept": false,
+      "theme": {
+        "schemaVersion": 1,
+        "image": "bad:name.png"
+      }
+    },
+    {
+      "name": "windows-reserved-device-image",
+      "accept": false,
+      "writeImage": false,
+      "errorPattern": "invalid image field|portable PNG, JPEG, or WebP filename",
+      "theme": {
+        "schemaVersion": 1,
+        "image": "CON.png"
+      }
+    }
+  ]
+}

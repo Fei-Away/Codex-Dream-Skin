@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Fei-Away/Codex-Dream-Skin/main/schemas/theme-v1.schema.json",
+  "title": "Codex Dream Skin portable theme contract v1",
+  "description": "The cross-platform core understood by the macOS and Windows theme loaders.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "image"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "The portable core contract version."
+    },
+    "id": {
+      "$ref": "#/$defs/portableText",
+      "default": "custom"
+    },
+    "name": {
+      "$ref": "#/$defs/portableText",
+      "default": "Codex Dream Skin"
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])\\.)(?!.*[<>:\"/\\\\|?*])(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]).+\\.(?:[Pp][Nn][Gg]|[Jj][Pp](?:[Ee])?[Gg]|[Ww][Ee][Bb][Pp])$",
+      "description": "A portable PNG, JPEG, or WebP filename in the same directory as theme.json."
+    },
+    "appearance": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "light",
+        "dark"
+      ],
+      "default": "auto"
+    },
+    "art": {
+      "type": "object",
+      "properties": {
+        "focusX": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "default": null
+        },
+        "focusY": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "default": null
+        },
+        "safeArea": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "left",
+            "right",
+            "center",
+            "none"
+          ],
+          "default": "auto"
+        },
+        "taskMode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "ambient",
+            "banner",
+            "off"
+          ],
+          "default": "auto"
+        }
+      },
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "portableText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "\\S",
+      "not": {
+        "pattern": "[\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]"
+      }
+    }
+  },
+  "x-dream-skin-runtime-compatibility": {
+    "missingSchemaVersion": "Legacy unversioned descriptors are read as v1. New and rewritten themes must declare schemaVersion.",
+    "unsupportedSchemaVersion": "Reject."
+  },
+  "x-dream-skin-platform-extensions": {
+    "macos": [
+      "colors",
+      "brand and interface copy",
+      "promo fields"
+    ],
+    "windows": [
+      "palette"
+    ],
+    "unknownFields": "Accepted and ignored by the portable core. Platform adapters may validate extensions they recognize."
+  }
+}

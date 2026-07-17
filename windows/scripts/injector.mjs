@@ -280,28 +280,36 @@ const THEME_CHOICES = {
   safeArea: new Set(["auto", "left", "right", "center", "none"]),
   taskMode: new Set(["auto", "ambient", "banner", "off"]),
 };
+const PORTABLE_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const PORTABLE_RESERVED_IMAGE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\./iu;
 
 function normalizedUnit(value, name) {
-  if (value === null || value === undefined || value === "") return null;
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < 0 || number > 1) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(`${name} must be null or a number between 0 and 1`);
   }
-  return number;
+  return value;
 }
 
 function normalizedChoice(value, name, choices, fallback) {
-  if (value === null || value === undefined || value === "") return fallback;
-  if (!choices.has(value)) throw new Error(`${name} has an unsupported value: ${value}`);
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !choices.has(value)) {
+    throw new Error(`${name} has an unsupported value: ${value}`);
+  }
   return value;
 }
 
 function normalizedText(value, name, fallback, maxLength = 120) {
-  if (value === null || value === undefined || value === "") return fallback;
-  if (typeof value !== "string" || value.length > maxLength || /[\u0000-\u001f]/.test(value)) {
+  if (value === undefined) return fallback;
+  if (
+    typeof value !== "string"
+    || Array.from(value).length > maxLength
+    || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)
+    || !value.trim()
+  ) {
     throw new Error(`${name} must be a short single-line string`);
   }
-  return value;
+  return value.trim();
 }
 
 async function loadTheme(themeDir) {
@@ -312,28 +320,42 @@ async function loadTheme(themeDir) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("Theme root must be an object");
   }
-  const image = normalizedText(raw.image, "image", null, 240);
-  if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
+  const schemaVersion = Object.hasOwn(raw, "schemaVersion") ? raw.schemaVersion : 1;
+  if (schemaVersion !== 1) {
+    throw new Error(`schemaVersion has an unsupported value: ${raw.schemaVersion}`);
+  }
+  const image = raw.image;
+  if (
+    typeof image !== "string"
+    || !image
+    || Array.from(image).length > 240
+    || /[<>:"/\\|?*\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(image)
+    || PORTABLE_RESERVED_IMAGE_NAME.test(image)
+    || !PORTABLE_IMAGE_EXTENSIONS.has(path.extname(image).toLowerCase())
+  ) {
+    throw new Error("Theme image must be a portable PNG, JPEG, or WebP filename");
+  }
   const imagePath = path.resolve(realThemeDir, image);
   const relativeImage = path.relative(realThemeDir, imagePath);
   if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
     throw new Error("Theme image must remain inside the selected theme directory");
   }
   const extension = path.extname(imagePath).toLowerCase();
-  if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) {
-    throw new Error(`Unsupported theme image format: ${extension || "missing"}`);
-  }
   const realImagePath = await fs.realpath(imagePath);
   const realRelativeImage = path.relative(realThemeDir, realImagePath);
   if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
-  const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
+  if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
+    throw new Error("art must be an object");
+  }
+  const art = raw.art || {};
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
   const theme = {
+    schemaVersion,
     id: normalizedText(raw.id, "id", "custom", 80),
-    name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
+    name: normalizedText(raw.name, "name", "Codex Dream Skin", 80),
     image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
     art: {
@@ -343,6 +365,14 @@ async function loadTheme(themeDir) {
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
     palette: {},
+  };
+  const portableTheme = {
+    schemaVersion,
+    id: theme.id,
+    name: theme.name,
+    image: theme.image,
+    appearance: theme.appearance,
+    art: { ...theme.art },
   };
   if (typeof palette.accent === "string" && palette.accent.trim()) {
     const accent = palette.accent.trim();
@@ -376,6 +406,7 @@ async function loadTheme(themeDir) {
     themePath,
     imagePath: realImagePath,
     imageBytes,
+    portableTheme,
     fingerprint,
     sourceStamp: `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`,
   };
@@ -987,6 +1018,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
+      portableTheme: loaded.portableTheme,
     }));
   } else if (options.mode === "watch") await runWatch(options);
   else await runOneShot(options);

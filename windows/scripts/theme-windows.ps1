@@ -133,6 +133,13 @@ function Test-DreamSkinThemePathWithin {
   }
 }
 
+function Test-DreamSkinThemeSchemaVersion {
+  param([AllowNull()][object]$Value)
+  $numeric = $Value -is [int] -or $Value -is [long] -or $Value -is [double] -or
+    $Value -is [single] -or $Value -is [decimal]
+  return $numeric -and ([double]$Value -eq 1)
+}
+
 function Read-DreamSkinTheme {
   param(
     [Parameter(Mandatory = $true)][string]$ThemeDirectory,
@@ -153,8 +160,20 @@ function Read-DreamSkinTheme {
   if ($null -eq $theme -or $theme -is [string] -or $theme -is [array] -or -not $theme.image) {
     throw "Theme metadata must be an object with a relative image path: $themePath"
   }
+  $schemaProperty = $theme.PSObject.Properties |
+    Where-Object { $_.Name -ceq 'schemaVersion' } |
+    Select-Object -First 1
+  if ($null -eq $schemaProperty) {
+    $theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1 -Force
+  } elseif (-not (Test-DreamSkinThemeSchemaVersion -Value $theme.schemaVersion)) {
+    throw "Theme metadata has an unsupported schemaVersion: $themePath"
+  }
   $image = "$($theme.image)"
-  if ([System.IO.Path]::IsPathRooted($image)) { throw 'Theme image path must be relative.' }
+  if ([System.IO.Path]::IsPathRooted($image) -or
+    $image -match '[<>:"/\\|?*\u0000-\u001f\u007f-\u009f\u2028\u2029]' -or
+    $image -match '^(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])\.') {
+    throw 'Theme image path must be a portable filename.'
+  }
   $imagePath = [System.IO.Path]::GetFullPath((Join-Path $directory $image))
   if (-not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $directory) -or
     -not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
@@ -177,6 +196,14 @@ function Write-DreamSkinTheme {
   Assert-DreamSkinNoReparseComponents -Path $ThemeDirectory
   New-Item -ItemType Directory -Force -Path $ThemeDirectory | Out-Null
   Assert-DreamSkinNoReparseComponents -Path $ThemeDirectory
+  $schemaProperty = $Theme.PSObject.Properties |
+    Where-Object { $_.Name -ceq 'schemaVersion' } |
+    Select-Object -First 1
+  if ($null -eq $schemaProperty) {
+    $Theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1 -Force
+  } elseif (-not (Test-DreamSkinThemeSchemaVersion -Value $Theme.schemaVersion)) {
+    throw 'Theme metadata has an unsupported schemaVersion.'
+  }
   $json = $Theme | ConvertTo-Json -Depth 8
   $themePath = Join-Path $ThemeDirectory 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $themePath
@@ -257,6 +284,7 @@ function Set-DreamSkinActiveTheme {
   try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
   if ($null -eq $Theme) {
     $Theme = [pscustomobject]@{
+      schemaVersion = 1
       id = 'custom'
       name = '自定义主题'
       appearance = 'auto'

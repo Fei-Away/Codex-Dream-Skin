@@ -130,10 +130,16 @@ The pixels stay in the Codex renderer; there is no upload or external API call.
 If Canvas analysis is unavailable, the theme falls back to a safe default and
 the detected Codex shell/OS appearance.
 
-Theme metadata is optional. The defaults are deliberately adaptive:
+New themes follow the machine-readable
+[`theme-v1.schema.json`](https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/schemas/theme-v1.schema.json)
+portable contract.
+Only `schemaVersion` and `image` are required; the remaining metadata uses
+adaptive defaults:
 
 ```json
 {
+  "schemaVersion": 1,
+  "image": "background.webp",
   "appearance": "auto",
   "art": {
     "focusX": 0.72,
@@ -144,6 +150,12 @@ Theme metadata is optional. The defaults are deliberately adaptive:
 }
 ```
 
+- `schemaVersion`: new or rewritten themes use the JSON number `1`. A
+  descriptor with no version property is read as legacy v1 for migration;
+  explicit `null`, `"1"`, and unsupported future versions are rejected.
+- `image`: a PNG, JPEG, or WebP filename beside `theme.json`. Absolute paths,
+  subdirectories, traversal, and Windows reserved device names such as
+  `CON.png` are rejected so the pack remains portable.
 - `appearance`: `auto`, `light`, or `dark`. `auto` follows the native
   Codex/ChatGPT or OS appearance; an explicit value wins. Image luminance
   still informs palette and composition, but never overrides the user's UI mode.
@@ -162,6 +174,12 @@ fields. Explicit art metadata (`focusX`, `focusY`, `safeArea`, `taskMode`) has
 the same priority over automatic inference. The home route remains expressive;
 task routes keep native content, cards, composer, and code readable above the
 image layer.
+
+The v1 portable core accepts unknown fields so platform extensions and
+community metadata remain forward-compatible. macOS currently owns `colors`,
+brand/interface copy, and promo fields; Windows owns `palette`. An extension
+unknown to this platform is ignored, while every recognized core field remains
+strictly validated.
 
 CLI example:
 

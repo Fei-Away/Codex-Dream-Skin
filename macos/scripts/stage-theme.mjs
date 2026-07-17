@@ -10,6 +10,8 @@ if (!sourceDirArg || !stageDirArg) {
 const MAX_CONFIG_BYTES = 1024 * 1024;
 const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const OPEN_FLAGS = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0);
+const PORTABLE_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const PORTABLE_RESERVED_IMAGE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\./iu;
 
 function assertContained(rootPath, candidatePath, label) {
   const relative = path.relative(rootPath, candidatePath);
@@ -81,17 +83,25 @@ async function main() {
   const configPath = path.join(sourceRoot, "theme.json");
   const config = await readStableFile(configPath, "Theme config", MAX_CONFIG_BYTES);
   const theme = decodeJson(config.bytes, "Theme config");
-  if (theme?.schemaVersion !== 1 || typeof theme.image !== "string" || !theme.image) {
-    throw new Error("Theme config has an unsupported schema or image field");
+  if (!theme || typeof theme !== "object" || Array.isArray(theme)) {
+    throw new Error("Theme config root must be an object");
   }
-  if (path.basename(theme.image) !== theme.image) {
+  const schemaVersion = Object.hasOwn(theme, "schemaVersion") ? theme.schemaVersion : 1;
+  if (schemaVersion !== 1) {
+    throw new Error("Theme config has an unsupported schemaVersion field");
+  }
+  if (
+    typeof theme.image !== "string"
+    || !theme.image
+    || Array.from(theme.image).length > 240
+    || /[<>:"/\\|?*\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(theme.image)
+    || PORTABLE_RESERVED_IMAGE_NAME.test(theme.image)
+    || !PORTABLE_IMAGE_EXTENSIONS.has(path.extname(theme.image).toLowerCase())
+  ) {
     throw new Error("Theme image must stay inside its theme directory");
   }
   if (theme.image === "theme.json") {
     throw new Error("Theme image must not replace theme.json");
-  }
-  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(theme.image)) {
-    throw new Error("Theme image contains control characters");
   }
 
   const imagePath = path.resolve(sourceRoot, theme.image);

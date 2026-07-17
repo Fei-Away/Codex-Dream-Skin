@@ -15,6 +15,31 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 4. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
 5. Run `scripts/restore-dream-skin.ps1` to remove the live skin, close the saved CDP session, and reopen Codex normally. Add `-RestoreBaseTheme` to restore only saved appearance keys, `-RecoverConfigBackup` for explicit byte-for-byte recovery of a damaged config, or `-Uninstall` to delete shortcuts. A completed config restore archives that install's backup so a later install captures a fresh baseline.
 
+## Portable theme contract
+
+New `theme.json` files follow the repository's machine-readable
+[`theme-v1.schema.json`](https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/schemas/theme-v1.schema.json)
+contract:
+
+```json
+{
+  "schemaVersion": 1,
+  "image": "background.webp"
+}
+```
+
+The portable core also supports optional `id`, `name`, `appearance`, and
+`art.focusX`, `art.focusY`, `art.safeArea`, and `art.taskMode`. The image must
+be a PNG, JPEG, or WebP filename beside `theme.json`; path components and
+reserved device names such as `CON.png` are rejected. Missing focus coordinates
+or explicit `null` use image analysis. New and rewritten themes always carry
+the JSON number `schemaVersion: 1`; an old descriptor with no version property
+is read as legacy v1, while explicit invalid or future versions fail closed.
+
+Unknown v1 fields are ignored by the portable core. Windows recognizes
+`palette.accent`; macOS-specific `colors` and interface copy remain harmless
+extensions on Windows.
+
 ## Guardrails
 
 - Preserve the official executable, package signature, user threads, pets, plugins, and authentication state.

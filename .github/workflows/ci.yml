@@ -100,6 +100,7 @@ jobs:
       - name: Run portable Node.js regressions
         shell: bash
         run: |
+          node tests/theme-contract.test.mjs
           node --test macos/tests/*.test.mjs
           node --test windows/tests/*.test.mjs
           node macos/scripts/injector.mjs --check-payload >/dev/null

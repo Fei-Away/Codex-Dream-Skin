@@ -612,7 +612,8 @@ try {
   $themeStateRoot = Join-Path $temporaryRoot 'theme-state'
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   $initialTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($initialTheme.Theme.id -cne 'preset-romantic-rose' -or
+  if ($initialTheme.Theme.schemaVersion -ne 1 -or
+    $initialTheme.Theme.id -cne 'preset-romantic-rose' -or
     $initialTheme.Theme.name -cne '桥本有菜' -or
     $initialTheme.Theme.appearance -cne 'auto' -or
     $initialTheme.Theme.art.safeArea -cne 'left' -or
@@ -628,12 +629,61 @@ try {
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
-  if ($updatedTheme.Theme.name -cne '测试主题' -or
+  if ($updatedTheme.Theme.schemaVersion -ne 1 -or
+    $updatedTheme.Theme.name -cne '测试主题' -or
     $updatedTheme.Theme.id -cne 'custom' -or
     $updatedTheme.Theme.art.safeArea -cne 'auto' -or
     $updatedTheme.Theme.art.taskMode -cne 'auto' -or
     -not (Test-DreamSkinThemePathWithin -Path $updatedTheme.ImagePath -Root $themePaths.Active)) {
     throw 'Imported image did not reset to the generic adaptive contract inside the managed directory.'
+  }
+  $legacyThemeDirectory = Join-Path $temporaryRoot 'legacy-unversioned-theme'
+  New-Item -ItemType Directory -Path $legacyThemeDirectory | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Destination (Join-Path $legacyThemeDirectory 'dream-reference.jpg')
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $legacyThemeDirectory 'theme.json') `
+    -Content "{`"id`":`"legacy-windows`",`"name`":`"Legacy Windows theme`",`"image`":`"dream-reference.jpg`"}`r`n"
+  $legacyTheme = Read-DreamSkinTheme -ThemeDirectory $legacyThemeDirectory
+  if ($legacyTheme.Theme.schemaVersion -ne 1 -or
+    (Read-DreamSkinUtf8File -Path $legacyTheme.ThemePath) -match 'schemaVersion') {
+    throw 'Legacy unversioned theme compatibility changed the source file or failed to normalize v1 in memory.'
+  }
+  $futureThemeDirectory = Join-Path $temporaryRoot 'future-version-theme'
+  New-Item -ItemType Directory -Path $futureThemeDirectory | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Destination (Join-Path $futureThemeDirectory 'dream-reference.jpg')
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $futureThemeDirectory 'theme.json') `
+    -Content "{`"schemaVersion`":2,`"image`":`"dream-reference.jpg`"}`r`n"
+  $futureThemeRejected = $false
+  try { $null = Read-DreamSkinTheme -ThemeDirectory $futureThemeDirectory } catch { $futureThemeRejected = $true }
+  if (-not $futureThemeRejected) { throw 'A future theme schemaVersion was accepted by the Windows theme store.' }
+  $caseVariantThemeDirectory = Join-Path $temporaryRoot 'case-variant-version-theme'
+  New-Item -ItemType Directory -Path $caseVariantThemeDirectory | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Destination (Join-Path $caseVariantThemeDirectory 'dream-reference.jpg')
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $caseVariantThemeDirectory 'theme.json') `
+    -Content "{`"SchemaVersion`":1,`"image`":`"dream-reference.jpg`"}`r`n"
+  $caseVariantTheme = Read-DreamSkinTheme -ThemeDirectory $caseVariantThemeDirectory
+  Write-DreamSkinTheme -ThemeDirectory $caseVariantThemeDirectory -Theme $caseVariantTheme.Theme
+  $caseVariantJson = Read-DreamSkinUtf8File -Path $caseVariantTheme.ThemePath
+  if ($caseVariantJson -notmatch '"schemaVersion"\s*:\s*1' -or
+    $caseVariantJson -cmatch '"SchemaVersion"') {
+    throw 'A rewritten theme did not emit the exact lowercase schemaVersion property.'
+  }
+  $reservedThemeDirectory = Join-Path $temporaryRoot 'reserved-device-theme'
+  New-Item -ItemType Directory -Path $reservedThemeDirectory | Out-Null
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $reservedThemeDirectory 'theme.json') `
+    -Content "{`"schemaVersion`":1,`"image`":`"CON.png`"}`r`n"
+  $reservedThemeRejected = $false
+  $reservedThemeError = ''
+  try {
+    $null = Read-DreamSkinTheme -ThemeDirectory $reservedThemeDirectory
+  } catch {
+    $reservedThemeRejected = $true
+    $reservedThemeError = $_.Exception.Message
+  }
+  if (-not $reservedThemeRejected -or $reservedThemeError -notmatch 'portable filename') {
+    throw 'A Windows reserved device image name was not rejected by the portable filename check.'
   }
   $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   $idempotentTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
@@ -806,6 +856,12 @@ try {
     '-e', "process.stderr.write('ignored-warning\n'); process.stdout.write('kept-output')") -DiscardStderr
   if ($discardedProbe.ExitCode -ne 0 -or ($discardedProbe.Output -join '') -cne 'kept-output') {
     throw 'Native stderr discard changed stdout or the real exit code.'
+  }
+
+  $themeContractPath = Join-Path (Split-Path -Parent $Root) 'tests\theme-contract.test.mjs'
+  if (Test-Path -LiteralPath $themeContractPath -PathType Leaf) {
+    $themeContractTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($themeContractPath)
+    if ($themeContractTest.ExitCode -ne 0) { throw 'Portable theme contract regression test failed.' }
   }
 
   $selfTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(

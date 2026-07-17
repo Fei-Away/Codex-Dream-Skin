@@ -43,6 +43,10 @@ if ! /usr/bin/grep -F -q 'flag: "wx"' "$ROOT/scripts/write-theme.mjs"; then
 fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
+PORTABLE_CONTRACT_TEST="$ROOT/../tests/theme-contract.test.mjs"
+if [ -f "$PORTABLE_CONTRACT_TEST" ]; then
+  "$NODE" "$PORTABLE_CONTRACT_TEST"
+fi
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"

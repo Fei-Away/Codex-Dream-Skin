@@ -4,6 +4,7 @@
 
 ### 新增
 
+- 新增机器可读的 Theme v1 跨平台核心规范与共享兼容性夹具；macOS、Windows 现在用同一组有效/无效主题验证版本、图片文件名、外观和构图字段，并检查所有内置主题与预设。
 - 自适应图像主题引擎：通过本地 Canvas 分析亮度、主色、视觉焦点、左右安全区和图像比例，为任意背景图生成协调的浅色/深色外观；图片不会上传到外部服务。
 - 主题新增 `appearance: auto | light | dark` 与 `art.focusX/focusY`（`0..1`）、`art.safeArea: auto | left | right | center | none`、`art.taskMode: auto | ambient | banner | off` 配置；显式值优先于自动分析。
 - 首页与任务页按图像比例采用不同呈现：超宽图在任务页使用横幅和纵向渐隐，普通比例图使用低噪环境背景，也可用 `taskMode=off` 关闭任务页图像。

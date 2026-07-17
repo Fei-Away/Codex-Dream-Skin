@@ -12,6 +12,13 @@ const SKIN_VERSION = "1.2.0";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
+const PORTABLE_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const PORTABLE_RESERVED_IMAGE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\./iu;
+const PORTABLE_THEME_CHOICES = {
+  appearance: new Set(["auto", "light", "dark"]),
+  safeArea: new Set(["auto", "left", "right", "center", "none"]),
+  taskMode: new Set(["auto", "ambient", "banner", "off"]),
+};
 let staticPayloadAssets = null;
 
 function parseArgs(argv) {
@@ -300,13 +307,35 @@ async function loadTheme(themeDir) {
     throw error;
   }
   const raw = JSON.parse(config);
-  if (raw.schemaVersion !== 1 || typeof raw.image !== "string" || !raw.image) {
-    throw new Error(`${configPath} has an unsupported schema or image field`);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`${configPath} root must be an object`);
   }
-  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(raw.image)) {
+  const schemaVersion = Object.hasOwn(raw, "schemaVersion") ? raw.schemaVersion : 1;
+  if (schemaVersion !== 1) {
+    throw new Error(`${configPath} has an unsupported schemaVersion field`);
+  }
+  if (
+    typeof raw.image !== "string"
+    || !raw.image
+    || Array.from(raw.image).length > 240
+    || /[<>:"/\\|?*\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(raw.image)
+    || PORTABLE_RESERVED_IMAGE_NAME.test(raw.image)
+    || !PORTABLE_IMAGE_EXTENSIONS.has(path.extname(raw.image).toLowerCase())
+  ) {
     throw new Error(`${configPath} has an invalid image field`);
   }
-  if (path.basename(raw.image) !== raw.image) throw new Error("Theme image must stay inside its theme directory");
+  const portableText = (value, fallback, max, name) => {
+    if (value === undefined) return fallback;
+    if (
+      typeof value !== "string"
+      || Array.from(value).length > max
+      || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)
+      || !value.trim()
+    ) {
+      throw new Error(`${configPath} has an invalid ${name} field`);
+    }
+    return value.trim();
+  };
   const text = (value, fallback, max, name) => {
     if (value === undefined) return fallback;
     if (typeof value !== "string" || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) {
@@ -323,13 +352,14 @@ async function loadTheme(themeDir) {
   };
   const choice = (value, name, choices) => {
     if (value === undefined) return undefined;
-    if (typeof value !== "string" || !choices.includes(value)) {
+    if (typeof value !== "string" || !choices.has(value)) {
       throw new Error(`${configPath} has an invalid ${name} field`);
     }
     return value;
   };
   const unit = (value, name) => {
     if (value === undefined) return undefined;
+    if (value === null) return null;
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
       throw new Error(`${configPath} has an invalid ${name} field`);
     }
@@ -341,7 +371,7 @@ async function loadTheme(themeDir) {
     "background", "panel", "panelAlt", "accent", "accentAlt", "secondary",
     "highlight", "text", "muted", "line",
   ];
-  const appearance = choice(raw.appearance, "appearance", ["auto", "light", "dark"]);
+  const appearance = choice(raw.appearance, "appearance", PORTABLE_THEME_CHOICES.appearance);
   if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
     throw new Error(`${configPath} has an invalid art field`);
   }
@@ -349,13 +379,13 @@ async function loadTheme(themeDir) {
   const art = {
     focusX: unit(rawArt.focusX, "art.focusX"),
     focusY: unit(rawArt.focusY, "art.focusY"),
-    safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"]),
-    taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "off"]),
+    safeArea: choice(rawArt.safeArea, "art.safeArea", PORTABLE_THEME_CHOICES.safeArea),
+    taskMode: choice(rawArt.taskMode, "art.taskMode", PORTABLE_THEME_CHOICES.taskMode),
   };
   const theme = {
-    schemaVersion: 1,
-    id: text(raw.id, "custom", 80, "id"),
-    name: text(raw.name, "Codex Dream Skin", 80, "name"),
+    schemaVersion,
+    id: portableText(raw.id, "custom", 80, "id"),
+    name: portableText(raw.name, "Codex Dream Skin", 80, "name"),
     brandSubtitle: text(raw.brandSubtitle, "CODEX DREAM SKIN", 80, "brandSubtitle"),
     tagline: text(raw.tagline, "Make something wonderful.", 160, "tagline"),
     projectPrefix: text(raw.projectPrefix, "选择项目 · ", 80, "projectPrefix"),
@@ -382,6 +412,19 @@ async function loadTheme(themeDir) {
   if (Object.values(art).some((value) => value !== undefined)) {
     theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
   }
+  const portableTheme = {
+    schemaVersion,
+    id: theme.id,
+    name: theme.name,
+    image: theme.image,
+    appearance: appearance ?? "auto",
+    art: {
+      focusX: art.focusX ?? null,
+      focusY: art.focusY ?? null,
+      safeArea: art.safeArea ?? "auto",
+      taskMode: art.taskMode ?? "auto",
+    },
+  };
   const requestedImagePath = path.join(assetsRoot, theme.image);
   let imagePath;
   try {
@@ -393,9 +436,6 @@ async function loadTheme(themeDir) {
   assertContainedPath(assetsRoot, imagePath, "Theme image");
   const imageStat = await fs.stat(imagePath);
   const extension = path.extname(theme.image).toLowerCase();
-  if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) {
-    throw new Error(`Unsupported theme image format: ${extension || "missing"}`);
-  }
   let imageHandle;
   try {
     imageHandle = await fs.open(imagePath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
@@ -419,7 +459,7 @@ async function loadTheme(themeDir) {
     if (art.length < 1 || art.length > MAX_ART_BYTES) {
       throw new Error(`Theme image must be a non-empty file no larger than ${MAX_ART_BYTES} bytes`);
     }
-    return { art, assetsRoot, extension, imagePath, theme };
+    return { art, assetsRoot, extension, imagePath, portableTheme, theme };
   } finally {
     await imageHandle.close();
   }
@@ -451,7 +491,7 @@ async function loadPayload(themeDir) {
     loadTheme(themeDir),
   ]);
   const { css, template } = staticAssets;
-  const { art, extension, theme } = loaded;
+  const { art, extension, portableTheme, theme } = loaded;
   const styleRevision = createHash("sha256").update(css).digest("hex").slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
   if (!artMetadata) {
@@ -479,6 +519,7 @@ async function loadPayload(themeDir) {
   return {
     imageBytes: art.length,
     payload,
+    portableTheme,
     revision,
     theme,
     timings: {
@@ -880,6 +921,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         imageBytes: loaded.imageBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
         artMetadata: loaded.theme.artMetadata ?? null,
+        portableTheme: loaded.portableTheme,
         timings: loaded.timings,
       }, null, 2));
     } else if (options.mode === "watch") await runWatch(options);

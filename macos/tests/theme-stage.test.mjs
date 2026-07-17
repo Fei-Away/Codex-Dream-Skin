@@ -68,6 +68,28 @@ try {
   await fs.mkdir(traversalStage);
   await assert.rejects(runStage(traversal, traversalStage), /inside its theme directory/);
 
+  const legacy = path.join(tempRoot, "legacy");
+  const legacyStage = path.join(tempRoot, "legacy-stage");
+  await fs.mkdir(legacy);
+  await fs.mkdir(legacyStage);
+  await fs.copyFile(fixtureAsset, path.join(legacy, "background.png"));
+  await fs.writeFile(
+    path.join(legacy, "theme.json"),
+    `${JSON.stringify({ id: "legacy", name: "Legacy", image: "background.png" })}\n`,
+  );
+  assert.equal(await runStage(legacy, legacyStage), "background.png");
+
+  const future = path.join(tempRoot, "future");
+  const futureStage = path.join(tempRoot, "future-stage");
+  await fs.mkdir(future);
+  await fs.mkdir(futureStage);
+  await fs.copyFile(fixtureAsset, path.join(future, "background.png"));
+  await fs.writeFile(
+    path.join(future, "theme.json"),
+    `${JSON.stringify({ schemaVersion: 2, id: "future", image: "background.png" })}\n`,
+  );
+  await assert.rejects(runStage(future, futureStage), /unsupported schemaVersion/);
+
   const symlink = path.join(tempRoot, "symlink");
   await fs.mkdir(symlink);
   await fs.symlink(outside, path.join(symlink, "background.png"));
