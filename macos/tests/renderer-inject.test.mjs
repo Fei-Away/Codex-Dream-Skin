@@ -11,6 +11,17 @@ const css = await fs.readFile(path.join(macosRoot, "assets", "dream-skin.css"), 
 
 assert.doesNotMatch(
   css,
+  /main\.main-surface\s*>\s*header\.app-header-tint\s*\{[^}]*\b(?:position|z-index)\s*:/,
+  "The skin must preserve Codex's native fixed header so the side-panel toggle remains reachable.",
+);
+assert.doesNotMatch(
+  css,
+  /main\.main-surface:not\(\.dream-skin-home-shell\)\s*>\s*\*\s*\{[^}]*\bposition\s*:/,
+  "Task-route child layering must not overwrite the native header position.",
+);
+
+assert.doesNotMatch(
+  css,
   /background-image:\s*var\(--dream-skin-art\),\s*var\(--dream-skin-art\)/,
   "The home hero must not stack duplicate copies of the selected image.",
 );

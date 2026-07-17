@@ -401,7 +401,7 @@ html.codex-dream-skin:is([data-dream-task-mode="off"], [data-dream-art-task-mode
   content: none;
 }
 
-html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) > * {
+html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) > :not(header.app-header-tint) {
   position: relative;
   z-index: 1;
 }
@@ -430,8 +430,7 @@ html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-ski
 }
 
 html.codex-dream-skin main.main-surface > header.app-header-tint {
-  position: relative;
-  z-index: 2;
+  /* Preserve Codex's native fixed header geometry and side-panel controls. */
   background: rgb(var(--ds-panel-rgb) / .90) !important;
   border-bottom: 1px solid var(--ds-line) !important;
   backdrop-filter: blur(14px) saturate(108%) !important;

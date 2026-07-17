@@ -15,6 +15,7 @@
 - Home feature card: click one card and confirm the real composer is populated or the normal action occurs.
 - Project selector: click the real project chip under the "选择项目" label and confirm the native project menu opens.
 - Sidebar: open a real task, then return to New Task.
+- Task side panel: open and close the native thread panel twice, resize the window, and repeat; the toggle must remain visible and clickable.
 - Composer: type text, verify caret/readability, then clear it without sending.
 - Reload: use CDP `Page.reload`, wait, and confirm the injection marker returns.
 - Pet overlay: open a desktop pet and confirm its auxiliary window stays transparent with no skin background or decoration layer behind it.
