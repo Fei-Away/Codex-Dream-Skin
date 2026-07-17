@@ -135,6 +135,69 @@ try {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
     }
   }
+  foreach ($requiredIconBinding in @(
+    '$shortcut.IconLocation = "$($engine.Icon),0"',
+    '$restore.IconLocation = "$($engine.RestoreIcon),0"',
+    '$tray.IconLocation = "$($engine.Icon),0"',
+    'Codex Dream Skin - Tray.lnk'
+  )) {
+    if (-not $installSource.Contains($requiredIconBinding)) {
+      throw "Installer icon binding is missing or renamed unexpectedly: $requiredIconBinding"
+    }
+  }
+
+  function Assert-DreamSkinIcoDirectory {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    [byte[]]$bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 6 -or [BitConverter]::ToUInt16($bytes, 0) -ne 0 -or
+      [BitConverter]::ToUInt16($bytes, 2) -ne 1 -or [BitConverter]::ToUInt16($bytes, 4) -ne 5) {
+      throw "ICO header is invalid: $Path"
+    }
+    $dimensions = @()
+    foreach ($index in 0..4) {
+      $entryOffset = 6 + (16 * $index)
+      $width = if ($bytes[$entryOffset] -eq 0) { 256 } else { [int]$bytes[$entryOffset] }
+      $height = if ($bytes[$entryOffset + 1] -eq 0) { 256 } else { [int]$bytes[$entryOffset + 1] }
+      if ($width -ne $height) { throw "ICO frame is not square: $Path" }
+      $length = [BitConverter]::ToUInt32($bytes, $entryOffset + 8)
+      $imageOffset = [BitConverter]::ToUInt32($bytes, $entryOffset + 12)
+      if ($length -eq 0 -or $imageOffset -lt (6 + (16 * 5)) -or
+        ([uint64]$imageOffset + [uint64]$length) -gt [uint64]$bytes.Length) {
+        throw "ICO frame points outside the file: $Path"
+      }
+      $dimensions += $width
+    }
+    if (($dimensions -join ',') -cne '16,24,32,48,256') {
+      throw "ICO frame sizes are incomplete: $Path"
+    }
+  }
+
+  $mainIconPath = Join-Path $Root 'assets\dream-skin.ico'
+  $restoreIconPath = Join-Path $Root 'assets\dream-skin-restore.ico'
+  Assert-DreamSkinIcoDirectory -Path $mainIconPath
+  Assert-DreamSkinIcoDirectory -Path $restoreIconPath
+  $generatedIconRoot = Join-Path $temporaryRoot 'generated-icons'
+  & (Join-Path $Root 'tools\build-dream-skin-icons.ps1') -OutputDirectory $generatedIconRoot
+  foreach ($iconName in @('dream-skin.ico', 'dream-skin-restore.ico')) {
+    $committedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Root "assets\$iconName")).Hash
+    $generatedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $generatedIconRoot $iconName)).Hash
+    if ($committedHash -cne $generatedHash) { throw "Committed icon is not reproducible: $iconName" }
+  }
+  Remove-Item -LiteralPath $generatedIconRoot -Recurse -Force
+  $commonSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\common-windows.ps1')
+  foreach ($requiredIconAsset in @('assets\dream-skin.ico', 'assets\dream-skin-restore.ico', 'RestoreIcon')) {
+    if (-not $commonSource.Contains($requiredIconAsset)) { throw "Runtime icon packaging is missing: $requiredIconAsset" }
+  }
+  $trayIconSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
+  foreach ($requiredTrayIconBehavior in @(
+    "Join-Path `$SkillRoot 'assets\dream-skin.ico'",
+    '[System.Drawing.SystemIcons]::Application',
+    '$dreamSkinIcon.Dispose()'
+  )) {
+    if (-not $trayIconSource.Contains($requiredTrayIconBehavior)) {
+      throw "Tray icon lifetime or fallback behavior is missing: $requiredTrayIconBehavior"
+    }
+  }
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
   foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {

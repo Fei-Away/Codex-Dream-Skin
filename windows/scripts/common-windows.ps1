@@ -52,12 +52,16 @@ function Get-DreamSkinRuntimeEnginePaths {
   param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
   $root = Join-Path ([System.IO.Path]::GetFullPath($StateRoot)) 'engine'
   $scripts = Join-Path $root 'scripts'
+  $assets = Join-Path $root 'assets'
   return [pscustomobject]@{
     Root = $root
     Scripts = $scripts
+    Assets = $assets
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
+    Icon = Join-Path $assets 'dream-skin.ico'
+    RestoreIcon = Join-Path $assets 'dream-skin-restore.ico'
   }
 }
 
@@ -127,6 +131,8 @@ function Install-DreamSkinRuntimeEngine {
   $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $fullStateRoot
   $required = @(
     'assets\dream-reference.jpg',
+    'assets\dream-skin.ico',
+    'assets\dream-skin-restore.ico',
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
     'assets\theme.json',

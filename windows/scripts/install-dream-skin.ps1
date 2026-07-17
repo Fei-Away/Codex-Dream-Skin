@@ -60,6 +60,7 @@ try {
       $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$startScript`"$portArgument -PromptRestart"
       $shortcut.WorkingDirectory = $engine.Root
       $shortcut.Description = 'Launch the official Codex app with Codex Dream Skin'
+      $shortcut.IconLocation = "$($engine.Icon),0"
       $shortcut.Save()
     }
 
@@ -68,6 +69,7 @@ try {
     $restore.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$restoreScript`"$portArgument -RestoreBaseTheme -PromptRestart"
     $restore.WorkingDirectory = $engine.Root
     $restore.Description = 'Restore the official Codex appearance and close the CDP session'
+    $restore.IconLocation = "$($engine.RestoreIcon),0"
     $restore.Save()
 
     foreach ($folder in @($desktop, $startMenu)) {
@@ -76,6 +78,7 @@ try {
       $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$trayScript`"$portArgument"
       $tray.WorkingDirectory = $engine.Root
       $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
+      $tray.IconLocation = "$($engine.Icon),0"
       $tray.Save()
     }
     Start-Process -FilePath $powershell -ArgumentList `

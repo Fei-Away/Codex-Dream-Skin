@@ -19,12 +19,25 @@ $restoreScript = Join-Path $PSScriptRoot 'restore-dream-skin.ps1'
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
 $acquired = $false
+$dreamSkinIcon = $null
 try {
   try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
   if (-not $acquired) { exit 0 }
 
   $notify = [System.Windows.Forms.NotifyIcon]::new()
-  $notify.Icon = [System.Drawing.SystemIcons]::Application
+  try {
+    $iconPath = Join-Path $SkillRoot 'assets\dream-skin.ico'
+    if (Test-Path -LiteralPath $iconPath -PathType Leaf) {
+      $dreamSkinIcon = [System.Drawing.Icon]::new($iconPath)
+    }
+  } catch {
+    $dreamSkinIcon = $null
+  }
+  $notify.Icon = if ($null -ne $dreamSkinIcon) {
+    $dreamSkinIcon
+  } else {
+    [System.Drawing.SystemIcons]::Application
+  }
   $notify.Text = 'Codex Dream Skin'
   $notify.Visible = $true
   $menu = [System.Windows.Forms.ContextMenuStrip]::new()
@@ -162,6 +175,7 @@ try {
   [System.Windows.Forms.Application]::Run()
 } finally {
   if ($null -ne $notify) { $notify.Dispose() }
+  if ($null -ne $dreamSkinIcon) { $dreamSkinIcon.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
   $mutex.Dispose()
 }
