@@ -23,6 +23,8 @@
   --ds-secondary: var(--ds-cyan);
   --ds-highlight: var(--ds-purple);
   --ds-on-accent: rgb(var(--ds-bg-rgb) / 1);
+  --ds-dialog-radius: 20px;
+  --ds-dialog-inset-radius: 14px;
   --ds-focus-x: var(--dream-skin-focus-x, var(--dream-art-focus-x, 50%));
   --ds-focus-y: var(--dream-skin-focus-y, var(--dream-art-focus-y, 50%));
   --ds-art-position: var(--dream-art-position, var(--dream-skin-art-position, var(--ds-focus-x) var(--ds-focus-y)));
@@ -427,6 +429,40 @@ html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) article {
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) article {
   background: rgb(var(--ds-panel-rgb) / .72);
+}
+
+/* Current Codex renderers expose stable attributes on the final user and
+   assistant surfaces. Give both roles one shared column contract instead of
+   allowing short user messages to shrink while assistant replies span the row. */
+html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) [data-user-message-bubble],
+html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) [data-local-conversation-final-assistant] {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  color: var(--ds-text) !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .12) !important;
+  border-radius: var(--ds-dialog-radius) !important;
+  background: rgb(var(--ds-panel-rgb) / .44) !important;
+  box-shadow: 0 8px 24px rgb(var(--ds-bg-rgb) / .10) !important;
+  backdrop-filter: blur(7px) saturate(105%);
+}
+
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [data-user-message-bubble],
+html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [data-local-conversation-final-assistant] {
+  background: rgb(var(--ds-panel-rgb) / .72) !important;
+}
+
+html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) [data-local-conversation-final-assistant] {
+  padding: clamp(16px, 1.4vw, 22px) !important;
+}
+
+html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell)
+  :is([data-user-message-bubble], [data-local-conversation-final-assistant]) pre {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  border-radius: var(--ds-dialog-inset-radius) !important;
 }
 
 html.codex-dream-skin main.main-surface > header.app-header-tint {

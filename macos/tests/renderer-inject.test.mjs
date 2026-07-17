@@ -122,6 +122,26 @@ assert.match(
 );
 assert.match(
   css,
+  /\[data-user-message-bubble\],[\s\S]{0,180}\[data-local-conversation-final-assistant\]\s*\{[\s\S]{0,220}width:\s*100% !important;[\s\S]{0,100}max-width:\s*100% !important;/,
+  "User and assistant messages should share the full conversation column width.",
+);
+assert.match(
+  css,
+  /\[data-user-message-bubble\],[\s\S]{0,180}\[data-local-conversation-final-assistant\]\s*\{[\s\S]{0,420}border-radius:\s*var\(--ds-dialog-radius\) !important;/,
+  "Current Codex message surfaces should keep the shared rounded dialog shape.",
+);
+assert.match(
+  css,
+  /\[data-local-conversation-final-assistant\]\s*\{[\s\S]{0,120}padding:\s*clamp\(16px, 1\.4vw, 22px\) !important;/,
+  "Assistant message surfaces should retain readable inner spacing.",
+);
+assert.match(
+  css,
+  /data-dream-shell="light"\][\s\S]{0,180}\[data-user-message-bubble\],[\s\S]{0,220}\[data-local-conversation-final-assistant\]\s*\{[\s\S]{0,120}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.72\) !important;/,
+  "Current message surfaces should use the adaptive light-shell panel color.",
+);
+assert.match(
+  css,
   /\[class~="bg-token-main-surface-primary"\]\[class~="h-full"\]\[class~="w-full"\][\s\S]{0,100}background:\s*transparent !important;/,
   "Full-size utility route wrappers should not hide the selected artwork.",
 );
