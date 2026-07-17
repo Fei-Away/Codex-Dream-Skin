@@ -31,24 +31,24 @@ esac
 
 ensure_state_root
 SWITCH_LOCK="$STATE_ROOT/.theme-switch.lock"
-# Keep one regular lock file and let the kernel own lock lifetime. Unlike a
-# mkdir + PID protocol, this has no visible "directory exists but PID is not
-# written yet" window for a competing importer to mistake as stale.
+# shlock publishes the owner PID with an atomic hard-link operation. This
+# avoids the mkdir-then-write gap without holding an FD that the long-running
+# injector or Codex process could inherit after this script exits.
 if [ -L "$SWITCH_LOCK" ] || { [ -e "$SWITCH_LOCK" ] && [ ! -f "$SWITCH_LOCK" ]; }; then
   fail "Theme switch lock must be a regular file."
 fi
-(umask 077; set -o noclobber; : > "$SWITCH_LOCK") 2>/dev/null || true
-[ -f "$SWITCH_LOCK" ] && [ ! -L "$SWITCH_LOCK" ] \
-  || fail "Theme switch lock must be a regular file."
-/bin/chmod 600 "$SWITCH_LOCK"
-exec 9<>"$SWITCH_LOCK" || fail "Could not open the theme switch lock."
-/usr/bin/lockf -s -t 0 9 || fail "Another theme switch is already running."
-
+/usr/bin/shlock -f "$SWITCH_LOCK" -p "$$" \
+  || fail "Another theme switch is already running."
 stage=""
 cleanup_switch() {
   [ -z "$stage" ] || /bin/rm -rf "$stage"
+  lock_owner="$(/bin/cat "$SWITCH_LOCK" 2>/dev/null || true)"
+  [ "$lock_owner" != "$$" ] || /bin/rm -f "$SWITCH_LOCK"
 }
 trap cleanup_switch EXIT
+[ -f "$SWITCH_LOCK" ] && [ ! -L "$SWITCH_LOCK" ] \
+  || fail "Theme switch lock must be a regular file."
+/bin/chmod 600 "$SWITCH_LOCK"
 
 THEMES_ROOT="$STATE_ROOT/themes"
 SRC="$THEMES_ROOT/$THEME_ID"
