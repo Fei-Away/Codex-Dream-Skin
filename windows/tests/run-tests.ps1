@@ -733,6 +733,31 @@ try {
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
   }
+  $trayTokens = $null
+  $trayParseErrors = $null
+  $trayAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $traySource,
+    [ref]$trayTokens,
+    [ref]$trayParseErrors
+  )
+  if ($trayParseErrors.Count -gt 0) { throw "Tray script failed to parse: $($trayParseErrors[0].Message)" }
+  $addTrayItemAst = $trayAst.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Add-DreamSkinTrayItem'
+  }, $true)
+  if ($null -eq $addTrayItemAst) { throw 'Tray item helper could not be loaded for an empty-menu behavior check.' }
+  Invoke-Expression $addTrayItemAst.Extent.Text
+  Add-Type -AssemblyName System.Windows.Forms
+  $emptyMenu = [System.Windows.Forms.ContextMenuStrip]::new()
+  try {
+    $probeItem = Add-DreamSkinTrayItem -Items $emptyMenu.Items -Text 'first-item-probe' -Action $null -Enabled $false
+    if ($emptyMenu.Items.Count -ne 1 -or $probeItem.Text -ne 'first-item-probe' -or $probeItem.Enabled) {
+      throw 'Tray item helper cannot add the first disabled entry to an empty menu.'
+    }
+  } finally {
+    $emptyMenu.Dispose()
+  }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
     throw 'Complete restore does not stop a separately launched tray process.'
