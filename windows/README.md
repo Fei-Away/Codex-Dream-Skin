@@ -24,8 +24,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 
 安装器会校验官方 Codex Store 包和 Node.js，保存可恢复的外观配置，并初始化本地主题仓库。默认还会创建这些快捷方式：
 
-- `Codex Dream Skin`：启动或重新应用皮肤。
-- `Codex Dream Skin - Tray`：打开系统托盘主题控制。
+- `Codex Dream Skin`：静默启动或重新应用皮肤；失败时显示错误对话框和日志路径。
+- `Codex Dream Skin - Theme Manager`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
 如需使用自定义端口，可以在安装时传入 `-Port`。端口范围必须是 `1024` 到 `65535`。
@@ -36,7 +36,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 
 ## 启动与验证
 
-推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。
+推荐从 `Codex Dream Skin` 快捷方式启动。正常启动不显示 PowerShell 窗口；它发现 Codex 已经运行时会先询问是否重启，失败时会显示错误对话框并将详情写入 `launcher-error.log`。排查问题时仍可直接运行下面的命令行启动脚本。
 
 命令行启动：
 
@@ -63,7 +63,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 ## 更换和保存主题
 
-打开 `Codex Dream Skin - Tray` 后可以：
+打开 `Codex Dream Skin - Theme Manager` 后可以：
 
 - 更换 PNG、JPEG 或 WebP 背景图。
 - 保存当前主题并从「已保存主题」切换。
@@ -101,6 +101,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-
 | 会话状态 | `%LOCALAPPDATA%\CodexDreamSkin\state.json` |
 | 注入器日志 | `%LOCALAPPDATA%\CodexDreamSkin\injector.log` |
 | 注入器错误日志 | `%LOCALAPPDATA%\CodexDreamSkin\injector-error.log` |
+| 启动器错误日志 | `%LOCALAPPDATA%\CodexDreamSkin\launcher-error.log` |
 | 验证日志 | `%LOCALAPPDATA%\CodexDreamSkin\verify.log` |
 | Codex 配置 | `%USERPROFILE%\.codex\config.toml` |
 

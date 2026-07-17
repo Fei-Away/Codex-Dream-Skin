@@ -55,6 +55,7 @@ function Get-DreamSkinRuntimeEnginePaths {
   return [pscustomobject]@{
     Root = $root
     Scripts = $scripts
+    Launcher = Join-Path $scripts 'launch-dream-skin.ps1'
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
@@ -135,6 +136,7 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\image-metadata.mjs',
     'scripts\injector.mjs',
     'scripts\install-dream-skin.ps1',
+    'scripts\launch-dream-skin.ps1',
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',

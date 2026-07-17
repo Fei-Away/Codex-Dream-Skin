@@ -24,8 +24,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 
 The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
 
-- `Codex Dream Skin`: launch or reapply the skin.
-- `Codex Dream Skin - Tray`: open the system tray theme controls.
+- `Codex Dream Skin`: silently launch or reapply the skin; failures show an error dialog and log path.
+- `Codex Dream Skin - Theme Manager`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
 Pass `-Port` during installation to use a fixed custom port. Valid ports range from `1024` through `65535`.
@@ -36,7 +36,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 
 ## Launch and verify
 
-The `Codex Dream Skin` shortcut is the recommended launcher. It asks for confirmation before restarting an open Codex window.
+The `Codex Dream Skin` shortcut is the recommended launcher. Successful launches do not show a PowerShell window. It asks for confirmation before restarting an open Codex window; failures show an error dialog and write details to `launcher-error.log`. The command-line start script below remains available for terminal troubleshooting.
 
 Command-line launch:
 
@@ -63,7 +63,7 @@ Next, use the generated screenshot to check horizontal overflow and text contras
 
 ## Change and save themes
 
-Open `Codex Dream Skin - Tray` to:
+Open `Codex Dream Skin - Theme Manager` to:
 
 - Import a PNG, JPEG, or WebP background.
 - Save the active theme and switch through saved themes.
@@ -101,6 +101,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-
 | Session state | `%LOCALAPPDATA%\CodexDreamSkin\state.json` |
 | Injector log | `%LOCALAPPDATA%\CodexDreamSkin\injector.log` |
 | Injector error log | `%LOCALAPPDATA%\CodexDreamSkin\injector-error.log` |
+| Launcher error log | `%LOCALAPPDATA%\CodexDreamSkin\launcher-error.log` |
 | Verification log | `%LOCALAPPDATA%\CodexDreamSkin\verify.log` |
 | Codex configuration | `%USERPROFILE%\.codex\config.toml` |
 

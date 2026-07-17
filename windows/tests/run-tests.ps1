@@ -30,6 +30,7 @@ try {
       -Recurse -File -Force
   )
   if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
+    -not (Test-DreamSkinPathWithin -Path $engine.Launcher -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
@@ -123,18 +124,160 @@ try {
   if ($trayGuardIndex -lt 0 -or $engineInstallIndex -le $trayGuardIndex) {
     throw 'Installer does not reject an active source-bound tray before replacing the runtime engine.'
   }
-  foreach ($requiredShortcutBinding in @(
-    '$startScript = $engine.Start',
-    '$restoreScript = $engine.Restore',
-    '$trayScript = $engine.Tray',
-    '$shortcut.WorkingDirectory = $engine.Root',
-    '$restore.WorkingDirectory = $engine.Root',
-    '$tray.WorkingDirectory = $engine.Root'
-  )) {
+  foreach ($requiredShortcutBinding in @('$Engine.Launcher', '$Engine.Restore', '$Engine.Tray', '$Engine.Root')) {
     if (-not $installSource.Contains($requiredShortcutBinding)) {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
     }
   }
+
+  $installTokens = $null
+  $installParseErrors = $null
+  $installAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $installSource, [ref]$installTokens, [ref]$installParseErrors
+  )
+  if ($installParseErrors.Count -gt 0) { throw "Installer failed to parse: $($installParseErrors[0].Message)" }
+  $shortcutHelperAst = $installAst.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Install-DreamSkinShortcuts'
+  }, $true)
+  if ($null -eq $shortcutHelperAst) { throw 'Installer shortcut helper could not be loaded for migration checks.' }
+  Invoke-Expression $shortcutHelperAst.Extent.Text
+
+  $shortcutTestRoot = Join-Path $temporaryRoot 'shortcut-test'
+  $testDesktop = Join-Path $shortcutTestRoot 'Desktop'
+  $testStartMenu = Join-Path $shortcutTestRoot 'Start Menu'
+  $testEngineRoot = Join-Path $shortcutTestRoot 'engine'
+  $testScripts = Join-Path $testEngineRoot 'scripts'
+  foreach ($directory in @($testDesktop, $testStartMenu, $testScripts)) {
+    [System.IO.Directory]::CreateDirectory($directory) | Out-Null
+  }
+  $testEngine = [pscustomobject]@{
+    Root = $testEngineRoot
+    Launcher = Join-Path $testScripts 'launch-dream-skin.ps1'
+    Start = Join-Path $testScripts 'start-dream-skin.ps1'
+    Restore = Join-Path $testScripts 'restore-dream-skin.ps1'
+    Tray = Join-Path $testScripts 'tray-dream-skin.ps1'
+  }
+  foreach ($scriptPath in @($testEngine.Launcher, $testEngine.Start, $testEngine.Restore, $testEngine.Tray)) {
+    [System.IO.File]::WriteAllText($scriptPath, '# shortcut target')
+  }
+  $wscript = New-Object -ComObject WScript.Shell
+  foreach ($folder in @($testDesktop, $testStartMenu)) {
+    $legacy = $wscript.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))
+    $legacy.TargetPath = $env:ComSpec
+    $legacy.Save()
+  }
+  $unrelatedPath = Join-Path $testDesktop 'Keep This Shortcut.lnk'
+  $unrelated = $wscript.CreateShortcut($unrelatedPath)
+  $unrelated.TargetPath = $env:ComSpec
+  $unrelated.Save()
+
+  $testPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+  Install-DreamSkinShortcuts -WScriptShell $wscript -DesktopDirectory $testDesktop `
+    -StartMenuDirectory $testStartMenu -PowerShellPath $testPowerShell -Engine $testEngine `
+    -PortArgument ' -Port 9444'
+  foreach ($folder in @($testDesktop, $testStartMenu)) {
+    if (Test-Path -LiteralPath (Join-Path $folder 'Codex Dream Skin - Tray.lnk')) {
+      throw 'Shortcut migration left an exact legacy Tray shortcut behind.'
+    }
+    $launchPath = Join-Path $folder 'Codex Dream Skin.lnk'
+    $managerPath = Join-Path $folder 'Codex Dream Skin - Theme Manager.lnk'
+    if (-not (Test-Path -LiteralPath $launchPath) -or -not (Test-Path -LiteralPath $managerPath)) {
+      throw 'Shortcut migration did not create Launch and Theme Manager in both target folders.'
+    }
+    $launch = $wscript.CreateShortcut($launchPath)
+    $manager = $wscript.CreateShortcut($managerPath)
+    if (-not (Test-DreamSkinPathEqual -Left $launch.TargetPath -Right $testPowerShell) -or
+      -not $launch.Arguments.Contains('-WindowStyle Hidden') -or
+      -not $launch.Arguments.Contains($testEngine.Launcher) -or
+      -not $launch.Arguments.Contains('-Port 9444') -or
+      -not (Test-DreamSkinPathEqual -Left $launch.WorkingDirectory -Right $testEngine.Root) -or
+      $launch.Description -cne 'Launch or reapply Codex Dream Skin') {
+      throw 'Launch shortcut is not hidden or does not target the shortcut-only launcher.'
+    }
+    if (-not $manager.Arguments.Contains($testEngine.Tray) -or
+      -not (Test-DreamSkinPathEqual -Left $manager.WorkingDirectory -Right $testEngine.Root) -or
+      $manager.Description -cne 'Open Codex Dream Skin status and theme controls in the system tray') {
+      throw 'Theme Manager shortcut does not target the tray controls.'
+    }
+  }
+  $restoreShortcutPath = Join-Path $testDesktop 'Codex Dream Skin - Restore.lnk'
+  if (-not (Test-Path -LiteralPath $restoreShortcutPath) -or -not (Test-Path -LiteralPath $unrelatedPath)) {
+    throw 'Shortcut migration removed an unrelated shortcut or omitted Restore.'
+  }
+  $restoreShortcut = $wscript.CreateShortcut($restoreShortcutPath)
+  if (-not $restoreShortcut.Arguments.Contains($testEngine.Restore) -or
+    -not $restoreShortcut.Arguments.Contains('-RestoreBaseTheme -PromptRestart')) {
+    throw 'Restore shortcut behavior changed during migration.'
+  }
+
+  $launcherSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\launch-dream-skin.ps1')
+  $launcherTokens = $null
+  $launcherParseErrors = $null
+  $launcherAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $launcherSource, [ref]$launcherTokens, [ref]$launcherParseErrors
+  )
+  if ($launcherParseErrors.Count -gt 0) { throw "Launcher failed to parse: $($launcherParseErrors[0].Message)" }
+  $loggerAst = $launcherAst.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Write-DreamSkinLauncherError'
+  }, $true)
+  if ($null -eq $loggerAst) { throw 'Launcher error logger could not be loaded for behavior checks.' }
+  Invoke-Expression $loggerAst.Extent.Text
+  $loggerRoot = Join-Path $temporaryRoot 'launcher-log-test'
+  $syntheticException = [System.InvalidOperationException]::new("synthetic launcher failure`r`nsecond line")
+  $testLauncherPath = Join-Path $testScripts 'launch-dream-skin.ps1'
+  $logPath = Write-DreamSkinLauncherError -Exception $syntheticException -Port 9444 `
+    -LauncherPath $testLauncherPath -StartScriptPath $testEngine.Start -StateRoot $loggerRoot
+  $launcherLog = Read-DreamSkinUtf8File -Path $logPath
+  foreach ($requiredLogField in @(
+    'port=9444',
+    'exceptionType=System.InvalidOperationException',
+    'message=synthetic launcher failure second line',
+    "launcherPath=$([System.IO.Path]::GetFullPath($testLauncherPath))",
+    "startScriptPath=$([System.IO.Path]::GetFullPath($testEngine.Start))"
+  )) {
+    if (-not $launcherLog.Contains($requiredLogField)) { throw "Launcher error log is missing: $requiredLogField" }
+  }
+  $timestampLine = @($launcherLog -split '[\r\n]+' | Where-Object { $_ -like 'timestamp=*' })
+  $parsedTimestamp = [DateTimeOffset]::MinValue
+  if ($timestampLine.Count -ne 1 -or
+    -not [DateTimeOffset]::TryParse($timestampLine[0].Substring(10), [ref]$parsedTimestamp) -or
+    $parsedTimestamp.Offset -ne [TimeSpan]::Zero -or -not $timestampLine[0].EndsWith('Z') -or
+    $launcherLog.Contains('config.toml') -or $launcherLog.Contains('DREAM_SKIN_TEST_SECRET')) {
+    throw 'Launcher error log timestamp or sensitive-data boundary is invalid.'
+  }
+
+  $launcherExecutionRoot = Join-Path $shortcutTestRoot 'launcher-execution'
+  [System.IO.Directory]::CreateDirectory($launcherExecutionRoot) | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\launch-dream-skin.ps1') `
+    -Destination (Join-Path $launcherExecutionRoot 'launch-dream-skin.ps1')
+  $fakeStartSource = @'
+[CmdletBinding()]
+param([int]$Port = 9335, [switch]$PromptRestart)
+$result = "$Port|$PromptRestart|$($PSBoundParameters.ContainsKey('Port'))"
+[System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'forwarded-parameters.txt'), $result)
+'@
+  [System.IO.File]::WriteAllText(
+    (Join-Path $launcherExecutionRoot 'start-dream-skin.ps1'),
+    $fakeStartSource
+  )
+  $testLauncher = Join-Path $launcherExecutionRoot 'launch-dream-skin.ps1'
+  & $testPowerShell -NoProfile -ExecutionPolicy Bypass -File $testLauncher
+  if ($LASTEXITCODE -ne 0 -or
+    (Read-DreamSkinUtf8File -Path (Join-Path $launcherExecutionRoot 'forwarded-parameters.txt')) -cne
+      '9335|True|False') {
+    throw 'Launcher does not forward the default PromptRestart invocation correctly.'
+  }
+  & $testPowerShell -NoProfile -ExecutionPolicy Bypass -File $testLauncher -Port 9444
+  if ($LASTEXITCODE -ne 0 -or
+    (Read-DreamSkinUtf8File -Path (Join-Path $launcherExecutionRoot 'forwarded-parameters.txt')) -cne
+      '9444|True|True') {
+    throw 'Launcher does not forward an explicitly selected port correctly.'
+  }
+  Remove-Item -LiteralPath $shortcutTestRoot, $loggerRoot -Recurse -Force
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
   foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {
@@ -148,6 +291,7 @@ try {
     }
   }
   if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.Launcher -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
     throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
@@ -734,6 +878,11 @@ try {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
   }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
+  foreach ($managerShortcutName in @('Codex Dream Skin - Tray.lnk', 'Codex Dream Skin - Theme Manager.lnk')) {
+    if (-not $restoreSource.Contains($managerShortcutName)) {
+      throw "Complete uninstall does not remove shortcut name: $managerShortcutName"
+    }
+  }
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
     throw 'Complete restore does not stop a separately launched tray process.'
   }
@@ -761,6 +910,20 @@ try {
     -not $startSource.Contains('$pauseCleared = $true') -or
     -not $startSource.Contains('Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot')) {
     throw 'Start does not preserve an existing pause marker when startup rolls back.'
+  }
+
+  $readmeZh = Read-DreamSkinUtf8File -Path (Join-Path $Root 'README.md')
+  $readmeEn = Read-DreamSkinUtf8File -Path (Join-Path $Root 'README.en.md')
+  foreach ($documentation in @($readmeZh, $readmeEn)) {
+    foreach ($requiredLauncherDocumentation in @(
+      'Codex Dream Skin - Theme Manager',
+      'launcher-error.log',
+      'start-dream-skin.ps1'
+    )) {
+      if (-not $documentation.Contains($requiredLauncherDocumentation)) {
+        throw "Windows documentation is missing launcher guidance: $requiredLauncherDocumentation"
+      }
+    }
   }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
