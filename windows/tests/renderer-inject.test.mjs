@@ -22,6 +22,7 @@ assert.doesNotMatch(
 
 function createFixture({
   shellPresent,
+  pathname = "/",
   staleSkin = false,
   homePresent = false,
   utilityPresent = false,
@@ -172,6 +173,13 @@ function createFixture({
     window: {
       matchMedia() { return { matches: osAppearance === "dark" }; },
     },
+    location: {
+      protocol: "app:",
+      hostname: "codex",
+      pathname,
+      search: "",
+      hash: "",
+    },
     document,
     MutationObserver: class {
       constructor(callback) {
@@ -272,6 +280,35 @@ auxiliary.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
 assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), true);
+
+const pet = createFixture({ shellPresent: false, pathname: "/avatar-overlay" });
+const petPayload = buildPayload({
+  palette: { accent: "#d45a70" },
+  pet: { mode: "accent", glow: .6 },
+});
+const petResult = vm.runInNewContext(petPayload, pet.context);
+assert.equal(petResult.installed, true);
+assert.equal(pet.rootClasses.has("codex-dream-skin-pet"), true);
+assert.equal(pet.rootClasses.has("codex-dream-skin"), false);
+assert.equal(pet.rootStyles.get("--dream-pet-accent"), "#d45a70");
+assert.equal(pet.rootStyles.get("--dream-pet-glow-blur"), "11.2px");
+assert.equal(pet.nodes.has("codex-dream-skin-pet-style"), true);
+assert.equal(pet.nodes.has("codex-dream-skin-style"), false);
+assert.equal(pet.nodes.has("codex-dream-skin-chrome"), false);
+assert.equal(pet.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+assert.equal(pet.rootClasses.has("codex-dream-skin-pet"), false);
+assert.equal(pet.rootStyles.has("--dream-pet-accent"), false);
+assert.equal(pet.nodes.has("codex-dream-skin-pet-style"), false);
+
+const petDisabled = createFixture({ shellPresent: false, pathname: "/avatar-overlay" });
+vm.runInNewContext(buildPayload({ pet: { mode: "off", glow: 1 } }), petDisabled.context);
+assert.equal(petDisabled.rootClasses.has("codex-dream-skin-pet"), false);
+assert.equal(petDisabled.nodes.has("codex-dream-skin-pet-style"), false);
+
+const unrelatedOverlay = createFixture({ shellPresent: false, pathname: "/other-overlay" });
+vm.runInNewContext(petPayload, unrelatedOverlay.context);
+assert.equal(unrelatedOverlay.rootClasses.has("codex-dream-skin-pet"), false);
+assert.equal(unrelatedOverlay.nodes.has("codex-dream-skin-pet-style"), false);
 
 const configured = createFixture({
   shellPresent: true,

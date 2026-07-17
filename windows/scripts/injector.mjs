@@ -89,6 +89,16 @@ function isValidCdpPageTarget(item, port) {
   }
 }
 
+export function isPetOverlayUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "app:" && url.hostname === "codex" &&
+      url.pathname === "/avatar-overlay" && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
 class CdpSession {
   constructor(target, port) {
     this.target = target;
@@ -279,6 +289,7 @@ const THEME_CHOICES = {
   appearance: new Set(["auto", "light", "dark"]),
   safeArea: new Set(["auto", "left", "right", "center", "none"]),
   taskMode: new Set(["auto", "ambient", "banner", "off"]),
+  petMode: new Set(["accent", "off"]),
 };
 
 function normalizedUnit(value, name) {
@@ -331,6 +342,7 @@ async function loadTheme(themeDir) {
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
+  const pet = raw.pet && typeof raw.pet === "object" && !Array.isArray(raw.pet) ? raw.pet : {};
   const theme = {
     id: normalizedText(raw.id, "id", "custom", 80),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
@@ -343,6 +355,10 @@ async function loadTheme(themeDir) {
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
     palette: {},
+    pet: {
+      mode: normalizedChoice(pet.mode, "pet.mode", THEME_CHOICES.petMode, "accent"),
+      glow: normalizedUnit(pet.glow, "pet.glow") ?? .45,
+    },
   };
   if (typeof palette.accent === "string" && palette.accent.trim()) {
     const accent = palette.accent.trim();
@@ -425,9 +441,16 @@ async function probeSession(session) {
       composer: Boolean(document.querySelector('.composer-surface-chrome')),
       main: Boolean(document.querySelector('[role="main"]')),
     };
+    const codex = location.protocol === 'app:' && markers.shell && markers.sidebar &&
+      (markers.composer || markers.main);
+    const pet = location.protocol === 'app:' && location.hostname === 'codex' &&
+      location.pathname === '/avatar-overlay' && !location.search && !location.hash &&
+      !markers.shell && !markers.sidebar;
     return {
       markers,
-      codex: location.protocol === 'app:' && markers.shell && markers.sidebar && (markers.composer || markers.main),
+      codex,
+      pet,
+      kind: codex ? 'shell' : pet ? 'pet' : 'unsupported',
     };
   })()`);
 }
@@ -438,7 +461,7 @@ async function waitForCodexProbe(session, timeoutMs = 1800) {
   while (Date.now() < deadline) {
     try {
       probe = await probeSession(session);
-      if (probe?.codex) return probe;
+      if (probe?.codex || probe?.pet) return probe;
     } catch {
       // The renderer may be between documents while the early payload waits.
     }
@@ -463,7 +486,9 @@ async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
         try {
           session = await connectTarget(target, port);
           const probe = await probeSession(session);
-          if (probe?.codex) connected.push({ target, session, probe });
+          if (probe?.codex || (probe?.pet && isPetOverlayUrl(target.url))) {
+            connected.push({ target, session, probe });
+          }
           else session.close();
         } catch (error) {
           session?.close();
@@ -471,7 +496,7 @@ async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
         }
       }
       if (connected.length) return connected;
-      lastError = new Error("No page matched the expected Codex shell markers");
+      lastError = new Error("No page matched the expected Codex shell or pet overlay markers");
     } catch (error) {
       if (error instanceof CdpIdentityMismatchError) throw error;
       lastError = error;
@@ -505,7 +530,10 @@ export function earlyPayloadFor(payload, revision) {
       if (!root || !document.body) return false;
       const shell = document.querySelector('main.main-surface');
       const sidebar = document.querySelector('aside.app-shell-left-panel');
-      if (!shell || !sidebar) return false;
+      const pageLocation = typeof location === 'object' ? location : window.location;
+      const petOverlay = pageLocation?.protocol === 'app:' && pageLocation.hostname === 'codex' &&
+        pageLocation.pathname === '/avatar-overlay' && !pageLocation.search && !pageLocation.hash;
+      if (!petOverlay && (!shell || !sidebar)) return false;
       stop();
       ${payload};
       window[appliedKey] = generation;
@@ -538,7 +566,7 @@ async function removeFromSession(session) {
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
     document.documentElement?.classList.remove(
-      'codex-dream-skin', 'dream-theme-light', 'dream-theme-dark',
+      'codex-dream-skin', 'codex-dream-skin-pet', 'dream-theme-light', 'dream-theme-dark',
       'dream-art-wide', 'dream-art-standard', 'dream-focus-left',
       'dream-focus-center', 'dream-focus-right', 'dream-safe-left',
       'dream-safe-center', 'dream-safe-right', 'dream-safe-none',
@@ -546,13 +574,15 @@ async function removeFromSession(session) {
     );
     for (const property of [
       '--dream-art', '--dream-art-position', '--dream-focus-x', '--dream-focus-y',
-      '--dream-accent', '--dream-accent-ink', '--dream-image-luma'
+      '--dream-accent', '--dream-accent-ink', '--dream-image-luma',
+      '--dream-pet-accent', '--dream-pet-glow-blur'
     ]) document.documentElement?.style.removeProperty(property);
     document.querySelectorAll('.dream-home').forEach((node) => node.classList.remove('dream-home'));
     document.querySelectorAll('.dream-task').forEach((node) => node.classList.remove('dream-task'));
     document.querySelectorAll('.dream-home-shell').forEach((node) => node.classList.remove('dream-home-shell'));
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
+    document.getElementById('codex-dream-skin-pet-style')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
     return true;
   })()`);
@@ -561,12 +591,16 @@ async function removeFromSession(session) {
 async function verifyRemovedSession(session) {
   return session.evaluate(`(() =>
     !document.documentElement.classList.contains('codex-dream-skin') &&
+    !document.documentElement.classList.contains('codex-dream-skin-pet') &&
     !document.documentElement.style.getPropertyValue('--dream-art') &&
+    !document.documentElement.style.getPropertyValue('--dream-pet-accent') &&
+    !document.documentElement.style.getPropertyValue('--dream-pet-glow-blur') &&
     !document.querySelector('.dream-home') &&
     !document.querySelector('.dream-task') &&
     !document.querySelector('.dream-home-shell') &&
     !document.getElementById('codex-dream-skin-style') &&
     !document.getElementById('codex-dream-skin-chrome') &&
+    !document.getElementById('codex-dream-skin-pet-style') &&
     !window.__CODEX_DREAM_SKIN_STATE__
   )()`);
 }
@@ -609,13 +643,37 @@ async function verifySession(session) {
   })()`);
 }
 
-async function waitForVerifiedSession(session, timeoutMs) {
+async function verifyPetSession(session) {
+  return session.evaluate(`(() => {
+    const root = document.documentElement;
+    const result = {
+      target: location.protocol === 'app:' && location.hostname === 'codex' &&
+        location.pathname === '/avatar-overlay' && !location.search && !location.hash,
+      installed: root.classList.contains('codex-dream-skin-pet'),
+      stylePresent: Boolean(document.getElementById('codex-dream-skin-pet-style')),
+      shellStylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
+      chromePresent: Boolean(document.getElementById('codex-dream-skin-chrome')),
+      accent: root.style.getPropertyValue('--dream-pet-accent').trim(),
+      blur: root.style.getPropertyValue('--dream-pet-glow-blur').trim(),
+      mode: window.__CODEX_DREAM_SKIN_STATE__?.config?.petMode ?? 'accent',
+    };
+    const shellClean = !result.shellStylePresent && !result.chromePresent;
+    result.pass = result.mode === 'off'
+      ? result.target && !result.installed && !result.stylePresent && shellClean &&
+        !result.accent && !result.blur
+      : result.target && result.installed && result.stylePresent && shellClean &&
+        Boolean(result.accent) && Boolean(result.blur);
+    return result;
+  })()`);
+}
+
+async function waitForVerifiedSession(session, timeoutMs, verifier = verifySession) {
   const deadline = Date.now() + timeoutMs;
   let lastResult;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      lastResult = await verifySession(session);
+      lastResult = await verifier(session);
       lastError = null;
       if (lastResult.pass) return lastResult;
     } catch (error) {
@@ -657,6 +715,7 @@ async function runOneShot(options) {
   try {
     for (const { target, session, probe } of connected) {
       try {
+        const verifier = probe.pet ? verifyPetSession : verifySession;
         if (options.mode === "remove") await removeFromSession(session);
         else if (options.mode === "once") await applyToSession(session, payload);
         if (options.mode === "once") {
@@ -670,10 +729,10 @@ async function runOneShot(options) {
         const verified = options.mode === "remove"
           ? await verifyRemovedSession(session)
           : (options.reload || options.mode === "once" || options.mode === "verify")
-            ? await waitForVerifiedSession(session, options.timeoutMs)
-            : await verifySession(session);
-        results.push({ targetId: target.id, markers: probe.markers, result: verified });
-        if (options.screenshot && !screenshotCaptured) {
+            ? await waitForVerifiedSession(session, options.timeoutMs, verifier)
+            : await verifier(session);
+        results.push({ targetId: target.id, kind: probe.kind, markers: probe.markers, result: verified });
+        if (options.screenshot && !screenshotCaptured && probe.codex) {
           await capture(session, options.screenshot);
           screenshotCaptured = true;
         }
@@ -881,7 +940,7 @@ async function runWatch(options) {
             }
           }
           const probe = await waitForCodexProbe(session);
-          if (!probe?.codex) {
+          if (!probe?.codex && !(probe?.pet && isPetOverlayUrl(target.url))) {
             await removeEarlyPayload(session, earlyScriptId);
             rejectTarget(target, 5000);
             session.close();
@@ -901,7 +960,7 @@ async function runWatch(options) {
           sessions.set(target.id, session);
           if (earlyScriptId) earlyScripts.set(target.id, earlyScriptId);
           targetFailures.delete(target.id);
-          console.log(`[dream-skin] injected target ${target.id}`);
+          console.log(`[dream-skin] injected ${probe.kind} target ${target.id}`);
         } catch (error) {
           await removeEarlyPayload(session, earlyScriptId);
           fallbackTargets.delete(target.id);
@@ -967,8 +1026,18 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
     { ...validPageTarget, id: 123 },
     { ...validPageTarget, type: "other" },
   ];
+  const validPetOverlay = "app://codex/avatar-overlay";
+  const invalidPetOverlays = [
+    "app://codex/avatar-overlay?preview=1",
+    "app://codex/avatar-overlay#preview",
+    "app://codex/avatar-overlay/child",
+    "app://other/avatar-overlay",
+    "https://codex/avatar-overlay",
+    "not a URL",
+  ];
   if (!valid || browserId !== "test-browser" || !isValidCdpPageTarget(validPageTarget, options.port) ||
-      invalidPageTargets.some((item) => isValidCdpPageTarget(item, options.port))) {
+      invalidPageTargets.some((item) => isValidCdpPageTarget(item, options.port)) ||
+      !isPetOverlayUrl(validPetOverlay) || invalidPetOverlays.some(isPetOverlayUrl)) {
     throw new Error("CDP URL and target validation self-test failed");
   }
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
@@ -986,6 +1055,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       themeId: loaded.theme.id,
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,
+      pet: loaded.theme.pet,
       artMetadata: loaded.theme.artMetadata ?? null,
     }));
   } else if (options.mode === "watch") await runWatch(options);

@@ -2,6 +2,8 @@
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
+  const PET_STYLE_ID = "codex-dream-skin-pet-style";
+  const PET_ROOT_CLASS = "codex-dream-skin-pet";
   const ROOT_CLASSES = [
     "codex-dream-skin",
     "dream-theme-light",
@@ -28,6 +30,7 @@
     "--dream-accent-ink",
     "--dream-image-luma",
   ];
+  const PET_PROPERTIES = ["--dream-pet-accent", "--dream-pet-glow-blur"];
   const HOME_UTILITY_CLASS = "dream-home-utility";
   const installToken = {};
   let samplingNativeShell = false;
@@ -55,6 +58,7 @@
   const normalizeConfig = (value) => {
     const config = value && typeof value === "object" ? value : {};
     const art = config.art && typeof config.art === "object" ? config.art : {};
+    const pet = config.pet && typeof config.pet === "object" ? config.pet : {};
     const hasNumber = (candidate) =>
       (typeof candidate === "number" || (typeof candidate === "string" && candidate.trim() !== "")) &&
       Number.isFinite(Number(candidate));
@@ -74,6 +78,7 @@
       ? art.taskMode
       : "auto";
     const metadataRatio = Number(config?.artMetadata?.ratio);
+    const petMode = ["accent", "off"].includes(pet.mode) ? pet.mode : "accent";
     return {
       appearance,
       safeArea,
@@ -81,6 +86,8 @@
       focusX: hasNumber(art.focusX) ? clamp(art.focusX) : null,
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
       accent: safeAccent,
+      petMode,
+      petGlow: hasNumber(pet.glow) ? clamp(pet.glow) : .45,
       initialAspect: Number.isFinite(metadataRatio) && metadataRatio > 0 ? metadataRatio : null,
     };
   };
@@ -275,7 +282,14 @@
     return "light";
   };
 
-  const clearSkinDom = () => {
+  const clearPetDom = () => {
+    const root = document.documentElement;
+    root?.classList.remove(PET_ROOT_CLASS);
+    for (const property of PET_PROPERTIES) root?.style.removeProperty(property);
+    document.getElementById(PET_STYLE_ID)?.remove();
+  };
+
+  const clearShellSkinDom = () => {
     const root = document.documentElement;
     root?.classList.remove(...ROOT_CLASSES);
     for (const property of ROOT_PROPERTIES) root?.style.removeProperty(property);
@@ -285,6 +299,41 @@
     document.querySelectorAll(`.${HOME_UTILITY_CLASS}`).forEach((node) => node.classList.remove(HOME_UTILITY_CLASS));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
+  };
+
+  const clearSkinDom = () => {
+    clearShellSkinDom();
+    clearPetDom();
+  };
+
+  const applyPetProfile = (root) => {
+    const accent = config.accent || `rgb(${profile.accent.join(" ")})`;
+    const blur = 4 + config.petGlow * 12;
+    root.classList.add(PET_ROOT_CLASS);
+    root.style.setProperty("--dream-pet-accent", accent);
+    root.style.setProperty("--dream-pet-glow-blur", `${blur.toFixed(1).replace(/\.0$/, "")}px`);
+
+    let style = document.getElementById(PET_STYLE_ID);
+    if (!style) {
+      style = document.createElement("style");
+      style.id = PET_STYLE_ID;
+      (document.head || root).appendChild(style);
+    }
+    if (style.dataset.dreamVersion !== "1") {
+      style.textContent = `
+        html.${PET_ROOT_CLASS},
+        html.${PET_ROOT_CLASS} body {
+          background: transparent !important;
+        }
+        html.${PET_ROOT_CLASS} body {
+          filter: drop-shadow(
+            0 0 var(--dream-pet-glow-blur)
+            color-mix(in srgb, var(--dream-pet-accent) 62%, transparent)
+          );
+        }
+      `;
+      style.dataset.dreamVersion = "1";
+    }
   };
 
   const applyProfile = (root) => {
@@ -329,10 +378,15 @@
     const shellMain = document.querySelector("main.main-surface");
     const shellSidebar = document.querySelector("aside.app-shell-left-panel");
     if (!shellMain || !shellSidebar) {
-      clearSkinDom();
+      clearShellSkinDom();
+      const petOverlay = location.protocol === "app:" && location.hostname === "codex" &&
+        location.pathname === "/avatar-overlay" && !location.search && !location.hash;
+      if (petOverlay && config.petMode === "accent") applyPetProfile(root);
+      else clearPetDom();
       return;
     }
 
+    clearPetDom();
     root.classList.add("codex-dream-skin");
     applyProfile(root);
 

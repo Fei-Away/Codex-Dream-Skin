@@ -18,7 +18,7 @@
 - Task side panel: open and close the native thread panel twice, resize the window, and repeat; the toggle must remain visible and clickable.
 - Composer: type text, verify caret/readability, then clear it without sending.
 - Reload: use CDP `Page.reload`, wait, and confirm the injection marker returns.
-- Pet overlay: open a desktop pet and confirm its auxiliary window stays transparent with no skin background or decoration layer behind it.
+- Pet overlay: open a desktop pet and confirm its exact `/avatar-overlay` window stays transparent, retains native animation and interaction, and receives only the active theme's accent glow. Change themes and confirm the glow updates; pause or restore and confirm it is removed. Set `pet.mode` to `off` and confirm no pet style remains.
 - Restore/reapply cycle: remove live skin, verify marker absent, apply again, verify marker present.
 - Update resilience: resolve the current `OpenAI.Codex` Appx location dynamically for launch. A versioned path saved for cleanup must be revalidated against the registered package full/family identity before any process is stopped.
 - Restart consent: an existing normal Codex window is never force-closed without explicit CLI authorization or shortcut confirmation.

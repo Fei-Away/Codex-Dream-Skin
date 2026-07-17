@@ -18,6 +18,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 ## Guardrails
 
 - Preserve the official executable, package signature, user threads, pets, plugins, and authentication state.
+- Pet theming is limited to a non-interactive accent glow on the exact `app://codex/avatar-overlay` renderer. Keep the auxiliary window transparent, do not replace official pet assets or animation, and use `pet.mode: off` to disable the effect.
 - Theme images must be UI-free wallpapers. Never import a README screenshot, fake window, sidebar, card, composer, logo, or text baked into the bitmap.
 - Paint one continuous 16:9 wallpaper across the full Codex window. Let the sidebar, main area, header, and composer act as coordinated readability layers; keep the home route expressive and task routes quieter.
 - `appearance: auto` follows the native computed `color-scheme` first and the system appearance only as a fallback. Image brightness may tune color and composition, but must not flip the user's shell mode; explicit `light` and `dark` remain authoritative.
@@ -29,7 +30,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 - The watcher registers a generation-checked early payload for connected renderers so reload/navigation can paint the skin before the normal load-event fallback; unsupported CDP targets fall back safely.
 - The active theme, saved themes, imported images, pause marker, and tray controls live under `%LOCALAPPDATA%\CodexDreamSkin`. Reject empty or over-16 MB images before copying or encoding them.
 - Every managed-store write rejects junctions and other reparse points in every existing path component. Imports also use the bundled Node metadata parser before copying to reject dimensions above 16384px or 50MP.
-- CDP targets must use a same-port loopback WebSocket, belong to the current Store package, retain the launch-time Browser ID, and expose expected Codex renderer markers.
+- CDP targets must use a same-port loopback WebSocket, belong to the current Store package, retain the launch-time Browser ID, and expose either the expected Codex shell markers or the exact pet-overlay URL and structure.
 - Loopback prevents LAN exposure, but Chromium CDP has no same-user authentication. Run only trusted local software while the skin is active, and use restore to close the debug session when it is no longer needed.
 - Preserve `config.toml` as strict UTF-8. Never use encoding-dependent whole-file PowerShell reads/writes, silently transcode UTF-16, or overwrite a file that changed after it was read. Ambiguous TOML shapes must fail before writing rather than receive a best-effort rewrite.
 - Keep install/start/restore/verify serialized with the per-user operation lock in `common-windows.ps1`.
@@ -51,7 +52,7 @@ node --check assets\renderer-inject.js
 - `assets/dream-skin.css`: full visual layer.
 - `assets/renderer-inject.js`: idempotent DOM integration and cleanup.
 - `assets/dream-reference.jpg`: pure 2560 × 1440 Arina Hashimoto wallpaper seeded as the default and as a saved theme; it contains no Codex UI.
-- `assets/theme.json`: shared adaptive theme contract for the seeded preset.
+- `assets/theme.json`: shared adaptive theme contract for the seeded preset, including optional `pet.mode` and `pet.glow` controls.
 - `scripts/theme-windows.ps1`: persistent active/saved theme store, safe image import, pause state, and preset seeding.
 - `scripts/tray-dream-skin.ps1`: Windows Forms tray for apply, pause, import, save, switch, and complete restore.
 - `references/qa-inventory.md`: required functional and visual signoff coverage.

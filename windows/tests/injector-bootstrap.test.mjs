@@ -9,13 +9,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
-function createFixture() {
+function createFixture(pathname = "/other-overlay") {
   const observers = [];
   const timers = new Map();
   let nextTimer = 1;
   const markers = { shell: false, sidebar: false };
+  const location = { protocol: "app:", hostname: "codex", pathname, search: "", hash: "" };
   const context = {
-    window: { installs: [] },
+    location,
+    window: { installs: [], location },
     document: {
       documentElement: {},
       body: {},
@@ -53,6 +55,10 @@ assert.deepEqual(guarded.context.window.installs, [], "A main surface without th
 guarded.markers.sidebar = true;
 guarded.observers[0].callback([]);
 assert.deepEqual(guarded.context.window.installs, ["guarded"], "The guarded payload should install once the shell is complete.");
+
+const pet = createFixture("/avatar-overlay");
+vm.runInNewContext(earlyPayloadFor('window.installs.push("pet")', "pet"), pet.context);
+assert.deepEqual(pet.context.window.installs, ["pet"], "The exact pet overlay should receive the early payload.");
 
 const generations = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);
