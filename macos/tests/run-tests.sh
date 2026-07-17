@@ -47,6 +47,19 @@ fi
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
+"$NODE" "$ROOT/tests/launcher-file.test.mjs"
+
+/usr/bin/grep -F -q 'launcher-file.mjs" write' \
+  "$ROOT/scripts/install-dream-skin-macos.sh"
+/usr/bin/grep -F -q 'launcher-file.mjs" check' \
+  "$ROOT/scripts/restore-dream-skin-macos.sh"
+/usr/bin/grep -F -q 'launcher-file.mjs" remove' \
+  "$ROOT/scripts/restore-dream-skin-macos.sh"
+if /usr/bin/grep -F -q '/bin/rm -f "$HOME/Desktop/Codex Dream Skin' \
+  "$ROOT/scripts/restore-dream-skin-macos.sh"; then
+  printf 'Uninstall still removes Desktop entries without an ownership check.\n' >&2
+  exit 1
+fi
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do

@@ -60,10 +60,20 @@ fi
 
 /bin/rm -f "$STATE_PATH"
 if [ "$UNINSTALL" = "true" ]; then
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin.command"
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Customize.command"
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Verify.command"
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Restore.command"
+  launchers=(
+    "$HOME/Desktop/Codex Dream Skin.command"
+    "$HOME/Desktop/Codex Dream Skin - Customize.command"
+    "$HOME/Desktop/Codex Dream Skin - Verify.command"
+    "$HOME/Desktop/Codex Dream Skin - Restore.command"
+  )
+  # Preflight every entry before removing any of them so an unrelated file
+  # fails the uninstall without leaving the owned launcher set half-removed.
+  for launcher in "${launchers[@]}"; do
+    "$NODE" "$SCRIPT_DIR/launcher-file.mjs" check "$launcher"
+  done
+  for launcher in "${launchers[@]}"; do
+    "$NODE" "$SCRIPT_DIR/launcher-file.mjs" remove "$launcher"
+  done
 fi
 
 printf 'Codex Dream Skin Studio was removed and the requested macOS restore actions completed successfully.\n'

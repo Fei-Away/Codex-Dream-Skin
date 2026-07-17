@@ -67,15 +67,7 @@ shell_quote() {
 write_launcher() {
   local target="$1"
   local command="$2"
-  if [ -e "$target" ] && ! /usr/bin/grep -q '^# CodexDreamSkinStudio launcher$' "$target" 2>/dev/null; then
-    fail "Refusing to overwrite an unrelated Desktop file: $target"
-  fi
-  /usr/bin/printf '%s\n' \
-    '#!/bin/bash' \
-    '# CodexDreamSkinStudio launcher' \
-    'set -e' \
-    "$command" > "$target"
-  /bin/chmod 700 "$target"
+  "$NODE" "$SCRIPT_DIR/launcher-file.mjs" write "$target" "$command"
 }
 
 if [ "$CREATE_LAUNCHERS" = "true" ]; then
