@@ -700,13 +700,51 @@ BACKUP="$TMP/theme-backup.json"
 /bin/cp "$CONFIG" "$TMP/original.toml"
 "$NODE" "$ROOT/scripts/theme-config.mjs" install "$CONFIG" "$BACKUP" >/dev/null
 /usr/bin/cmp -s "$CONFIG" "$TMP/original.toml"
-"$NODE" -e '
-  const backup = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-  if (backup.values.appearanceTheme !== `appearanceTheme = "system"`) process.exit(1);
-  if (backup.values.appearanceDarkCodeThemeId !== `appearanceDarkCodeThemeId = "vscode-dark"`) process.exit(1);
-' "$BACKUP"
+[ ! -e "$BACKUP" ]
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CONFIG" "$BACKUP" >/dev/null
 /usr/bin/cmp -s "$CONFIG" "$TMP/original.toml"
+
+# Backups from releases that managed appearance keys must still restore through
+# the strict parser and disappear only after a successful round trip.
+"$NODE" -e '
+  const fs = require("node:fs");
+  const [file, configPath] = process.argv.slice(1);
+  fs.writeFileSync(file, `${JSON.stringify({
+    schemaVersion: 1,
+    platform: "darwin",
+    configPath,
+    values: {
+      appearanceTheme: `appearanceTheme = "system"`,
+      appearanceDarkCodeThemeId: `appearanceDarkCodeThemeId = "vscode-dark"`,
+    },
+  }, null, 2)}\n`);
+' "$BACKUP" "$CONFIG"
+/usr/bin/printf '%s\n' \
+  'model = "gpt-5"' \
+  'project = "中文项目"' \
+  '' \
+  '[desktop]' \
+  'appearanceTheme = "dark"' \
+  'appearanceDarkCodeThemeId = "monokai"' \
+  'keepMe = true' > "$CONFIG"
+"$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CONFIG" "$BACKUP" >/dev/null
+/usr/bin/cmp -s "$CONFIG" "$TMP/original.toml"
+[ ! -e "$BACKUP" ]
+
+write_null_theme_backup() {
+  local backup="$1"
+  local config="$2"
+  "$NODE" -e '
+    const fs = require("node:fs");
+    const [file, configPath] = process.argv.slice(1);
+    fs.writeFileSync(file, `${JSON.stringify({
+      schemaVersion: 1,
+      platform: "darwin",
+      configPath,
+      values: { appearanceTheme: null, appearanceDarkCodeThemeId: null },
+    }, null, 2)}\n`);
+  ' "$backup" "$config"
+}
 
 assert_theme_config_restore_rejected() {
   local label="$1"
@@ -714,7 +752,7 @@ assert_theme_config_restore_rejected() {
   local backup="$3"
   /bin/cp "$config" "$config.original"
   if "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$config" "$backup" >/dev/null 2>&1; then
-    printf 'theme-config unexpectedly accepted invalid %s backup.\n' "$label" >&2
+    printf 'theme-config unexpectedly accepted unsafe %s restore.\n' "$label" >&2
     exit 1
   fi
   /usr/bin/cmp -s "$config" "$config.original"
@@ -752,6 +790,7 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" install "$NO_DESKTOP_CONFIG" "$NO_DESKTOP_BACKUP" >/dev/null
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$NO_DESKTOP_CONFIG" "$NO_DESKTOP_BACKUP" >/dev/null
 /usr/bin/cmp -s "$NO_DESKTOP_CONFIG" "$TMP/original-without-desktop.toml"
+[ ! -e "$NO_DESKTOP_BACKUP" ]
 
 INVALID_UTF_CONFIG="$TMP/config-invalid-utf8.toml"
 INVALID_UTF_BACKUP="$TMP/config-invalid-utf8-backup.json"
@@ -761,6 +800,11 @@ INVALID_UTF_BACKUP="$TMP/config-invalid-utf8-backup.json"
 if "$NODE" "$ROOT/scripts/theme-config.mjs" install \
   "$INVALID_UTF_CONFIG" "$INVALID_UTF_BACKUP" >/dev/null 2>&1; then
   printf 'theme-config unexpectedly accepted invalid UTF-8.\n' >&2
+  exit 1
+fi
+if "$NODE" "$ROOT/scripts/theme-config.mjs" restore \
+  "$INVALID_UTF_CONFIG" "$INVALID_UTF_BACKUP" >/dev/null 2>&1; then
+  printf 'theme-config restore unexpectedly accepted invalid UTF-8.\n' >&2
   exit 1
 fi
 /usr/bin/cmp -s "$INVALID_UTF_CONFIG" "$TMP/original-invalid-utf8.toml"
@@ -776,8 +820,25 @@ assert_theme_config_install_rejected() {
     printf 'theme-config unexpectedly accepted invalid %s config.\n' "$label" >&2
     exit 1
   fi
+  if "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$config" "$backup" >/dev/null 2>&1; then
+    printf 'theme-config restore unexpectedly accepted invalid %s config.\n' "$label" >&2
+    exit 1
+  fi
   /usr/bin/cmp -s "$config" "$config.original"
   [ ! -e "$backup" ]
+  [ ! -e "$config.dream-skin.lock" ]
+}
+
+assert_theme_config_install_noop() {
+  local label="$1"
+  local config="$2"
+  local backup="$3"
+  /bin/cp "$config" "$config.original"
+  "$NODE" "$ROOT/scripts/theme-config.mjs" install "$config" "$backup" >/dev/null
+  /usr/bin/cmp -s "$config" "$config.original"
+  [ ! -e "$backup" ]
+  "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$config" "$backup" >/dev/null
+  /usr/bin/cmp -s "$config" "$config.original"
   [ ! -e "$config.dream-skin.lock" ]
 }
 
@@ -798,20 +859,37 @@ assert_theme_config_install_rejected nul "$NUL_CONFIG" "$TMP/config-nul-backup.j
 DUPLICATE_DESKTOP_CONFIG="$TMP/config-duplicate-desktop.toml"
 /usr/bin/printf '%s\n' '[desktop]' 'keep = 1' '[desktop]' 'keep = 2' \
   > "$DUPLICATE_DESKTOP_CONFIG"
-assert_theme_config_install_rejected duplicate-desktop "$DUPLICATE_DESKTOP_CONFIG" \
+assert_theme_config_install_noop duplicate-desktop "$DUPLICATE_DESKTOP_CONFIG" \
   "$TMP/config-duplicate-desktop-backup.json"
 
 MULTILINE_CONFIG="$TMP/config-multiline.toml"
 /usr/bin/printf '%s\n' 'note = """value' 'continued"""' '[desktop]' 'keep = true' \
   > "$MULTILINE_CONFIG"
-assert_theme_config_install_rejected multiline "$MULTILINE_CONFIG" \
-  "$TMP/config-multiline-backup.json"
+MULTILINE_BACKUP="$TMP/config-multiline-backup.json"
+assert_theme_config_install_noop multiline "$MULTILINE_CONFIG" "$MULTILINE_BACKUP"
+
+PRESERVED_BACKUP="$TMP/config-preserved-backup.json"
+write_null_theme_backup "$PRESERVED_BACKUP" "$MULTILINE_CONFIG"
+/bin/cp "$PRESERVED_BACKUP" "$PRESERVED_BACKUP.original"
+"$NODE" "$ROOT/scripts/theme-config.mjs" install \
+  "$MULTILINE_CONFIG" "$PRESERVED_BACKUP" >/dev/null
+/usr/bin/cmp -s "$PRESERVED_BACKUP" "$PRESERVED_BACKUP.original"
 
 MULTILINE_ARRAY_CONFIG="$TMP/config-multiline-array.toml"
 /usr/bin/printf '%s\n' '[desktop]' 'rows = [' '  ["one", "two"],' ']' \
   'appearanceTheme = "system"' > "$MULTILINE_ARRAY_CONFIG"
-assert_theme_config_install_rejected multiline-array "$MULTILINE_ARRAY_CONFIG" \
-  "$TMP/config-multiline-array-backup.json"
+MULTILINE_ARRAY_BACKUP="$TMP/config-multiline-array-backup.json"
+assert_theme_config_install_noop multiline-array \
+  "$MULTILINE_ARRAY_CONFIG" "$MULTILINE_ARRAY_BACKUP"
+
+write_null_theme_backup "$MULTILINE_BACKUP" "$MULTILINE_CONFIG"
+assert_theme_config_restore_rejected multiline-layout "$MULTILINE_CONFIG" \
+  "$MULTILINE_BACKUP"
+/bin/rm -f "$MULTILINE_BACKUP"
+write_null_theme_backup "$MULTILINE_ARRAY_BACKUP" "$MULTILINE_ARRAY_CONFIG"
+assert_theme_config_restore_rejected multiline-array-layout \
+  "$MULTILINE_ARRAY_CONFIG" "$MULTILINE_ARRAY_BACKUP"
+/bin/rm -f "$MULTILINE_ARRAY_BACKUP"
 
 CRLF_CONFIG="$TMP/config-crlf.toml"
 CRLF_BACKUP="$TMP/config-crlf-backup.json"
@@ -821,6 +899,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" install "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
+[ ! -e "$CRLF_BACKUP" ]
 
 /usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
