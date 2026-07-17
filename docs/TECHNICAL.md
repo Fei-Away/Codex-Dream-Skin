@@ -51,7 +51,7 @@
 
 - 入口或触发：`theme-package.mjs validate <source-dir>` 与 `theme-package.mjs pack <source-dir> --output <file.dreamskin>`。
 - 主要处理过程：稳定读取 manifest/theme/资源；按公开 Schema 与资源限制验证；计算 SHA-256；生成规范化清单；使用确定顺序和固定元数据写 ZIP。
-- 数据读取与写入：只读源目录；通过随机临时文件写输出；校验成功后原子重命名。
+- 数据读取与写入：只读源目录；通过随机临时文件写完整输出；校验成功后用同目录排他硬链接原子发布，目标若已存在则失败，避免 check-then-rename 覆盖竞态。
 - 外部依赖：无网络、无第三方运行时；纯 Node ZIP 写入使用固定条目顺序、时间和权限元数据，并由 golden package 逐字节复现测试覆盖。
 - 成功结果：同一输入在同一格式版本下产生相同内容哈希与可导入包。
 - 失败处理与用户反馈：输出稳定错误码、JSON 路径或资源路径；删除临时输出，不留下半包。

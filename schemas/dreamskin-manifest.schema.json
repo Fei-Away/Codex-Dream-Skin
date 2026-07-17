@@ -23,14 +23,19 @@
       "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"
     },
     "packageVersion": { "$ref": "#/$defs/semver" },
-    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "name": { "$ref": "#/$defs/singleLine80" },
     "author": {
       "type": "object",
       "additionalProperties": false,
       "required": ["name"],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
-        "url": { "type": "string", "format": "uri", "maxLength": 2048 }
+        "name": { "$ref": "#/$defs/singleLine80" },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://(?![^/?#]*@)",
+          "maxLength": 2048
+        }
       }
     },
     "targets": {
@@ -47,7 +52,12 @@
       "required": ["background"],
       "properties": {
         "background": { "$ref": "#/$defs/resource" },
-        "preview": { "$ref": "#/$defs/resource" }
+        "preview": {
+          "allOf": [
+            { "$ref": "#/$defs/resource" },
+            { "properties": { "bytes": { "maximum": 4194304 } } }
+          ]
+        }
       }
     },
     "contentHash": { "$ref": "#/$defs/sha256" }
@@ -56,6 +66,12 @@
     "semver": {
       "type": "string",
       "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "singleLine80": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]+$"
     },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "resource": {

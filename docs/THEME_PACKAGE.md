@@ -13,7 +13,7 @@ node tools/theme-package.mjs pack examples/theme-package/kimi-sakura-dawn \
 node tools/theme-package.mjs inspect kimi-sakura-dawn.dreamskin
 ```
 
-三个命令只在本机工作，不联网。成功和失败都向 stdout 输出一个 JSON 报告；失败退出码为 `1`，并带稳定 `code`。`pack` 拒绝覆盖已有输出，只通过同目录临时文件和原子重命名发布新包。
+三个命令只在本机工作，不联网。成功和失败都向 stdout 输出一个 JSON 报告；失败退出码为 `1`，并带稳定 `code`。`pack` 拒绝覆盖已有输出，只通过同目录完整临时文件和原子、排他的文件发布生成新包。
 
 如需同时验证运行环境兼容性，显式提供平台和 Dream Skin 版本；工具不会根据当前电脑偷偷推断：
 

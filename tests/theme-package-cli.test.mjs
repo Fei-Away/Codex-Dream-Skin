@@ -198,6 +198,19 @@ try {
   assert.equal(secondPackResult.status, 0, secondPackResult.stderr || secondPackResult.stdout);
   assert.deepEqual(await fs.readFile(secondPackage), await fs.readFile(firstPackage));
 
+  const existingOutput = path.join(temporaryRoot, "existing.dreamskin");
+  const existingSentinel = Buffer.from("do not overwrite\n", "utf8");
+  await fs.writeFile(existingOutput, existingSentinel);
+  const existingResult = runCli("pack", source, "--output", existingOutput);
+  assert.equal(existingResult.status, 1, existingResult.stderr || existingResult.stdout);
+  assert.equal(parseReport(existingResult).code, "OUTPUT_EXISTS");
+  assert.deepEqual(await fs.readFile(existingOutput), existingSentinel);
+  assert.equal(
+    (await fs.readdir(temporaryRoot)).some((name) => name.startsWith(".existing.dreamskin.")),
+    false,
+    "failed exclusive publish must clean its complete temporary file",
+  );
+
   const inspectResult = runCli("inspect", firstPackage);
   assert.equal(inspectResult.status, 0, inspectResult.stderr || inspectResult.stdout);
   const inspectReport = parseReport(inspectResult);
@@ -397,6 +410,22 @@ try {
   );
   assert.equal(wrongPlatformResult.status, 1, wrongPlatformResult.stderr || wrongPlatformResult.stdout);
   assert.equal(parseReport(wrongPlatformResult).code, "COMPAT_PLATFORM_UNSUPPORTED");
+
+  const missingManifestSource = await createValidSource("missing-manifest-source");
+  await fs.rm(path.join(missingManifestSource, "manifest.json"));
+  const missingManifestResult = runCli("validate", missingManifestSource);
+  assert.equal(missingManifestResult.status, 1, missingManifestResult.stderr || missingManifestResult.stdout);
+  assert.deepEqual(parseReport(missingManifestResult), {
+    pass: false,
+    code: "SOURCE_FILE_MISSING",
+    message: "manifest.json does not exist.",
+    field: "manifest.json",
+    persistentChanges: false,
+  });
+
+  const missingPackageResult = runCli("inspect", path.join(temporaryRoot, "missing.dreamskin"));
+  assert.equal(missingPackageResult.status, 1, missingPackageResult.stderr || missingPackageResult.stdout);
+  assert.equal(parseReport(missingPackageResult).code, "PACKAGE_NOT_FOUND");
 } finally {
   await fs.rm(temporaryRoot, { recursive: true, force: true });
 }
