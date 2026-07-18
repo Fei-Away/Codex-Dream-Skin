@@ -579,11 +579,30 @@ function encodeColorTokensForRuntime(
   colors: ThemeColorTokens,
   features: RuntimeThemeFeatures,
 ): ThemeColorTokens | null {
+  const parsedBackground = parseThemeColor(colors.background);
+  if (!parsedBackground) return null;
+  const opaqueBackground: RgbaColor = {
+    red: parsedBackground.red,
+    green: parsedBackground.green,
+    blue: parsedBackground.blue,
+    alpha: 1,
+  };
   const encoded = {} as ThemeColorTokens;
   for (const key of Object.keys(COLOR_FIELD_ALIASES) as Array<keyof ThemeColorTokens>) {
     const parsed = parseThemeColor(colors[key]);
     if (!parsed) return null;
-    const formatted = formatEditedThemeColor(parsed, features, colors[key]);
+    let runtimeColor = parsed;
+    if (parsed.alpha < 1 && !supportsTransparentColorEditing(features)) {
+      runtimeColor = key === "background"
+        ? { ...parsed, alpha: 1 }
+        : {
+            red: (parsed.red * parsed.alpha) + (opaqueBackground.red * (1 - parsed.alpha)),
+            green: (parsed.green * parsed.alpha) + (opaqueBackground.green * (1 - parsed.alpha)),
+            blue: (parsed.blue * parsed.alpha) + (opaqueBackground.blue * (1 - parsed.alpha)),
+            alpha: 1,
+          };
+    }
+    const formatted = formatEditedThemeColor(runtimeColor, features, colors[key]);
     if (!formatted) return null;
     encoded[key] = formatted;
   }
@@ -720,12 +739,40 @@ function hasCompleteExplicitColors(draft: ThemeEditorDraft): boolean {
   return explicitColorCount(draft) === EDITABLE_COLOR_FIELDS.length;
 }
 
+function ordinaryMaterializationColors(draft: ThemeEditorDraft): ThemeColorTokens {
+  const base = adaptiveBaseColorTokens(draft);
+  const explicit = draft.colorMode === "explicit" ? draft.explicitColors ?? {} : {};
+  return canonicalizeColorTokens({ ...base, ...explicit });
+}
+
 function materializeFullExplicitColors(draft: ThemeEditorDraft, features: RuntimeThemeFeatures): boolean {
-  const encoded = encodeColorTokensForRuntime(previewColorTokens(draft), features);
+  const encoded = encodeColorTokensForRuntime(ordinaryMaterializationColors(draft), features);
   if (!encoded) return false;
   draft.colorMode = "explicit";
   draft.explicitColors = { ...encoded };
   draft.colors = { ...encoded };
+  return true;
+}
+
+function selectEditorColorMode(nextMode: ThemeColorMode): boolean {
+  const draft = state.editorDraft;
+  if (!draft || nextMode === draft.colorMode) return false;
+  if (nextMode === "adaptive") {
+    draft.colorMode = "adaptive";
+    draft.explicitColors = null;
+    draft.colors = previewColorTokens(draft);
+    return true;
+  }
+  if (state.status.themeFeatures.partialColors) {
+    draft.colorMode = "explicit";
+    draft.explicitColors = {};
+    draft.colors = previewColorTokens(draft);
+    return true;
+  }
+  if (!materializeFullExplicitColors(draft, state.status.themeFeatures)) {
+    showToast("无法生成旧运行时色板", "warning", "无法把当前普通颜色转换为完整十色，请检查主题颜色后重试。");
+    return false;
+  }
   return true;
 }
 
@@ -1661,7 +1708,7 @@ function renderSimulationImage(imageUrl: string, className: string): string {
 }
 
 function currentImageMetadata(draft: ThemeEditorDraft, source: ThemeSummary): ThemeImageMetadata | null {
-  return draft.replacementImageMetadata ?? source.imageMetadata;
+  return draft.replacementImagePath !== null ? draft.replacementImageMetadata : source.imageMetadata;
 }
 
 function resolvePreviewSafeArea(draft: ThemeEditorDraft, source: ThemeSummary): Exclude<ThemeSafeArea, "auto"> {
@@ -1761,13 +1808,13 @@ function renderCodexSimulation(draft: ThemeEditorDraft, source: ThemeSummary): s
         <header class="sim-header">
           <div><b data-preview-copy="name">${escapeHtml(draft.name || "Untitled")}</b><small>Local workspace</small></div>
           <div class="sim-header-actions">
-            <button type="button" data-preview-action="open-menu" aria-haspopup="menu" aria-expanded="false" aria-label="打开模拟菜单">&hellip;</button>
+            <button type="button" data-preview-action="open-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="preview-simulation-menu" aria-label="打开模拟菜单">&hellip;</button>
             <button type="button" disabled aria-label="Disabled example">&times;</button>
           </div>
-          <div class="sim-popover" role="menu" data-preview-popover hidden>
-            <button type="button" role="menuitem" data-preview-action="menu-command" data-preview-feedback-message="已模拟打开主题目录">&#x6253;&#x5F00;&#x4E3B;&#x9898;&#x76EE;&#x5F55;</button>
-            <button type="button" role="menuitem" data-preview-action="menu-command" data-preview-feedback-message="主题信息已模拟复制">&#x590D;&#x5236;&#x4E3B;&#x9898;&#x4FE1;&#x606F;</button>
-            <button type="button" role="menuitem" disabled>&#x6682;&#x4E0D;&#x53EF;&#x7528;</button>
+          <div class="sim-popover" id="preview-simulation-menu" role="menu" aria-label="模拟主题操作" data-preview-popover hidden>
+            <button type="button" role="menuitem" tabindex="0" data-preview-action="menu-command" data-preview-feedback-message="已模拟打开主题目录">&#x6253;&#x5F00;&#x4E3B;&#x9898;&#x76EE;&#x5F55;</button>
+            <button type="button" role="menuitem" tabindex="-1" data-preview-action="menu-command" data-preview-feedback-message="主题信息已模拟复制">&#x590D;&#x5236;&#x4E3B;&#x9898;&#x4FE1;&#x606F;</button>
+            <button type="button" role="menuitem" tabindex="-1" disabled>&#x6682;&#x4E0D;&#x53EF;&#x7528;</button>
           </div>
         </header>
         <div class="sim-feedback" data-preview-feedback role="status" aria-live="polite" hidden></div>
@@ -1897,8 +1944,8 @@ function renderThemeEditor(): string {
                 <div class="editor-field editor-field-wide">
                   <span>配色模式</span>
                   <div class="editor-choice-group" role="radiogroup" aria-label="配色模式">
-                    <button type="button" role="radio" aria-checked="${draft.colorMode === "adaptive"}" class="${draft.colorMode === "adaptive" ? "is-active" : ""}" data-editor-color-mode="adaptive">自适应 · 移除 colors</button>
-                    <button type="button" role="radio" aria-checked="${draft.colorMode === "explicit"}" class="${draft.colorMode === "explicit" ? "is-active" : ""}" data-editor-color-mode="explicit">显式色板 · ${explicitCount}/10</button>
+                    <button type="button" role="radio" tabindex="${draft.colorMode === "adaptive" ? "0" : "-1"}" aria-checked="${draft.colorMode === "adaptive"}" class="${draft.colorMode === "adaptive" ? "is-active" : ""}" data-editor-color-mode="adaptive">自适应 · 移除 colors</button>
+                    <button type="button" role="radio" tabindex="${draft.colorMode === "explicit" ? "0" : "-1"}" aria-checked="${draft.colorMode === "explicit"}" class="${draft.colorMode === "explicit" ? "is-active" : ""}" data-editor-color-mode="explicit">显式色板 · ${explicitCount}/10</button>
                   </div>
                   <small>${draft.colorMode === "adaptive" ? "保存时不写 colors，可用于移除当前运行时不支持的颜色能力。" : features.partialColors ? "支持部分覆盖：只保存原有或你实际修改的色键。" : completeExplicitColors ? "旧运行时完整色板模式：保持 10/10，可编辑但不能单独移除某一色键。" : `当前只有 ${explicitCount}/10；旧运行时不能保存部分色板，请补全或切回自适应。`}</small>
                   ${draft.colorMode === "explicit" && !features.partialColors && !completeExplicitColors ? `<button class="button button-ghost editor-materialize-colors" type="button" data-action="editor-materialize-colors">补齐为完整十色</button>` : ""}
@@ -2611,22 +2658,7 @@ app.addEventListener("click", async (event) => {
   const colorModeButton = target.closest<HTMLButtonElement>("[data-editor-color-mode]");
   if (colorModeButton?.dataset.editorColorMode && state.editorDraft && !colorModeButton.disabled) {
     const nextMode = colorModeButton.dataset.editorColorMode as ThemeColorMode;
-    if (nextMode === state.editorDraft.colorMode) return;
-    if (nextMode === "adaptive") {
-      state.editorDraft.colorMode = "adaptive";
-      state.editorDraft.explicitColors = null;
-      state.editorDraft.colors = previewColorTokens(state.editorDraft);
-    } else if (nextMode === "explicit") {
-      if (state.status.themeFeatures.partialColors) {
-        state.editorDraft.colorMode = "explicit";
-        state.editorDraft.explicitColors = {};
-        state.editorDraft.colors = previewColorTokens(state.editorDraft);
-      } else if (!materializeFullExplicitColors(state.editorDraft, state.status.themeFeatures)) {
-        showToast("无法生成旧运行时色板", "warning", "请先移除不支持的透明色或 palette，再重试完整十色。");
-        return;
-      }
-    }
-    renderApp();
+    if (selectEditorColorMode(nextMode)) renderApp();
     return;
   }
 
@@ -2663,16 +2695,25 @@ app.addEventListener("click", async (event) => {
     } else if (previewAction === "open-menu" && previewControl instanceof HTMLButtonElement) {
       const popover = previewControl.closest(".sim-header")?.querySelector<HTMLElement>("[data-preview-popover]");
       if (popover) {
-        popover.hidden = !popover.hidden;
-        previewControl.setAttribute("aria-expanded", String(!popover.hidden));
+        const opening = popover.hidden;
+        popover.hidden = !opening;
+        previewControl.setAttribute("aria-expanded", String(opening));
+        if (opening) {
+          const menuItems = Array.from(popover.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'));
+          menuItems.forEach((item, index) => { item.tabIndex = index === 0 ? 0 : -1; });
+          requestAnimationFrame(() => menuItems[0]?.focus());
+        } else {
+          previewControl.focus();
+        }
       }
     } else if (previewAction === "menu-command") {
       const header = previewControl.closest<HTMLElement>(".sim-header");
       const popover = header?.querySelector<HTMLElement>("[data-preview-popover]");
       const opener = header?.querySelector<HTMLButtonElement>('[data-preview-action="open-menu"]');
+      showPreviewFeedback(previewControl, previewControl.dataset.previewFeedbackMessage ?? "模拟操作已完成");
       if (popover) popover.hidden = true;
       opener?.setAttribute("aria-expanded", "false");
-      showPreviewFeedback(previewControl, previewControl.dataset.previewFeedbackMessage ?? "模拟操作已完成");
+      opener?.focus();
     } else if (previewAction === "send-message") {
       const composer = previewControl.closest<HTMLElement>(".sim-composer");
       composer?.classList.add("is-sent");
@@ -3020,6 +3061,7 @@ app.addEventListener("submit", async (event) => {
     ? state.themes.find((theme) => !before.has(theme.selectionKey))?.selectionKey ?? sourceId
     : sourceId;
   renderApp();
+  restoreModalOpener('[data-action="open-theme-editor"]');
 });
 
 app.addEventListener("input", (event) => {
@@ -3241,6 +3283,41 @@ app.addEventListener("error", (event) => {
 
 document.addEventListener("keydown", (event) => {
   const target = event.target as HTMLElement;
+  const previewMenuItem = target.closest<HTMLButtonElement>('[role="menuitem"]');
+  const previewMenu = previewMenuItem?.closest<HTMLElement>('[data-preview-popover]:not([hidden])');
+  if (previewMenuItem && previewMenu && ["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+    event.preventDefault();
+    const items = Array.from(previewMenu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'));
+    const currentIndex = Math.max(0, items.indexOf(previewMenuItem));
+    const nextIndex = event.key === "Home" ? 0
+      : event.key === "End" ? items.length - 1
+        : (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items.forEach((item, index) => { item.tabIndex = index === nextIndex ? 0 : -1; });
+    items[nextIndex]?.focus();
+    return;
+  }
+
+  const colorModeRadio = target.closest<HTMLButtonElement>('[role="radio"][data-editor-color-mode]');
+  const colorModeKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"];
+  if (colorModeRadio && state.editorDraft && colorModeKeys.includes(event.key)) {
+    event.preventDefault();
+    const group = colorModeRadio.closest<HTMLElement>('[role="radiogroup"]');
+    const radios = Array.from(group?.querySelectorAll<HTMLButtonElement>('[role="radio"][data-editor-color-mode]:not(:disabled)') ?? []);
+    const currentIndex = Math.max(0, radios.indexOf(colorModeRadio));
+    const forward = event.key === "ArrowRight" || event.key === "ArrowDown";
+    const nextIndex = event.key === "Home" ? 0
+      : event.key === "End" ? radios.length - 1
+        : (currentIndex + (forward ? 1 : -1) + radios.length) % radios.length;
+    const nextMode = radios[nextIndex]?.dataset.editorColorMode as ThemeColorMode | undefined;
+    if (nextMode && selectEditorColorMode(nextMode)) {
+      renderApp();
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLButtonElement>(`[data-editor-color-mode="${nextMode}"]`)?.focus();
+      });
+    }
+    return;
+  }
+
   const previewTab = target.closest<HTMLButtonElement>('[role="tab"][data-preview-mode]');
   if (previewTab && state.editorDraft && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
     event.preventDefault();
