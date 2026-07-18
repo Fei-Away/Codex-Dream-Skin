@@ -129,6 +129,7 @@ try {
 
   $installSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\install-dream-skin.ps1')
   $commonSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\common-windows.ps1')
+  $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
   $hashVerificationIndex = $commonSource.IndexOf(
     'Staged Dream Skin runtime failed hash verification', [System.StringComparison]::Ordinal
   )
@@ -158,6 +159,12 @@ try {
   if ([regex]::Matches($installSource, '-ExecutionPolicy RemoteSigned').Count -ne 4 -or
     $installSource.Contains('-ExecutionPolicy Bypass')) {
     throw 'Installer shortcuts or tray launch still bypass the PowerShell execution policy.'
+  }
+  if (-not $installSource.Contains('[switch]$AutoApply') -or
+    -not $installSource.Contains('$autoApplyArgument = if ($AutoApply)') -or
+    -not $traySource.Contains('function Invoke-DreamSkinAutoApply') -or
+    -not $traySource.Contains('Get-DreamSkinVerifiedCdpIdentity -Port $effectivePort -Codex $codex')) {
+    throw 'Tray auto-apply is not explicitly gated by install and verified-CDP detection.'
   }
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
@@ -773,6 +780,10 @@ try {
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
     throw 'Complete restore does not stop a separately launched tray process.'
+  }
+  if (-not $restoreSource.Contains('$startup = [Environment]::GetFolderPath(''Startup'')') -or
+    -not $restoreSource.Contains('(Join-Path $startup ''Codex Dream Skin - Tray.lnk'')')) {
+    throw 'Shortcut uninstall does not remove the auto-start tray shortcut.'
   }
   if ($restoreSource.Contains('Start-Process -FilePath $relaunchCodex.Executable') -or
     -not $restoreSource.Contains('Start-DreamSkinCodex -Codex $relaunchCodex')) {

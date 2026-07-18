@@ -151,12 +151,14 @@ try {
     if ($Uninstall) {
       $desktop = [Environment]::GetFolderPath('Desktop')
       $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+      $startup = [Environment]::GetFolderPath('Startup')
       @(
         (Join-Path $desktop 'Codex Dream Skin.lnk'),
         (Join-Path $desktop 'Codex Dream Skin - Restore.lnk'),
         (Join-Path $desktop 'Codex Dream Skin - Tray.lnk'),
         (Join-Path $startMenu 'Codex Dream Skin.lnk'),
-        (Join-Path $startMenu 'Codex Dream Skin - Tray.lnk')
+        (Join-Path $startMenu 'Codex Dream Skin - Tray.lnk'),
+        (Join-Path $startup 'Codex Dream Skin - Tray.lnk')
       ) | ForEach-Object { Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue }
     }
 

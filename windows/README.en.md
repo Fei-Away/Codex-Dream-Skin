@@ -25,10 +25,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
 
 - `Codex Dream Skin`: launch or reapply the skin.
-- `Codex Dream Skin - Tray`: open the system tray theme controls.
+- `Codex Dream Skin - Tray`: open the system tray theme controls. Pass `-AutoApply` to the installer if you want the tray to try taking over normal Codex launches.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
-The current Windows default theme is `OpenAI 中国主题`. It renders a red-and-gold home banner, `OpenAI 中国主题`, `Codex App 中国特别版`, and the top-right tagline `初心如磐 · 智启未来`; normal task routes use a low-distraction red-and-gold background layer with softened flag-raising artwork, while the sidebar, suggestion cards, project picker, and composer remain native Codex controls.
+The current Windows default theme is `OpenAI 中国主题`. It renders a red-and-gold home banner, `OpenAI 中国主题`, `Codex App 中国特别版`, and the top-right tagline `初心如磐 · 智启未来`; normal task routes use a low-distraction red-and-gold background layer with tiled, softened flag-raising artwork, while the sidebar, suggestion cards, project picker, and composer remain native Codex controls.
 
 `Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
 
@@ -46,7 +46,7 @@ When upgrading from an older runtime to `OpenAI 中国主题`, if the active the
 
 ## Launch and verify
 
-The `Codex Dream Skin` shortcut is the recommended launcher. It asks for confirmation before restarting an open Codex window.
+Use the `Codex Dream Skin` shortcut to launch or reapply the skin. It asks for confirmation before restarting an open Codex window. If you want the tray to try taking over normal Codex launches, pass `-AutoApply` during installation; a normal install does not close or reopen Codex in the background.
 
 Command-line launch:
 
@@ -163,7 +163,7 @@ When `-Port` is omitted, the launcher searches for a free port beginning at `933
 
 ### Verification cannot find a CDP endpoint
 
-Launch Codex through the `Codex Dream Skin` shortcut, then run verification. A normal Codex launch does not open the debug session used by Dream Skin.
+Launch Codex through the `Codex Dream Skin` shortcut, then run verification. A normal Codex launch does not open the Dream Skin debug session unless `-AutoApply` was explicitly enabled during installation.
 
 ### The skin stops working after a Codex update
 

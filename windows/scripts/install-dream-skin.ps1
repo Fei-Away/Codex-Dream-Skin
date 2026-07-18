@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [int]$Port = 9335,
-  [switch]$NoShortcuts
+  [switch]$NoShortcuts,
+  [switch]$AutoApply
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,11 +49,13 @@ try {
     $shell = New-Object -ComObject WScript.Shell
     $desktop = [Environment]::GetFolderPath('Desktop')
     $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+    $startup = [Environment]::GetFolderPath('Startup')
     $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
     $startScript = $engine.Start
     $restoreScript = $engine.Restore
     $trayScript = $engine.Tray
     $portArgument = if ($PortExplicit) { " -Port $Port" } else { '' }
+    $autoApplyArgument = if ($AutoApply) { ' -AutoApply' } else { '' }
 
     foreach ($folder in @($desktop, $startMenu)) {
       $shortcut = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin.lnk'))
@@ -70,16 +73,18 @@ try {
     $restore.Description = 'Restore the official Codex appearance and close the CDP session'
     $restore.Save()
 
-    foreach ($folder in @($desktop, $startMenu)) {
+    $trayFolders = @($desktop, $startMenu)
+    if ($AutoApply) { $trayFolders += $startup }
+    foreach ($folder in $trayFolders) {
       $tray = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))
       $tray.TargetPath = $powershell
-      $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument"
+      $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument$autoApplyArgument"
       $tray.WorkingDirectory = $engine.Root
-      $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
+      $tray.Description = 'Open Codex Dream Skin status, auto-apply, and theme controls in the system tray'
       $tray.Save()
     }
     Start-Process -FilePath $powershell -ArgumentList `
-      "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument" `
+      "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument$autoApplyArgument" `
       -WindowStyle Hidden | Out-Null
   }
 

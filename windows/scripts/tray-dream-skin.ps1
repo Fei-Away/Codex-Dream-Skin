@@ -1,5 +1,8 @@
 ﻿[CmdletBinding()]
-param([int]$Port = 9335)
+param(
+  [int]$Port = 9335,
+  [switch]$AutoApply
+)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -45,7 +48,49 @@ try {
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
     $argumentLine = '-NoProfile -ExecutionPolicy RemoteSigned -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
-    Start-Process -FilePath $powershell -ArgumentList $argumentLine | Out-Null
+    return Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden -PassThru
+  }
+
+  $script:autoApplyProcess = $null
+  $script:lastAutoApplyAt = [DateTime]::MinValue
+
+  function Get-DreamSkinTrayPort {
+    $state = $null
+    try { $state = Read-DreamSkinState -Path $paths.State } catch {}
+    if ($null -ne $state -and $state.port) {
+      $statePort = 0
+      if ([int]::TryParse("$($state.port)", [ref]$statePort)) {
+        try {
+          Assert-DreamSkinPort -Port $statePort
+          return $statePort
+        } catch {}
+      }
+    }
+    return $Port
+  }
+
+  function Invoke-DreamSkinAutoApply {
+    if (-not $AutoApply -or (Test-DreamSkinPaused -StateRoot $StateRoot)) { return }
+    if ($null -ne $script:autoApplyProcess -and -not $script:autoApplyProcess.HasExited) { return }
+    if ((Get-Date) -lt $script:lastAutoApplyAt.AddSeconds(20)) { return }
+
+    $codex = $null
+    try { $codex = Get-DreamSkinCodexInstall } catch { return }
+    if ($null -eq $codex) { return }
+    $processes = @(Get-DreamSkinCodexProcesses -Codex $codex)
+    if ($processes.Count -eq 0) { return }
+
+    $effectivePort = Get-DreamSkinTrayPort
+    if ($null -ne (Get-DreamSkinVerifiedCdpIdentity -Port $effectivePort -Codex $codex)) { return }
+    if (-not (Test-DreamSkinPortAvailable -Port $effectivePort) -and
+      -not (Test-DreamSkinCodexPortOwner -Port $effectivePort -Codex $codex)) {
+      return
+    }
+
+    $script:lastAutoApplyAt = Get-Date
+    $script:autoApplyProcess = Start-DreamSkinPowerShell -Script $startScript -Arguments @(
+      '-Port', "$effectivePort", '-RestartExisting'
+    )
   }
 
   function Add-DreamSkinTrayItem {
@@ -82,7 +127,7 @@ try {
 
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '应用或重新应用' -Action {
       Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-      Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+      $null = Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
     }
     $pauseText = if ($paused) { '继续显示皮肤' } else { '暂停皮肤' }
     $nextPaused = -not $paused
@@ -138,7 +183,7 @@ try {
     }
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '完全恢复 Codex' -Action {
-      Start-DreamSkinPowerShell -Script $restoreScript -Arguments @(
+      $null = Start-DreamSkinPowerShell -Script $restoreScript -Arguments @(
         '-Port', "$Port", '-RestoreBaseTheme', '-PromptRestart'
       )
       $notify.Visible = $false
@@ -154,13 +199,25 @@ try {
   $notify.add_DoubleClick({
     try {
       Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-      Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+      $null = Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
     } catch {
       Show-DreamSkinTrayError -Message $_.Exception.Message
     }
   })
+  if ($AutoApply) {
+    $timer = [System.Windows.Forms.Timer]::new()
+    $timer.Interval = 2500
+    $timer.add_Tick({
+      try { Invoke-DreamSkinAutoApply } catch {}
+    })
+    $timer.Start()
+  }
   [System.Windows.Forms.Application]::Run()
 } finally {
+  if ($null -ne $timer) {
+    $timer.Stop()
+    $timer.Dispose()
+  }
   if ($null -ne $notify) { $notify.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
   $mutex.Dispose()

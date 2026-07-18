@@ -113,6 +113,21 @@ function Remove-DreamSkinRuntimeTree {
   Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
 }
 
+function Get-DreamSkinFileSha256 {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $stream = $null
+  $sha256 = $null
+  try {
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $stream = [System.IO.File]::Open($fullPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    return ([System.BitConverter]::ToString($sha256.ComputeHash($stream)) -replace '-', '').ToUpperInvariant()
+  } finally {
+    if ($null -ne $sha256) { $sha256.Dispose() }
+    if ($null -ne $stream) { $stream.Dispose() }
+  }
+}
+
 function Install-DreamSkinRuntimeEngine {
   param(
     [Parameter(Mandatory = $true)][string]$SkillRoot,
@@ -191,8 +206,8 @@ function Install-DreamSkinRuntimeEngine {
       $relative = $sourceFile.FullName.Substring($sourcePrefix.Length)
       $stagedFile = Join-Path $stagingRoot $relative
       if (-not (Test-Path -LiteralPath $stagedFile -PathType Leaf) -or
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFile.FullName).Hash -cne
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $stagedFile).Hash) {
+        (Get-DreamSkinFileSha256 -Path $sourceFile.FullName) -cne
+        (Get-DreamSkinFileSha256 -Path $stagedFile)) {
         throw "Staged Dream Skin runtime failed hash verification: $relative"
       }
     }

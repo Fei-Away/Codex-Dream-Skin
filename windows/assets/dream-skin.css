@@ -708,9 +708,9 @@ html.codex-dream-skin.dream-theme-openai-china.dream-art-wide:is(.dream-task-amb
     var(--dream-task-art),
     radial-gradient(ellipse at 84% 14%, color-mix(in oklab, #f6c663 24%, transparent) 0%, transparent 38%),
     radial-gradient(ellipse at 78% 90%, color-mix(in oklab, #df5735 9%, transparent) 0%, transparent 42%) !important;
-  background-repeat: no-repeat !important;
-  background-size: 100% 100%, 100% 100%, min(960px, 82vw) auto, 76% 46%, 88% 46% !important;
-  background-position: center, center, right -116px top 58px, right -18% top -10%, right -22% bottom -14% !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat !important;
+  background-size: 100% 100%, 100% 100%, cover, 76% 46%, 88% 46% !important;
+  background-position: center, center, center, right -18% top -10%, right -22% bottom -14% !important;
   background-blend-mode: normal, normal, multiply, normal, normal !important;
 }
 
