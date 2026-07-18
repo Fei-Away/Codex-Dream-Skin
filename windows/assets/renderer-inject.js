@@ -2,6 +2,7 @@
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
+  const DOCK_ID = "codex-dream-skin-utility-dock";
   const ROOT_CLASSES = [
     "codex-dream-skin",
     "dream-theme-light",
@@ -18,6 +19,7 @@
     "dream-task-ambient",
     "dream-task-banner",
     "dream-task-off",
+    "dream-focus-mode",
   ];
   const ROOT_PROPERTIES = [
     "--dream-art",
@@ -32,6 +34,9 @@
   const installToken = {};
   let samplingNativeShell = false;
   let observer = null;
+  let dockScroller = null;
+  let focusTimer = null;
+  let focusState = { active: false, sidebarWasExpanded: false, startedAt: 0 };
   window.__CODEX_DREAM_SKIN_DISABLED__ = false;
 
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, Number(value)));
@@ -73,6 +78,7 @@
     const taskMode = ["auto", "ambient", "banner", "off"].includes(art.taskMode)
       ? art.taskMode
       : "auto";
+    const features = config.features && typeof config.features === "object" ? config.features : {};
     const metadataRatio = Number(config?.artMetadata?.ratio);
     return {
       appearance,
@@ -82,12 +88,15 @@
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
       accent: safeAccent,
       initialAspect: Number.isFinite(metadataRatio) && metadataRatio > 0 ? metadataRatio : null,
+      utilityDock: features.utilityDock === true,
     };
   };
 
   const previous = window[STATE_KEY];
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.timer) clearInterval(previous.timer);
+  if (previous?.focusTimer) clearInterval(previous.focusTimer);
+  previous?.restoreFocus?.();
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
   if (previous?.artUrl) URL.revokeObjectURL(previous.artUrl);
   const artUrl = (() => {
@@ -285,7 +294,203 @@
     document.querySelectorAll(`.${HOME_UTILITY_CLASS}`).forEach((node) => node.classList.remove(HOME_UTILITY_CLASS));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
+    document.getElementById(DOCK_ID)?.remove();
+    dockScroller?.removeEventListener?.("scroll", updateDockState);
+    dockScroller = null;
   };
+
+  const sidebarTrigger = () => document.querySelector('[data-app-shell-sidebar-trigger]');
+  const threadScroller = () => document.querySelector(".thread-scroll-container");
+  const sidebarIsExpanded = () => {
+    const trigger = sidebarTrigger();
+    const label = trigger?.getAttribute?.("aria-label") || "";
+    if (/hide|collapse|关闭|隐藏|收起/i.test(label)) return true;
+    if (/show|expand|打开|显示|展开/i.test(label)) return false;
+    const rect = document.querySelector("aside.app-shell-left-panel")?.getBoundingClientRect?.();
+    return Boolean(rect && rect.width > 80);
+  };
+  const motionEnabled = () => {
+    try { return !window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return true; }
+  };
+  const threadTurns = (scroller) => scroller?.querySelectorAll
+    ? [...scroller.querySelectorAll("[data-turn-key]")]
+      .map((element) => ({ element, rect: element.getBoundingClientRect?.() }))
+      .filter(({ rect }) => rect && rect.height > 1)
+    : [];
+  const scrollThreadBy = (scroller, delta) => {
+    if (!scroller || !Number.isFinite(delta)) return false;
+    scroller.scrollTo?.({
+      top: scroller.scrollTop + delta,
+      behavior: motionEnabled() ? "smooth" : "auto",
+    });
+    return true;
+  };
+  const scrollToCurrentTurnTop = () => {
+    const scroller = threadScroller();
+    if (!scroller) return false;
+    const turns = threadTurns(scroller);
+    if (!turns.length) return scrollThreadBy(scroller, -Math.max(160, scroller.clientHeight * .82));
+    const viewport = scroller.getBoundingClientRect?.() || {
+      top: 0,
+      bottom: scroller.clientHeight,
+      height: scroller.clientHeight,
+    };
+    const viewportHeight = Math.max(1, viewport.height || viewport.bottom - viewport.top || scroller.clientHeight);
+    const tolerance = Math.max(6, Math.min(16, viewportHeight * .018));
+    const alignedIndex = turns.findIndex(({ rect }) =>
+      Math.abs(rect.top - viewport.top) <= tolerance && rect.bottom > viewport.top + tolerance);
+    if (alignedIndex >= 0) {
+      if (alignedIndex > 0) return scrollThreadBy(scroller, turns[alignedIndex - 1].rect.top - viewport.top);
+      return scrollThreadBy(scroller, -Math.max(160, scroller.clientHeight * .82));
+    }
+    const readingY = viewport.top + viewportHeight * .5;
+    let currentIndex = turns.findIndex(({ rect }) => rect.top <= readingY && rect.bottom > readingY);
+    if (currentIndex < 0) {
+      let bestVisible = -1;
+      let bestOverlap = 0;
+      for (let index = 0; index < turns.length; index += 1) {
+        const { rect } = turns[index];
+        const overlap = Math.max(0, Math.min(rect.bottom, viewport.bottom) - Math.max(rect.top, viewport.top));
+        if (overlap > bestOverlap) { bestOverlap = overlap; bestVisible = index; }
+      }
+      currentIndex = bestVisible;
+    }
+    if (currentIndex < 0) return scrollThreadBy(scroller, -Math.max(160, scroller.clientHeight * .82));
+    const current = turns[currentIndex];
+    if (current.rect.top >= viewport.top - tolerance) {
+      if (currentIndex > 0) return scrollThreadBy(scroller, turns[currentIndex - 1].rect.top - viewport.top);
+      return scrollThreadBy(scroller, -Math.max(160, scroller.clientHeight * .82));
+    }
+    return scrollThreadBy(scroller, current.rect.top - viewport.top);
+  };
+  const formatFocusElapsed = (elapsedMs) => {
+    const totalSeconds = Math.max(0, Math.floor(Number(elapsedMs) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return hours > 0
+      ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+      : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+  const renderFocusTimer = () => {
+    const output = document.getElementById("codex-dream-skin-focus-timer");
+    if (!output) return;
+    const label = formatFocusElapsed(focusState.active && focusState.startedAt
+      ? Date.now() - focusState.startedAt : 0);
+    output.textContent = label;
+    output.setAttribute("aria-label", `Focus time ${label}`);
+  };
+  const stopFocusTimer = () => {
+    if (focusTimer) clearInterval(focusTimer);
+    focusTimer = null;
+    renderFocusTimer();
+  };
+  const restoreFocus = () => {
+    if (!focusState.active) return;
+    document.documentElement?.classList.remove("dream-focus-mode");
+    if (focusState.sidebarWasExpanded && !sidebarIsExpanded()) sidebarTrigger()?.click?.();
+    focusState = { active: false, sidebarWasExpanded: false, startedAt: 0 };
+    stopFocusTimer();
+  };
+  const setFocusMode = (active) => {
+    const root = document.documentElement;
+    const trigger = sidebarTrigger();
+    if (!root || !trigger) return;
+    if (active && !focusState.active) {
+      focusState = { active: true, sidebarWasExpanded: sidebarIsExpanded(), startedAt: Date.now() };
+      if (focusState.sidebarWasExpanded) trigger.click?.();
+      root.classList.add("dream-focus-mode");
+      stopFocusTimer();
+      renderFocusTimer();
+      focusTimer = setInterval(renderFocusTimer, 1000);
+    } else if (!active && focusState.active) {
+      restoreFocus();
+    }
+    updateDockState();
+  };
+  const DOCK_ICONS = {
+    focus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H4a1 1 0 0 0-1 1v4M16 3h4a1 1 0 0 1 1 1v4M8 21H4a1 1 0 0 1-1-1v-4M16 21h4a1 1 0 0 0 1-1v-4"/><circle cx="12" cy="12" r="3.2"/></svg>',
+    sidebar: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M8.5 4v16M5.5 8h.01M5.5 12h.01"/></svg>',
+    top: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M7 12l5-5 5 5M12 7v12"/></svg>',
+    bottom: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14M7 12l5 5 5-5M12 5v12"/></svg>',
+  };
+  const makeDockItem = (dock, action, label, onClick) => {
+    const item = document.createElement("div");
+    item.className = "dream-dock-item";
+    item.dataset.dockItem = action;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = `codex-dream-skin-dock-${action}`;
+    button.className = "dream-dock-button";
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.innerHTML = DOCK_ICONS[action];
+    button.addEventListener("click", onClick);
+    const tooltip = document.createElement("span");
+    tooltip.className = "dream-dock-tooltip";
+    tooltip.textContent = label;
+    tooltip.setAttribute("role", "tooltip");
+    item.appendChild(button);
+    item.appendChild(tooltip);
+    dock.appendChild(item);
+    return button;
+  };
+  function ensureDock() {
+    if (!config.utilityDock) {
+      document.getElementById(DOCK_ID)?.remove();
+      return null;
+    }
+    let dock = document.getElementById(DOCK_ID);
+    if (!dock || dock.parentElement !== document.body) {
+      dock?.remove();
+      dock = document.createElement("nav");
+      dock.id = DOCK_ID;
+      dock.className = "dream-utility-dock";
+      dock.setAttribute("aria-label", "Task utility dock");
+      makeDockItem(dock, "focus", "Focus mode", () => setFocusMode(!focusState.active));
+      const timer = document.createElement("output");
+      timer.id = "codex-dream-skin-focus-timer";
+      timer.className = "dream-focus-timer";
+      timer.textContent = "00:00";
+      dock.appendChild(timer);
+      makeDockItem(dock, "sidebar", "Show or hide sidebar", () => sidebarTrigger()?.click?.());
+      makeDockItem(dock, "top", "Current turn or previous turn", scrollToCurrentTurnTop);
+      makeDockItem(dock, "bottom", "Latest message", () => {
+        const scroller = threadScroller();
+        scroller?.scrollTo?.({ top: scroller.scrollHeight, behavior: motionEnabled() ? "smooth" : "auto" });
+      });
+      document.body.appendChild(dock);
+    }
+    const currentScroller = threadScroller();
+    if (currentScroller !== dockScroller) {
+      dockScroller?.removeEventListener?.("scroll", updateDockState);
+      dockScroller = currentScroller;
+      dockScroller?.addEventListener?.("scroll", updateDockState, { passive: true });
+    }
+    updateDockState();
+    return dock;
+  }
+  function updateDockState() {
+    const dock = document.getElementById(DOCK_ID);
+    if (!dock) return;
+    const focusButton = document.getElementById("codex-dream-skin-dock-focus");
+    const sidebarButton = document.getElementById("codex-dream-skin-dock-sidebar");
+    const topButton = document.getElementById("codex-dream-skin-dock-top");
+    const bottomButton = document.getElementById("codex-dream-skin-dock-bottom");
+    const scroller = threadScroller();
+    const canScroll = Boolean(scroller && scroller.scrollHeight > scroller.clientHeight + 1);
+    if (focusButton) {
+      focusButton.setAttribute("aria-pressed", String(focusState.active));
+      focusButton.classList.toggle("is-active", focusState.active);
+    }
+    if (sidebarButton) {
+      sidebarButton.disabled = focusState.active || !sidebarTrigger();
+      sidebarButton.setAttribute("aria-pressed", String(sidebarIsExpanded()));
+    }
+    if (topButton) topButton.disabled = !canScroll;
+    if (bottomButton) bottomButton.disabled = !canScroll;
+    renderFocusTimer();
+  }
 
   const applyProfile = (root) => {
     const focusX = config.focusX ?? profile.focusX;
@@ -376,6 +581,7 @@
       document.body.appendChild(chrome);
     }
     chrome.classList.toggle("dream-home-shell", Boolean(home));
+    ensureDock();
   };
 
   const cleanup = () => {
@@ -383,8 +589,10 @@
     if (state?.installToken !== installToken) return false;
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     clearSkinDom();
+    restoreFocus();
     state?.observer?.disconnect();
     if (state?.timer) clearInterval(state.timer);
+    if (state?.focusTimer) clearInterval(state.focusTimer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
     delete window[STATE_KEY];
@@ -411,7 +619,8 @@
   });
   const timer = setInterval(ensure, 5000);
   window[STATE_KEY] = {
-    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
+    ensure, cleanup, restoreFocus, scrollToCurrentTurnTop, observer, timer, focusTimer, scheduler,
+    artUrl, profile, config, installToken, version: "1.2.0",
   };
   ensure();
   analyzeArt().then((result) => {
@@ -421,5 +630,5 @@
     state.profile = result;
     ensure();
   });
-  return { installed: true, version: "1.2.0", adaptive: true };
+  return { installed: true, version: "1.2.0", adaptive: true, utilityDock: config.utilityDock };
 })(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__)

@@ -78,6 +78,20 @@ Open `Codex Dream Skin - Tray` to:
 
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
 
+### Optional task utility dock
+
+Themes can opt in to a compact right-side task dock by adding this field to their `theme.json`:
+
+```json
+{
+  "features": {
+    "utilityDock": true
+  }
+}
+```
+
+Reapply the theme after editing the file. The dock provides focus mode with an elapsed timer, the native sidebar toggle, current-turn/previous-turn navigation, and a latest-message shortcut. It uses Codex's semantic sidebar and thread elements, disables thread actions when no scrollable task is present, respects reduced-motion preferences, and is removed completely when the skin is paused or restored.
+
 ## Restore and remove shortcuts
 
 Restore the stock appearance. If Codex is running, confirm its closure and relaunch:

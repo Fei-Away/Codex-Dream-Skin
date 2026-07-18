@@ -640,3 +640,150 @@ html.codex-dream-skin.dream-art-wide main.main-surface
     transition-duration: .01ms !important;
   }
 }
+
+/* Optional task utility dock. The renderer only creates it when the active
+   theme explicitly enables features.utilityDock. */
+#codex-dream-skin-utility-dock {
+  position: fixed !important;
+  right: 14px !important;
+  bottom: 14px !important;
+  z-index: 2147483000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 5px !important;
+  width: 42px !important;
+  padding: 6px 4px !important;
+  color: var(--dream-text) !important;
+  border: 1px solid color-mix(in oklab, var(--dream-line) 86%, transparent) !important;
+  border-radius: 21px !important;
+  background: color-mix(in oklab, var(--dream-surface-raised) 84%, transparent) !important;
+  box-shadow: 0 12px 34px color-mix(in oklab, var(--dream-canvas) 34%, transparent) !important;
+  backdrop-filter: blur(14px) saturate(1.08) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.08) !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-item {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 34px !important;
+  height: 34px !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-button {
+  display: grid !important;
+  place-items: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  color: var(--dream-text-muted) !important;
+  border: 1px solid transparent !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease,
+    transform 140ms ease !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-button svg {
+  width: 18px !important;
+  height: 18px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.75 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-button:hover:not(:disabled),
+#codex-dream-skin-utility-dock .dream-dock-button:focus-visible,
+#codex-dream-skin-utility-dock .dream-dock-button.is-active {
+  color: var(--dream-accent-ink) !important;
+  border-color: color-mix(in oklab, var(--dream-accent) 62%, transparent) !important;
+  background: var(--dream-accent) !important;
+  transform: translateY(-1px) !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--dream-accent) 62%, white) !important;
+  outline-offset: 2px !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-button:disabled {
+  opacity: .32 !important;
+  cursor: default !important;
+  transform: none !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-tooltip {
+  position: absolute !important;
+  top: 50% !important;
+  right: calc(100% + 9px) !important;
+  width: max-content !important;
+  max-width: 220px !important;
+  padding: 5px 8px !important;
+  color: var(--dream-text) !important;
+  border: 1px solid var(--dream-line) !important;
+  border-radius: 8px !important;
+  background: var(--dream-surface-raised) !important;
+  box-shadow: 0 8px 22px color-mix(in oklab, var(--dream-canvas) 32%, transparent) !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translate(5px, -50%) !important;
+  transition: opacity 120ms ease, visibility 120ms ease, transform 120ms ease !important;
+}
+
+#codex-dream-skin-utility-dock .dream-dock-item:hover > .dream-dock-tooltip,
+#codex-dream-skin-utility-dock .dream-dock-item:has(> .dream-dock-button:focus-visible) > .dream-dock-tooltip {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translate(0, -50%) !important;
+}
+
+#codex-dream-skin-utility-dock .dream-focus-timer {
+  display: none !important;
+  min-width: 46px !important;
+  padding: 3px 6px !important;
+  color: var(--dream-text-muted) !important;
+  border: 1px solid var(--dream-line) !important;
+  border-radius: 999px !important;
+  background: var(--dream-surface) !important;
+  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace !important;
+  text-align: center !important;
+}
+
+html.codex-dream-skin.dream-focus-mode #codex-dream-skin-utility-dock {
+  width: auto !important;
+  border-radius: 18px !important;
+}
+
+html.codex-dream-skin.dream-focus-mode #codex-dream-skin-utility-dock
+  .dream-dock-item:not([data-dock-item="focus"]) {
+  display: none !important;
+}
+
+html.codex-dream-skin.dream-focus-mode #codex-dream-skin-utility-dock .dream-focus-timer {
+  display: block !important;
+}
+
+@media (max-width: 760px) {
+  #codex-dream-skin-utility-dock {
+    right: 8px !important;
+    bottom: 8px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #codex-dream-skin-utility-dock,
+  #codex-dream-skin-utility-dock * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}

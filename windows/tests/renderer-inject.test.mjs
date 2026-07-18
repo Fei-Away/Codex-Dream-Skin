@@ -30,9 +30,13 @@ function createFixture({
   shellAppearance = "dark",
   computedColorScheme = "",
   osAppearance = "light",
+  reducedMotion = false,
+  threadPresent = false,
+  sidebarExpanded = true,
   analysisFixture = null,
 }) {
   const nodes = new Map();
+  const allElements = new Set();
   const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
   const rootStyles = new Map(staleSkin ? [["--dream-art", "url(\"blob:stale\")"]] : []);
   const revokedUrls = [];
@@ -86,9 +90,11 @@ function createFixture({
   };
   const body = {
     className: "",
+    children: [],
     getAttribute() { return null; },
     appendChild(node) {
       node.parentElement = body;
+      body.children.push(node);
       nodes.set(node.id, node);
     },
   };
@@ -98,6 +104,39 @@ function createFixture({
       return { left: 290, top: 36, width: 990, height: 784 };
     },
   };
+  let sidebarOpen = sidebarExpanded;
+  const shellSidebar = {
+    getBoundingClientRect() { return { width: sidebarOpen ? 290 : 0 }; },
+  };
+  const sidebarButton = {
+    getAttribute(name) {
+      if (name === "aria-label") return sidebarOpen ? "Hide sidebar" : "Show sidebar";
+      return null;
+    },
+    click() { sidebarOpen = !sidebarOpen; },
+  };
+  const threadScroll = {
+    scrollTop: 450,
+    clientHeight: 700,
+    scrollHeight: 2400,
+    listeners: new Map(),
+    addEventListener(name, callback) { this.listeners.set(name, callback); },
+    removeEventListener(name) { this.listeners.delete(name); },
+    scrollTo({ top }) { this.scrollTop = top; this.listeners.get("scroll")?.(); },
+    getBoundingClientRect() { return { top: 0, bottom: 700, height: 700 }; },
+  };
+  const turnFixtures = [
+    { key: "turn-1", offsetTop: 0, height: 250 },
+    { key: "turn-2", offsetTop: 270, height: 400 },
+    { key: "turn-3", offsetTop: 690, height: 500 },
+  ].map(({ key, offsetTop, height }) => ({
+    getAttribute(name) { return name === "data-turn-key" ? key : null; },
+    getBoundingClientRect() {
+      const top = offsetTop - threadScroll.scrollTop;
+      return { top, bottom: top + height, height };
+    },
+  }));
+  threadScroll.querySelectorAll = (selector) => selector === "[data-turn-key]" ? turnFixtures : [];
   const routeClasses = new Set();
   const utilityClasses = new Set();
   const utilityNode = { classList: makeClassList(utilityClasses) };
@@ -124,17 +163,48 @@ function createFixture({
         },
       };
     }
-    return {
+    const attributes = new Map();
+    const listeners = new Map();
+    const children = [];
+    const element = {
       id: "",
+      type: "",
+      className: "",
+      disabled: false,
       dataset: {},
       style: {},
       classList: makeClassList(),
       parentElement: null,
+      children,
+      isConnected: true,
       textContent: "",
       innerHTML: "",
-      setAttribute() {},
-      remove() { nodes.delete(this.id); },
+      addEventListener(name, callback) { listeners.set(name, callback); },
+      removeEventListener(name) { listeners.delete(name); },
+      appendChild(node) {
+        node.parentElement = this;
+        children.push(node);
+        if (node.id) nodes.set(node.id, node);
+        return node;
+      },
+      setAttribute(name, value) { attributes.set(name, String(value)); },
+      getAttribute(name) { return attributes.get(name) ?? null; },
+      click() { if (!this.disabled) listeners.get("click")?.({ currentTarget: this }); },
+      remove() {
+        const disconnect = (node) => {
+          node.isConnected = false;
+          for (const child of node.children ?? []) disconnect(child);
+          for (const [key, value] of nodes) if (value === node) nodes.delete(key);
+        };
+        disconnect(this);
+        if (this.parentElement?.children) {
+          const index = this.parentElement.children.indexOf(this);
+          if (index >= 0) this.parentElement.children.splice(index, 1);
+        }
+      },
     };
+    allElements.add(element);
+    return element;
   };
   if (staleSkin) {
     const style = createElement();
@@ -150,11 +220,15 @@ function createFixture({
     head: root,
     body,
     createElement,
-    getElementById(id) { return nodes.get(id) ?? null; },
+    getElementById(id) {
+      return nodes.get(id) ?? [...allElements].find((element) => element.id === id && element.isConnected) ?? null;
+    },
     querySelector(selector) {
       if (selector === "main.main-surface") return hasMain ? shellMain : null;
       if (selector === "main") return hasMain ? shellMain : null;
-      if (selector === "aside.app-shell-left-panel") return hasSidebar ? {} : null;
+      if (selector === "aside.app-shell-left-panel") return hasMain && hasSidebar && sidebarOpen ? shellSidebar : null;
+      if (selector === '[data-app-shell-sidebar-trigger]') return hasMain ? sidebarButton : null;
+      if (selector === ".thread-scroll-container") return hasMain && threadPresent ? threadScroll : null;
       if (selector === '[role="main"]:has([data-testid="home-icon"])') {
         return hasMain && homePresent ? routeMain : null;
       }
@@ -175,7 +249,9 @@ function createFixture({
   };
   const context = {
     window: {
-      matchMedia() { return { matches: osAppearance === "dark" }; },
+      matchMedia(query) {
+        return { matches: query.includes("reduced-motion") ? reducedMotion : osAppearance === "dark" };
+      },
     },
     document,
     MutationObserver: class {
@@ -230,6 +306,9 @@ function createFixture({
     revokedUrls,
     routeClasses,
     utilityClasses,
+    threadScroll,
+    sidebarButton,
+    get sidebarExpanded() { return sidebarOpen; },
     setShellPresent(value) {
       hasMain = value;
       hasSidebar = value;
@@ -256,6 +335,53 @@ assert.equal(main.rootClasses.has("dream-theme-dark"), false);
 assert.equal(main.nodes.has("codex-dream-skin-style"), false);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), false);
 assert.deepEqual(main.revokedUrls, ["blob:fixture-1"]);
+
+const dockFixture = createFixture({ shellPresent: true, threadPresent: true });
+const dockResult = vm.runInNewContext(buildPayload({
+  features: { utilityDock: true },
+}), dockFixture.context);
+assert.equal(dockResult.utilityDock, true);
+assert.ok(dockFixture.context.document.getElementById("codex-dream-skin-utility-dock"));
+dockFixture.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
+assert.equal(
+  dockFixture.context.document.body.children.filter((node) => node.id === "codex-dream-skin-utility-dock").length,
+  1,
+  "Repeated ensure passes must not duplicate the utility dock.",
+);
+const focusButton = dockFixture.context.document.getElementById("codex-dream-skin-dock-focus");
+const sidebarDockButton = dockFixture.context.document.getElementById("codex-dream-skin-dock-sidebar");
+sidebarDockButton.click();
+assert.equal(dockFixture.sidebarExpanded, false);
+dockFixture.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
+assert.equal(dockFixture.rootClasses.has("codex-dream-skin"), true,
+  "Collapsing the native sidebar must not remove the skin.");
+assert.ok(dockFixture.context.document.getElementById("codex-dream-skin-utility-dock"));
+sidebarDockButton.click();
+focusButton.click();
+assert.equal(dockFixture.rootClasses.has("dream-focus-mode"), true);
+assert.equal(dockFixture.sidebarExpanded, false);
+assert.equal(sidebarDockButton.disabled, true);
+assert.equal(focusButton.getAttribute("aria-pressed"), "true");
+assert.equal(
+  dockFixture.context.document.getElementById("codex-dream-skin-focus-timer").textContent,
+  "00:00",
+);
+focusButton.click();
+assert.equal(dockFixture.rootClasses.has("dream-focus-mode"), false);
+assert.equal(dockFixture.sidebarExpanded, true, "Focus mode must restore the sidebar entry state.");
+const topButton = dockFixture.context.document.getElementById("codex-dream-skin-dock-top");
+const bottomButton = dockFixture.context.document.getElementById("codex-dream-skin-dock-bottom");
+dockFixture.threadScroll.scrollTop = 850;
+topButton.click();
+assert.equal(dockFixture.threadScroll.scrollTop, 690,
+  "The first click must align the current conversation turn.");
+topButton.click();
+assert.equal(dockFixture.threadScroll.scrollTop, 270,
+  "A second click from an aligned turn must navigate to the previous turn.");
+bottomButton.click();
+assert.equal(dockFixture.threadScroll.scrollTop, dockFixture.threadScroll.scrollHeight);
+assert.equal(dockFixture.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+assert.equal(dockFixture.context.document.getElementById("codex-dream-skin-utility-dock"), null);
 
 const reinjected = createFixture({ shellPresent: true });
 vm.runInNewContext(payload, reinjected.context);
