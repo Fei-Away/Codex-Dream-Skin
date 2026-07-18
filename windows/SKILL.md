@@ -1,6 +1,6 @@
 ---
 name: codex-dream-skin
-description: Apply, launch, verify, repair, update, or restore a full decorative skin for the Windows Codex desktop app. Use when the user asks for a Codex theme that goes beyond official color settings, wants the pink-purple Dream/Fiona-style interface, needs the skin reapplied after a Codex update, or needs a safe rollback without modifying WindowsApps or app.asar.
+description: Apply, launch, verify, repair, update, or restore a full decorative skin for the Windows Codex desktop app. Use when the user asks for a Codex theme that goes beyond official color settings, wants the navy-cyan Furina/Fontaine-style interface, needs the skin reapplied after a Codex update, or needs a safe rollback without modifying WindowsApps or app.asar.
 ---
 
 # Codex Dream Skin
@@ -9,7 +9,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 
 ## Workflow
 
-1. Install Node.js 22 or newer, close Codex, then run `scripts/install-dream-skin.ps1` once. The installer preserves the user's native appearance settings, seeds the Arina Hashimoto theme, copies the runtime to `%LOCALAPPDATA%\CodexDreamSkin\engine`, and creates launch/restore/tray shortcuts that do not depend on the source checkout.
+1. Install Node.js 22 or newer, close Codex, then run `scripts/install-dream-skin.ps1` once. The installer preserves the user's native appearance settings, seeds the Furina theme, copies the runtime to `%LOCALAPPDATA%\CodexDreamSkin\engine`, and creates launch/restore/tray shortcuts that do not depend on the source checkout.
 2. Use the `Codex Dream Skin` shortcut, or run `%LOCALAPPDATA%\CodexDreamSkin\engine\scripts\start-dream-skin.ps1`. The shortcut asks before restarting an already-open Codex app; CLI callers must explicitly add `-RestartExisting`.
 3. Run `scripts/verify-dream-skin.ps1 -ScreenshotPath <absolute-path>` after launch. Treat a missing continuous wallpaper, home shell, native composer, sidebar layer, or injection marker as failure. The native suggestion count is responsive and may be two to four.
 4. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
@@ -51,7 +51,7 @@ node --check assets\renderer-inject.js
 - `scripts/config-utf8.ps1`: atomic UTF-8 configuration backup, selective restore, and explicit recovery.
 - `assets/dream-skin.css`: full visual layer.
 - `assets/renderer-inject.js`: idempotent DOM integration and cleanup.
-- `assets/dream-reference.jpg`: pure 2560 × 1440 Arina Hashimoto wallpaper seeded as the default and as a saved theme; it contains no Codex UI.
+- `assets/dream-reference.jpg`: pure 2560 × 1440 Furina wallpaper seeded as the default and as a saved theme; it contains no Codex UI.
 - `assets/theme.json`: shared adaptive theme contract for the seeded preset.
 - `scripts/theme-windows.ps1`: persistent active/saved theme store, safe image import, pause state, and preset seeding.
 - `scripts/tray-dream-skin.ps1`: Windows Forms tray for apply, pause, import, save, switch, and complete restore.

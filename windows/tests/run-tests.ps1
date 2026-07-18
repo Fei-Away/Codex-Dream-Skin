@@ -635,29 +635,53 @@ try {
 
   $themeStateRoot = Join-Path $temporaryRoot 'theme-state'
   $legacyPresetDirectory = Join-Path $themeStateRoot 'themes\preset-romantic-rose'
+  $arinaPresetDirectory = Join-Path $themeStateRoot 'themes\preset-arina-hashimoto'
   $customThemeDirectory = Join-Path $themeStateRoot 'themes\custom-keepme'
-  New-Item -ItemType Directory -Force -Path $legacyPresetDirectory, $customThemeDirectory | Out-Null
+  New-Item -ItemType Directory -Force -Path $legacyPresetDirectory, $arinaPresetDirectory, $customThemeDirectory | Out-Null
   [System.IO.File]::WriteAllText((Join-Path $legacyPresetDirectory 'retired-marker'), 'retired', $utf8NoBom)
+  [System.IO.File]::WriteAllText((Join-Path $arinaPresetDirectory 'retired-marker'), 'retired', $utf8NoBom)
   [System.IO.File]::WriteAllText((Join-Path $customThemeDirectory 'keep-marker'), 'keep', $utf8NoBom)
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   if ((Test-Path -LiteralPath $legacyPresetDirectory) -or
+    (Test-Path -LiteralPath $arinaPresetDirectory) -or
     -not (Test-Path -LiteralPath (Join-Path $customThemeDirectory 'keep-marker'))) {
     throw 'Theme-store migration did not retire the old preset ID while preserving custom themes.'
   }
   $initialTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($initialTheme.Theme.id -cne 'preset-arina-hashimoto' -or
-    $initialTheme.Theme.name -cne '桥本有菜' -or
+  if ($initialTheme.Theme.id -cne 'preset-furina' -or
+    $initialTheme.Theme.name -cne '芙宁娜 · Furina' -or
+    $initialTheme.Theme.styleRevision -ne 21 -or
     $initialTheme.Theme.appearance -cne 'auto' -or
+    $initialTheme.Theme.palette.accent -cne '#42b8f5' -or
     $initialTheme.Theme.art.safeArea -cne 'left' -or
     $initialTheme.Theme.art.taskMode -cne 'ambient' -or
     [System.IO.Path]::GetExtension($initialTheme.ImagePath) -cne '.jpg') {
-    throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
+    throw 'Default Windows theme did not seed the Furina wallpaper contract.'
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
   if ($preseededThemes.Count -ne 1 -or
-    $preseededThemes[0].Id -cne 'preset-arina-hashimoto' -or
-    $preseededThemes[0].Name -cne '桥本有菜') {
-    throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
+    $preseededThemes[0].Id -cne 'preset-furina' -or
+    $preseededThemes[0].Name -cne '芙宁娜 · Furina') {
+    throw 'Furina was not preseeded in the Windows saved-theme menu.'
+  }
+  $legacyActiveStateRoot = Join-Path $temporaryRoot 'legacy-active-theme-state'
+  $legacyActiveDirectory = Join-Path $legacyActiveStateRoot 'active-theme'
+  New-Item -ItemType Directory -Force -Path $legacyActiveDirectory | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Destination (Join-Path $legacyActiveDirectory 'dream-reference.jpg')
+  $legacyActiveThemeJson = (Get-Content -LiteralPath (Join-Path $Root 'assets\theme.json') -Raw) `
+    -replace '"preset-furina"', '"preset-arina-hashimoto"' `
+    -replace '"芙宁娜 · Furina"', '"桥本有菜"'
+  [System.IO.File]::WriteAllText(
+    (Join-Path $legacyActiveDirectory 'theme.json'),
+    $legacyActiveThemeJson,
+    $utf8NoBom
+  )
+  $legacyActivePaths = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $legacyActiveStateRoot
+  $migratedActiveTheme = Read-DreamSkinTheme -ThemeDirectory $legacyActivePaths.Active
+  if ($migratedActiveTheme.Theme.id -cne 'preset-furina' -or
+    $migratedActiveTheme.Theme.name -cne '芙宁娜 · Furina') {
+    throw 'The active legacy bundled preset was not migrated to Furina.'
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
@@ -748,15 +772,58 @@ try {
     '.app-shell-main-content-top-fade',
     '.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary',
     '--dream-immersive-composer',
+    '--dream-focus-transition',
+    '--dream-focus-transition: 380ms cubic-bezier(.25, .32, .25, 1)',
+    '--dream-route-focus',
+    '--dream-thread-focus',
+    '@property --dream-route-focus',
+    '@property --dream-thread-focus',
+    '.dream-route-entering',
+    '--dream-nav-highlight',
+    '--dream-nav-focus-ring',
+    'button[class~="group/section-toggle"]',
+    ':is(:active, :focus-visible, [data-state="open"], [aria-pressed="true"])',
+    'button[class~="rounded-full"]',
+    '--dream-task-sidebar-overlay',
+    '--dream-task-overlay-edge',
+    '.thread-scroll-container > div:first-child',
+    'max-w-(--thread-content-max-width)',
+    'padding-top: 20px',
+    'background: color-mix(in oklab, var(--dream-surface) 72%, transparent)',
+    'backdrop-filter: none',
     'background-position: var(--dream-art-position)',
     '.dream-home-utility',
     ':has(.dream-home-utility) .composer-surface-chrome',
+    'button[class~="h-token-button-composer"]',
+    'button[class~="h-token-button-composer-sm"]',
+    'div[class~="items-center"][class~="justify-end"][class~="w-full"]',
+    'column-gap: 8px',
+    'overflow: hidden',
+    '[class~="mb-1"][class~="flex-grow"][class~="overflow-y-auto"][class~="px-3"]',
+    '[class~="max-h-[25dvh]"][class~="overflow-y-auto"]',
+    'max-height: min(38dvh, 420px)',
+    'overscroll-behavior: contain',
+    ':is(.composer-surface-chrome, .composer-surface-chrome [class~="overflow-y-auto"])',
+    'scrollbar-width: none',
+    '::-webkit-scrollbar',
     ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
+  if ($css.Contains(':is(:focus, [data-state="open"]')) {
+    throw 'Sidebar navigation still treats persistent pointer focus as a selected state.'
+  }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @(
+    'System.Windows.Forms.NotifyIcon',
+    'New-DreamSkinTrayIcon',
+    '[AllowEmptyCollection()]',
+    '暂停皮肤',
+    '更换背景图',
+    '已保存主题',
+    '停止 Dream Skin',
+    '完全恢复 Codex'
+  )) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
@@ -769,6 +836,20 @@ try {
   if (-not $traySource.Contains('Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata') -or
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
+  }
+  $traySelfTest = Invoke-DreamSkinNative -FilePath (
+    (Get-Command powershell.exe -ErrorAction Stop).Source
+  ) -ArgumentList @(
+    '-NoProfile',
+    '-STA',
+    '-ExecutionPolicy',
+    'RemoteSigned',
+    '-File',
+    (Join-Path $Root 'scripts\tray-dream-skin.ps1'),
+    '-SelfTest'
+  )
+  if ($traySelfTest.ExitCode -ne 0 -or ($traySelfTest.Output -join "`n") -notmatch 'PASS: tray icon') {
+    throw "Tray icon/menu self-test failed: $($traySelfTest.Output -join '<NL>')"
   }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {

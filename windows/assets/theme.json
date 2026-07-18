@@ -1,18 +1,22 @@
 {
   "schemaVersion": 1,
-  "id": "preset-arina-hashimoto",
-  "name": "桥本有菜",
-  "brandSubtitle": "CODEX DREAM SKIN",
-  "tagline": "把柔光与玫瑰带进今天的工作台。",
+  "styleRevision": 21,
+  "id": "preset-furina",
+  "name": "芙宁娜 · Furina",
+  "brandSubtitle": "FONTAINE DREAM SKIN",
+  "tagline": "让水光与舞台点亮今天的工作台。",
   "projectPrefix": "选择项目 · ",
-  "projectLabel": "◉  选择项目",
-  "statusText": "DREAM SKIN ONLINE",
-  "quote": "MAKE SOMETHING WONDERFUL",
+  "projectLabel": "◈  选择项目",
+  "statusText": "HYDRO STAGE ONLINE",
+  "quote": "CURTAIN UP. CREATE SOMETHING EXTRAORDINARY.",
   "image": "dream-reference.jpg",
   "appearance": "auto",
+  "palette": {
+    "accent": "#42b8f5"
+  },
   "art": {
-    "focusX": 0.72,
-    "focusY": 0.45,
+    "focusX": 0.76,
+    "focusY": 0.46,
     "safeArea": "left",
     "taskMode": "ambient"
   }

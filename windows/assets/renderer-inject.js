@@ -18,6 +18,7 @@
     "dream-task-ambient",
     "dream-task-banner",
     "dream-task-off",
+    "dream-route-entering",
   ];
   const ROOT_PROPERTIES = [
     "--dream-art",
@@ -29,9 +30,16 @@
     "--dream-image-luma",
   ];
   const HOME_UTILITY_CLASS = "dream-home-utility";
+  const THREAD_CONTENT_SELECTOR =
+    '.thread-scroll-container > div:first-child > div[class~="mx-auto"][class*="max-w-(--thread-content-max-width)"]';
   const installToken = {};
   let samplingNativeShell = false;
   let observer = null;
+  let cachedAppearance = null;
+  let observedShellMain = null;
+  let observedShellSidebar = null;
+  let observedHome = null;
+  let observedThreadContent = null;
   window.__CODEX_DREAM_SKIN_DISABLED__ = false;
 
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, Number(value)));
@@ -89,6 +97,8 @@
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.timer) clearInterval(previous.timer);
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
+  if (previous?.scheduler?.routeTimeout) clearTimeout(previous.scheduler.routeTimeout);
+  if (previous?.scheduler?.frame != null) cancelAnimationFrame(previous.scheduler.frame);
   if (previous?.artUrl) URL.revokeObjectURL(previous.artUrl);
   const artUrl = (() => {
     const comma = artDataUrl.indexOf(",");
@@ -106,7 +116,7 @@
   const existingStyle = document.getElementById(STYLE_ID);
   if (existingStyle) {
     existingStyle.textContent = cssText;
-    existingStyle.dataset.dreamVersion = "3";
+    existingStyle.dataset.dreamVersion = "6";
   }
 
   const analyzeArt = () => new Promise((resolve) => {
@@ -290,7 +300,9 @@
   const applyProfile = (root) => {
     const focusX = config.focusX ?? profile.focusX;
     const focusY = config.focusY ?? profile.focusY;
-    const appearance = config.appearance === "auto" ? detectShellAppearance() : config.appearance;
+    const appearance = config.appearance === "auto"
+      ? (cachedAppearance ??= detectShellAppearance())
+      : config.appearance;
     const focus = focusX < .4 ? "left" : focusX > .6 ? "right" : "center";
     const safeArea = config.safeArea === "auto" ? (profile.safeArea ||
       (focus === "left" ? "right" : focus === "right" ? "left" : "center")) : config.safeArea;
@@ -312,13 +324,17 @@
     for (const value of ["ambient", "banner", "off"]) {
       root.classList.toggle(`dream-task-${value}`, taskMode === value);
     }
-    root.style.setProperty("--dream-art", `url("${artUrl}")`);
-    root.style.setProperty("--dream-art-position", `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`);
-    root.style.setProperty("--dream-focus-x", String(focusX));
-    root.style.setProperty("--dream-focus-y", String(focusY));
-    root.style.setProperty("--dream-accent", accent);
-    root.style.setProperty("--dream-accent-ink", accentInk);
-    root.style.setProperty("--dream-image-luma", profile.luma.toFixed(3));
+    const setRootProperty = (name, value) => {
+      if (root.style.getPropertyValue?.(name) === value) return;
+      root.style.setProperty(name, value);
+    };
+    setRootProperty("--dream-art", `url("${artUrl}")`);
+    setRootProperty("--dream-art-position", `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`);
+    setRootProperty("--dream-focus-x", String(focusX));
+    setRootProperty("--dream-focus-y", String(focusY));
+    setRootProperty("--dream-accent", accent);
+    setRootProperty("--dream-accent-ink", accentInk);
+    setRootProperty("--dream-image-luma", profile.luma.toFixed(3));
   };
 
   const ensure = () => {
@@ -329,9 +345,15 @@
     const shellMain = document.querySelector("main.main-surface");
     const shellSidebar = document.querySelector("aside.app-shell-left-panel");
     if (!shellMain || !shellSidebar) {
+      observedShellMain = null;
+      observedShellSidebar = null;
+      observedHome = null;
+      observedThreadContent = null;
       clearSkinDom();
       return;
     }
+    observedShellMain = shellMain;
+    observedShellSidebar = shellSidebar;
 
     root.classList.add("codex-dream-skin");
     applyProfile(root);
@@ -342,12 +364,14 @@
       style.id = STYLE_ID;
       (document.head || root).appendChild(style);
     }
-    if (style.dataset.dreamVersion !== "3") {
+    if (style.dataset.dreamVersion !== "6") {
       style.textContent = cssText;
-      style.dataset.dreamVersion = "3";
+      style.dataset.dreamVersion = "6";
     }
 
     const home = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
+    observedHome = home;
+    observedThreadContent = document.querySelector(THREAD_CONTENT_SELECTOR);
     for (const candidate of document.querySelectorAll('[role="main"]')) {
       candidate.classList.toggle("dream-home", candidate === home);
       candidate.classList.toggle("dream-task", candidate !== home);
@@ -378,32 +402,95 @@
     state?.observer?.disconnect();
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
+    if (state?.scheduler?.routeTimeout) clearTimeout(state.scheduler.routeTimeout);
+    if (state?.scheduler?.frame != null) cancelAnimationFrame(state.scheduler.frame);
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
     delete window[STATE_KEY];
     return true;
   };
 
-  const scheduler = { timeout: null };
-  const scheduleEnsure = () => {
-    if (scheduler.timeout) clearTimeout(scheduler.timeout);
-    scheduler.timeout = setTimeout(() => {
-      scheduler.timeout = null;
-      ensure();
-    }, 180);
-  };
-  observer = new MutationObserver(() => {
-    if (samplingNativeShell) return;
-    scheduleEnsure();
-  });
-  observer.observe(document.documentElement, {
+  const observerOptions = {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode"],
+  };
+  const scheduler = {
+    timeout: null,
+    routeTimeout: null,
+    running: false,
+    runs: 0,
+    ignored: 0,
+    routePulses: 0,
+  };
+  const pulseRouteFocus = () => {
+    const root = document.documentElement;
+    if (!root) return;
+    if (scheduler.routeTimeout !== null) clearTimeout(scheduler.routeTimeout);
+    root.classList.add("dream-route-entering");
+    getComputedStyle(root).getPropertyValue?.("--dream-thread-focus");
+    observer?.takeRecords?.();
+    scheduler.routePulses += 1;
+    scheduler.routeTimeout = setTimeout(() => {
+      scheduler.routeTimeout = null;
+      root.classList.remove("dream-route-entering");
+      observer?.takeRecords?.();
+    }, 0);
+  };
+  const scheduleEnsure = () => {
+    if (scheduler.timeout !== null || scheduler.running) return;
+    scheduler.timeout = setTimeout(() => {
+      scheduler.timeout = null;
+      scheduler.running = true;
+      observer?.disconnect();
+      try {
+        scheduler.runs += 1;
+        ensure();
+      } finally {
+        observer?.observe(document.documentElement, observerOptions);
+        scheduler.running = false;
+      }
+    }, 0);
+  };
+  observer = new MutationObserver((mutations) => {
+    if (samplingNativeShell) return;
+    const shellMain = document.querySelector("main.main-surface");
+    const shellSidebar = document.querySelector("aside.app-shell-left-panel");
+    const home = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
+    const threadContent = document.querySelector(THREAD_CONTENT_SELECTOR);
+    const routeChanged = shellMain !== observedShellMain ||
+      shellSidebar !== observedShellSidebar ||
+      home !== observedHome;
+    const taskContentChanged = !routeChanged &&
+      !observedHome &&
+      Boolean(threadContent) &&
+      threadContent !== observedThreadContent;
+    const appearanceChanged = mutations.some((mutation) =>
+      mutation.type === "attributes" &&
+      (mutation.target === document.documentElement || mutation.target === document.body) &&
+      observerOptions.attributeFilter.includes(mutation.attributeName));
+    const skinMissing = !document.documentElement.classList.contains("codex-dream-skin") ||
+      !document.getElementById(STYLE_ID) ||
+      !document.getElementById(CHROME_ID);
+    const homeContentChanged = Boolean(observedHome) &&
+      mutations.some((mutation) => mutation.type === "childList");
+    if (appearanceChanged) cachedAppearance = null;
+    if (taskContentChanged) {
+      observedThreadContent = threadContent;
+      pulseRouteFocus();
+    }
+    if (!routeChanged && !appearanceChanged && !skinMissing && !homeContentChanged && !taskContentChanged) {
+      scheduler.ignored += 1;
+      return;
+    }
+    if (taskContentChanged && !appearanceChanged && !skinMissing && !homeContentChanged) return;
+    scheduleEnsure();
   });
+  observer.observe(document.documentElement, observerOptions);
   const timer = setInterval(ensure, 5000);
   window[STATE_KEY] = {
-    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
+    ensure, cleanup, pulseRouteFocus, observer, timer, scheduler, artUrl, profile, config, installToken,
+    version: "1.2.0",
   };
   ensure();
   analyzeArt().then((result) => {
@@ -411,7 +498,7 @@
     if (state?.installToken !== installToken || window.__CODEX_DREAM_SKIN_DISABLED__) return;
     profile = result;
     state.profile = result;
-    ensure();
+    scheduleEnsure();
   });
   return { installed: true, version: "1.2.0", adaptive: true };
 })(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__)

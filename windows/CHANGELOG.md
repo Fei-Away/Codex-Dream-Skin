@@ -1,5 +1,15 @@
 # Windows Changelog
 
+## Furina preset — 2026-07-17
+
+- Windows 的内置预设改为「芙宁娜 · Furina」：使用 UI-free 的 2560 × 1440 枫丹舞台与水元素壁纸、右侧人物焦点和左侧文字安全区。
+- 浅色与深色壳层改用海军蓝、湖蓝、银白配色；初始化会把仍在使用旧内置主题的活动状态迁移到 Furina，清理退休预设，并保留用户自建主题与当前自定义主题。
+- 重新设计原生菜单、项目 ribbon、sidebar、阅读列与 composer 的玻璃层级；统一 hover、open、pressed、selected 与键盘焦点状态，并修复点击后残留高亮、文字边距不足、模型/麦克风/停止按钮粘连和长文本对比度不足。
+- 页面切换使用注册的 route/thread progress 与 380ms 平衡缓动：零延迟开始主区和侧栏 veil，任务内容替换时只淡入新阅读底层，避免全窗闪烁。renderer 同时缓存外观检测并忽略普通消息 mutation，移除长对话层的高成本 blur、外阴影和滤镜过渡。
+- composer 外壳不再滚动；长提示词先把输入区扩大到 `min(38dvh, 420px)`，达到上限后只有编辑器内部滚动，因此操作按钮始终固定。原生 scrollbar chrome 保持隐藏，但滚轮、触控板和键盘滚动仍可用。
+- 托盘改用专属 Hydro 蓝水滴图标，允许向空菜单集合添加第一个项目，修复首次右键的未处理异常；新增“停止 Dream Skin”，通过现有安全恢复流程停止 injector、关闭 CDP 会话，并使用隐藏 PowerShell 子进程避免弹窗。
+- 扩展 Windows 回归测试与真实 tray self-test，覆盖 Furina 播种/旧预设迁移、零延迟路由调度、任务内容淡入、无关 mutation 忽略、长对话性能约束、composer 固定按钮、Hydro 图标和空菜单绑定。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

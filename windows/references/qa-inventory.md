@@ -25,7 +25,7 @@
 - Shortcut policy: installed launch, restore, tray, and tray-child commands use `RemoteSigned` without `Bypass`; Internet-zone markers are removed only from hash-verified managed PowerShell copies.
 - Config safety: Chinese project names, LF/CRLF choice, quoted target keys, table-header comments, and unrelated TOML sections survive install/selective restore; ambiguous target shapes fail unchanged, exact recovery keeps a copy of the replaced current file, and install refuses both registered and state-recorded old Codex processes.
 - Theme safety: empty/over-16 MB images, over-16384px/50MP dimensions, path escapes, symlinks/junctions, malformed JSON, and unsupported formats are rejected before payload construction.
-- Tray lifecycle: pause/resume reflects the clicked state, bundled Arina Hashimoto theme is present on first install, and complete restore terminates any separately launched tray before it can reapply the skin.
+- Tray lifecycle: the Hydro icon is visible, the first right-click opens a populated menu without an exception, pause/resume reflects the clicked state, “停止 Dream Skin” stops the injector/CDP session and exits the tray after confirmation, bundled Furina is present on first install, and complete restore terminates any separately launched tray before it can reapply the skin.
 
 ## Visual checks
 

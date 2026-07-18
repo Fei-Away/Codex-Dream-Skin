@@ -1,18 +1,32 @@
+@property --dream-route-focus {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --dream-thread-focus {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 :root.codex-dream-skin {
   color-scheme: light;
-  --dream-accent: oklch(0.66 0.15 18);
-  --dream-accent-ink: oklch(0.98 0.006 20);
-  --dream-art-position: 72% 45%;
-  --dream-canvas: color-mix(in oklab, oklch(0.975 0.006 35) 96%, var(--dream-accent));
-  --dream-surface: color-mix(in oklab, oklch(0.988 0.004 35) 97%, var(--dream-accent));
-  --dream-surface-raised: color-mix(in oklab, oklch(0.995 0.003 35) 98%, var(--dream-accent));
-  --dream-sidebar: color-mix(in oklab, oklch(0.965 0.006 35) 94%, var(--dream-accent));
-  --dream-text: oklch(0.25 0.018 30);
-  --dream-text-muted: oklch(0.48 0.018 30);
-  --dream-line: color-mix(in oklab, oklch(0.75 0.012 30) 80%, var(--dream-accent));
+  --dream-accent: oklch(0.7 0.15 235);
+  --dream-accent-ink: oklch(0.22 0.035 245);
+  --dream-art-position: 76% 46%;
+  --dream-canvas: color-mix(in oklab, oklch(0.975 0.009 235) 96%, var(--dream-accent));
+  --dream-surface: color-mix(in oklab, oklch(0.988 0.006 235) 97%, var(--dream-accent));
+  --dream-surface-raised: color-mix(in oklab, oklch(0.995 0.004 235) 98%, var(--dream-accent));
+  --dream-sidebar: color-mix(in oklab, oklch(0.965 0.01 235) 94%, var(--dream-accent));
+  --dream-text: oklch(0.25 0.028 245);
+  --dream-text-muted: oklch(0.48 0.025 245);
+  --dream-line: color-mix(in oklab, oklch(0.75 0.026 235) 80%, var(--dream-accent));
   --dream-line-soft: color-mix(in oklab, transparent 76%, var(--dream-accent));
   --dream-accent-soft: color-mix(in oklab, var(--dream-accent) 14%, var(--dream-surface));
   --dream-accent-hover: color-mix(in oklab, var(--dream-accent) 20%, var(--dream-surface));
+  --dream-nav-highlight: color-mix(in oklab, var(--dream-accent) 17%, var(--dream-surface-raised));
+  --dream-nav-focus-ring: color-mix(in oklab, var(--dream-accent) 38%, transparent);
   --dream-hero-shade: color-mix(in oklab, var(--dream-surface) 93%, transparent);
   --dream-ambient-opacity: .18;
   --dream-shadow: 0 16px 42px color-mix(in oklab, var(--dream-accent) 9%, transparent);
@@ -21,11 +35,22 @@
   --dream-immersive-far: color-mix(in oklab, var(--dream-surface) 14%, transparent);
   --dream-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 50%, transparent);
   --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 72%, transparent);
+  --dream-task-sidebar-overlay: color-mix(in oklab, var(--dream-sidebar) 44%, transparent);
+  --dream-task-sidebar-edge-overlay: color-mix(in oklab, var(--dream-surface) 74%, transparent);
   --dream-immersive-composer: color-mix(in oklab, var(--dream-surface-raised) 76%, var(--dream-accent) 4%);
   --dream-immersive-line: color-mix(in oklab, var(--dream-line) 76%, transparent);
   --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 86%, transparent);
   --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 78%, transparent);
   --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 66%, transparent);
+  --dream-task-overlay-edge: color-mix(in oklab, var(--dream-surface) 74%, transparent);
+  --dream-task-overlay-mid: color-mix(in oklab, var(--dream-surface) 69%, transparent);
+  --dream-task-overlay-far: color-mix(in oklab, var(--dream-surface) 61%, transparent);
+  --dream-route-focus: 0;
+  --dream-thread-focus: 0;
+  --dream-focus-transition: 380ms cubic-bezier(.25, .32, .25, 1);
+  transition:
+    --dream-route-focus var(--dream-focus-transition),
+    --dream-thread-focus var(--dream-focus-transition);
 }
 
 :root.codex-dream-skin.dream-theme-dark {
@@ -48,11 +73,34 @@
   --dream-immersive-far: color-mix(in oklab, var(--dream-surface) 16%, transparent);
   --dream-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 48%, transparent);
   --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 70%, transparent);
+  --dream-task-sidebar-overlay: color-mix(in oklab, var(--dream-sidebar) 42%, transparent);
+  --dream-task-sidebar-edge-overlay: color-mix(in oklab, var(--dream-surface) 68%, transparent);
   --dream-immersive-composer: color-mix(in oklab, var(--dream-surface-raised) 88%, var(--dream-accent) 5%);
   --dream-immersive-line: color-mix(in oklab, var(--dream-line) 82%, transparent);
   --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 82%, transparent);
   --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 74%, transparent);
   --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 60%, transparent);
+  --dream-task-overlay-edge: color-mix(in oklab, var(--dream-surface) 69%, transparent);
+  --dream-task-overlay-mid: color-mix(in oklab, var(--dream-surface) 64%, transparent);
+  --dream-task-overlay-far: color-mix(in oklab, var(--dream-surface) 53%, transparent);
+}
+
+:root.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell)) {
+  --dream-route-focus: 1;
+  --dream-thread-focus: 1;
+}
+
+/* A replaced task thread begins transparent in the same rendering turn, then
+   follows the normal curve without adding a debounce or animation-frame wait. */
+:root.codex-dream-skin.dream-route-entering {
+  --dream-thread-focus: 0 !important;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root.codex-dream-skin {
+    --dream-focus-transition: 0ms linear;
+  }
 }
 
 html.codex-dream-skin body {
@@ -73,20 +121,45 @@ html.codex-dream-skin aside.app-shell-left-panel nav {
   background: transparent !important;
 }
 
-html.codex-dream-skin aside.app-shell-left-panel button {
+html.codex-dream-skin aside.app-shell-left-panel :is(button, a, [role="button"]) {
   color: var(--dream-text) !important;
-  transition: background-color 180ms cubic-bezier(.22, 1, .36, 1), color 180ms cubic-bezier(.22, 1, .36, 1) !important;
+  border-radius: 12px !important;
+  transition:
+    background-color 160ms cubic-bezier(.2, .72, .2, 1),
+    color 160ms cubic-bezier(.2, .72, .2, 1),
+    box-shadow 160ms cubic-bezier(.2, .72, .2, 1) !important;
 }
 
-html.codex-dream-skin aside.app-shell-left-panel button:hover {
+html.codex-dream-skin aside.app-shell-left-panel :is(button, a, [role="button"]):hover {
   background: var(--dream-accent-soft) !important;
 }
 
+html.codex-dream-skin aside.app-shell-left-panel
+  button[class~="group/section-toggle"] {
+  padding-inline: 8px 6px !important;
+}
+
 html.codex-dream-skin aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
-html.codex-dream-skin aside.app-shell-left-panel [aria-current="page"] {
+html.codex-dream-skin aside.app-shell-left-panel [aria-current="page"],
+html.codex-dream-skin aside.app-shell-left-panel
+  :is(button, a, [role="button"]):is(:active, :focus-visible, [data-state="open"], [aria-pressed="true"]) {
   color: var(--dream-text) !important;
-  background: var(--dream-accent-hover) !important;
+  outline: none !important;
+  border-radius: 12px !important;
+  background: var(--dream-nav-highlight) !important;
   box-shadow: inset 0 0 0 1px var(--dream-line-soft) !important;
+}
+
+html.codex-dream-skin aside.app-shell-left-panel
+  :is(button, a, [role="button"]):focus-visible {
+  box-shadow:
+    inset 0 0 0 1px var(--dream-line-soft),
+    0 0 0 2px var(--dream-nav-focus-ring) !important;
+}
+
+html.codex-dream-skin aside.app-shell-left-panel
+  :is(button[class~="rounded-full"], button:has(> svg:only-child), [role="button"]:has(> svg:only-child)) {
+  border-radius: 999px !important;
 }
 
 html.codex-dream-skin aside.app-shell-left-panel svg,
@@ -112,20 +185,36 @@ html.codex-dream-skin main.main-surface > header.app-header-tint {
   backdrop-filter: blur(12px) saturate(1.05) !important;
 }
 
-/* Wide art also reaches the native application menu, which sits outside the
-   main surface and needs its own dark-theme legibility layer. */
-html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] {
+/* The native application menu sits directly over the wallpaper. Give both
+   shell modes one compact glass rail so its text never lands on dark artwork. */
+html.codex-dream-skin [class~="group/application-menu-top-bar"] {
   color: var(--dream-text) !important;
-  background: color-mix(in oklab, var(--dream-sidebar) 90%, transparent) !important;
+  background: linear-gradient(90deg,
+    color-mix(in oklab, var(--dream-sidebar) 92%, transparent),
+    color-mix(in oklab, var(--dream-surface) 78%, transparent)) !important;
   border-bottom: 1px solid var(--dream-line-soft) !important;
-  box-shadow: 0 1px 12px color-mix(in oklab, var(--dream-canvas) 72%, transparent) !important;
-  backdrop-filter: blur(16px) saturate(.9) !important;
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--dream-canvas) 18%, transparent),
+    inset 0 -1px color-mix(in oklab, var(--dream-surface-raised) 34%, transparent) !important;
+  backdrop-filter: blur(18px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.12) !important;
 }
 
-html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] button,
-html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] svg {
+html.codex-dream-skin [class~="group/application-menu-top-bar"] button {
   color: var(--dream-text) !important;
-  text-shadow: 0 1px 2px color-mix(in oklab, var(--dream-canvas) 82%, transparent) !important;
+  border-radius: 8px !important;
+  text-shadow: none !important;
+  transition: color 160ms ease, background-color 160ms ease !important;
+}
+
+html.codex-dream-skin [class~="group/application-menu-top-bar"] button:hover,
+html.codex-dream-skin [class~="group/application-menu-top-bar"] button[data-state="open"] {
+  color: var(--dream-text) !important;
+  background: var(--dream-accent-soft) !important;
+}
+
+html.codex-dream-skin [class~="group/application-menu-top-bar"] svg {
+  color: currentColor !important;
+  filter: none !important;
 }
 
 #codex-dream-skin-chrome {
@@ -368,10 +457,17 @@ html.codex-dream-skin.dream-safe-center .dream-home > div:first-child > div:firs
 html.codex-dream-skin .composer-surface-chrome {
   color: var(--dream-text) !important;
   border: 1px solid var(--dream-line) !important;
-  border-radius: 18px !important;
-  background: color-mix(in oklab, var(--dream-surface-raised) 95%, transparent) !important;
-  box-shadow: 0 12px 34px color-mix(in oklab, var(--dream-accent) 8%, transparent) !important;
-  backdrop-filter: blur(14px) saturate(1.06) !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  background: color-mix(in oklab, var(--dream-surface-raised) 92%, transparent) !important;
+  box-shadow: 0 16px 42px color-mix(in oklab, var(--dream-canvas) 16%, transparent),
+    inset 0 1px color-mix(in oklab, var(--dream-surface-raised) 66%, transparent) !important;
+  backdrop-filter: blur(18px) saturate(1.1) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.1) !important;
+  transition: background-color var(--dream-focus-transition),
+    box-shadow var(--dream-focus-transition),
+    border-color var(--dream-focus-transition),
+    backdrop-filter var(--dream-focus-transition) !important;
 }
 
 html.codex-dream-skin .ProseMirror {
@@ -379,10 +475,73 @@ html.codex-dream-skin .ProseMirror {
   caret-color: var(--dream-accent) !important;
 }
 
+/* Let long prompts enlarge the composer before the editor itself scrolls.
+   The outer shell and intermediate wrapper must never scroll, otherwise the
+   action row moves with the text despite its scrollbar being hidden. */
+html.codex-dream-skin .composer-surface-chrome
+  [class~="mb-1"][class~="flex-grow"][class~="overflow-y-auto"][class~="px-3"] {
+  overflow: visible !important;
+}
+
+html.codex-dream-skin .composer-surface-chrome
+  [class~="max-h-[25dvh]"][class~="overflow-y-auto"] {
+  max-height: min(38dvh, 420px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* Keep the editor's eventual inner scrollbar visually quiet. */
+html.codex-dream-skin
+  :is(.composer-surface-chrome, .composer-surface-chrome [class~="overflow-y-auto"]) {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html.codex-dream-skin
+  :is(.composer-surface-chrome, .composer-surface-chrome [class~="overflow-y-auto"])::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 html.codex-dream-skin button[class~="bg-token-foreground"] {
   color: var(--dream-accent-ink) !important;
   background: var(--dream-accent) !important;
-  box-shadow: none !important;
+  box-shadow: 0 5px 16px color-mix(in oklab, var(--dream-accent) 30%, transparent),
+    inset 0 1px color-mix(in oklab, white 34%, transparent) !important;
+}
+
+/* Composer utility controls, including the live model selector, share a quiet
+   glass-pill treatment while keeping their native labels and click targets. */
+html.codex-dream-skin .composer-surface-chrome button[class~="h-token-button-composer"],
+html.codex-dream-skin .composer-surface-chrome button[class~="h-token-button-composer-sm"] {
+  color: var(--dream-text) !important;
+  border-color: var(--dream-immersive-line) !important;
+  background: color-mix(in oklab, var(--dream-surface-raised) 68%, transparent) !important;
+  box-shadow: inset 0 1px color-mix(in oklab, var(--dream-surface-raised) 72%, transparent),
+    0 2px 8px color-mix(in oklab, var(--dream-canvas) 10%, transparent) !important;
+  backdrop-filter: blur(10px) saturate(1.08) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(1.08) !important;
+  transition: color 160ms ease, border-color 160ms ease,
+    background-color 160ms ease, box-shadow 160ms ease !important;
+}
+
+html.codex-dream-skin .composer-surface-chrome button[class~="h-token-button-composer"]:hover,
+html.codex-dream-skin .composer-surface-chrome button[class~="h-token-button-composer-sm"]:hover,
+html.codex-dream-skin .composer-surface-chrome button[class~="h-token-button-composer"][data-state="open"],
+html.codex-dream-skin .composer-surface-chrome button[class~="h-token-button-composer-sm"][data-state="open"] {
+  color: var(--dream-text) !important;
+  border-color: color-mix(in oklab, var(--dream-accent) 42%, var(--dream-line)) !important;
+  background: var(--dream-accent-soft) !important;
+  box-shadow: inset 0 1px color-mix(in oklab, var(--dream-surface-raised) 78%, transparent),
+    0 4px 14px color-mix(in oklab, var(--dream-accent) 16%, transparent) !important;
+}
+
+/* Match the native 8px mic/send spacing between the model-picker group and
+   the action group; Codex otherwise places those two flex children flush. */
+html.codex-dream-skin .composer-surface-chrome
+  div[class~="items-center"][class~="justify-end"][class~="w-full"] {
+  column-gap: 8px !important;
 }
 
 html.codex-dream-skin [data-message-author-role],
@@ -407,6 +566,8 @@ html.codex-dream-skin.dream-art-wide:has(main.main-surface.dream-home-shell)
   aside.app-shell-left-panel,
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))
   aside.app-shell-left-panel {
+  position: relative;
+  isolation: isolate;
   background: linear-gradient(90deg,
     var(--dream-immersive-sidebar),
     var(--dream-immersive-edge)) !important;
@@ -416,18 +577,26 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
   backdrop-filter: none !important;
 }
 
-html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))
-  aside.app-shell-left-panel {
+/* The sidebar and main veil consume the same inherited route progress. This
+   preserves the previous endpoint opacities while keeping every frame aligned. */
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  aside.app-shell-left-panel::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
   background: linear-gradient(90deg,
-    var(--dream-task-immersive-sidebar),
-    var(--dream-task-immersive-edge)) !important;
+    var(--dream-task-sidebar-overlay),
+    var(--dream-task-sidebar-edge-overlay)) !important;
+  opacity: var(--dream-route-focus);
+  will-change: opacity;
 }
 
-html.codex-dream-skin.dream-art-wide:has(main.main-surface.dream-home-shell)
-  aside.app-shell-left-panel::after,
-html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))
-  aside.app-shell-left-panel::after {
-  background: transparent !important;
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  aside.app-shell-left-panel > :first-child {
+  position: relative;
+  z-index: 1;
 }
 
 html.codex-dream-skin.dream-art-wide main.main-surface.dream-home-shell,
@@ -441,11 +610,22 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
   box-shadow: none !important;
 }
 
-html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner) main.main-surface:not(.dream-home-shell) {
+/* Task focus adds opacity through a separate underlay. Keeping the expressive
+   home wash stable lets Chromium crossfade the stronger white task veil
+   instead of discretely swapping two gradients. */
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
   background: linear-gradient(90deg,
-    var(--dream-task-immersive-edge),
-    var(--dream-task-immersive-mid) 64%,
-    var(--dream-task-immersive-far)) !important;
+    var(--dream-task-overlay-edge),
+    var(--dream-task-overlay-mid) 64%,
+    var(--dream-task-overlay-far));
+  opacity: var(--dream-route-focus);
+  will-change: opacity;
 }
 
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner) .dream-task {
@@ -454,6 +634,44 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
 
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner) .dream-task::before {
   content: none !important;
+}
+
+/* Keep long-form text legible over Furina's pale hair and costume. This layer
+   grows with the whole conversation, so never apply a backdrop blur or broad
+   outer shadow here: either would rasterize an increasingly tall surface. */
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  .thread-scroll-container > div:first-child
+  > div[class~="mx-auto"][class*="max-w-(--thread-content-max-width)"] {
+  padding-top: 20px !important;
+  position: relative !important;
+  isolation: isolate;
+  background: transparent !important;
+  border-inline: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
+}
+
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  .thread-scroll-container > div:first-child
+  > div[class~="mx-auto"][class*="max-w-(--thread-content-max-width)"]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  background: color-mix(in oklab, var(--dream-surface) 72%, transparent) !important;
+  border-inline: 1px solid var(--dream-line-soft) !important;
+  border-radius: 28px !important;
+  box-shadow: inset 0 1px color-mix(in oklab, var(--dream-surface-raised) 44%, transparent) !important;
+  opacity: var(--dream-thread-focus);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
 }
 
 html.codex-dream-skin.dream-art-wide main.main-surface > header.app-header-tint {
@@ -500,31 +718,41 @@ html.codex-dream-skin.dream-art-wide .composer-surface-chrome {
   color: var(--dream-text) !important;
   background: var(--dream-immersive-composer) !important;
   border: 0 !important;
-  box-shadow: 0 10px 30px color-mix(in oklab, var(--dream-canvas) 20%, transparent),
+  border-radius: 20px !important;
+  box-shadow: 0 16px 42px color-mix(in oklab, var(--dream-canvas) 24%, transparent),
     inset 0 0 0 1px var(--dream-immersive-line) !important;
-  backdrop-filter: none !important;
+  backdrop-filter: blur(20px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.12) !important;
 }
 
 html.codex-dream-skin.dream-art-wide .composer-surface-chrome::before {
   content: none !important;
 }
 
-/* Current Codex builds render the home project picker in a hashed utility bar.
-   Merge it with the composer so the bottom control reads as one surface. */
+/* Current Codex builds inset the home project picker relative to the composer.
+   Keep that responsive geometry and make the row an intentional floating
+   ribbon instead of forcing two unequal widths into one joined outline. */
 html.codex-dream-skin .dream-home-utility {
-  border: 1px solid var(--dream-line) !important;
-  border-bottom: 0 !important;
-  border-radius: 18px 18px 0 0 !important;
-  background: var(--dream-immersive-composer) !important;
-  box-shadow: none !important;
+  top: 0 !important;
+  margin-bottom: 8px !important;
+  padding-block: 6px !important;
+  border: 1px solid var(--dream-immersive-line) !important;
+  border-radius: 14px !important;
+  background: color-mix(in oklab, var(--dream-immersive-composer) 90%, transparent) !important;
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--dream-canvas) 16%, transparent),
+    inset 0 1px color-mix(in oklab, var(--dream-surface-raised) 58%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(1.1) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.1) !important;
+  transition: background-color var(--dream-focus-transition),
+    box-shadow var(--dream-focus-transition),
+    border-color var(--dream-focus-transition),
+    backdrop-filter var(--dream-focus-transition) !important;
 }
 
 html.codex-dream-skin .dream-home:has(.dream-home-utility) .composer-surface-chrome {
-  border-radius: 0 0 18px 18px !important;
-  box-shadow: 0 10px 30px color-mix(in oklab, var(--dream-canvas) 20%, transparent),
-    inset 1px 0 var(--dream-immersive-line),
-    inset -1px 0 var(--dream-immersive-line),
-    inset 0 -1px var(--dream-immersive-line) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 16px 42px color-mix(in oklab, var(--dream-canvas) 24%, transparent),
+    inset 0 0 0 1px var(--dream-immersive-line) !important;
 }
 
 /* Plugins, scheduled tasks and search routes ship opaque sticky wrappers.

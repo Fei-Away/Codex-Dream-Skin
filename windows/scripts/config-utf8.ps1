@@ -1,7 +1,7 @@
 $script:DreamSkinUtf8NoBom = [System.Text.UTF8Encoding]::new($false, $true)
 $script:DreamSkinLegacyAppearanceTheme = 'appearanceTheme = "light"'
 $script:DreamSkinManagedLightCodeTheme = 'appearanceLightCodeThemeId = "codex"'
-$script:DreamSkinManagedLightChromeTheme = 'appearanceLightChromeTheme = { accent = "#B65CFF", contrast = 64, fonts = { code = "Cascadia Code", ui = "Microsoft YaHei UI" }, ink = "#4A235F", opaqueWindows = true, semanticColors = { diffAdded = "#BCE8CF", diffRemoved = "#F7B8CE", skill = "#C47BFF" }, surface = "#FFF4FA" }'
+$script:DreamSkinManagedLightChromeTheme = 'appearanceLightChromeTheme = { accent = "#2B9FE8", contrast = 64, fonts = { code = "Cascadia Code", ui = "Microsoft YaHei UI" }, ink = "#0D2948", opaqueWindows = true, semanticColors = { diffAdded = "#BCE8CF", diffRemoved = "#F2BBC5", skill = "#65CFFF" }, surface = "#F3FAFF" }'
 
 function ConvertFrom-DreamSkinUtf8Bytes {
   param(

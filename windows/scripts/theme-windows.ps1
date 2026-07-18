@@ -195,9 +195,15 @@ function Initialize-DreamSkinThemeStore {
   $assetRoot = Join-Path $SkillRoot 'assets'
   $assetImage = Join-Path $assetRoot 'dream-reference.jpg'
   Assert-DreamSkinImageFile -Path $assetImage
+  $retiredPresetIds = @('preset-romantic-rose', 'preset-arina-hashimoto')
   $activeTheme = Join-Path $paths.Active 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $activeTheme
-  if (-not (Test-Path -LiteralPath $activeTheme -PathType Leaf)) {
+  $seedActiveTheme = -not (Test-Path -LiteralPath $activeTheme -PathType Leaf)
+  if (-not $seedActiveTheme) {
+    $existingActiveTheme = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+    $seedActiveTheme = "$($existingActiveTheme.Theme.id)" -in $retiredPresetIds
+  }
+  if ($seedActiveTheme) {
     Ensure-DreamSkinManagedDirectory -Path $paths.Active -Root $paths.Root
     Assert-DreamSkinNoReparseComponents -Path (Join-Path $paths.Active 'dream-reference.jpg')
     $activeImage = Join-Path $paths.Active 'dream-reference.jpg'
@@ -214,12 +220,14 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $activeTheme
     Copy-Item -LiteralPath (Join-Path $assetRoot 'theme.json') -Destination $activeTheme -Force
   }
-  $retiredPresetDirectory = Join-Path $paths.Saved 'preset-romantic-rose'
-  Assert-DreamSkinNoReparseComponents -Path $retiredPresetDirectory
-  if (Test-Path -LiteralPath $retiredPresetDirectory) {
-    Remove-Item -LiteralPath $retiredPresetDirectory -Recurse -Force
+  foreach ($retiredPresetId in $retiredPresetIds) {
+    $retiredPresetDirectory = Join-Path $paths.Saved $retiredPresetId
+    Assert-DreamSkinNoReparseComponents -Path $retiredPresetDirectory
+    if (Test-Path -LiteralPath $retiredPresetDirectory) {
+      Remove-Item -LiteralPath $retiredPresetDirectory -Recurse -Force
+    }
   }
-  $presetDirectory = Join-Path $paths.Saved 'preset-arina-hashimoto'
+  $presetDirectory = Join-Path $paths.Saved 'preset-furina'
   $presetTheme = Join-Path $presetDirectory 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $presetDirectory
   Assert-DreamSkinNoReparseComponents -Path $presetTheme
