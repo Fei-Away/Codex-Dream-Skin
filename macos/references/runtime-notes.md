@@ -2,6 +2,7 @@
 
 - Discover the official `com.openai.codex` bundle on every launch; do not assume an upgrade keeps the same executable internals.
 - Use `Contents/Resources/cua_node/bin/node` from that bundle. Require Node.js 20+, a valid strict code signature, matching architecture, and OpenAI Team ID `2DC432GLL2` on both app and runtime.
+- State readers that can run before a validated launch must establish this runtime identity at their own execution boundary; never treat an inherited `NODE` value as proof of trust.
 - Do not ship a Node binary and do not depend on a globally installed `node` or `npm`.
 - Launch the official executable through a per-user `launchd` job with `--remote-debugging-address=127.0.0.1` and a selected port. LaunchServices may discard Chromium flags.
 - Prefer port `9341`; scan through `9441` on collision and record the selected port in state.

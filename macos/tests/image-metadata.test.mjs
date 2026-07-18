@@ -25,17 +25,17 @@ const malformedPng = Buffer.from(portal);
 malformedPng[0] = 0;
 assert.equal(readImageMetadata(malformedPng, ".png"), null);
 
-const amber = await fs.readFile(path.join(
+const gothic = await fs.readFile(path.join(
   macosRoot,
   "presets",
-  "preset-amber-dusk",
+  "preset-gothic-void-crusade",
   "background.jpg",
 ));
-assert.deepEqual(readImageMetadata(amber, ".jpg"), {
-  width: 1920,
-  height: 1200,
-  ratio: 1.6,
-  wide: false,
+assert.deepEqual(readImageMetadata(gothic, ".jpg"), {
+  width: 2560,
+  height: 1440,
+  ratio: 2560 / 1440,
+  wide: true,
   aspect: "wide",
   taskMode: "ambient",
 });

@@ -214,7 +214,12 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $activeTheme
     Copy-Item -LiteralPath (Join-Path $assetRoot 'theme.json') -Destination $activeTheme -Force
   }
-  $presetDirectory = Join-Path $paths.Saved 'preset-romantic-rose'
+  $retiredPresetDirectory = Join-Path $paths.Saved 'preset-romantic-rose'
+  Assert-DreamSkinNoReparseComponents -Path $retiredPresetDirectory
+  if (Test-Path -LiteralPath $retiredPresetDirectory) {
+    Remove-Item -LiteralPath $retiredPresetDirectory -Recurse -Force
+  }
+  $presetDirectory = Join-Path $paths.Saved 'preset-arina-hashimoto'
   $presetTheme = Join-Path $presetDirectory 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $presetDirectory
   Assert-DreamSkinNoReparseComponents -Path $presetTheme

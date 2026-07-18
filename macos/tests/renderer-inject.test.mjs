@@ -102,6 +102,11 @@ assert.match(
 );
 assert.match(
   css,
+  /home-suggestions button \[class~="text-token-text-primary"\]\s*\{[\s\S]{0,80}color:\s*var\(--ds-text\) !important;/,
+  "Home suggestion labels must override native light-shell text tokens with the selected theme color.",
+);
+assert.match(
+  css,
   /\.composer-surface-chrome p\.placeholder::after\s*\{[\s\S]{0,120}color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.82\) !important;[\s\S]{0,80}opacity:\s*1 !important;/,
   "Composer placeholder text must not inherit a stale native color with double opacity.",
 );
@@ -310,7 +315,11 @@ function createFixture(theme, {
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(nextTheme))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify("test"))
-    .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(cssText));
+    .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(cssText))
+    .replace(
+      "__DREAM_SKIN_PAYLOAD_REVISION_JSON__",
+      JSON.stringify(`${nextTheme.id}:${cssText}`),
+    );
   const flushTimers = (maximumDelay = Infinity) => {
     const pending = [...timers.entries()].filter(([, timer]) => timer.delay <= maximumDelay);
     for (const [id, timer] of pending) {

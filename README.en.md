@@ -42,7 +42,25 @@
   </sub>
 </p>
 
-## Tested featured preset: Arina Hashimoto
+## Tested featured presets
+
+### Gothic Void Crusade / 哥特虚空远征
+
+**Special thanks to [@seansong-ideogram](https://github.com/seansong-ideogram) for designing and contributing this striking, atmospheric original gothic science-fiction work to the community.** It leads the tested featured presets and is the default theme for fresh macOS installs.
+
+<p align="center">
+  <img src="docs/images/presets/gothic-void-crusade-preview.jpg" alt="Gothic Void Crusade theme running in Codex" width="900"><br>
+  <sub>Real injected Codex home screen (preview only)</sub>
+</p>
+
+After installing on macOS, switch from **已保存主题** or run:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-gothic-void-crusade
+```
+
+### Arina Hashimoto / 桥本有菜
 
 “Arina Hashimoto / 桥本有菜” has been verified on the real Codex home screen in
 both light and dark appearances. The user-provided source PNG is `1672 × 941`;
@@ -52,12 +70,12 @@ cards, project picker, and composer
 shown below are native Codex controls.
 
 <p align="center">
-  <img src="docs/images/presets/romantic-rose-light.jpg" alt="Arina Hashimoto theme tested in light appearance" width="900"><br>
+  <img src="docs/images/presets/arina-hashimoto-light.jpg" alt="Arina Hashimoto theme tested in light appearance" width="900"><br>
   <sub>Light · real injected screenshot; unsent input hidden during capture (preview only)</sub>
 </p>
 
 <p align="center">
-  <img src="docs/images/presets/romantic-rose-dark.jpg" alt="Arina Hashimoto theme tested in dark appearance" width="900"><br>
+  <img src="docs/images/presets/arina-hashimoto-dark.jpg" alt="Arina Hashimoto theme tested in dark appearance" width="900"><br>
   <sub>Dark · real injected screenshot; unsent input hidden during capture (preview only)</sub>
 </p>
 
@@ -67,7 +85,7 @@ Install from the repo and switch in one command on macOS:
 cd macos
 ./scripts/install-dream-skin-macos.sh --no-launch
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
-  --id preset-romantic-rose
+  --id preset-arina-hashimoto
 ```
 
 Windows has a persistent local theme store and system-tray controls, and seeds
@@ -82,7 +100,7 @@ After launch, switch directly through **已保存主题 → 桥本有菜**; no c
 manual import is required. **更换背景图** still imports your own UI-free
 wallpaper, which can then be saved for one-click switching.
 
-> The downloadable user source is [`docs/images/presets/romantic-rose-source.png`](./docs/images/presets/romantic-rose-source.png) (`1672 × 941`); the macOS one-click preset uses the normalized derived [`background.jpg`](./macos/presets/preset-romantic-rose/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; confirm likeness and asset rights before redistributing it.
+> The downloadable user source is [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png) (`1672 × 941`); the macOS one-click preset uses the normalized derived [`background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; confirm likeness and asset rights before redistributing it.
 
 ## Concept gallery (not importable backgrounds)
 

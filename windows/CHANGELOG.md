@@ -14,6 +14,7 @@
 
 ### 修复
 
+- 安装器在完成受管运行时副本的 SHA-256 校验后，仅清除其中 PowerShell 脚本的下载区标记；启动、恢复、托盘快捷方式和托盘子进程改用 `RemoteSigned`，不再组合隐藏 PowerShell 与 `ExecutionPolicy Bypass` 触发常见 LNK 启发式告警，同时继续服从系统和企业组策略。
 - 保留 Codex 原生固定顶栏的定位与层级，避免打开任务侧边面板后开关被推出主区、导致面板无法关闭。
 - 暗色外观下，原生顶部菜单栏现在使用深色半透明可读性层，并提高菜单按钮与图标的文字对比度，避免浅色壁纸让导航项难以辨认。
 - 渲染层现在只在检测到完整 Codex 主界面壳层时启用皮肤；宠物等透明辅助窗口会主动清理主题背景与装饰节点，避免出现遮挡宠物的矩形背景框。
@@ -50,6 +51,7 @@
 - Store 更新时，仍在运行且身份有效的旧版本 CDP 会直接热重应用；旧版本若未开启 CDP，则在获得现有重启授权后关闭并启动当前注册版本，避免并行打开两个 Codex。
 - 遇到 `[desktop.*]` 子表时会在写配置前停止，避免外观标量键与 TOML 子表冲突；热重应用验证失败时会尽力移除本次残余样式。
 - Restore 不再要求当前环境仍能找到 Node；schema 3 清理会严格匹配安装时记录的 Node 路径，Node 已升级或卸载也不影响安全恢复。
+- 截图验证不再派发 Escape、移动鼠标或额外等待 300ms，避免验证过程改变当前窗口状态。
 
 ### 安全
 
@@ -59,12 +61,14 @@
 - injector 只连接相同端口、page ID 与路径一致的 loopback WebSocket，并在注入前确认真实 Codex shell DOM 标记。
 - watcher 绑定启动时的 CDP Browser ID，并持续持有 Browser WebSocket 作为身份锚；原浏览器关闭或端口被复用时直接退出，不会连接到新端点。
 - CDP HTTP、WebSocket 建连与命令均加入超时，HTTP 探测拒绝重定向，异常目标不会无限挂起或把探测带离 loopback。
+- injector 收到畸形 JSON 或 `null`、字符串、数字等非对象 CDP 帧时会安全关闭会话，不再因直接读取消息字段而抛出未处理异常。
 - injector 日志与验证文件不再记录窗口标题、页面路由、页面文本或被拒绝 URL 的内容，只保留临时 target ID、结构标记和布局结果。
 - 快捷方式不再静默携带 `-RestartExisting`；需要重启时先向用户确认。
 - install、start、restore 和 verify 使用当前用户互斥锁，避免双击或并发命令竞争端口、配置和 state。
 
 ### 改进
 
+- 预置主题的稳定 ID 从 `preset-romantic-rose` 更名为 `preset-arina-hashimoto`；初始化只清理旧预置目录，继续保留用户自建主题。
 - 默认端口被占用时自动在后续 100 个端口内选择空闲端口；显式指定的冲突端口仍安全失败。
 - injector 会等待首轮注入完成再判定启动成功；目标异常时使用有上限的指数退避和限频日志，减少后台唤醒和日志膨胀。
 - 明确要求 Node.js 22 或更新版本，并记录 `process.execPath`，兼容 PATH 中的启动转发程序。
@@ -76,3 +80,4 @@
 - 增加本地 HTTP/CDP fixture，逐项执行 `--verify`、`--once` 和 `--remove`，确认一次性目标发现会校验 Browser ID 且不再访问未定义变量。
 - 增加受管主题初始化、换图、保存、切换、暂停标记、payload 配置嵌入、整窗 CSS 和托盘菜单静态回归检查。
 - 增加中文项目路径、CRLF/LF、UTF-16 与歧义 TOML 拒绝、并发写检测、section 隔离、精确恢复、Appx/state 身份、状态归档、payload 构造、Browser ID 和不安全 CDP URL 的回归检查。
+- injector 自检覆盖非对象 CDP 帧拒绝和截图流程不派发 renderer 输入事件。

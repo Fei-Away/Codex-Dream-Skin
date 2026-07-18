@@ -7,6 +7,20 @@ set -euo pipefail
 
 THEME_ID=""
 APPLY_NOW="true"
+OPERATION_TOKEN=""
+stage=""
+
+finish_switch() {
+  local code="$1"
+  [ -z "${stage:-}" ] || /bin/rm -rf "$stage"
+  if [ "$code" -ne 0 ] && [ -n "${OPERATION_TOKEN:-}" ]; then
+    write_operation_state failed "主题切换未完成，应用结果未确认" "$OPERATION_TOKEN" 2>/dev/null || true
+    finish_client_operation "${PORT:-9341}" error "主题切换未完成，应用结果未确认" \
+      "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
+  fi
+}
+trap 'finish_switch "$?"' EXIT
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --id) THEME_ID="${2:-}"; shift 2 ;;
@@ -26,10 +40,24 @@ THEMES_ROOT="$STATE_ROOT/themes"
 SRC="$THEMES_ROOT/$THEME_ID"
 [ -d "$SRC" ] || fail "Theme not found: $THEME_ID"
 [ -f "$SRC/theme.json" ] || fail "theme.json missing in $THEME_ID"
+if [ "$APPLY_NOW" = "true" ]; then
+  OPERATION_TOKEN="$(new_operation_token)"
+  write_operation_state applying "正在切换主题" "$OPERATION_TOKEN" \
+    || fail "Could not publish the theme switch operation state."
+fi
 ensure_node_runtime
 themes_root_real="$(cd "$THEMES_ROOT" && pwd -P)"
 src_real="$(cd "$SRC" && pwd -P)"
 case "$src_real/" in "$themes_root_real/"*) ;; *) fail "Theme directory escapes the saved theme library." ;; esac
+
+PORT=9341
+if [ -f "$STATE_PATH" ]; then
+  saved="$(state_field port 2>/dev/null || true)"
+  [ -n "${saved:-}" ] && PORT="$saved"
+fi
+if [ -n "$OPERATION_TOKEN" ] && verified_cdp_endpoint "$PORT" 2>/dev/null; then
+  begin_client_operation "$PORT" switch 3000 "$OPERATION_TOKEN" >/dev/null 2>&1 || true
+fi
 
 progress() {
   printf '%s\n' "$*" >&2
@@ -39,8 +67,6 @@ progress() {
 progress "Switching..."
 
 stage="$(/usr/bin/mktemp -d "$STATE_ROOT/.theme-switch.XXXXXX")"
-cleanup_stage() { /bin/rm -rf "$stage"; }
-trap cleanup_stage EXIT
 /bin/mkdir -p "$THEME_DIR"
 /bin/chmod 700 "$stage"
 # Snapshot theme.json and its referenced image from stable, no-follow file
@@ -68,7 +94,7 @@ done
 /usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
   ! -name 'theme.json' ! -name "$THEME_IMAGE" -delete
 /bin/rm -rf "$stage"
-trap - EXIT
+stage=""
 
 THEME_NAME="$("$NODE" -e 'try{const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(t.name||"")}catch{}' "$THEME_DIR/theme.json" 2>/dev/null || true)"
 [ -n "$THEME_NAME" ] || THEME_NAME="$THEME_ID"
@@ -78,14 +104,8 @@ if [ "$APPLY_NOW" != "true" ]; then
   exit 0
 fi
 
-PORT=9341
-if [ -f "$STATE_PATH" ]; then
-  saved="$(state_field port 2>/dev/null || true)"
-  [ -n "${saved:-}" ] && PORT="$saved"
-fi
-
 # Hot path: CDP already open → seconds, not tens of seconds
-if hot_reapply_theme "$PORT" 8000; then
+if hot_reapply_theme "$PORT" 8000 "$OPERATION_TOKEN"; then
   progress "Done: ${THEME_NAME}"
   exit 0
 fi

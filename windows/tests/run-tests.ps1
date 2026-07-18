@@ -18,6 +18,12 @@ try {
     Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
       -Recurse -Force -ErrorAction Stop
   }
+  $zoneMarkedSourceScript = Join-Path $runtimeSourceRoot 'scripts\start-dream-skin.ps1'
+  Set-Content -LiteralPath $zoneMarkedSourceScript -Stream 'Zone.Identifier' `
+    -Value "[ZoneTransfer]`r`nZoneId=3`r`n" -Encoding Ascii
+  if (@(Get-Item -LiteralPath $zoneMarkedSourceScript -Stream 'Zone.Identifier').Count -ne 1) {
+    throw 'Runtime test could not create an Internet-zone marker on its source fixture.'
+  }
 
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
   $sourcePrefix = $runtimeSourceRoot.TrimEnd('\') + '\'
@@ -43,6 +49,10 @@ try {
       (Get-FileHash -Algorithm SHA256 -LiteralPath $installedFile).Hash) {
       throw "Installed runtime hash does not match its source: $relative"
     }
+  }
+  if (@(Get-Item -LiteralPath $engine.Start -Stream 'Zone.Identifier' `
+    -ErrorAction SilentlyContinue).Count -ne 0) {
+    throw 'Installed runtime retained an Internet-zone marker and cannot use RemoteSigned safely.'
   }
 
   [System.IO.File]::WriteAllText((Join-Path $engine.Root 'stale-runtime.txt'), 'stale')
@@ -118,6 +128,16 @@ try {
   }
 
   $installSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\install-dream-skin.ps1')
+  $commonSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\common-windows.ps1')
+  $hashVerificationIndex = $commonSource.IndexOf(
+    'Staged Dream Skin runtime failed hash verification', [System.StringComparison]::Ordinal
+  )
+  $unblockIndex = $commonSource.IndexOf(
+    'Unblock-File -LiteralPath $runtimeScript.FullName', [System.StringComparison]::Ordinal
+  )
+  if ($hashVerificationIndex -lt 0 -or $unblockIndex -le $hashVerificationIndex) {
+    throw 'Runtime scripts are not unblocked only after staged byte-content verification.'
+  }
   $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
   $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
   if ($trayGuardIndex -lt 0 -or $engineInstallIndex -le $trayGuardIndex) {
@@ -134,6 +154,10 @@ try {
     if (-not $installSource.Contains($requiredShortcutBinding)) {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
     }
+  }
+  if ([regex]::Matches($installSource, '-ExecutionPolicy RemoteSigned').Count -ne 4 -or
+    $installSource.Contains('-ExecutionPolicy Bypass')) {
+    throw 'Installer shortcuts or tray launch still bypass the PowerShell execution policy.'
   }
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
@@ -610,9 +634,18 @@ try {
   }
 
   $themeStateRoot = Join-Path $temporaryRoot 'theme-state'
+  $legacyPresetDirectory = Join-Path $themeStateRoot 'themes\preset-romantic-rose'
+  $customThemeDirectory = Join-Path $themeStateRoot 'themes\custom-keepme'
+  New-Item -ItemType Directory -Force -Path $legacyPresetDirectory, $customThemeDirectory | Out-Null
+  [System.IO.File]::WriteAllText((Join-Path $legacyPresetDirectory 'retired-marker'), 'retired', $utf8NoBom)
+  [System.IO.File]::WriteAllText((Join-Path $customThemeDirectory 'keep-marker'), 'keep', $utf8NoBom)
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
+  if ((Test-Path -LiteralPath $legacyPresetDirectory) -or
+    -not (Test-Path -LiteralPath (Join-Path $customThemeDirectory 'keep-marker'))) {
+    throw 'Theme-store migration did not retire the old preset ID while preserving custom themes.'
+  }
   $initialTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($initialTheme.Theme.id -cne 'preset-romantic-rose' -or
+  if ($initialTheme.Theme.id -cne 'preset-arina-hashimoto' -or
     $initialTheme.Theme.name -cne '桥本有菜' -or
     $initialTheme.Theme.appearance -cne 'auto' -or
     $initialTheme.Theme.art.safeArea -cne 'left' -or
@@ -622,7 +655,7 @@ try {
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
   if ($preseededThemes.Count -ne 1 -or
-    $preseededThemes[0].Id -cne 'preset-romantic-rose' -or
+    $preseededThemes[0].Id -cne 'preset-arina-hashimoto' -or
     $preseededThemes[0].Name -cne '桥本有菜') {
     throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
   }
@@ -728,6 +761,10 @@ try {
   }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
     throw 'Tray pause/restore closures do not terminate cleanly.'
+  }
+  if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 1 -or
+    $traySource.Contains('-ExecutionPolicy Bypass')) {
+    throw 'Tray actions still bypass the PowerShell execution policy.'
   }
   if (-not $traySource.Contains('Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata') -or
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
