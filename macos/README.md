@@ -52,8 +52,10 @@ Install location after step 2:
 
 Automatic loading is enabled by default. It registers the per-user LaunchAgent
 `com.openai.codex-dream-skin-studio.autoload`, starts the official Codex with a
-loopback CDP port, and keeps the injector attached after Codex exits or its
-renderer reloads. Use `--no-auto-load` during installation to keep manual mode.
+loopback CDP port, and keeps the injector attached across renderer reloads.
+Closing Codex leaves it closed; the supervisor waits for the next user launch
+instead of reopening the app. Use `--no-auto-load` during installation to keep
+manual mode.
 
 The injector also watches the installed theme configuration, background image,
 CSS, and renderer script. When any of them changes, it reloads the newest

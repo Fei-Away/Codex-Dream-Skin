@@ -2,6 +2,7 @@
 
 set -u
 . "$(cd "$(dirname "$0")" && pwd -P)/common-macos.sh"
+. "$SCRIPT_DIR/supervisor-policy-macos.sh"
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:${PATH:-}"
 
 if [ "${1:-}" != "--daemon" ]; then
@@ -11,6 +12,8 @@ fi
 SUPERVISOR_CHILD_PID=""
 STOP_REQUESTED="false"
 UNTHEMED_CODEX_PID=""
+CODEX_SESSION_OBSERVED="false"
+WAITING_FOR_USER_LAUNCH_LOGGED="false"
 
 log() {
   printf '%s %s\n' "$(/bin/date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*" >> "$AUTOLOAD_LOG"
@@ -126,7 +129,17 @@ while [ "$STOP_REQUESTED" = "false" ]; do
     PORT="$(saved_port)"
     [ -n "$PORT" ] || PORT=9341
     if ! codex_is_running; then
+      if ! supervisor_should_launch_codex "$CODEX_SESSION_OBSERVED"; then
+        stop_child
+        if [ "$WAITING_FOR_USER_LAUNCH_LOGGED" = "false" ]; then
+          log "Codex exited after being observed; waiting for the user to launch it again."
+          WAITING_FOR_USER_LAUNCH_LOGGED="true"
+        fi
+        /bin/sleep 2
+        continue
+      fi
       PORT="$(select_available_port "$PORT")"
+      CODEX_SESSION_OBSERVED="true"
       start_codex_direct "$PORT"
       if ! wait_for_cdp "$PORT"; then
         log "Codex did not expose verified CDP on port $PORT."
@@ -134,6 +147,8 @@ while [ "$STOP_REQUESTED" = "false" ]; do
         continue
       fi
     else
+      CODEX_SESSION_OBSERVED="true"
+      WAITING_FOR_USER_LAUNCH_LOGGED="false"
       current_pid="$(codex_main_pids | /usr/bin/head -n 1)"
       if [ "$current_pid" != "$UNTHEMED_CODEX_PID" ]; then
         UNTHEMED_CODEX_PID="$current_pid"
@@ -147,6 +162,9 @@ while [ "$STOP_REQUESTED" = "false" ]; do
       /bin/sleep 5
       continue
     fi
+  else
+    CODEX_SESSION_OBSERVED="true"
+    WAITING_FOR_USER_LAUNCH_LOGGED="false"
   fi
 
   if ! verified_cdp_endpoint "$PORT"; then

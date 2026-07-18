@@ -198,7 +198,7 @@ async function applyAutoLoad(input) {
 }
 
 async function apiState() {
-  return { theme: await activeTheme(), autoload: autoLoadStatus(), version: "1.5.2" };
+  return { theme: await activeTheme(), autoload: autoLoadStatus(), version: "1.5.3" };
 }
 
 async function handleApi(request, response, pathname) {

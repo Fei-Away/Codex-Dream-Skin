@@ -13,6 +13,19 @@ while IFS= read -r file; do "$NODE" --check "$file" >/dev/null; done < <(
   /usr/bin/find "$ROOT/scripts" "$ROOT/assets" "$ROOT/presets" -type f \( -name '*.mjs' -o -name '*.js' \) -print
 )
 
+# Auto-load may start Codex once for the current supervisor session, but a
+# user-initiated quit must leave it closed until the user launches it again.
+/usr/bin/env /bin/bash -c '
+  . "$1/scripts/supervisor-policy-macos.sh"
+  supervisor_should_launch_codex false
+  if supervisor_should_launch_codex true; then
+    printf "Supervisor policy would relaunch Codex after it was already observed.\n" >&2
+    exit 1
+  fi
+' _ "$ROOT"
+/usr/bin/grep -F -q 'supervisor_should_launch_codex "$CODEX_SESSION_OBSERVED"' \
+  "$ROOT/scripts/supervise-dream-skin-macos.sh"
+
 if /usr/bin/grep -R -n -E 'dream-skin-skin|DREAM_SKIN_SKIN|1\.0\.0-rc2' \
   "$ROOT/scripts" "$ROOT/assets" >/dev/null; then
   printf 'Legacy release-candidate identifiers remain in runtime files.\n' >&2
@@ -55,7 +68,7 @@ fi
 MIKU_PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$ROOT/themes/miku-dream")"
 "$NODE" -e '
   const value = JSON.parse(process.argv[1]);
-  if (!value.pass || value.version !== "1.5.2" || value.themeId !== "miku-dream" || value.themeName !== "Miku Dream" || value.imageBytes < 1) process.exit(1);
+  if (!value.pass || value.version !== "1.5.3" || value.themeId !== "miku-dream" || value.themeName !== "Miku Dream" || value.imageBytes < 1) process.exit(1);
 ' "$MIKU_PAYLOAD_JSON"
 /usr/bin/grep -F -q 'dream-skin-composer-dock' "$ROOT/assets/renderer-inject.js"
 /usr/bin/grep -F -q 'from-token-main-surface-primary' "$ROOT/assets/dream-skin.css"
@@ -861,7 +874,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.2" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.3" ]' _ "$ROOT"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
