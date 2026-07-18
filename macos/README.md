@@ -86,8 +86,12 @@ active theme exists. Switch presets with:
 
 Small & Beauty is a Schema V2 reinterpretation of a compact, familiar chat UI.
 Its name and design direction acknowledge MyKeyVans' Telegram theme
-[“小而美 8.0”](https://t.me/MyTricksCollection/135). The bundled abstract
-background is original to this preset and contains no Telegram or WeChat assets.
+[“小而美 8.0”](https://t.me/MyTricksCollection/135). The source post describes
+that theme as using WeChat 8.0 colors as the blueprint for a high-fidelity
+imitation and notes that some fields came from an untraceable WeChat v7 Android
+theme. This Codex preset uses neither theme's files or fields. The bundled
+abstract background is original to this preset and contains no Telegram or
+WeChat assets.
 
 The user-provided source PNG is `1672 × 941`. Its pack contains a standardized
 derived `2560 × 1440` JPEG plus theme metadata; the derived export does not add

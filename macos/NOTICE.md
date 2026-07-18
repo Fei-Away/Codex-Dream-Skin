@@ -21,7 +21,9 @@ It does **not** grant rights to:
 
 `presets/preset-small-and-beauty/background.png` is original abstract chat-bubble artwork generated for this preset and contributed for redistribution under this repository's MIT license. It contains no copied Telegram or WeChat artwork, icons, logos, screenshots, or other third-party assets.
 
-The preset name and design direction acknowledge MyKeyVans' Telegram theme [“小而美 8.0”](https://t.me/MyTricksCollection/135), which described a compact chat interface inspired by WeChat 8.0. This Codex preset is an independent reinterpretation and is not affiliated with, endorsed by, or sponsored by Telegram, Tencent, WeChat, or the referenced theme author.
+The preset name and design direction acknowledge MyKeyVans' Telegram theme [“小而美 8.0”](https://t.me/MyTricksCollection/135). The source post explicitly describes that theme as using WeChat 8.0 colors as the blueprint for a high-fidelity imitation, borrowing a slogan to “properly define Small & Beauty,” and referencing some fields from an Android WeChat v7 local theme whose original sharer could no longer be identified.
+
+This Codex preset uses neither of those theme files or field definitions. It independently reimplements the visual direction through Schema V2 semantic tokens and is not affiliated with, endorsed by, or sponsored by Telegram, Tencent, WeChat, or the referenced theme author.
 
 ## Arina Hashimoto reference material
 

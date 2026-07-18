@@ -61,9 +61,9 @@ macOS 安装后可从「已保存主题」直接切换，也可以运行：
 
 ### Small & Beauty / 小而美
 
-`Small & Beauty` 是一套基于 Schema V2 的紧凑聊天界面主题：使用克制的中性色表面、低圆角、细边框与绿色强调色，并分别为浅色和深色外观调整语义色彩。名称与设计灵感致谢 MyKeyVans 发布的 Telegram 主题 [「小而美 8.0」](https://t.me/MyTricksCollection/135)。本预设是面向 Codex 原生控件的重新诠释，不包含 Telegram 或微信的图像、图标或其他第三方素材，也不代表相关品牌的认可或合作。
+`Small & Beauty` 是一套基于 Schema V2 的紧凑聊天界面主题：使用克制的中性色表面、低圆角、细边框与绿色强调色，并分别为浅色和深色外观调整语义色彩。名称与设计灵感致谢 MyKeyVans 发布的 Telegram 主题 [「小而美 8.0」](https://t.me/MyTricksCollection/135)；原文称该主题“以微信 8.0 版本的配色为蓝本，做了一个高仿主题”，并借用口号“正确定义『小而美』”。本 Codex 预设只重新诠释这一名称和视觉方向，不使用原 Telegram 主题文件、其提及的 WeChat v7 主题字段，或 Telegram/微信的图像、图标及其他第三方素材，也不代表相关品牌或原作者的认可与合作。
 
-`Small & Beauty` is a compact Schema V2 chat theme with restrained neutral surfaces, subtle corners, fine borders, and a green accent. Its name and design direction acknowledge MyKeyVans' Telegram theme [“小而美 8.0”](https://t.me/MyTricksCollection/135). This Codex preset is an original reinterpretation and does not bundle Telegram or WeChat artwork, icons, or other third-party assets.
+`Small & Beauty` is a compact Schema V2 chat theme with restrained neutral surfaces, subtle corners, fine borders, and a green accent. Its name and design direction acknowledge MyKeyVans' Telegram theme [“小而美 8.0”](https://t.me/MyTricksCollection/135). The source post explicitly describes that theme as using WeChat 8.0 colors as the blueprint for a high-fidelity imitation and borrowing a slogan to “properly define Small & Beauty.” This Codex preset reinterprets only the name and visual direction; it does not use the original Telegram theme files, the referenced WeChat v7 theme fields, or Telegram/WeChat artwork, icons, and other third-party assets.
 
 <p align="center">
   <img src="macos/presets/preset-small-and-beauty/background.png" alt="Small & Beauty abstract chat banner" width="900"><br>
