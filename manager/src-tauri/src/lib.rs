@@ -448,7 +448,7 @@ struct RuntimeCommands {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct RuntimeCapabilities {
     manifest_version: u32,
     platform: String,
@@ -1448,8 +1448,14 @@ fn parse_theme_json_with_policy(
             return Err("theme.json is missing required field schemaVersion.".into());
         }
     }
-    let mut theme: ThemeConfig =
-        serde_json::from_slice(bytes).map_err(|error| format!("Invalid theme.json: {error}"))?;
+    let mut theme: ThemeConfig = serde_json::from_slice(bytes).map_err(|error| {
+        let message = format!("Invalid theme.json: {error}");
+        if message.contains("unknown field") {
+            format!("{message} The theme may require a newer Manager.")
+        } else {
+            message
+        }
+    })?;
     normalize_theme_config(&mut theme);
     validate_theme(&theme)?;
     Ok(theme)
@@ -4275,9 +4281,9 @@ mod tests {
         let mut value = serde_json::to_value(&package().config).unwrap();
         value["shellCommand"] = serde_json::Value::String("calc.exe".into());
         let bytes = serde_json::to_vec(&value).unwrap();
-        assert!(parse_theme_json(&bytes)
-            .unwrap_err()
-            .contains("unknown field"));
+        let error = parse_theme_json(&bytes).unwrap_err();
+        assert!(error.contains("unknown field"));
+        assert!(error.contains("The theme may require a newer Manager."));
     }
 
     #[test]
@@ -4691,6 +4697,86 @@ mod tests {
         assert_ne!(before, after);
         assert!(capabilities.commands.restore.args.is_empty());
         assert!(!capabilities.commands.restore.base_theme_args.is_empty());
+    }
+
+    #[test]
+    fn runtime_capability_manifest_accepts_additive_evidence_but_gates_contracts() {
+        let root = TestDir::new();
+        let capabilities = fallback_runtime_capabilities();
+        for command in [
+            &capabilities.commands.install,
+            &capabilities.commands.start,
+            &capabilities.commands.restore,
+        ] {
+            let path = root.0.join(&command.script);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, b"runtime").unwrap();
+        }
+        let command_json = |command: &RuntimeCommandContract| {
+            let restart_semantics = match &command.restart_semantics {
+                RestartSemantics::RequiresCodexClosed => "requires-codex-closed",
+                RestartSemantics::OptionalExplicit => "optional-explicit",
+                RestartSemantics::None => "none",
+            };
+            serde_json::json!({
+                "script": command.script.clone(),
+                "args": command.args.clone(),
+                "restartArgs": command.restart_args.clone(),
+                "baseThemeArgs": command.base_theme_args.clone(),
+                "restartSemantics": restart_semantics,
+            })
+        };
+        let mut value = serde_json::json!({
+            "manifestVersion": capabilities.manifest_version,
+            "platform": capabilities.platform,
+            "runtimeVersion": capabilities.runtime_version,
+            "minimumNodeMajor": capabilities.minimum_node_major,
+            "themeSchemaVersion": capabilities.theme_schema_version,
+            "themeFeatures": {
+                "appearance": true,
+                "futurePaletteEvidence": true
+            },
+            "paths": {
+                "activeTheme": capabilities.paths.active_theme,
+                "themeStore": capabilities.paths.theme_store,
+                "state": capabilities.paths.state,
+                "logs": capabilities.paths.logs
+            },
+            "commands": {
+                "install": command_json(&capabilities.commands.install),
+                "start": command_json(&capabilities.commands.start),
+                "restore": command_json(&capabilities.commands.restore)
+            },
+            "evidence": {
+                "rendererAdapters": ["semantic-v2"]
+            }
+        });
+
+        let parsed: RuntimeCapabilities = serde_json::from_value(value.clone()).unwrap();
+        assert!(parsed.theme_features.appearance);
+        validate_runtime_capabilities(&root.0, &parsed).unwrap();
+
+        let mut unknown_path = value.clone();
+        unknown_path["paths"]["futurePath"] = serde_json::json!("unsafe");
+        assert!(serde_json::from_value::<RuntimeCapabilities>(unknown_path)
+            .unwrap_err()
+            .to_string()
+            .contains("unknown field"));
+
+        let mut unknown_command = value.clone();
+        unknown_command["commands"]["futureCommand"] = command_json(&capabilities.commands.start);
+        assert!(
+            serde_json::from_value::<RuntimeCapabilities>(unknown_command)
+                .unwrap_err()
+                .to_string()
+                .contains("unknown field")
+        );
+
+        value["manifestVersion"] = serde_json::json!(2);
+        let future: RuntimeCapabilities = serde_json::from_value(value).unwrap();
+        assert!(validate_runtime_capabilities(&root.0, &future)
+            .unwrap_err()
+            .contains("Unsupported runtime capability manifest version 2"));
     }
 
     #[test]
