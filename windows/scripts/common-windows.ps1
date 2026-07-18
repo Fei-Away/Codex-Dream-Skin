@@ -795,21 +795,26 @@ function Get-DreamSkinCodexProcesses {
 }
 
 function Stop-DreamSkinCodex {
-  param([Parameter(Mandatory = $true)][object]$Codex, [switch]$AllowForce)
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [switch]$AllowForce,
+    [int]$GracePeriodSeconds = 15
+  )
+  if ($GracePeriodSeconds -lt 0) { throw 'Grace period cannot be negative.' }
   $processes = Get-DreamSkinCodexProcesses -Codex $Codex
   if ($processes.Count -eq 0) { return }
   foreach ($item in $processes) {
     try { [void](Get-Process -Id $item.ProcessId -ErrorAction Stop).CloseMainWindow() } catch {}
   }
 
-  $deadline = (Get-Date).AddSeconds(15)
+  $deadline = (Get-Date).AddSeconds($GracePeriodSeconds)
   while ((Get-DreamSkinCodexProcesses -Codex $Codex).Count -gt 0 -and (Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 250
   }
   $remaining = Get-DreamSkinCodexProcesses -Codex $Codex
   if ($remaining.Count -eq 0) { return }
   if (-not $AllowForce) {
-    throw 'Codex did not close within 15 seconds. Close it manually or explicitly authorize a forced restart.'
+    throw "Codex did not close within $GracePeriodSeconds seconds. Close it manually or explicitly authorize a forced restart."
   }
   foreach ($item in $remaining) {
     $current = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$item.ProcessId)" -ErrorAction SilentlyContinue

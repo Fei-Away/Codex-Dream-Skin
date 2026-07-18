@@ -28,7 +28,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。需要自动接管普通 Codex 启动时，安装命令额外传入 `-AutoApply`。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
-当前 Windows 默认主题是 `OpenAI 中国主题`。它会在首页显示红金横幅、`OpenAI 中国主题`、`Codex App 中国特别版` 和右上角 `初心如磐 · 智启未来` 标语；普通任务页会使用低干扰的红金背景层与平铺弱化升旗视觉铺底，侧栏、建议卡、项目选择和输入框仍然使用 Codex 原生控件。
+当前 Windows 默认主题是 `OpenAI 中国主题`。它会在首页显示红金横幅、`OpenAI 中国主题`、`Codex App 中国特别版` 和右上角 `初心如磐 · 智启未来` 标语；普通任务页会使用低干扰的红金背景层与单张弱化升旗视觉 `cover` 铺底，侧栏、建议卡、项目选择和输入框仍然使用 Codex 原生控件。
 
 安装命令中的 `Bypass` 只作用于这一次由用户明确发起的安装进程。安装器会先校验运行时副本的 SHA-256，再仅对 `%LOCALAPPDATA%\CodexDreamSkin\engine` 中受管的 PowerShell 副本清除下载区标记。日常快捷方式使用 `RemoteSigned`，不会绕过系统或企业组策略。
 
@@ -38,6 +38,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -Port 9444
 ```
 
+如需手动打开普通 Codex 图标后也自动切换到皮肤版，安装时传入 `-AutoApply`：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -AutoApply
+```
+
+`-AutoApply` 会创建当前用户开机启动托盘。托盘每 250ms 检测一次普通 Codex 主窗口；发现它不是皮肤版启动时，会快速关闭普通窗口并用 Dream Skin 参数重开。由于官方普通启动没有 CDP 注入端口，这一步不能原地热加载，只能快速接管重开。
+
 ## 更新
 
 先退出 Dream Skin 托盘并关闭 Codex，再更新仓库（`git pull`，或重新下载最新源码），然后重新运行上面的安装命令。安装器会原子替换受管运行时并重建快捷方式；当前主题、已保存主题和导入图片不会被删除。
@@ -46,7 +54,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 
 ## 启动与验证
 
-推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。需要让托盘尝试自动接管普通 Codex 启动时，安装时传入 `-AutoApply`；普通安装不会在后台自动关闭或重开 Codex。
+推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。启用 `-AutoApply` 后，也可以继续点普通 Codex 图标；托盘会快速接管并重开皮肤版。普通安装不会在后台自动关闭或重开 Codex。
 
 命令行启动：
 
@@ -79,6 +87,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 cd windows
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+```
+
+安装并启用普通 Codex 图标自动接管：
+
+```powershell
+cd windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -AutoApply
 ```
 
 启动后导出一张验证截图：

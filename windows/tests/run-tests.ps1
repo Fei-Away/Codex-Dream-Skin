@@ -129,6 +129,7 @@ try {
 
   $installSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\install-dream-skin.ps1')
   $commonSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\common-windows.ps1')
+  $startSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\start-dream-skin.ps1')
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
   $hashVerificationIndex = $commonSource.IndexOf(
     'Staged Dream Skin runtime failed hash verification', [System.StringComparison]::Ordinal
@@ -165,6 +166,14 @@ try {
     -not $traySource.Contains('function Invoke-DreamSkinAutoApply') -or
     -not $traySource.Contains('Get-DreamSkinVerifiedCdpIdentity -Port $effectivePort -Codex $codex')) {
     throw 'Tray auto-apply is not explicitly gated by install and verified-CDP detection.'
+  }
+  if (-not $commonSource.Contains('[int]$GracePeriodSeconds = 15') -or
+    -not $startSource.Contains('[switch]$FastRestart') -or
+    -not $startSource.Contains('$gracePeriod = if ($FastRestart) { 0 } else { 15 }') -or
+    -not $traySource.Contains('$timer.Interval = 250') -or
+    -not $traySource.Contains('$script:lastAutoApplyAt.AddSeconds(1)') -or
+    -not $traySource.Contains("'-FastRestart'")) {
+    throw 'Tray auto-apply no longer uses the guarded fast restart path.'
   }
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force

@@ -28,7 +28,7 @@ The installer validates the official Codex Store package and Node.js, saves a re
 - `Codex Dream Skin - Tray`: open the system tray theme controls. Pass `-AutoApply` to the installer if you want the tray to try taking over normal Codex launches.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
-The current Windows default theme is `OpenAI 中国主题`. It renders a red-and-gold home banner, `OpenAI 中国主题`, `Codex App 中国特别版`, and the top-right tagline `初心如磐 · 智启未来`; normal task routes use a low-distraction red-and-gold background layer with tiled, softened flag-raising artwork, while the sidebar, suggestion cards, project picker, and composer remain native Codex controls.
+The current Windows default theme is `OpenAI 中国主题`. It renders a red-and-gold home banner, `OpenAI 中国主题`, `Codex App 中国特别版`, and the top-right tagline `初心如磐 · 智启未来`; normal task routes use a low-distraction red-and-gold background layer with one softened flag-raising image stretched with `cover`, while the sidebar, suggestion cards, project picker, and composer remain native Codex controls.
 
 `Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
 
@@ -38,6 +38,14 @@ Pass `-Port` during installation to use a fixed custom port. Valid ports range f
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -Port 9444
 ```
 
+Pass `-AutoApply` if you also want normal manual Codex launches to switch into the skinned session:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -AutoApply
+```
+
+`-AutoApply` creates a current-user Startup tray watcher. The tray checks for a normal Codex main window every 250ms; if the window was not launched with the Dream Skin CDP endpoint, it quickly closes that normal window and reopens Codex with Dream Skin arguments. Stock Codex launches do not expose the required CDP port, so this takeover cannot hot-inject in place.
+
 ## Update
 
 Exit the Dream Skin tray and close Codex, update the checkout (`git pull`, or download the latest source again), then rerun the install command above. The installer atomically replaces the managed runtime and rebuilds its shortcuts without deleting the active theme, saved themes, or imported images.
@@ -46,7 +54,7 @@ When upgrading from an older runtime to `OpenAI 中国主题`, if the active the
 
 ## Launch and verify
 
-Use the `Codex Dream Skin` shortcut to launch or reapply the skin. It asks for confirmation before restarting an open Codex window. If you want the tray to try taking over normal Codex launches, pass `-AutoApply` during installation; a normal install does not close or reopen Codex in the background.
+Use the `Codex Dream Skin` shortcut to launch or reapply the skin. It asks for confirmation before restarting an open Codex window. After enabling `-AutoApply`, you can also keep opening the normal Codex icon; the tray quickly takes it over and reopens the skinned session. A normal install does not close or reopen Codex in the background.
 
 Command-line launch:
 
@@ -79,6 +87,13 @@ Fresh install and launch from a checkout:
 cd windows
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+```
+
+Install and enable takeover for normal Codex icon launches:
+
+```powershell
+cd windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -AutoApply
 ```
 
 Export a verification screenshot after launch:

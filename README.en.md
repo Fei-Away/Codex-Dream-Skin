@@ -17,36 +17,11 @@
   Unofficial. Does not modify <code>.app</code> / <code>app.asar</code> / WindowsApps.
 </p>
 
-## Sponsors
-
-<p align="center">
-  <a href="https://passion8.cc/register?aff=TuPe">
-    <img src="docs/images/sponsor-passion8.png" alt="Passion8" height="72">
-  </a>
-</p>
-
-<p align="center">
-  <strong>Smarter Connections · Passionate Creation</strong><br>
-  <sub>Connect AI · Power Creation</sub>
-</p>
-
-<p align="center">
-  Thanks to <a href="https://passion8.cc/register?aff=TuPe"><strong>passion8.cc</strong></a> for sponsoring this project.<br>
-  Full-power AI gateway: official models, no silent downgrades, no wrapper shells.<br>
-  One-line setup for Codex / Claude Code / Grok.
-</p>
-
-<p align="center">
-  <sub>
-    Theme install and API config stay separate — this project never rewrites your provider settings.
-  </sub>
-</p>
-
 ## Tested featured presets
 
 ### OpenAI China Special / OpenAI 中国特别版
 
-Windows now seeds `OpenAI 中国主题` as the default theme. It uses a red-and-gold home banner, figure-and-flag artwork, faint slogan text, and a warm light workspace. The home header shows `OpenAI 中国主题` and `Codex App 中国特别版`, with the top-right tagline `初心如磐 · 智启未来`. Normal task routes also use a low-distraction red-and-gold background layer with softened flag-raising artwork while keeping task content and the composer readable. The sidebar, cards, project picker, and composer remain native Codex controls rather than a fake full-window screenshot.
+Windows now seeds `OpenAI 中国主题` as the default theme. It uses a red-and-gold home banner, figure-and-flag artwork, faint slogan text, and a warm light workspace. The home header shows `OpenAI 中国主题` and `Codex App 中国特别版`, with the top-right tagline `初心如磐 · 智启未来`. Normal task routes also use a low-distraction red-and-gold background layer with one softened flag-raising image stretched with `cover` while keeping task content and the composer readable. The sidebar, cards, project picker, and composer remain native Codex controls rather than a fake full-window screenshot.
 
 <p align="center">
   <img src="docs/images/presets/openai-china-special-preview.png" alt="OpenAI China Special Windows theme preview" width="900"><br>
@@ -67,6 +42,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-sk
 ```
 
 If you already installed an older Dream Skin runtime, exit the tray, close Codex, pull the latest source, and rerun the installer. Use the `Codex Dream Skin` shortcut after installation, or `Codex Dream Skin - Restore` to return to the stock appearance.
+
+Pass `-AutoApply` during installation if you want manual launches from the normal Codex icon to switch into the skinned session. It creates a current-user Startup tray watcher; when the tray detects a normal Codex window, it quickly closes that window and reopens Codex with Dream Skin arguments because a stock launch has no CDP port that can be hot-injected.
 
 ### Gothic Void Crusade / 哥特虚空远征
 
@@ -177,7 +154,7 @@ for the eight individual styles.
 ## What it does
 
 - **Real UI** — Sidebar, cards, project picker, and input stay native. Not a fake full-window screenshot.
-- **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable. Windows task routes can tile softened background art.
+- **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable. Windows task routes stretch one softened background image with `cover` instead of repeating it.
 - **Swappable art** — Drop in a UI-free image you like and it becomes your theme.
 - **Saved themes** — Switch local themes from the macOS menu bar or Windows system tray.
 - **Auto-apply on Windows** — The tray watcher can start at login and reopen normal Codex launches with the skin enabled.

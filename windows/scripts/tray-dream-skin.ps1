@@ -53,6 +53,8 @@ try {
 
   $script:autoApplyProcess = $null
   $script:lastAutoApplyAt = [DateTime]::MinValue
+  $script:autoApplyStartedAt = [DateTime]::MinValue
+  $script:autoApplyPort = $Port
 
   function Get-DreamSkinTrayPort {
     $state = $null
@@ -69,27 +71,72 @@ try {
     return $Port
   }
 
+  function Test-DreamSkinCodexNeedsAutoApply {
+    param([Parameter(Mandatory = $true)][object]$Codex)
+    $processes = @(Get-DreamSkinCodexProcesses -Codex $Codex)
+    foreach ($process in $processes) {
+      $commandLine = "$($process.CommandLine)"
+      if (-not $commandLine) { continue }
+      $isMainCodexWindow = $commandLine.IndexOf(' --type=', [System.StringComparison]::OrdinalIgnoreCase) -lt 0
+      $hasDebugPort = $commandLine.IndexOf('--remote-debugging-port', [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+      if ($isMainCodexWindow -and -not $hasDebugPort) { return $true }
+    }
+    return $false
+  }
+
   function Invoke-DreamSkinAutoApply {
     if (-not $AutoApply -or (Test-DreamSkinPaused -StateRoot $StateRoot)) { return }
-    if ($null -ne $script:autoApplyProcess -and -not $script:autoApplyProcess.HasExited) { return }
-    if ((Get-Date) -lt $script:lastAutoApplyAt.AddSeconds(20)) { return }
+    if ($null -ne $script:autoApplyProcess) {
+      if (-not $script:autoApplyProcess.HasExited) {
+        if ((Get-Date) -lt $script:autoApplyStartedAt.AddSeconds(120)) { return }
+        try { Stop-Process -Id $script:autoApplyProcess.Id -Force -ErrorAction Stop } catch {}
+        Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot | Out-Null
+        $notify.ShowBalloonTip(3000, 'Codex Dream Skin', '自动接管超时，已暂停以避免反复重启。', [System.Windows.Forms.ToolTipIcon]::Warning)
+        $script:autoApplyProcess = $null
+        return
+      }
+
+      $exitCode = $script:autoApplyProcess.ExitCode
+      try { $script:autoApplyProcess.Dispose() } catch {}
+      $script:autoApplyProcess = $null
+      $codexAfter = $null
+      try { $codexAfter = Get-DreamSkinCodexInstall } catch {}
+      $identityAfter = if ($null -ne $codexAfter) {
+        Get-DreamSkinVerifiedCdpIdentity -Port $script:autoApplyPort -Codex $codexAfter
+      } else {
+        $null
+      }
+      if ($exitCode -ne 0 -or $null -eq $identityAfter) {
+        Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot | Out-Null
+        $notify.ShowBalloonTip(3000, 'Codex Dream Skin', '自动接管失败，已暂停以避免反复重启。', [System.Windows.Forms.ToolTipIcon]::Warning)
+      } else {
+        $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '已自动应用皮肤。', [System.Windows.Forms.ToolTipIcon]::Info)
+      }
+      return
+    }
+    if ((Get-Date) -lt $script:lastAutoApplyAt.AddSeconds(1)) { return }
 
     $codex = $null
     try { $codex = Get-DreamSkinCodexInstall } catch { return }
     if ($null -eq $codex) { return }
-    $processes = @(Get-DreamSkinCodexProcesses -Codex $codex)
-    if ($processes.Count -eq 0) { return }
+    if (-not (Test-DreamSkinCodexNeedsAutoApply -Codex $codex)) { return }
 
     $effectivePort = Get-DreamSkinTrayPort
     if ($null -ne (Get-DreamSkinVerifiedCdpIdentity -Port $effectivePort -Codex $codex)) { return }
     if (-not (Test-DreamSkinPortAvailable -Port $effectivePort) -and
       -not (Test-DreamSkinCodexPortOwner -Port $effectivePort -Codex $codex)) {
-      return
+      try {
+        $effectivePort = Select-DreamSkinPort -PreferredPort $Port
+      } catch {
+        return
+      }
     }
 
     $script:lastAutoApplyAt = Get-Date
+    $script:autoApplyStartedAt = $script:lastAutoApplyAt
+    $script:autoApplyPort = $effectivePort
     $script:autoApplyProcess = Start-DreamSkinPowerShell -Script $startScript -Arguments @(
-      '-Port', "$effectivePort", '-RestartExisting'
+      '-Port', "$effectivePort", '-RestartExisting', '-FastRestart'
     )
   }
 
@@ -206,7 +253,7 @@ try {
   })
   if ($AutoApply) {
     $timer = [System.Windows.Forms.Timer]::new()
-    $timer.Interval = 2500
+    $timer.Interval = 250
     $timer.add_Tick({
       try { Invoke-DreamSkinAutoApply } catch {}
     })

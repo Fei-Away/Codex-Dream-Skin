@@ -4,7 +4,8 @@ param(
   [switch]$RestartExisting,
   [switch]$PromptRestart,
   [string]$ProfilePath,
-  [switch]$ForegroundInjector
+  [switch]$ForegroundInjector,
+  [switch]$FastRestart
 )
 
 $ErrorActionPreference = 'Stop'
@@ -95,7 +96,8 @@ try {
     if (-not $restartAuthorized) {
       throw 'Codex is open without a verified Dream Skin CDP endpoint. Close it first or explicitly use -RestartExisting.'
     }
-    Stop-DreamSkinCodex -Codex $codexToStop -AllowForce
+    $gracePeriod = if ($FastRestart) { 0 } else { 15 }
+    Stop-DreamSkinCodex -Codex $codexToStop -AllowForce -GracePeriodSeconds $gracePeriod
     $closedExistingCodex = $true
     $codex = $currentCodex
   }

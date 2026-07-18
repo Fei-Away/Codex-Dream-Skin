@@ -17,35 +17,11 @@
   非 OpenAI 官方产品。不修改 <code>.app</code> / <code>app.asar</code> / WindowsApps。
 </p>
 
-## 赞助商
-
-<p align="center">
-  <a href="https://passion8.cc/register?aff=TuPe">
-    <img src="docs/images/sponsor-passion8.png" alt="Passion8" height="72">
-  </a>
-</p>
-
-<p align="center">
-  <strong>更智能的连接 · 更热爱的创造</strong><br>
-  <sub>热爱驱动 · 无限可能 · Connect AI · Power Creation</sub>
-</p>
-
-<p align="center">
-  感谢 <a href="https://passion8.cc/register?aff=TuPe"><strong>passion8.cc</strong></a> 赞助本项目。<br>
-  满血 AI 中转：官方模型直连，无降智、无套壳；一行配置接入 Codex / Claude Code / Grok。
-</p>
-
-<p align="center">
-  <sub>
-    换肤与 API 配置互相独立，本项目不会自动改写你的模型供应商设置。
-  </sub>
-</p>
-
 ## 实测精选预设
 
 ### OpenAI 中国特别版 / OpenAI China Special
 
-Windows 当前默认启用「OpenAI 中国主题」。这套皮肤使用红金横幅、人物与旗帜视觉、淡字标语和浅色工作台配色；首页标题区显示 `OpenAI 中国主题` 与 `Codex App 中国特别版`，右上角标语为 `初心如磐 · 智启未来`。普通任务页也会使用低干扰的红金背景层与弱化升旗视觉铺底，保留任务内容和输入框可读性。截图中的侧栏、建议卡、项目选择和输入框仍然是 Codex 原生控件，不是整窗假截图。
+Windows 当前默认启用「OpenAI 中国主题」。这套皮肤使用红金横幅、人物与旗帜视觉、淡字标语和浅色工作台配色；首页标题区显示 `OpenAI 中国主题` 与 `Codex App 中国特别版`，右上角标语为 `初心如磐 · 智启未来`。普通任务页也会使用低干扰的红金背景层与单张弱化升旗视觉 `cover` 铺底，保留任务内容和输入框可读性。截图中的侧栏、建议卡、项目选择和输入框仍然是 Codex 原生控件，不是整窗假截图。
 
 <p align="center">
   <img src="docs/images/presets/openai-china-special-preview.png" alt="OpenAI 中国特别版 Windows 主题预览" width="900"><br>
@@ -66,6 +42,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-sk
 ```
 
 如果已经装过旧版 Dream Skin，先退出托盘并关闭 Codex，再拉取最新代码并重新运行安装命令。安装后可继续使用桌面快捷方式 `Codex Dream Skin` 启动，或用 `Codex Dream Skin - Restore` 恢复官方外观。
+
+如果希望手动点击普通 Codex 图标后也自动切到皮肤版，安装时加 `-AutoApply`。它会创建当前用户开机启动托盘；托盘检测到普通 Codex 窗口后会快速关闭并用皮肤参数重开，因为普通官方启动没有可热注入的 CDP 端口。
 
 ### Gothic Void Crusade / 哥特虚空远征
 
@@ -164,7 +142,7 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 ## 它能做什么
 
 - **真·可交互**：侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去
-- **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰；Windows 任务页支持弱化背景平铺
+- **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰；Windows 任务页使用单张弱化背景 `cover` 铺满，不重复平铺
 - **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
 - **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
 - **自动接管**：Windows 托盘可随登录启动，检测到普通 Codex 打开后自动重开为皮肤版
