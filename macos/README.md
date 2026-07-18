@@ -181,6 +181,17 @@ Reset to the bundled abstract demo:
 ~/.codex/codex-dream-skin-studio/scripts/customize-theme-macos.sh --reset-demo
 ```
 
+## Semantic theme tokens
+
+Theme files may use schema v2 with separate Light and Dark semantic tokens
+for the shell, sidebar, messages, composer, cards, controls, popovers,
+typography, shape, effects, and motion. Existing schema v1 themes continue to
+load without being rewritten and render unchanged.
+
+See [`references/theme-schema-v2.md`](references/theme-schema-v2.md) for the
+token groups, runtime variable mapping, validation rules, and compatibility
+behavior.
+
 ## License
 
 MIT — see `LICENSE`. Additional notices in `NOTICE.md` cover trademarks,

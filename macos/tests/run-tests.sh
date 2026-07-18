@@ -52,9 +52,32 @@ if /usr/bin/grep -F -q 'CODEX_EXPECTED_TEAM_ID' "$ROOT/scripts/common-macos.sh" 
 fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
+# Every semantic --ds-<group>-<token> variable referenced by the stylesheet
+# must be supplied by the schema (or defined as a CSS-side alias).
+"$NODE" --input-type=module -e '
+  import fs from "node:fs";
+  import { pathToFileURL } from "node:url";
+  const root = process.argv[1];
+  const { buildThemeTokens } = await import(pathToFileURL(`${root}/scripts/theme-schema.mjs`));
+  const resolved = buildThemeTokens(JSON.parse(fs.readFileSync(`${root}/assets/theme.json`, "utf8")));
+  const css = fs.readFileSync(`${root}/assets/dream-skin.css`, "utf8");
+  const references = new Set(
+    [...css.matchAll(/var\((--ds-(?:color|typography|shape|layout|motion|blur|effect)-[a-z0-9-]+)/g)]
+      .map((match) => match[1]),
+  );
+  const supplied = new Set([
+    ...Object.keys(resolved.cssVariables.shared),
+    ...Object.keys(resolved.cssVariables.dark),
+    ...Object.keys(resolved.cssVariables.light),
+  ]);
+  const aliases = new Set([...css.matchAll(/^\s*(--ds-[a-z0-9-]+):/gm)].map((match) => match[1]));
+  const missing = [...references].filter((name) => !supplied.has(name) && !aliases.has(name));
+  if (missing.length) throw new Error(`Missing semantic theme variables: ${missing.join(", ")}`);
+' "$ROOT"
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
+"$NODE" "$ROOT/tests/theme-schema.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
@@ -595,6 +618,60 @@ for invalid_case in appearance safe-area task-mode focus-x focus-y name-control;
     "invalid $EXPECTED_INVALID_FIELD field"
 done
 
+# Schema v2 themes must load, count semantic variables, and keep v1 compatible.
+V2_THEME="$TMP/v2-theme"
+/bin/mkdir -p "$V2_THEME"
+/bin/cp "$ROOT/assets/portal-hero.png" "$V2_THEME/background.png"
+"$NODE" -e '
+  const fs = require("node:fs");
+  fs.writeFileSync(process.argv[1], `${JSON.stringify({
+    schemaVersion: 2,
+    id: "v2-test",
+    name: "语义主题",
+    image: "background.png",
+    tokens: {
+      shared: { shape: { cardRadius: "8px" } },
+      dark: { color: { accent: "#07c160", messageUser: "#3f8f55" } },
+      light: { color: { accent: "#07c160", messageUser: "#95ec69" } },
+    },
+  }, null, 2)}\n`);
+' "$V2_THEME/theme.json"
+V2_PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$V2_THEME")"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (!value.pass || value.themeName !== "语义主题" || value.themeSchemaVersion !== 2 ||
+      value.sourceSchemaVersion !== 2 || value.themeVariableCount < 200) process.exit(1);
+' "$V2_PAYLOAD_JSON"
+
+# Schema v1 themes keep loading and report the migrated schema version.
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (value.themeSchemaVersion !== 2 || value.sourceSchemaVersion !== 1 ||
+      value.themeVariableCount < 200) process.exit(1);
+' "$PAYLOAD_JSON"
+
+# Unsafe semantic token values must fail payload construction.
+INVALID_TOKEN_THEME="$TMP/invalid-token-theme"
+/bin/mkdir -p "$INVALID_TOKEN_THEME"
+/bin/cp "$ROOT/assets/portal-hero.png" "$INVALID_TOKEN_THEME/background.png"
+"$NODE" -e '
+  const fs = require("node:fs");
+  fs.writeFileSync(process.argv[1], `${JSON.stringify({
+    schemaVersion: 2,
+    id: "unsafe",
+    image: "background.png",
+    tokens: { dark: { effect: { cardShadow: "0 0 1px red; display:none" } } },
+  }, null, 2)}\n`);
+' "$INVALID_TOKEN_THEME/theme.json"
+if INVALID_TOKEN_OUTPUT="$(
+  "$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$INVALID_TOKEN_THEME" 2>&1
+)"; then
+  printf 'Unsafe semantic theme token unexpectedly passed.\n' >&2
+  exit 1
+fi
+/usr/bin/printf '%s\n' "$INVALID_TOKEN_OUTPUT" | /usr/bin/grep -F -q \
+  "Theme token tokens.dark.effect.cardShadow contains an unsafe CSS value."
+
 /bin/mkdir -p "$TMP/missing-theme"
 if MISSING_THEME_OUTPUT="$(
   "$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$TMP/missing-theme" 2>&1
@@ -822,7 +899,16 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
-"$ROOT/scripts/doctor-macos.sh" >/dev/null
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.3.0" ]' _ "$ROOT"
+DOCTOR_HOME="$TMP/doctor-home"
+/bin/mkdir -p \
+  "$DOCTOR_HOME/.codex" \
+  "$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/theme"
+/usr/bin/printf '%s\n' 'model = "gpt-5"' > "$DOCTOR_HOME/.codex/config.toml"
+/bin/cp "$ROOT/assets/theme.json" \
+  "$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/theme/theme.json"
+/bin/cp "$ROOT/assets/portal-hero.png" \
+  "$DOCTOR_HOME/Library/Application Support/CodexDreamSkinStudio/theme/portal-hero.png"
+/usr/bin/env HOME="$DOCTOR_HOME" "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

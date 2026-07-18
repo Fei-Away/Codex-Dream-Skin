@@ -14,6 +14,7 @@
 
 - Shell and JavaScript syntax checks.
 - Payload construction with bundled demo and an isolated custom theme.
+- Schema v2 semantic token coverage, schema v1 compatibility, and unsafe CSS token rejection.
 - Reject unsupported theme config, unsafe image paths, invalid colors, oversized images, non-loopback WebSocket URLs, and unrecognized renderer targets.
 - Exact install/restore round trip for the two TOML settings while preserving unrelated values.
 - Empty `HOME` recovery.

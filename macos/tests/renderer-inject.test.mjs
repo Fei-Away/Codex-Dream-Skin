@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { buildThemeTokens } from "../scripts/theme-schema.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const macosRoot = path.resolve(here, "..");
@@ -394,6 +395,35 @@ const shellFollow = createFixture({
 shellFollow.root.className = "";
 vm.runInNewContext(shellFollow.payload, shellFollow.context);
 assert.equal(shellFollow.attributes.get("data-dream-shell"), "light");
+
+const semanticResolved = buildThemeTokens({
+  schemaVersion: 2,
+  tokens: {
+    shared: { shape: { cardRadius: "9px" } },
+    dark: { color: { accent: "#06ad56", messageUser: "#3f8f55" } },
+    light: { color: { accent: "#07c160", messageUser: "#95ec69" } },
+  },
+});
+const semantic = createFixture({
+  id: "semantic-contract",
+  appearance: "auto",
+  art: { safeArea: "auto", taskMode: "auto" },
+  sourceSchemaVersion: 2,
+  cssVariables: semanticResolved.cssVariables,
+  explicitCssVariables: semanticResolved.explicitCssVariables,
+});
+semantic.root.className = "";
+vm.runInNewContext(semantic.payload, semantic.context);
+assert.equal(semantic.attributes.get("data-dream-tokens"), "2");
+assert.equal(semantic.rootStyle.values.get("--ds-shape-card-radius"), "9px");
+assert.equal(semantic.rootStyle.values.get("--ds-color-message-user"), "#95ec69");
+assert.equal(semantic.rootStyle.values.get("--ds-green"), "#07c160");
+assert.equal(semantic.rootStyle.values.get("--ds-accent-rgb"), "7 193 96");
+semantic.setNativeShell("dark");
+semantic.window.__CODEX_DREAM_SKIN_STATE__.ensure();
+assert.equal(semantic.rootStyle.values.get("--ds-color-message-user"), "#3f8f55");
+assert.equal(semantic.rootStyle.values.get("--ds-green"), "#06ad56");
+assert.equal(semantic.rootStyle.values.get("--ds-accent-rgb"), "6 173 86");
 shellFollow.setNativeShell("dark");
 shellFollow.window.__CODEX_DREAM_SKIN_STATE__.ensure();
 assert.equal(shellFollow.attributes.get("data-dream-shell"), "dark");

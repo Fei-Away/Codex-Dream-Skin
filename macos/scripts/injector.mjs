@@ -6,12 +6,13 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { readImageMetadata } from "./image-metadata.mjs";
+import { buildThemeTokens, THEME_SCHEMA_VERSION } from "./theme-schema.mjs";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.2.0";
+const SKIN_VERSION = "1.3.0";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
@@ -445,7 +446,8 @@ async function loadTheme(themeDir) {
     throw error;
   }
   const raw = JSON.parse(config);
-  if (raw.schemaVersion !== 1 || typeof raw.image !== "string" || !raw.image) {
+  if (![1, THEME_SCHEMA_VERSION].includes(raw.schemaVersion)
+    || typeof raw.image !== "string" || !raw.image) {
     throw new Error(`${configPath} has an unsupported schema or image field`);
   }
   if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(raw.image)) {
@@ -486,6 +488,12 @@ async function loadTheme(themeDir) {
     "background", "panel", "panelAlt", "accent", "accentAlt", "secondary",
     "highlight", "text", "muted", "line",
   ];
+  let resolvedTokens;
+  try {
+    resolvedTokens = buildThemeTokens(raw);
+  } catch (error) {
+    throw new Error(`${configPath}: ${error.message}`);
+  }
   const appearance = choice(raw.appearance, "appearance", ["auto", "light", "dark"]);
   if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
     throw new Error(`${configPath} has an invalid art field`);
@@ -498,7 +506,8 @@ async function loadTheme(themeDir) {
     taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "off"]),
   };
   const theme = {
-    schemaVersion: 1,
+    schemaVersion: THEME_SCHEMA_VERSION,
+    sourceSchemaVersion: raw.schemaVersion,
     id: text(raw.id, "custom", 80, "id"),
     name: text(raw.name, "ChatGPT Dream Skin", 80, "name"),
     brandSubtitle: text(raw.brandSubtitle, "CODEX DREAM SKIN", 80, "brandSubtitle"),
@@ -510,6 +519,10 @@ async function loadTheme(themeDir) {
     image: raw.image,
     colorMode: rawColors ? "explicit" : "auto",
     explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
+    tokens: resolvedTokens.tokens,
+    cssVariables: resolvedTokens.cssVariables,
+    explicitCssVariables: resolvedTokens.explicitCssVariables,
+    themeVariableCount: resolvedTokens.variableCount,
     colors: {
       background: color(rawColors?.background, "#071116"),
       panel: color(rawColors?.panel, "#0b1a20"),
@@ -1800,6 +1813,9 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         version: SKIN_VERSION,
         themeId: loaded.theme.id,
         themeName: loaded.theme.name,
+        themeSchemaVersion: loaded.theme.schemaVersion,
+        sourceSchemaVersion: loaded.theme.sourceSchemaVersion,
+        themeVariableCount: loaded.theme.themeVariableCount,
         imageBytes: loaded.imageBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
         artMetadata: loaded.theme.artMetadata ?? null,

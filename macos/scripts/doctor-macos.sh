@@ -18,6 +18,7 @@ for required in \
   "$PROJECT_ROOT/assets/dream-skin.css" \
   "$PROJECT_ROOT/assets/renderer-inject.js" \
   "$PROJECT_ROOT/assets/theme.json" \
+  "$PROJECT_ROOT/scripts/theme-schema.mjs" \
   "$PROJECT_ROOT/scripts/injector.mjs"; do
   [ -s "$required" ] || fail "Required project file is missing or empty: $required"
 done

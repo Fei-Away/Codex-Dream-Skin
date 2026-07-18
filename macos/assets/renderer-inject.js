@@ -7,7 +7,7 @@
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
-    "data-dream-art-ready",
+    "data-dream-art-ready", "data-dream-tokens",
   ];
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
@@ -17,7 +17,7 @@
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
     ? THEME.artMetadata : null;
   const ANALYSIS_CACHE_KEY = "__CODEX_DREAM_SKIN_ANALYSIS_CACHE__";
-  const THEME_VARIABLES = [
+  const THEME_VARIABLES = [...new Set([
     "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime",
     "--ds-cyan", "--ds-purple", "--ds-text", "--ds-muted", "--ds-line",
     "--ds-bg-rgb", "--ds-panel-rgb", "--ds-panel-2-rgb", "--ds-accent-rgb",
@@ -27,7 +27,10 @@
     "--dream-skin-focus-x", "--dream-skin-focus-y", "--dream-skin-art-position",
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
     "--dream-skin-project-label",
-  ];
+    ...Object.keys(THEME.cssVariables?.shared || {}),
+    ...Object.keys(THEME.cssVariables?.dark || {}),
+    ...Object.keys(THEME.cssVariables?.light || {}),
+  ])];
   const installToken = {};
   const existingAnalysisCache = window[ANALYSIS_CACHE_KEY];
   const analysisCache = existingAnalysisCache && typeof existingAnalysisCache.get === "function" &&
@@ -298,6 +301,49 @@
     return detectShellMode();
   };
 
+  // Semantic tokens (schema v2). Every token resolves to a --ds-<group>-<name>
+  // variable. Defaults reference the adaptive core variables, so they follow
+  // image analysis; explicit v2 color tokens also steer the matching core
+  // variable so legacy selectors and derived rgb() shades stay coherent.
+  const SEMANTIC_CORE_MAP = {
+    "--ds-color-canvas": ["--ds-bg", "--ds-bg-rgb"],
+    "--ds-color-surface": ["--ds-panel", "--ds-panel-rgb"],
+    "--ds-color-surface-elevated": ["--ds-panel-2", "--ds-panel-2-rgb"],
+    "--ds-color-accent": ["--ds-green", "--ds-accent-rgb"],
+    "--ds-color-card-icon": ["--ds-lime", "--ds-accent-alt-rgb"],
+    "--ds-color-accent-secondary": ["--ds-cyan", "--ds-secondary-rgb"],
+    "--ds-color-accent-tertiary": ["--ds-purple", "--ds-highlight-rgb"],
+    "--ds-color-text": ["--ds-text", "--ds-text-rgb"],
+    "--ds-color-text-muted": ["--ds-muted", "--ds-muted-rgb"],
+    "--ds-color-divider": ["--ds-line", "--ds-line-rgb"],
+  };
+
+  const applySemanticTokens = (root, shell, coreVariables) => {
+    setAttribute(root, "data-dream-tokens", THEME.sourceSchemaVersion === 2 ? "2" : "1");
+    if (THEME.sourceSchemaVersion === 2) {
+      const explicit = {
+        ...(THEME.explicitCssVariables?.shared || {}),
+        ...(THEME.explicitCssVariables?.[shell] || {}),
+      };
+      for (const [name, targets] of Object.entries(SEMANTIC_CORE_MAP)) {
+        const value = explicit[name];
+        if (typeof value !== "string" || !value) continue;
+        const [coreName, rgbName] = targets;
+        setStyleProperty(root, coreName, value);
+        coreVariables[coreName] = value;
+        const rgb = rgbString(value);
+        if (rgb) setStyleProperty(root, rgbName, rgb);
+      }
+    }
+    const semantic = {
+      ...(THEME.cssVariables?.shared || {}),
+      ...(THEME.cssVariables?.[shell] || THEME.cssVariables?.dark || {}),
+    };
+    for (const [name, value] of Object.entries(semantic)) {
+      if (typeof value === "string" && value) setStyleProperty(root, name, value);
+    }
+  };
+
   const applyTheme = (root, shell) => {
     const colors = THEME.colors || {};
     const explicit = new Set(Array.isArray(THEME.explicitColorKeys) ? THEME.explicitColorKeys : []);
@@ -342,6 +388,7 @@
       const rgb = rgbString(value);
       if (rgb) setStyleProperty(root, name, rgb);
     }
+    applySemanticTokens(root, shell, variables);
     setStyleProperty(root, "--dream-skin-name", cssString(THEME.name || "Codex Dream Skin"));
     setStyleProperty(root, "--dream-skin-tagline", cssString(THEME.tagline || "Make something wonderful."));
     setStyleProperty(root, "--dream-skin-project-prefix", cssString(THEME.projectPrefix || "选择项目 · "));

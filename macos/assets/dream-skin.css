@@ -1080,3 +1080,436 @@ html.codex-dream-skin [data-message-author-role] { border-radius: 16px; }
     animation-iteration-count: 1 !important;
   }
 }
+
+/* --- Semantic token layer (theme.json schema v2) ---------------------------
+   Active only when the loaded theme declares schemaVersion 2 (the renderer
+   sets data-dream-tokens). Schema v1 themes keep the exact rendering above.
+   Token defaults resolve to the adaptive core variables, so partial v2
+   themes stay coherent with image analysis. */
+
+html.codex-dream-skin[data-dream-tokens="2"] body {
+  background: var(--ds-color-canvas) !important;
+  color: var(--ds-color-text) !important;
+  font-family: var(--ds-typography-ui-font) !important;
+  font-size: var(--ds-typography-body-size);
+  line-height: var(--ds-typography-body-line-height);
+  letter-spacing: var(--ds-typography-letter-spacing);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--ds-effect-canvas-pattern-opacity);
+  background-image:
+    radial-gradient(circle, var(--ds-color-canvas-pattern-primary) 0 1px, transparent 1.8px),
+    radial-gradient(circle, var(--ds-color-canvas-pattern-secondary) 0 1px, transparent 1.8px);
+  background-position: 0 0, 27px 33px;
+  background-size: 71px 71px, 89px 89px;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] pre,
+html.codex-dream-skin[data-dream-tokens="2"] code {
+  font-family: var(--ds-typography-mono-font) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] pre {
+  border: var(--ds-shape-border-width) solid var(--ds-color-code-border);
+  border-radius: var(--ds-shape-control-radius);
+  background: var(--ds-color-code) !important;
+  color: var(--ds-color-code-text) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] ::selection {
+  background: var(--ds-color-selection);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] :focus-visible {
+  outline: var(--ds-shape-focus-width) solid var(--ds-color-focus-ring) !important;
+  outline-offset: 1px;
+}
+
+/* Sidebar surface, text roles, and density. */
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel {
+  --height-toolbar: var(--ds-layout-sidebar-header-height);
+  background: linear-gradient(180deg, var(--ds-color-sidebar), var(--ds-color-sidebar-alt)) !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-sidebar-border) !important;
+  border-left: 0 !important;
+  border-radius: var(--ds-shape-sidebar-radius) !important;
+  box-shadow: var(--ds-effect-sidebar-shadow) !important;
+  color: var(--ds-color-sidebar-text) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel,
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel * {
+  --height-token-row: var(--ds-layout-sidebar-row-height) !important;
+  --height-token-nav-row: var(--ds-layout-sidebar-row-height) !important;
+  --radius-token-row: var(--ds-layout-sidebar-row-radius) !important;
+  --padding-row-cell-x: var(--ds-layout-sidebar-row-padding-x) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button,
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel a {
+  color: var(--ds-color-sidebar-text) !important;
+  transition: background-color var(--ds-motion-normal) var(--ds-motion-easing),
+    border-color var(--ds-motion-normal) var(--ds-motion-easing),
+    color var(--ds-motion-normal) var(--ds-motion-easing) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [class*="text-token-foreground"] {
+  color: var(--ds-color-sidebar-text) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [class*="text-token-input-placeholder-foreground"] {
+  color: var(--ds-color-sidebar-muted) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel svg {
+  color: var(--ds-color-sidebar-icon) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button:hover,
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel a:hover {
+  background: var(--ds-color-sidebar-hover) !important;
+  color: var(--ds-color-sidebar-text) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button:hover svg,
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel a:hover svg {
+  color: var(--ds-color-accent) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [aria-current="page"] {
+  background: var(--ds-color-sidebar-selected) !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-sidebar-selected-border) !important;
+  box-shadow: none !important;
+  color: var(--ds-color-sidebar-selected-text) !important;
+  font-weight: var(--ds-typography-sidebar-selected-weight) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel :is(
+  [class~="bg-token-list-hover-background"],
+  [aria-current="page"]
+) :is(button, a, span, div, svg) {
+  color: inherit !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel
+  :is(button, a, div)[class*="height-token-row"] {
+  font-size: var(--ds-typography-body-size) !important;
+  font-weight: var(--ds-typography-sidebar-item-weight) !important;
+  line-height: var(--ds-typography-body-line-height) !important;
+  gap: var(--ds-layout-sidebar-row-gap) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel
+  :is(button, a, div)[class*="height-token-row"] svg.icon-xs {
+  width: var(--ds-layout-sidebar-icon-size) !important;
+  height: var(--ds-layout-sidebar-icon-size) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [class~="gap-px"] {
+  gap: var(--ds-layout-sidebar-list-gap) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button[class*="section-toggle"] {
+  font-size: var(--ds-typography-sidebar-section-size) !important;
+  font-weight: var(--ds-typography-label-weight) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button[aria-label^="切换模式"] {
+  color: var(--ds-color-accent) !important;
+  font-family: var(--ds-typography-display-font) !important;
+  text-shadow: var(--ds-effect-accent-glow) !important;
+}
+
+/* The native brand button sets !important font utilities inside a Tailwind
+   cascade layer; an earlier named layer is required to win that cascade. */
+@layer theme {
+  html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button[aria-label^="切换模式"] {
+    font-size: var(--ds-typography-sidebar-brand-size) !important;
+    font-weight: var(--ds-typography-sidebar-brand-weight) !important;
+  }
+}
+
+/* Main surface and header. */
+html.codex-dream-skin[data-dream-tokens="2"] main.main-surface {
+  background: var(--ds-color-main) !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-main-border) !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: var(--ds-shape-main-radius) !important;
+  box-shadow: var(--ds-effect-main-shadow) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] main.main-surface > header.app-header-tint {
+  background: var(--ds-color-header) !important;
+  border-bottom: var(--ds-shape-border-width) solid var(--ds-color-header-border) !important;
+  backdrop-filter: blur(var(--ds-blur-content)) saturate(108%) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] main.main-surface:not(.dream-skin-home-shell) [role="main"] {
+  text-shadow: var(--ds-effect-media-text-shadow);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] main.main-surface:not(.dream-skin-home-shell) article {
+  border: var(--ds-shape-border-width) solid var(--ds-color-message-border);
+  background: var(--ds-color-message);
+  box-shadow: var(--ds-effect-message-shadow);
+  backdrop-filter: blur(var(--ds-blur-content)) saturate(105%);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] [role="main"] {
+  scrollbar-color: var(--ds-color-scrollbar) transparent;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] #codex-dream-skin-chrome {
+  border-radius: var(--ds-shape-main-radius);
+  opacity: var(--ds-effect-chrome-opacity);
+}
+
+/* Messages. */
+html.codex-dream-skin[data-dream-tokens="2"] article,
+html.codex-dream-skin[data-dream-tokens="2"] [data-message-author-role] {
+  border-radius: var(--ds-shape-message-radius);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] [data-message-author-role="user"] {
+  background: var(--ds-color-message-user);
+  color: var(--ds-color-message-user-text);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] [data-message-author-role="assistant"] {
+  background: var(--ds-color-message-assistant);
+  color: var(--ds-color-message-assistant-text);
+}
+
+/* Home lead, hero, and suggestion cards. */
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home {
+  --thread-content-max-width: min(var(--ds-layout-content-max-width), calc(100cqw - var(--ds-layout-hero-inset))) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home > div:first-child > div:first-child {
+  flex-basis: var(--ds-layout-home-lead-height) !important;
+  min-height: var(--ds-layout-home-lead-height) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home > div:first-child > div:first-child > div:first-child {
+  width: calc(100% - var(--ds-layout-hero-inset)) !important;
+  height: var(--ds-layout-hero-height) !important;
+  min-height: 0 !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-hero-border) !important;
+  border-radius: var(--ds-shape-hero-radius) !important;
+  background-color: var(--ds-color-hero) !important;
+  box-shadow: var(--ds-effect-hero-shadow) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home > div:first-child > div:first-child > div:first-child::before {
+  border-radius:
+    calc(var(--ds-shape-hero-radius) - var(--ds-shape-border-width))
+    0
+    0
+    calc(var(--ds-shape-hero-radius) - var(--ds-shape-border-width));
+  background: linear-gradient(90deg, var(--ds-color-hero-overlay), var(--ds-color-hero-overlay-soft) 78%, transparent 100%);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home > div:first-child > div:first-child > div:first-child > div:first-child {
+  padding: var(--ds-layout-hero-text-padding);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
+  width: var(--ds-layout-hero-text-width) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home [data-feature="game-source"] {
+  color: var(--ds-color-text-on-media) !important;
+  font-family: var(--ds-typography-display-font) !important;
+  font-size: var(--ds-typography-title-size) !important;
+  font-weight: var(--ds-typography-heading-weight) !important;
+  letter-spacing: var(--ds-typography-letter-spacing) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home [data-feature="game-source"]::after {
+  color: var(--ds-color-text-on-media-muted);
+  font-size: var(--ds-typography-small-size);
+  line-height: var(--ds-typography-body-line-height);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home [data-feature="game-source"] button {
+  border-color: var(--ds-color-focus-ring);
+  border-radius: var(--ds-shape-pill-radius);
+  background: var(--ds-color-accent-soft);
+  color: var(--ds-color-card-icon) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home div:has(> .group\/home-suggestions) {
+  inset-inline: 0 !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button {
+  min-height: var(--ds-layout-card-min-height) !important;
+  padding: var(--ds-layout-card-padding) !important;
+  gap: var(--ds-layout-card-gap) !important;
+  flex-direction: var(--ds-layout-card-direction) !important;
+  align-items: var(--ds-layout-card-align) !important;
+  justify-content: flex-start !important;
+  text-align: var(--ds-layout-card-text-align) !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-card-border) !important;
+  border-radius: var(--ds-shape-card-radius) !important;
+  background: linear-gradient(145deg, var(--ds-color-card), var(--ds-color-card-alt)) !important;
+  color: var(--ds-color-card-text) !important;
+  box-shadow: var(--ds-effect-card-shadow) !important;
+  backdrop-filter: blur(var(--ds-blur-content)) saturate(105%) !important;
+  transition: transform var(--ds-motion-normal) var(--ds-motion-easing),
+    box-shadow var(--ds-motion-normal) var(--ds-motion-easing),
+    border-color var(--ds-motion-normal) var(--ds-motion-easing) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button [class~="text-token-text-primary"] {
+  color: var(--ds-color-card-text) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button:hover {
+  transform: translateY(var(--ds-motion-hover-lift)) !important;
+  border-color: var(--ds-color-card-hover-border) !important;
+  box-shadow: var(--ds-effect-card-hover-shadow) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button > span:first-child {
+  width: auto !important;
+  flex: 0 0 auto !important;
+  justify-content: flex-start !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button > span:first-child > span:first-child {
+  width: var(--ds-layout-card-icon-size) !important;
+  height: var(--ds-layout-card-icon-size) !important;
+  display: grid !important;
+  place-items: center;
+  flex: 0 0 var(--ds-layout-card-icon-size) !important;
+  margin: var(--ds-layout-card-icon-margin) !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-focus-ring);
+  border-radius: var(--ds-shape-control-radius);
+  color: var(--ds-color-card-icon) !important;
+  background: var(--ds-color-accent-soft) !important;
+  box-shadow: none !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button svg {
+  width: var(--ds-layout-card-glyph-size) !important;
+  height: var(--ds-layout-card-glyph-size) !important;
+  color: var(--ds-color-card-icon) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button > span:last-child {
+  align-items: var(--ds-layout-card-copy-align) !important;
+  text-align: var(--ds-layout-card-text-align) !important;
+}
+
+/* Composer and the joined project-picker cap. */
+html.codex-dream-skin[data-dream-tokens="2"] .composer-surface-chrome {
+  border: var(--ds-shape-border-width) solid var(--ds-color-composer-border) !important;
+  border-radius: var(--ds-shape-composer-radius) !important;
+  background: var(--ds-color-composer) !important;
+  box-shadow: var(--ds-effect-composer-shadow) !important;
+  backdrop-filter: blur(var(--ds-blur-composer)) saturate(108%) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .composer-surface-chrome :is(input, textarea, [contenteditable="true"], .ProseMirror) {
+  color: var(--ds-color-composer-text) !important;
+  caret-color: var(--ds-color-accent) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .composer-surface-chrome p.placeholder::after {
+  color: var(--ds-color-composer-placeholder) !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home div:has(> .relative > .composer-surface-chrome) {
+  width: min(100%, var(--ds-layout-composer-max-width)) !important;
+  margin-inline: auto !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home-utility {
+  width: min(100%, var(--ds-layout-composer-max-width)) !important;
+  margin-inline: auto !important;
+  border-radius: var(--ds-shape-composer-radius) var(--ds-shape-composer-radius) 0 0 !important;
+  background: var(--ds-color-composer-alt) !important;
+  box-shadow:
+    inset 1px 0 var(--ds-color-composer-border),
+    inset -1px 0 var(--ds-color-composer-border),
+    inset 0 1px var(--ds-color-composer-border) !important;
+  backdrop-filter: blur(var(--ds-blur-composer)) saturate(108%) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home:has(.dream-skin-home-utility) .composer-surface-chrome {
+  border: 0 !important;
+  border-radius: 0 0 var(--ds-shape-composer-radius) var(--ds-shape-composer-radius) !important;
+  box-shadow:
+    var(--ds-effect-composer-shadow),
+    inset 1px 0 var(--ds-color-composer-border),
+    inset -1px 0 var(--ds-color-composer-border),
+    inset 0 -1px var(--ds-color-composer-border) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home-utility button,
+html.codex-dream-skin[data-dream-tokens="2"] .composer-surface-chrome button:not([class~="bg-token-foreground"]) {
+  color: var(--ds-color-text-muted) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home-utility button:hover,
+html.codex-dream-skin[data-dream-tokens="2"] .composer-surface-chrome button:not([class~="bg-token-foreground"]):hover {
+  color: var(--ds-color-text) !important;
+  background: var(--ds-color-control-hover) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] button[class~="bg-token-foreground"] {
+  background: var(--ds-color-control-primary) !important;
+  color: var(--ds-color-control-primary-text) !important;
+  box-shadow: var(--ds-effect-accent-glow) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] button[class~="bg-token-foreground"]:hover {
+  background: var(--ds-color-control-primary-hover) !important;
+}
+
+/* Project selector band. */
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector) {
+  width: min(100%, var(--ds-layout-composer-max-width)) !important;
+  margin-inline: auto !important;
+  box-sizing: border-box;
+  border-color: var(--ds-color-project-border);
+  background: linear-gradient(180deg, var(--ds-color-project), var(--ds-color-project-alt)) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-typography-label-size);
+  font-weight: var(--ds-typography-label-weight);
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/project-selector > button {
+  border-color: var(--ds-color-project-border) !important;
+  background: var(--ds-color-accent-soft) !important;
+  color: var(--ds-color-text) !important;
+}
+
+/* Popovers, menus, dialogs, and tooltips. */
+html.codex-dream-skin[data-dream-tokens="2"] :is([role="dialog"], [role="menu"], [role="listbox"], [role="tree"], [data-radix-menu-content]) {
+  border: var(--ds-shape-border-width) solid var(--ds-color-popover-border) !important;
+  border-radius: var(--ds-shape-popover-radius) !important;
+  background: var(--ds-color-popover) !important;
+  color: var(--ds-color-popover-text) !important;
+  box-shadow: var(--ds-effect-popover-shadow) !important;
+  backdrop-filter: blur(var(--ds-blur-popover)) saturate(105%) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] [role="tooltip"] {
+  border: var(--ds-shape-border-width) solid var(--ds-color-popover-border) !important;
+  border-radius: var(--ds-shape-control-radius) !important;
+  background: var(--ds-color-tooltip) !important;
+  color: var(--ds-color-tooltip-text) !important;
+}
