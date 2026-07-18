@@ -181,6 +181,8 @@ const MAX_JSON_SIZE: u64 = 1024 * 1024;
 const MAX_ZIP_ENTRIES: usize = 3;
 const MAX_IMAGE_EDGE: u32 = 16_384;
 const MAX_IMAGE_PIXELS: u64 = 50_000_000;
+const MAX_EDITOR_PREVIEW_FILES: usize = 4;
+const MAX_EDITOR_PREVIEW_BYTES: u64 = 32 * 1024 * 1024;
 
 static UNIQUE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -3700,6 +3702,159 @@ fn editor_preview_root(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_root(app)?.join("editor-preview"))
 }
 
+fn is_editor_preview_name(name: &str) -> bool {
+    if !name.starts_with("preview-") {
+        return false;
+    }
+    Path::new(name)
+        .extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "png" | "jpg" | "jpeg" | "webp"
+            )
+        })
+}
+
+fn prepare_editor_preview_root(root: &Path) -> Result<PathBuf, String> {
+    fs::create_dir_all(root)
+        .map_err(|error| format!("Cannot create editor preview directory: {error}"))?;
+    let metadata = fs::symlink_metadata(root)
+        .map_err(|error| format!("Cannot inspect editor preview directory: {error}"))?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("Editor preview directory must be a real directory, not a symlink.".into());
+    }
+    canonicalize_platform_path(root, "editor preview directory")
+}
+
+fn prune_editor_preview_cache_with_limits(
+    root: &Path,
+    keep: &Path,
+    max_files: usize,
+    max_bytes: u64,
+) -> Result<(), String> {
+    let root_metadata = fs::symlink_metadata(root)
+        .map_err(|error| format!("Cannot inspect editor preview cache: {error}"))?;
+    if !root_metadata.is_dir() || root_metadata.file_type().is_symlink() {
+        return Err("Editor preview cache must be a real directory, not a symlink.".into());
+    }
+    let canonical_root = canonicalize_platform_path(root, "editor preview cache")?;
+
+    let keep_metadata = fs::symlink_metadata(keep)
+        .map_err(|error| format!("Cannot inspect current editor preview: {error}"))?;
+    if !keep_metadata.is_file() || keep_metadata.file_type().is_symlink() {
+        return Err("Current editor preview must be a regular file, not a symlink.".into());
+    }
+    let canonical_keep = canonicalize_platform_path(keep, "current editor preview")?;
+    if canonical_keep.parent() != Some(canonical_root.as_path()) {
+        return Err("Current editor preview is outside its expected cache root.".into());
+    }
+    let keep_name = canonical_keep
+        .file_name()
+        .and_then(OsStr::to_str)
+        .ok_or("Current editor preview has an invalid filename.")?;
+    if !is_editor_preview_name(keep_name) {
+        return Err("Current editor preview has an unexpected filename.".into());
+    }
+
+    struct PreviewEntry {
+        current: bool,
+        modified: SystemTime,
+        name: String,
+        path: PathBuf,
+        bytes: u64,
+    }
+
+    let mut previews = Vec::new();
+    for entry in fs::read_dir(&canonical_root)
+        .map_err(|error| format!("Cannot list editor preview cache: {error}"))?
+    {
+        let entry =
+            entry.map_err(|error| format!("Cannot list editor preview cache entry: {error}"))?;
+        let name = match entry.file_name().to_str() {
+            Some(name) if is_editor_preview_name(name) => name.to_owned(),
+            _ => continue,
+        };
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("Cannot inspect editor preview cache entry: {error}"))?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            continue;
+        }
+        let canonical = canonicalize_platform_path(&path, "editor preview cache entry")?;
+        if canonical.parent() != Some(canonical_root.as_path()) {
+            return Err("Editor preview cache entry escapes its expected root.".into());
+        }
+        previews.push(PreviewEntry {
+            current: canonical == canonical_keep,
+            modified: metadata.modified().unwrap_or(UNIX_EPOCH),
+            name,
+            path: canonical,
+            bytes: metadata.len(),
+        });
+    }
+    if !previews.iter().any(|entry| entry.current) {
+        return Err("Current editor preview disappeared during cache cleanup.".into());
+    }
+
+    previews.sort_by(|left, right| {
+        right
+            .current
+            .cmp(&left.current)
+            .then_with(|| right.modified.cmp(&left.modified))
+            .then_with(|| right.name.cmp(&left.name))
+    });
+
+    let mut retained_files = 0_usize;
+    let mut retained_bytes = 0_u64;
+    for preview in previews {
+        let next_bytes = retained_bytes.checked_add(preview.bytes);
+        let retain = preview.current
+            || (retained_files < max_files && next_bytes.is_some_and(|bytes| bytes <= max_bytes));
+        if retain {
+            retained_files = retained_files.saturating_add(1);
+            retained_bytes = retained_bytes.saturating_add(preview.bytes);
+            continue;
+        }
+
+        let metadata = match fs::symlink_metadata(&preview.path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(format!(
+                    "Cannot re-inspect stale editor preview before cleanup: {error}"
+                ));
+            }
+        };
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            continue;
+        }
+        let canonical = canonicalize_platform_path(&preview.path, "stale editor preview")?;
+        if canonical.parent() != Some(canonical_root.as_path()) {
+            return Err("Stale editor preview escapes its expected cache root.".into());
+        }
+        if canonical == canonical_keep {
+            continue;
+        }
+        match fs::remove_file(&canonical) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("Cannot prune stale editor preview: {error}")),
+        }
+    }
+    Ok(())
+}
+
+fn prune_editor_preview_cache(root: &Path, keep: &Path) -> Result<(), String> {
+    prune_editor_preview_cache_with_limits(
+        root,
+        keep,
+        MAX_EDITOR_PREVIEW_FILES,
+        MAX_EDITOR_PREVIEW_BYTES,
+    )
+}
+
 fn inspect_theme_image_blocking(
     app: AppHandle,
     image_path: String,
@@ -3708,8 +3863,7 @@ fn inspect_theme_image_blocking(
     let (image_name, image, decoded) = load_theme_image(&source)?;
     let metadata = image_metadata(decoded.width(), decoded.height());
     let root = editor_preview_root(&app)?;
-    fs::create_dir_all(&root)
-        .map_err(|error| format!("Cannot create editor preview directory: {error}"))?;
+    let root = prepare_editor_preview_root(&root)?;
     let extension = Path::new(&image_name)
         .extension()
         .and_then(OsStr::to_str)
@@ -3720,6 +3874,7 @@ fn inspect_theme_image_blocking(
     let preview_path = destination
         .canonicalize()
         .map_err(|error| format!("Cannot resolve editor preview image: {error}"))?;
+    prune_editor_preview_cache(&root, &preview_path)?;
     let colors = image_adaptive_colors(&decoded).unwrap_or_else(default_theme_colors);
     Ok(ThemeImageInspection {
         preview_path: path_string(&preview_path),
@@ -4649,6 +4804,93 @@ mod tests {
             serde_json::from_slice(&package_json(&edited).unwrap()).unwrap();
         assert_eq!(json["projectPrefix"], "Choose project · ");
         assert!(json.get("colors").is_none());
+    }
+
+    #[test]
+    fn editor_preview_cache_pruning_is_bounded_and_preserves_unmanaged_entries() {
+        let root = TestDir::new();
+        let cache = root.0.join("editor-preview");
+        fs::create_dir(&cache).unwrap();
+        let current = cache.join("preview-current.png");
+        fs::write(&current, b"keep").unwrap();
+        for index in 0..6 {
+            fs::write(cache.join(format!("preview-{index}.png")), b"data").unwrap();
+        }
+        let unrelated = cache.join("notes.txt");
+        let unsupported = cache.join("preview-ignored.gif");
+        let directory = cache.join("preview-directory.png");
+        fs::write(&unrelated, b"user data").unwrap();
+        fs::write(&unsupported, b"not managed").unwrap();
+        fs::create_dir(&directory).unwrap();
+
+        prune_editor_preview_cache_with_limits(&cache, &current, 3, 9).unwrap();
+
+        let previews = fs::read_dir(&cache)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                let name = entry.file_name().to_str()?.to_owned();
+                let metadata = fs::symlink_metadata(entry.path()).ok()?;
+                (metadata.is_file()
+                    && !metadata.file_type().is_symlink()
+                    && is_editor_preview_name(&name))
+                .then_some(metadata.len())
+            })
+            .collect::<Vec<_>>();
+        assert!(current.is_file());
+        assert!(previews.len() <= 3);
+        assert!(previews.iter().sum::<u64>() <= 9);
+        assert_eq!(fs::read(&unrelated).unwrap(), b"user data");
+        assert_eq!(fs::read(&unsupported).unwrap(), b"not managed");
+        assert!(directory.is_dir());
+    }
+
+    #[test]
+    fn editor_preview_cache_rejects_a_keep_path_outside_its_root() {
+        let root = TestDir::new();
+        let cache = root.0.join("editor-preview");
+        fs::create_dir(&cache).unwrap();
+        let cached = cache.join("preview-cached.png");
+        let outside = root.0.join("preview-outside.png");
+        fs::write(&cached, b"cached").unwrap();
+        fs::write(&outside, b"outside").unwrap();
+
+        let error = prune_editor_preview_cache_with_limits(&cache, &outside, 1, 1)
+            .expect_err("outside keep path must be rejected");
+
+        assert!(error.contains("outside its expected cache root"));
+        assert_eq!(fs::read(&cached).unwrap(), b"cached");
+        assert_eq!(fs::read(&outside).unwrap(), b"outside");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn editor_preview_cache_rejects_symlink_roots_and_ignores_symlink_entries() {
+        use std::os::unix::fs::symlink;
+
+        let root = TestDir::new();
+        let cache = root.0.join("editor-preview");
+        fs::create_dir(&cache).unwrap();
+        let current = cache.join("preview-current.png");
+        fs::write(&current, b"keep").unwrap();
+        let linked_root = root.0.join("editor-preview-link");
+        symlink(&cache, &linked_root).unwrap();
+        assert!(
+            prune_editor_preview_cache_with_limits(&linked_root, &current, 1, 4)
+                .unwrap_err()
+                .contains("real directory")
+        );
+
+        let outside = root.0.join("outside.png");
+        let linked_entry = cache.join("preview-linked.png");
+        fs::write(&outside, b"outside").unwrap();
+        symlink(&outside, &linked_entry).unwrap();
+        prune_editor_preview_cache_with_limits(&cache, &current, 1, 4).unwrap();
+        assert_eq!(fs::read(&outside).unwrap(), b"outside");
+        assert!(fs::symlink_metadata(&linked_entry)
+            .unwrap()
+            .file_type()
+            .is_symlink());
     }
 
     #[test]
