@@ -3,6 +3,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { version as managerVersion } from "../package.json";
 import "./styles.css";
+import {
+  themeContrastIssues,
+  type ThemeContrastIssue,
+} from "./theme-contrast.js";
 
 type UnknownRecord = Record<string, unknown>;
 type ViewName = "themes" | "diagnostics";
@@ -739,6 +743,66 @@ function hasCompleteExplicitColors(draft: ThemeEditorDraft): boolean {
   return explicitColorCount(draft) === EDITABLE_COLOR_FIELDS.length;
 }
 
+const CONTRAST_FIELD_LABELS: Record<ThemeContrastIssue["field"], string> = {
+  text: "\u6b63\u6587",
+  muted: "\u5f31\u5316\u6587\u5b57",
+  accent: "\u5f3a\u8c03\u8272",
+  accentAlt: "\u8f85\u52a9\u5f3a\u8c03",
+};
+
+const CONTRAST_REQUIRED_KEYS: Array<keyof ThemeColorTokens> = [
+  "background",
+  "panel",
+  "panelAlt",
+  "text",
+  "muted",
+  "accent",
+  "accentAlt",
+];
+
+let lastContrastSignature = "";
+let lastContrastIssues: ThemeContrastIssue[] = [];
+
+function editorContrastIssues(draft: ThemeEditorDraft): ThemeContrastIssue[] {
+  const explicit = draft.colorMode === "explicit" ? draft.explicitColors : null;
+  if (!explicit || !CONTRAST_REQUIRED_KEYS.every((key) => Object.prototype.hasOwnProperty.call(explicit, key))) {
+    lastContrastSignature = "";
+    lastContrastIssues = [];
+    return [];
+  }
+  const signature = CONTRAST_REQUIRED_KEYS.map((key) => explicit[key]).join("\u0000");
+  if (signature === lastContrastSignature) return lastContrastIssues;
+  lastContrastSignature = signature;
+  lastContrastIssues = themeContrastIssues(previewColorTokens(draft));
+  return lastContrastIssues;
+}
+
+function contrastIssueText(issue: ThemeContrastIssue): string {
+  return `${CONTRAST_FIELD_LABELS[issue.field]}\u5728${issue.surfaceLabel}\u4e0a\u4ec5 ${issue.ratio.toFixed(2)}:1\uff0c\u9700\u8981\u81f3\u5c11 ${issue.minimum}:1\u3002`;
+}
+
+function contrastIssueRowText(issue: ThemeContrastIssue): string {
+  return `\u5bf9\u6bd4\u5ea6 ${issue.ratio.toFixed(2)}:1 / ${issue.minimum}:1 \u00b7 ${issue.surfaceLabel}`;
+}
+
+function contrastIssueRowMarkup(issues: ThemeContrastIssue[], key: keyof ThemeColorTokens): string {
+  const issue = issues.find((candidate) => candidate.field === key);
+  const text = issue ? escapeHtml(contrastIssueRowText(issue)) : "";
+  return `<small class="editor-color-contrast" data-editor-color-contrast="${key}" ${issue ? "" : "hidden"}>${text}</small>`;
+}
+
+function contrastIssueSummary(issues: ThemeContrastIssue[]): string {
+  return issues.map((issue) => contrastIssueText(issue)).join(" ");
+}
+
+function localizedMutationError(error: unknown): string {
+  const message = errorMessage(error);
+  const match = message.match(/(text|muted|accentAlt|accent) must have at least ([\d.]+):1 contrast/i);
+  if (!match) return message;
+  const field = match[1] as ThemeContrastIssue["field"];
+  return `${CONTRAST_FIELD_LABELS[field]}\u4e0e\u80cc\u666f\u3001\u9762\u677f\u6216\u6b21\u7ea7\u9762\u677f\u7684\u5bf9\u6bd4\u5ea6\u4e0d\u8db3\uff08\u81f3\u5c11 ${match[2]}:1\uff09\u3002\u672c\u6b21\u64cd\u4f5c\u672a\u5199\u5165\uff0c\u8bf7\u8c03\u6574\u4e3b\u9898\u8272\u677f\u540e\u91cd\u8bd5\u3002`;
+}
+
 function ordinaryMaterializationColors(draft: ThemeEditorDraft): ThemeColorTokens {
   const base = adaptiveBaseColorTokens(draft);
   const explicit = draft.colorMode === "explicit" ? draft.explicitColors ?? {} : {};
@@ -1155,6 +1219,7 @@ function syncThemeEditorPreview(): void {
     if (placeholder) placeholder.hidden = Boolean(imageUrl);
   });
   preview.setAttribute("aria-label", `${draft.name || "\u672a\u547d\u540d\u4e3b\u9898"} Codex \u6a21\u62df\u9884\u89c8`);
+  syncEditorContrastFeedback();
 }
 
 function isThemeColorKey(value: string): value is keyof ThemeColorTokens {
@@ -1185,6 +1250,38 @@ function syncEditorColorRow(key: keyof ThemeColorTokens, preserveText = false): 
   }
   if (output) output.value = `${percent}%`;
   if (alphaSwatch) alphaSwatch.style.setProperty("--alpha-color", draft.colors[key]);
+}
+
+function syncEditorContrastFeedback(): void {
+  const draft = state.editorDraft;
+  if (!draft) return;
+  const issues = editorContrastIssues(draft);
+  const warning = document.querySelector<HTMLElement>("[data-editor-contrast-warning]");
+  const list = document.querySelector<HTMLUListElement>("[data-editor-contrast-list]");
+  if (warning) warning.hidden = issues.length === 0;
+  if (list) {
+    list.replaceChildren(...issues.map((issue) => {
+      const item = document.createElement("li");
+      item.textContent = contrastIssueText(issue);
+      return item;
+    }));
+  }
+  for (const { key } of EDITABLE_COLOR_FIELDS) {
+    const row = document.querySelector<HTMLElement>(`[data-editor-color-row="${key}"]`);
+    const issue = issues.find((candidate) => candidate.field === key);
+    row?.classList.toggle("has-contrast-error", Boolean(issue));
+    const feedback = row?.querySelector<HTMLElement>("[data-editor-color-contrast]");
+    if (feedback) {
+      feedback.hidden = !issue;
+      feedback.textContent = issue ? contrastIssueRowText(issue) : "";
+    }
+  }
+  const fix = document.querySelector<HTMLButtonElement>("[data-action=\"editor-fix-contrast\"]");
+  if (fix) fix.disabled = !issues.some((issue) => issue.suggestedColor);
+  const saveButton = document.querySelector<HTMLButtonElement>("[data-editor-save]");
+  if (saveButton) {
+    saveButton.disabled = Boolean(state.busy) || saveButton.dataset.colorsSaveable !== "true" || issues.length > 0;
+  }
 }
 
 function syncEditorPaletteControls(preserveText = false): void {
@@ -1892,6 +1989,8 @@ function renderThemeEditor(): string {
     ? "透明度可输出 rgba() 或 #RRGGBBAA。"
     : features.rgba ? "透明度输出为 rgba()；当前运行时不接受透明 Hex。"
       : features.alphaHex ? "透明度输出为 #RRGGBBAA；当前运行时不接受 rgba()。" : "当前运行时只能编辑不透明颜色。";
+  const contrastIssues = editorContrastIssues(draft);
+  const contrastCanFix = contrastIssues.some((issue) => issue.suggestedColor);
   const imageMetadata = currentImageMetadata(draft, source);
   const sourceImageName = source.imagePath.split(/[\\/]/).pop() || "\u539f\u59cb\u4e3b\u9898\u56fe\u7247";
   const activeImageName = draft.replacementImagePath
@@ -2003,6 +2102,7 @@ function renderThemeEditor(): string {
                 ${EDITABLE_COLOR_FIELDS.map(({ key, label }) => `
                   <div class="editor-color-field" data-editor-color-row="${key}">
                     <div class="editor-color-heading"><span>${label}</span><span class="editor-color-heading-actions"><button type="button" data-editor-color-clear="${key}" ${features.partialColors && Object.prototype.hasOwnProperty.call(draft.explicitColors ?? {}, key) ? "" : "disabled"}>恢复自适应</button><output data-editor-color-alpha-output="${key}">${Math.round(alphaInputValue(draft.colors[key]) * 100)}%</output></span></div>
+                    ${contrastIssueRowMarkup(contrastIssues, key)}
                     <div class="editor-color-control">
                       <span class="editor-alpha-swatch" data-editor-color-alpha-swatch="${key}" style="--alpha-color:${escapeAttr(draft.colors[key])}"></span>
                       <input type="color" data-editor-color-swatch="${key}" value="${colorInputValue(draft.colors[key])}" aria-label="${label}" />
@@ -2013,10 +2113,19 @@ function renderThemeEditor(): string {
                 `).join("")}
               </div>
             </fieldset>
+            <div class="editor-contrast-warning" data-editor-contrast-warning ${contrastIssues.length ? "" : "hidden"}>
+              <span>${icon("shield")}</span>
+              <div>
+                <strong>&#x6682;&#x672A;&#x4FDD;&#x5B58;&#xFF1A;&#x6709; ${contrastIssues.length} &#x4E2A;&#x989C;&#x8272;&#x672A;&#x8FBE;&#x5230;&#x53EF;&#x8BFB;&#x6027;&#x8981;&#x6C42;</strong>
+                <ul data-editor-contrast-list>${contrastIssues.map((issue) => `<li>${escapeHtml(contrastIssueText(issue))}</li>`).join("")}</ul>
+                <small>&#x4FEE;&#x6539;&#x80CC;&#x666F;&#x6216;&#x6587;&#x5B57;&#x8272;&#x540E;&#x4F1A;&#x7ACB;&#x5373;&#x91CD;&#x65B0;&#x68C0;&#x67E5;&#xFF1B;&#x4E5F;&#x53EF;&#x624B;&#x52A8;&#x4F7F;&#x7528;&#x4E0B;&#x65B9;&#x5EFA;&#x8BAE;&#x3002;</small>
+              </div>
+              <button class="button button-secondary" type="button" data-action="editor-fix-contrast" ${contrastCanFix ? "" : "disabled"}>&#x81EA;&#x52A8;&#x4FEE;&#x590D;&#x53EF;&#x8BFB;&#x6027;</button>
+            </div>
             <div class="editor-safety-note">${icon("shield")} &#x53EA;&#x4FDD;&#x5B58;&#x672C;&#x5730;&#x56FE;&#x7247;&#x5F15;&#x7528;&#x3001;&#x6587;&#x5B57;&#x548C;&#x989C;&#x8272;&#xFF1B;&#x4E0D;&#x5141;&#x8BB8;&#x811A;&#x672C;&#x3001;CSS&#x3001;&#x8FDC;&#x7A0B;&#x8D44;&#x6E90;&#x6216;&#x547D;&#x4EE4;&#x3002;</div>
             <footer class="theme-editor-actions">
               <button class="button button-ghost" type="button" data-action="close-theme-editor">&#x53D6;&#x6D88;</button>
-              <button class="button button-primary" type="submit" ${state.busy || !colorsSaveable ? "disabled" : ""}>
+              <button class="button button-primary" type="submit" data-editor-save data-colors-saveable="${colorsSaveable}" ${state.busy || !colorsSaveable || contrastIssues.length ? "disabled" : ""}>
                 ${state.busy === "edit" ? '<span class="spinner"></span>' : draft.createCopy ? icon("copy") : icon("check")}
                 ${draft.createCopy ? "&#x4FDD;&#x5B58;&#x4E3A;&#x65B0;&#x4E3B;&#x9898;" : "&#x4FDD;&#x5B58;&#x4FEE;&#x6539;"}
               </button>
@@ -2459,7 +2568,7 @@ async function runMutation(
     } catch {
       // Preserve the original operation error as the user-facing result.
     }
-    showToast("操作没有完成", "error", errorMessage(error));
+    showToast("操作没有完成", "error", localizedMutationError(error));
     return false;
   } finally {
     state.busy = null;
@@ -2776,6 +2885,23 @@ app.addEventListener("click", async (event) => {
         renderApp();
         restoreModalOpener();
         return;
+      case "editor-fix-contrast":
+        if (state.editorDraft) {
+          const issues = editorContrastIssues(state.editorDraft);
+          let fixed = 0;
+          for (const issue of issues) {
+            if (!issue.suggestedColor) continue;
+            const previous = state.editorDraft.colors[issue.field];
+            const formatted = formatEditedThemeColor(issue.suggestedColor, state.status.themeFeatures, previous);
+            if (!formatted) continue;
+            state.editorDraft.colors[issue.field] = formatted;
+            state.editorDraft.explicitColors = { ...(state.editorDraft.explicitColors ?? {}), [issue.field]: formatted };
+            fixed += 1;
+          }
+          renderApp();
+          showToast("\u5df2\u5e94\u7528\u53ef\u8bfb\u6027\u5efa\u8bae", "info", `\u5df2\u663e\u5f0f\u8c03\u6574 ${fixed} \u4e2a\u989c\u8272\uff1b\u8bf7\u9884\u89c8\u540e\u518d\u4fdd\u5b58\u3002`);
+        }
+        return;
       case "editor-clear-appearance":
         if (state.editorDraft) {
           state.editorDraft.appearancePresent = false;
@@ -3017,6 +3143,15 @@ app.addEventListener("submit", async (event) => {
   }
   const draft = state.editorDraft;
   if (!draft || state.busy) return;
+  const contrastIssues = editorContrastIssues(draft);
+  if (contrastIssues.length) {
+    syncEditorContrastFeedback();
+    const firstRow = document.querySelector<HTMLElement>(`[data-editor-color-row="${contrastIssues[0].field}"]`);
+    firstRow?.scrollIntoView({ block: "center", behavior: "smooth" });
+    firstRow?.querySelector<HTMLInputElement>("[data-editor-color-text]")?.focus();
+    showToast("\u6682\u672a\u4fdd\u5b58\uff1a\u8bf7\u5148\u4fee\u590d\u914d\u8272\u53ef\u8bfb\u6027", "warning", contrastIssueSummary(contrastIssues));
+    return;
+  }
   const before = new Set(state.themes.map((theme) => theme.selectionKey));
   const sourceId = draft.sourceId;
   const createCopy = draft.createCopy;
