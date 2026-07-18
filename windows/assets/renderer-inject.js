@@ -18,6 +18,7 @@
     "dream-task-ambient",
     "dream-task-banner",
     "dream-task-off",
+    "dream-theme-openai-china",
   ];
   const ROOT_PROPERTIES = [
     "--dream-art",
@@ -27,6 +28,9 @@
     "--dream-accent",
     "--dream-accent-ink",
     "--dream-image-luma",
+    "--dream-main-left",
+    "--dream-main-top",
+    "--dream-main-width",
   ];
   const HOME_UTILITY_CLASS = "dream-home-utility";
   const installToken = {};
@@ -55,6 +59,7 @@
   const normalizeConfig = (value) => {
     const config = value && typeof value === "object" ? value : {};
     const art = config.art && typeof config.art === "object" ? config.art : {};
+    const themeId = typeof config.id === "string" ? config.id.trim().toLowerCase() : "";
     const hasNumber = (candidate) =>
       (typeof candidate === "number" || (typeof candidate === "string" && candidate.trim() !== "")) &&
       Number.isFinite(Number(candidate));
@@ -78,6 +83,7 @@
       appearance,
       safeArea,
       taskMode,
+      variant: themeId === "preset-openai-china-special" ? "openai-china" : "",
       focusX: hasNumber(art.focusX) ? clamp(art.focusX) : null,
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
       accent: safeAccent,
@@ -312,6 +318,7 @@
     for (const value of ["ambient", "banner", "off"]) {
       root.classList.toggle(`dream-task-${value}`, taskMode === value);
     }
+    root.classList.toggle("dream-theme-openai-china", config.variant === "openai-china");
     root.style.setProperty("--dream-art", `url("${artUrl}")`);
     root.style.setProperty("--dream-art-position", `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`);
     root.style.setProperty("--dream-focus-x", String(focusX));
@@ -334,6 +341,12 @@
     }
 
     root.classList.add("codex-dream-skin");
+    const mainBox = shellMain.getBoundingClientRect?.();
+    if (mainBox) {
+      root.style.setProperty("--dream-main-left", `${Math.round(mainBox.left)}px`);
+      root.style.setProperty("--dream-main-top", `${Math.round(mainBox.top)}px`);
+      root.style.setProperty("--dream-main-width", `${Math.round(mainBox.width)}px`);
+    }
     applyProfile(root);
 
     let style = document.getElementById(STYLE_ID);
@@ -368,6 +381,24 @@
       document.body.appendChild(chrome);
     }
     chrome.classList.toggle("dream-home-shell", Boolean(home));
+    chrome.classList.toggle("dream-china-chrome", config.variant === "openai-china");
+    if (config.variant === "openai-china" && chrome.dataset.dreamVariant !== "openai-china") {
+      chrome.textContent = "";
+      const star = document.createElement("span");
+      star.className = "dream-china-brandmark";
+      star.textContent = "★";
+      const brand = document.createElement("span");
+      brand.className = "dream-china-brand";
+      brand.innerHTML = "<strong>OpenAI 中国主题</strong><small>Codex App 中国特别版 ✦</small>";
+      const tagline = document.createElement("span");
+      tagline.className = "dream-china-tagline";
+      tagline.textContent = "初心如磐 · 智启未来";
+      chrome.append(star, brand, tagline);
+      chrome.dataset.dreamVariant = "openai-china";
+    } else if (config.variant !== "openai-china" && chrome.dataset.dreamVariant) {
+      chrome.textContent = "";
+      delete chrome.dataset.dreamVariant;
+    }
   };
 
   const cleanup = () => {

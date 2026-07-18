@@ -28,6 +28,8 @@ The installer validates the official Codex Store package and Node.js, saves a re
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
+The current Windows default theme is `OpenAI 中国主题`. It renders a red-and-gold home banner, `OpenAI 中国主题`, `Codex App 中国特别版`, and the top-right tagline `初心如磐 · 智启未来`; the sidebar, suggestion cards, project picker, and composer remain native Codex controls.
+
 `Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
 
 Pass `-Port` during installation to use a fixed custom port. Valid ports range from `1024` through `65535`.
@@ -39,6 +41,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 ## Update
 
 Exit the Dream Skin tray and close Codex, update the checkout (`git pull`, or download the latest source again), then rerun the install command above. The installer atomically replaces the managed runtime and rebuilds its shortcuts without deleting the active theme, saved themes, or imported images.
+
+When upgrading from an older runtime to `OpenAI 中国主题`, if the active theme still shows an older image, choose the default preset from the tray or remove `%LOCALAPPDATA%\CodexDreamSkin\active-theme` before rerunning the installer. Do not edit `WindowsApps` or `app.asar`.
 
 ## Launch and verify
 
@@ -66,6 +70,23 @@ The verification script confirms:
 - When the current route is home, the themed home structure has loaded.
 
 Next, use the generated screenshot to check horizontal overflow and text contrast. On both the home and normal task routes, manually check the project menu and composer interaction. See [`references/qa-inventory.md`](./references/qa-inventory.md) for the complete visual checklist.
+
+### One-shot commands
+
+Fresh install and launch from a checkout:
+
+```powershell
+cd windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+```
+
+Export a verification screenshot after launch:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-skin.ps1 `
+  -ScreenshotPath "$env:TEMP\openai-china-dream-skin.png"
+```
 
 ## Change and save themes
 

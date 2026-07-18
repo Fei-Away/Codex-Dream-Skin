@@ -43,6 +43,25 @@
 
 ## 实测精选预设
 
+### OpenAI 中国特别版 / OpenAI China Special
+
+Windows 当前默认启用「OpenAI 中国主题」。这套皮肤使用红金横幅、人物与旗帜视觉、淡字标语和浅色工作台配色；首页标题区显示 `OpenAI 中国主题` 与 `Codex App 中国特别版`，右上角标语为 `初心如磐 · 智启未来`。截图中的侧栏、建议卡、项目选择和输入框仍然是 Codex 原生控件，不是整窗假截图。
+
+<p align="center">
+  <img src="docs/images/presets/openai-china-special-preview.png" alt="OpenAI 中国特别版 Windows 主题预览" width="900"><br>
+  <sub>Windows · OpenAI 中国主题预览（仅预览）</sub>
+</p>
+
+首次安装前先关闭 Codex，然后运行：
+
+```powershell
+cd windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+```
+
+如果已经装过旧版 Dream Skin，先退出托盘并关闭 Codex，再拉取最新代码并重新运行安装命令。安装后可继续使用桌面快捷方式 `Codex Dream Skin` 启动，或用 `Codex Dream Skin - Restore` 恢复官方外观。
+
 ### Gothic Void Crusade / 哥特虚空远征
 
 **特别感谢 [@seansong-ideogram](https://github.com/seansong-ideogram) 为社区设计并贡献这套精美、极具氛围感的原创哥特科幻作品。** 它是当前实测精选的第一套预设，也是 macOS 全新安装时默认启用的主题。
@@ -82,14 +101,14 @@ cd macos
   --id preset-arina-hashimoto
 ```
 
-Windows 使用本地主题仓库与系统托盘，并会预置同一套「桥本有菜」。首次从仓库使用：
+Windows 默认预设已经切换为「OpenAI 中国主题」。如需在 Windows 上使用其他自定义图片，可通过系统托盘里的「更换背景图」导入纯背景，保存后继续一键切换。首次从仓库使用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\windows\scripts\install-dream-skin.ps1
 powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 ```
 
-启动后可直接从「已保存主题 → 桥本有菜」切换；不需要跨目录手动导入。托盘里的「更换背景图」仍可导入你自己的纯背景，保存后继续一键切换。
+启动后会应用 Windows 默认主题；托盘里的「更换背景图」仍可导入你自己的纯背景，保存后继续一键切换。
 
 > 可下载的用户源图是 [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png)（`1672 × 941`）；macOS 一键预设使用 [`macos/presets/preset-arina-hashimoto/background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；公开再分发前请确认人物与素材权利。
 

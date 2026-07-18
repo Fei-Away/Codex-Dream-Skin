@@ -640,3 +640,249 @@ html.codex-dream-skin.dream-art-wide main.main-surface
     transition-duration: .01ms !important;
   }
 }
+
+html.codex-dream-skin.dream-theme-openai-china {
+  color-scheme: light;
+  --dream-canvas: #fff9ed;
+  --dream-surface: #fffaf0;
+  --dream-surface-raised: #fffdf2;
+  --dream-sidebar: #fff8ec;
+  --dream-text: #69356f;
+  --dream-text-muted: #8a668e;
+  --dream-line: color-mix(in oklab, #e4512c 36%, #fff0d2);
+  --dream-line-soft: color-mix(in oklab, #e4512c 20%, transparent);
+  --dream-accent-soft: color-mix(in oklab, var(--dream-accent) 12%, #fff8df);
+  --dream-accent-hover: color-mix(in oklab, var(--dream-accent) 18%, #fff4dc);
+  --dream-hero-shade: transparent;
+  --dream-immersive-composer: color-mix(in oklab, #fffdf2 88%, #f2d4ef);
+  --dream-immersive-line: color-mix(in oklab, #d96a4f 28%, transparent);
+  --dream-shadow: 0 14px 32px color-mix(in oklab, #d94c2f 14%, transparent);
+}
+
+html.codex-dream-skin.dream-theme-openai-china body {
+  background-color: var(--dream-canvas) !important;
+  background-image: none !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china [class~="group/application-menu-top-bar"] {
+  color: #744272 !important;
+  background: linear-gradient(90deg, #fff5ed 0%, #fff9ef 48%, #ffe6af 100%) !important;
+  border-bottom: 1px solid #f4c9aa !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china aside.app-shell-left-panel {
+  color: #6f3a75 !important;
+  background: linear-gradient(180deg, #fffaf0 0%, #fff9ed 72%, #fff1e3 100%) !important;
+  border-right: 1px solid #f1c3ad !important;
+  box-shadow: inset -1px 0 #f7d6c2 !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china aside.app-shell-left-panel button {
+  color: #6f3a75 !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china aside.app-shell-left-panel button:hover,
+html.codex-dream-skin.dream-theme-openai-china aside.app-shell-left-panel [aria-current="page"],
+html.codex-dream-skin.dream-theme-openai-china aside.app-shell-left-panel [class~="bg-token-list-hover-background"] {
+  background: color-mix(in oklab, #fff8ec 72%, #f2d8f0) !important;
+  box-shadow: inset 0 0 0 1px #efc4b7 !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china main.main-surface,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface.dream-home-shell,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) {
+  background: var(--dream-surface) !important;
+  border-left: 1px solid #f4c9aa !important;
+  box-shadow: none !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china main.main-surface > header.app-header-tint,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface > header.app-header-tint {
+  color: #702f54 !important;
+  background: linear-gradient(90deg, #fff8ef 0%, #fff7e7 58%, #ffe8b6 100%) !important;
+  border-bottom: 1px solid #f0bda1 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china:has(main.main-surface.dream-home-shell) body,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide:has(main.main-surface.dream-home-shell) body,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide:is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell)) body {
+  background-color: var(--dream-canvas) !important;
+  background-image: none !important;
+  background-attachment: initial !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home {
+  --thread-content-max-width: min(1210px, calc(100cqw - 56px)) !important;
+  background:
+    radial-gradient(ellipse at 70% 82%, color-mix(in oklab, #f3ce7a 10%, transparent) 0%, transparent 36%),
+    var(--dream-surface) !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home > div:first-child {
+  padding-top: 20px !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home > div:first-child > div:first-child {
+  flex-basis: clamp(390px, 40cqw, 430px) !important;
+  min-height: 390px !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home > div:first-child > div:first-child > div:first-child,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface.dream-home-shell
+  .dream-home > div:first-child > div:first-child > div:first-child {
+  width: min(1137px, calc(100% - 82px)) !important;
+  max-width: 1137px !important;
+  height: clamp(248px, 24.95cqw, 304px) !important;
+  min-height: 248px !important;
+  border: 1px solid #f2b99d !important;
+  border-radius: 24px !important;
+  background-color: #a51420 !important;
+  background-image: var(--dream-art) !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+  background-position: center !important;
+  box-shadow: 0 12px 24px color-mix(in oklab, #cf4a34 12%, transparent) !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home > div:first-child > div:first-child > div:first-child::before,
+html.codex-dream-skin.dream-theme-openai-china.dream-safe-right .dream-home > div:first-child > div:first-child > div:first-child::before,
+html.codex-dream-skin.dream-theme-openai-china.dream-safe-center .dream-home > div:first-child > div:first-child > div:first-child::before,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface.dream-home-shell
+  .dream-home > div:first-child > div:first-child > div:first-child::before {
+  content: none !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home [data-feature="game-source"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home > div:first-child > div:first-child > div:first-child > div:nth-child(2) {
+  margin-top: 20px !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home .group\/home-suggestions {
+  gap: 16px !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home .group\/home-suggestions button,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface.dream-home-shell
+  .dream-home .group\/home-suggestions button {
+  min-height: 152px !important;
+  padding: 18px 16px 20px !important;
+  color: #63306f !important;
+  border: 1px solid #efb79d !important;
+  border-radius: 18px !important;
+  background: color-mix(in oklab, #fffdf0 92%, #ffe0c7) !important;
+  box-shadow: 0 10px 24px color-mix(in oklab, #df653a 14%, transparent) !important;
+  backdrop-filter: none !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home .group\/home-suggestions button:hover {
+  transform: translateY(-2px) !important;
+  background: #fff7e1 !important;
+  border-color: #e7835d !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home .group\/home-suggestions button > span:first-child > span:first-child {
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 999px !important;
+  color: #fff9ed !important;
+  background: radial-gradient(circle at 34% 30%, #ffbf72 0 16%, #f06a34 58%, #dd432e 100%) !important;
+  box-shadow: 0 0 0 8px color-mix(in oklab, #ffd786 42%, transparent) !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home .group\/home-suggestions button svg {
+  width: 23px !important;
+  height: 23px !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-home-utility {
+  border-color: color-mix(in oklab, #d96a4f 22%, transparent) !important;
+  background: linear-gradient(90deg, color-mix(in oklab, #f2d4ef 56%, #fffdf2), #fff9f0) !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .composer-surface-chrome,
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide .composer-surface-chrome {
+  color: #6f3a75 !important;
+  border: 0 !important;
+  background: color-mix(in oklab, #fffdf2 94%, #ffe6c7) !important;
+  box-shadow: 0 10px 28px color-mix(in oklab, #d86a44 12%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, #d96a4f 20%, transparent) !important;
+  backdrop-filter: none !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china button[class~="bg-token-foreground"] {
+  color: #fff9ed !important;
+  background: linear-gradient(135deg, #f59a61, #ef6d43) !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome.dream-china-chrome {
+  display: block !important;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none !important;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome.dream-china-chrome > span {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome .dream-china-brandmark {
+  left: calc(var(--dream-main-left, 337px) + 31px);
+  top: calc(var(--dream-main-top, 49px) + 8px);
+  color: #db342d;
+  font-size: 32px;
+  line-height: 1;
+  text-shadow: 0 2px 10px color-mix(in oklab, #db342d 12%, transparent);
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome .dream-china-brand {
+  left: calc(var(--dream-main-left, 337px) + 72px);
+  top: calc(var(--dream-main-top, 49px) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: #9e1818;
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome .dream-china-brand strong {
+  display: block;
+  font-size: 18px;
+  line-height: 20px;
+  font-weight: 820;
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome .dream-china-brand small {
+  display: block;
+  color: #a33b28;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome .dream-china-tagline {
+  left: calc(var(--dream-main-left, 337px) + var(--dream-main-width, 1218px) - 318px);
+  top: calc(var(--dream-main-top, 49px) + 14px);
+  color: #9a2f22;
+  font-family: "KaiTi", "STKaiti", "Microsoft YaHei UI", serif;
+  font-size: 19px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome:not(.dream-home-shell) .dream-china-brandmark,
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome:not(.dream-home-shell) .dream-china-brand,
+html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome:not(.dream-home-shell) .dream-china-tagline {
+  display: none;
+}

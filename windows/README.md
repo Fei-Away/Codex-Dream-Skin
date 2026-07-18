@@ -28,6 +28,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
+当前 Windows 默认主题是 `OpenAI 中国主题`。它会在首页显示红金横幅、`OpenAI 中国主题`、`Codex App 中国特别版` 和右上角 `初心如磐 · 智启未来` 标语；侧栏、建议卡、项目选择和输入框仍然使用 Codex 原生控件。
+
 安装命令中的 `Bypass` 只作用于这一次由用户明确发起的安装进程。安装器会先校验运行时副本的 SHA-256，再仅对 `%LOCALAPPDATA%\CodexDreamSkin\engine` 中受管的 PowerShell 副本清除下载区标记。日常快捷方式使用 `RemoteSigned`，不会绕过系统或企业组策略。
 
 如需使用自定义端口，可以在安装时传入 `-Port`。端口范围必须是 `1024` 到 `65535`。
@@ -39,6 +41,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 ## 更新
 
 先退出 Dream Skin 托盘并关闭 Codex，再更新仓库（`git pull`，或重新下载最新源码），然后重新运行上面的安装命令。安装器会原子替换受管运行时并重建快捷方式；当前主题、已保存主题和导入图片不会被删除。
+
+从旧版切换到 `OpenAI 中国主题` 时，如果当前主题仍停留在旧图片，打开托盘选择默认预设，或删除 `%LOCALAPPDATA%\CodexDreamSkin\active-theme` 后重新运行安装命令。不要手动改 `WindowsApps` 或 `app.asar`。
 
 ## 启动与验证
 
@@ -66,6 +70,23 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 - 当前为首页时，首页主题结构已经正确加载。
 
 随后用生成的截图检查横向溢出和文字对比度，再分别在首页与普通任务页手动检查项目菜单和输入框交互。完整视觉检查项见 [`references/qa-inventory.md`](./references/qa-inventory.md)。
+
+### 一次性命令
+
+从全新仓库直接安装并启动：
+
+```powershell
+cd windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+```
+
+启动后导出一张验证截图：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-skin.ps1 `
+  -ScreenshotPath "$env:TEMP\openai-china-dream-skin.png"
+```
 
 ## 更换和保存主题
 

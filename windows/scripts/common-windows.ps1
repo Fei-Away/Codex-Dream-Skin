@@ -128,6 +128,7 @@ function Install-DreamSkinRuntimeEngine {
   $required = @(
     'assets\dream-reference.jpg',
     'assets\dream-skin.css',
+    'assets\openai-china-hero.png',
     'assets\renderer-inject.js',
     'assets\theme.json',
     'scripts\common-windows.ps1',

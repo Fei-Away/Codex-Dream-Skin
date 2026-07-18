@@ -44,6 +44,25 @@
 
 ## Tested featured presets
 
+### OpenAI China Special / OpenAI 中国特别版
+
+Windows now seeds `OpenAI 中国主题` as the default theme. It uses a red-and-gold home banner, figure-and-flag artwork, faint slogan text, and a warm light workspace. The home header shows `OpenAI 中国主题` and `Codex App 中国特别版`, with the top-right tagline `初心如磐 · 智启未来`. The sidebar, cards, project picker, and composer remain native Codex controls rather than a fake full-window screenshot.
+
+<p align="center">
+  <img src="docs/images/presets/openai-china-special-preview.png" alt="OpenAI China Special Windows theme preview" width="900"><br>
+  <sub>Windows · OpenAI China theme preview only</sub>
+</p>
+
+For a fresh Windows install, close Codex first, then run:
+
+```powershell
+cd windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+```
+
+If you already installed an older Dream Skin runtime, exit the tray, close Codex, pull the latest source, and rerun the installer. Use the `Codex Dream Skin` shortcut after installation, or `Codex Dream Skin - Restore` to return to the stock appearance.
+
 ### Gothic Void Crusade / 哥特虚空远征
 
 **Special thanks to [@seansong-ideogram](https://github.com/seansong-ideogram) for designing and contributing this striking, atmospheric original gothic science-fiction work to the community.** It leads the tested featured presets and is the default theme for fresh macOS installs.
@@ -88,17 +107,17 @@ cd macos
   --id preset-arina-hashimoto
 ```
 
-Windows has a persistent local theme store and system-tray controls, and seeds
-the same Arina Hashimoto preset. For the first repo-based setup:
+Windows now defaults to `OpenAI 中国主题`. To use another custom image on
+Windows, import a UI-free wallpaper from the system tray and save it for
+one-click switching. For the first repo-based setup:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\windows\scripts\install-dream-skin.ps1
 powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 ```
 
-After launch, switch directly through **已保存主题 → 桥本有菜**; no cross-folder
-manual import is required. **更换背景图** still imports your own UI-free
-wallpaper, which can then be saved for one-click switching.
+After launch, the Windows default theme is applied. **更换背景图** still imports
+your own UI-free wallpaper, which can then be saved for one-click switching.
 
 > The downloadable user source is [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png) (`1672 × 941`); the macOS one-click preset uses the normalized derived [`background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; confirm likeness and asset rights before redistributing it.
 

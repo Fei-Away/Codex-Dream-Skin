@@ -645,19 +645,19 @@ try {
     throw 'Theme-store migration did not retire the old preset ID while preserving custom themes.'
   }
   $initialTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($initialTheme.Theme.id -cne 'preset-arina-hashimoto' -or
-    $initialTheme.Theme.name -cne '桥本有菜' -or
-    $initialTheme.Theme.appearance -cne 'auto' -or
-    $initialTheme.Theme.art.safeArea -cne 'left' -or
-    $initialTheme.Theme.art.taskMode -cne 'ambient' -or
-    [System.IO.Path]::GetExtension($initialTheme.ImagePath) -cne '.jpg') {
-    throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
+  if ($initialTheme.Theme.id -cne 'preset-openai-china-special' -or
+    $initialTheme.Theme.name -cne 'OpenAI 中国主题' -or
+    $initialTheme.Theme.appearance -cne 'light' -or
+    $initialTheme.Theme.art.safeArea -cne 'none' -or
+    $initialTheme.Theme.art.taskMode -cne 'off' -or
+    [System.IO.Path]::GetExtension($initialTheme.ImagePath) -cne '.png') {
+    throw 'Default Windows theme did not seed the OpenAI China wallpaper contract.'
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
   if ($preseededThemes.Count -ne 1 -or
-    $preseededThemes[0].Id -cne 'preset-arina-hashimoto' -or
-    $preseededThemes[0].Name -cne '桥本有菜') {
-    throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
+    $preseededThemes[0].Id -cne 'preset-openai-china-special' -or
+    $preseededThemes[0].Name -cne 'OpenAI 中国主题') {
+    throw 'OpenAI China theme was not preseeded in the Windows saved-theme menu.'
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
