@@ -58,7 +58,7 @@ try {
     foreach ($folder in @($desktop, $startMenu)) {
       $shortcut = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin.lnk'))
       $shortcut.TargetPath = $powershell
-      $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$startScript`"$portArgument -PromptRestart"
+      $shortcut.Arguments = "-NoProfile -ExecutionPolicy RemoteSigned -File `"$startScript`"$portArgument -PromptRestart"
       $shortcut.WorkingDirectory = $engine.Root
       $shortcut.Description = 'Launch the official Codex app with Codex Dream Skin'
       $shortcut.Save()
@@ -66,14 +66,14 @@ try {
 
     $restore = $shell.CreateShortcut((Join-Path $desktop 'Codex Dream Skin - Restore.lnk'))
     $restore.TargetPath = $powershell
-    $restore.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$restoreScript`"$portArgument -RestoreBaseTheme -PromptRestart"
+    $restore.Arguments = "-NoProfile -ExecutionPolicy RemoteSigned -File `"$restoreScript`"$portArgument -RestoreBaseTheme -PromptRestart"
     $restore.WorkingDirectory = $engine.Root
     $restore.Description = 'Restore the official Codex appearance and close the CDP session'
     $restore.Save()
 
     $studio = $shell.CreateShortcut((Join-Path $desktop 'Codex Dream Skin Studio.lnk'))
     $studio.TargetPath = $powershell
-    $studio.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$studioScript`""
+    $studio.Arguments = "-NoProfile -ExecutionPolicy RemoteSigned -File `"$studioScript`""
     $studio.WorkingDirectory = $engine.Root
     $studio.Description = 'Open the local Codex Dream Skin Studio'
     $studio.Save()
@@ -81,13 +81,13 @@ try {
     foreach ($folder in @($desktop, $startMenu)) {
       $tray = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))
       $tray.TargetPath = $powershell
-      $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$trayScript`"$portArgument"
+      $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument"
       $tray.WorkingDirectory = $engine.Root
       $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
       $tray.Save()
     }
     Start-Process -FilePath $powershell -ArgumentList `
-      "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$trayScript`"$portArgument" `
+      "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument" `
       -WindowStyle Hidden | Out-Null
   }
 

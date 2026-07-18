@@ -877,8 +877,24 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
     const home = document.querySelector('[role="main"].dream-skin-home');
     const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
-    const cardBoxes = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
+    const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
+    const cardBoxes = cardButtons.map(box);
     const visibleCards = cardBoxes.filter((item) => item?.visible);
+    const suggestionLabels = cardButtons.flatMap((button) => {
+      const expectedColor = getComputedStyle(button).color;
+      return [...button.querySelectorAll('*')]
+        .filter((node) => [...node.childNodes].some((child) =>
+          child.nodeType === 3 && child.textContent.trim()))
+        .map((node) => ({
+          ...box(node),
+          text: node.textContent.trim().slice(0, 80),
+          color: getComputedStyle(node).color,
+          expectedColor,
+        }));
+    });
+    const visibleSuggestionLabels = suggestionLabels.filter((item) => item?.visible);
+    const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
+      item.color === item.expectedColor);
     const hero = box(home?.firstElementChild?.firstElementChild?.firstElementChild);
     const projectButton = box(home?.querySelector('.group\\\\/project-selector > button'));
     const shell = box(document.querySelector('main.main-surface'));
@@ -898,6 +914,8 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       hero,
       cards: cardBoxes,
       visibleCardCount: visibleCards.length,
+      suggestionLabels,
+      suggestionLabelColorsMatch,
       projectButton,
       shell,
       composer,
@@ -917,7 +935,11 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       (!expectedRevision || result.revision === expectedRevision);
     // Project selector markup varies across Codex builds — soft requirement.
     const homePass = !result.homeRoute || (
-      result.homePresent && result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120
+      result.homePresent && result.hero?.visible && result.hero.width >= 280 &&
+      result.hero.height >= 120 && (result.visibleCardCount === 0 || (
+        visibleSuggestionLabels.length >= result.visibleCardCount &&
+        result.suggestionLabelColorsMatch
+      ))
     );
     result.pass = Boolean(basePass && homePass && payloadPass);
     result.expectedThemeId = expectedThemeId;

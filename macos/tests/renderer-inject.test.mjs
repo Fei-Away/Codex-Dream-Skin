@@ -102,6 +102,11 @@ assert.match(
 );
 assert.match(
   css,
+  /home-suggestions button \[class~="text-token-text-primary"\]\s*\{[\s\S]{0,80}color:\s*var\(--ds-text\) !important;/,
+  "Home suggestion labels must override native light-shell text tokens with the selected theme color.",
+);
+assert.match(
+  css,
   /\.composer-surface-chrome p\.placeholder::after\s*\{[\s\S]{0,120}color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.82\) !important;[\s\S]{0,80}opacity:\s*1 !important;/,
   "Composer placeholder text must not inherit a stale native color with double opacity.",
 );

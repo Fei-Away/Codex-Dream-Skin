@@ -30,18 +30,19 @@
 - 自适应图像主题引擎：通过本地 Canvas 分析亮度、主色、视觉焦点、左右安全区和图像比例，为任意背景图生成协调的浅色/深色外观；图片不会上传到外部服务。
 - 主题新增 `appearance: auto | light | dark` 与 `art.focusX/focusY`（`0..1`）、`art.safeArea: auto | left | right | center | none`、`art.taskMode: auto | ambient | banner | off` 配置；显式值优先于自动分析。
 - 首页与任务页按图像比例采用不同呈现：超宽图在任务页使用横幅和纵向渐隐，普通比例图使用低噪环境背景，也可用 `taskMode=off` 关闭任务页图像。
-- 内置「桥本有菜」实测精选预设与 5 套可复现的程序化抽象预设；安装后幂等播种到主题库，菜单栏或 `switch-theme-macos.sh` 可直接切换，且绝不覆盖 `custom-*` 用户主题。
+- 内置 Gothic Void Crusade 与「桥本有菜」两套实测预设；安装后幂等播种到主题库，菜单栏或 `switch-theme-macos.sh` 可直接切换，且绝不覆盖 `custom-*` 用户主题。
 - 新增中英文参考图生图指南：明确 `2560 × 1440`、Image 1/2/3 职责、裁切安全区、原创/已授权成年身份两套流程，以及“文案和小照片不烘焙进背景”的约束。
 
 ### 改进
 
 - watcher 在文档壳层出现后立即注入，按 CSS/主题/图片内容哈希热刷新并复用静态 payload；同一主题切换不再重复启动守护进程，减少原生界面闪现和后台轮询。
-- 主题切换先完整暂存图片，最后原子发布 `theme.json`；全新安装在没有活动主题时先启用通用的「午夜极光」，已有活动主题保持不变。
+- 主题切换先完整暂存图片，最后原子发布 `theme.json`；全新安装在没有活动主题时先启用 Gothic Void Crusade，已有活动主题保持不变。
 - `load-image-theme-macos.sh` 可通过 `--appearance`、`--focus-x`、`--focus-y`、`--safe-area`、`--task-mode` 精确调节构图；旧主题缺省时使用安全自适应值。
 - 客户端发行包的说明版本改为读取 `VERSION`，避免发布文案与实际版本漂移。
 
 ### 修复
 
+- 首页建议卡片的文字节点显式跟随主题正文色，避免 Codex 浅色模式的原生文字 token 覆盖深色主题并显示成近黑色；实时验证器会在卡片可见时核对实际文字颜色。
 - 保留 Codex 原生固定顶栏的定位与层级，避免打开任务侧边面板后开关被推出主区、导致面板无法关闭。
 - 修复亮色背景图在 ChatGPT/Codex 暗色模式下错误生成浅色皮肤壳的问题。`appearance=auto` 现在跟随原生/系统外观，避免白字叠在浅色面板上导致界面不可读。
 - 修复从“设置 > 外观”返回“已安排的任务”等无输入框路由后，验证器因找不到 composer 而拒绝合法 Codex 主界面的问题。
@@ -62,6 +63,7 @@
 
 - CDP 端点必须由已验证的官方 Codex 可执行文件或其子进程监听；WebSocket 还会校验 loopback、page ID、路径、无重定向，并安全处理畸形消息和发送异常。
 - App 与 bundled Node 必须满足固定的 OpenAI Team ID 和 Apple signing requirement；热应用不再信任外部 `NODE` 或 `state.json` 中缓存的运行时身份，CDP 祖先还会核对进程的真实 executable path。
+- 运行状态读取会在执行 Node 前自行确认已验证的 bundled runtime，避免调用顺序变化重新引入未验证执行；感谢 @guiguili520 报告 #12，以及 @rwang23 提供原始修复实现。
 - 主题配置与图片使用真实路径 containment，拒绝 symlink 越界、空文件、超过 16 MB、单边超过 16384 px 或超过 50 MP 的图片；主题展示文本拒绝换行和控制字符。
 - AppleScript 动态内容全部通过 argv 传递；SwiftBar 过滤主题 ID、文件名和菜单文本，避免主题元数据改变菜单属性或命令参数。
 - `config.toml` 只按严格 UTF-8 读取，拒绝 NUL、歧义多行 TOML、重复 `[desktop]`，通过用户级锁、原始字节核验和同目录原子替换保护中文配置与并发写入。

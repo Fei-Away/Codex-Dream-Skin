@@ -60,11 +60,12 @@ fi
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do
   [ -d "$preset" ] || continue
+  PRESET_ID="$(/usr/bin/basename "$preset")"
   PRESET_CHECK="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir "$preset")"
   "$NODE" -e '
     const v = JSON.parse(process.argv[1]);
-    if (!v.pass || !String(v.themeId).startsWith("preset-") || v.imageBytes < 1) process.exit(1);
-  ' "$PRESET_CHECK"
+    if (!v.pass || v.themeId !== process.argv[2] || v.imageBytes < 1) process.exit(1);
+  ' "$PRESET_CHECK" "$PRESET_ID"
 done
 
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
@@ -96,30 +97,30 @@ STANDALONE_DOCS="$TMP/standalone-source-docs"
 /bin/mkdir -p "$STANDALONE_ROOT" \
   "$STANDALONE_DOCS/images/gallery" "$STANDALONE_DOCS/images/presets"
 /usr/bin/printf '%s\n' \
-  'macos/presets/preset-romantic-rose/ macos/assets/portal-hero.png macos/NOTICE.md windows/assets/theme.json' \
+  'macos/presets/preset-arina-hashimoto/ macos/assets/portal-hero.png macos/NOTICE.md windows/assets/theme.json' \
   > "$STANDALONE_DOCS/reference-background-prompt-guide.md"
 /bin/cp "$STANDALONE_DOCS/reference-background-prompt-guide.md" \
   "$STANDALONE_DOCS/reference-background-prompt-guide.en.md"
 /bin/cp "$STANDALONE_DOCS/reference-background-prompt-guide.md" \
   "$STANDALONE_DOCS/background-generation-prompts.md"
 : > "$STANDALONE_DOCS/images/gallery/skin-01.jpg"
-: > "$STANDALONE_DOCS/images/presets/romantic-rose-source.png"
+: > "$STANDALONE_DOCS/images/presets/arina-hashimoto-source.png"
 : > "$STANDALONE_DOCS/images/hero-banner-red-white.png"
 /usr/bin/printf '%s\n' \
-  '- `presets/preset-romantic-rose/background.jpg`' \
+  '- `presets/preset-arina-hashimoto/background.jpg`' \
   '- `../windows/assets/dream-reference.jpg`' \
-  '- `../docs/images/presets/romantic-rose-source.png`' \
+  '- `../docs/images/presets/arina-hashimoto-source.png`' \
   "They are included at the maintainer's direction as a local theme preset, source archive, and real runtime previews." \
   > "$STANDALONE_ROOT/NOTICE.md"
 "$ROOT/scripts/prepare-standalone-docs.sh" "$STANDALONE_ROOT" "$STANDALONE_DOCS"
-/usr/bin/grep -F -q 'presets/preset-romantic-rose/' \
+/usr/bin/grep -F -q 'presets/preset-arina-hashimoto/' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 /usr/bin/grep -F -q 'assets/portal-hero.png' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 /usr/bin/grep -F -q 'https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/assets/theme.json' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 [ -f "$STANDALONE_ROOT/docs/images/hero-banner-red-white.png" ]
-/usr/bin/grep -F -q '`docs/images/presets/romantic-rose-source.png`' \
+/usr/bin/grep -F -q '`docs/images/presets/arina-hashimoto-source.png`' \
   "$STANDALONE_ROOT/NOTICE.md"
 /usr/bin/grep -F -q 'not included in this macOS archive' \
   "$STANDALONE_ROOT/NOTICE.md"
@@ -183,13 +184,21 @@ fi
   themes="$STATE_ROOT/themes"
   /bin/mkdir -p "$themes/custom-keepme"
   : > "$themes/custom-keepme/theme.json"
+  retired="preset-midnight-aurora preset-sakura-dawn preset-amber-dusk preset-forest-mist preset-cyber-neon preset-romantic-rose"
+  for id in $retired; do
+    /bin/mkdir -p "$themes/$id"
+    : > "$themes/$id/retired-marker"
+  done
   seed_bundled_presets
   seed_bundled_presets
-  [ -f "$themes/preset-midnight-aurora/theme.json" ] || exit 1
-  [ -f "$themes/preset-midnight-aurora/background.jpg" ] || exit 1
+  [ -f "$themes/preset-gothic-void-crusade/theme.json" ] || exit 1
+  [ -f "$themes/preset-gothic-void-crusade/background.jpg" ] || exit 1
+  [ -f "$themes/preset-arina-hashimoto/theme.json" ] || exit 1
+  [ -f "$themes/preset-arina-hashimoto/background.jpg" ] || exit 1
   [ -f "$themes/custom-keepme/theme.json" ] || exit 1
+  for id in $retired; do [ ! -e "$themes/$id" ] || exit 1; done
   seeded="$(/usr/bin/find "$themes" -maxdepth 1 -type d -name "preset-*" | /usr/bin/wc -l | /usr/bin/tr -d " ")"
-  [ "$seeded" -ge 4 ] || exit 1
+  [ "$seeded" -eq 2 ] || exit 1
 ' _ "$ROOT"
 
 # Theme switches stage files and publish theme.json last, preserving a complete
@@ -225,19 +234,21 @@ RUNTIME_HOME="$TMP/runtime-home"
 RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
 RUNTIME_STATE="$RUNTIME_STATE_ROOT/state.json"
 STATE_EVAL_MARKER="$TMP/state-eval-marker"
+UNTRUSTED_NODE_MARKER="$TMP/untrusted-node-executed"
 UNTRUSTED_BUNDLE="$TMP/evil-root/Codex \"Skin\".app"
 UNTRUSTED_EXE="$UNTRUSTED_BUNDLE/Contents/MacOS/ChatGPT"
 UNTRUSTED_VERSION="1.1.2 \$(touch \"$STATE_EVAL_MARKER\") ; echo pwned"
 UNTRUSTED_TEAM_ID="TEAM'ID"
 /bin/mkdir -p "$RUNTIME_STATE_ROOT" "$UNTRUSTED_BUNDLE/Contents/MacOS"
-/usr/bin/printf '#!/bin/bash\ntrue\n' > "$UNTRUSTED_EXE"
+/usr/bin/printf '#!/bin/bash\n/usr/bin/touch "${UNTRUSTED_NODE_MARKER:?}"\nexit 97\n' > "$UNTRUSTED_EXE"
 /bin/chmod +x "$UNTRUSTED_EXE"
 "$NODE" -e '
   const fs = require("node:fs");
   const [file, codexBundle, codexExe, codexVersion, codexTeamId] = process.argv.slice(1);
   fs.writeFileSync(file, `${JSON.stringify({ codexBundle, codexExe, codexVersion, codexTeamId })}\n`);
 ' "$RUNTIME_STATE" "$UNTRUSTED_BUNDLE" "$UNTRUSTED_EXE" "$UNTRUSTED_VERSION" "$UNTRUSTED_TEAM_ID"
-/usr/bin/env HOME="$RUNTIME_HOME" NODE="$UNTRUSTED_EXE" NODE_VERSION="untrusted" /bin/bash -c '
+/usr/bin/env HOME="$RUNTIME_HOME" NODE="$UNTRUSTED_EXE" NODE_VERSION="untrusted" \
+  UNTRUSTED_NODE_MARKER="$UNTRUSTED_NODE_MARKER" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
   TRUSTED_BUNDLE="$2"
   TRUSTED_EXE="$3"
@@ -255,7 +266,9 @@ UNTRUSTED_TEAM_ID="TEAM'ID"
     NODE="$TRUSTED_NODE"
     NODE_VERSION="v22.0.0"
     CODEX_TEAM_ID="2DC432GLL2"
+    remember_validated_runtime_identity
   }
+  state_field codexVersion >/dev/null
   ensure_node_runtime
   ensure_node_runtime
   [ "$DISCOVER_CALLS" -eq 1 ]
@@ -265,6 +278,10 @@ UNTRUSTED_TEAM_ID="TEAM'ID"
   [ "$CODEX_EXE" = "$TRUSTED_EXE" ]
   [ "$CODEX_TEAM_ID" = "2DC432GLL2" ]
 ' _ "$ROOT" "/trusted/ChatGPT.app" "/trusted/ChatGPT.app/Contents/MacOS/ChatGPT" "$NODE"
+[ ! -e "$UNTRUSTED_NODE_MARKER" ] || {
+  printf 'state_field executed an inherited, unvalidated Node runtime.\n' >&2
+  exit 1
+}
 [ ! -e "$STATE_EVAL_MARKER" ] || {
   printf 'Runtime state values were evaluated as shell code.\n' >&2
   exit 1
@@ -407,7 +424,7 @@ STATUS_PID=""
 # The common stop path must reject a real watcher running on 19341 when the
 # saved state claims 1934, even though nodePath/injectorPath/start-time all
 # match. This exercises the signal gate directly (status has its own matcher).
-"$NODE" "$ROOT/scripts/injector.mjs" --watch --port 19341 --theme-dir "$ROOT/presets/preset-midnight-aurora" \
+"$NODE" "$ROOT/scripts/injector.mjs" --watch --port 19341 --theme-dir "$ROOT/presets/preset-gothic-void-crusade" \
   >"$TMP/near-prefix-injector.out" 2>&1 &
 WATCH_PID="$!"
 /bin/sleep 0.2
