@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Codex Dream Skin Manager",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 640,
+        "minHeight": 520,
+        "resizable": true,
+        "decorations": false,
+        "transparent": false,
+        "shadow": false,
+        "theme": "Dark",
+        "backgroundColor": "#090b12"
+      }
+    ]
+  },
+  "bundle": {
+    "resources": [
+      "../../windows"
+    ]
+  }
+}

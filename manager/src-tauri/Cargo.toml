@@ -1,0 +1,31 @@
+[package]
+name = "codex-dream-skin-manager"
+version = "0.5.0"
+description = "Safe desktop manager for Codex Dream Skin"
+authors = ["Codex Dream Skin contributors"]
+edition = "2021"
+
+[lib]
+name = "codex_dream_skin_manager_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+tauri = { version = "2", features = ["macos-private-api", "protocol-asset"] }
+tauri-plugin-dialog = "2"
+url = "2"
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Gdi",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
