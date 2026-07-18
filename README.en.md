@@ -50,7 +50,12 @@ Windows now seeds `OpenAI 中国主题` as the default theme. It uses a red-and-
 
 <p align="center">
   <img src="docs/images/presets/openai-china-special-preview.png" alt="OpenAI China Special Windows theme preview" width="900"><br>
-  <sub>Windows · OpenAI China theme preview only</sub>
+  <sub>Windows · OpenAI China home preview only</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/presets/openai-china-task-background-preview.png" alt="OpenAI China Special task background preview" width="900"><br>
+  <sub>Windows · low-distraction flag-raising background on normal task routes; preview only</sub>
 </p>
 
 For a fresh Windows install, close Codex first, then run:
