@@ -78,8 +78,18 @@ assert.match(
 );
 assert.match(
   source,
-  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\([\s\S]{0,2500}visibleSuggestionLabels\.length >= result\.visibleCardCount[\s\S]{0,160}result\.suggestionLabelColorsMatch/,
+  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\([\s\S]{0,240}item\.color === item\.expectedColor/,
+  "Live verification must calculate whether themed suggestion labels retain the card color.",
+);
+assert.match(
+  source,
+  /visibleSuggestionLabels\.length >= result\.visibleCardCount[\s\S]{0,180}result\.suggestionLabelColorsMatch/,
   "Live verification must reject visible home suggestion labels that diverge from the themed card color.",
+);
+assert.match(
+  source,
+  /const suggestionIconAlignments = cardButtons\.flatMap\([\s\S]{0,2400}suggestionIconsCentered[\s\S]{0,3000}result\.suggestionIconsCentered/,
+  "Live verification must reject suggestion glyphs or row labels that drift away from their card centers.",
 );
 
 console.log("PASS: early injection is shell-guarded, generation-safe, and removed on shutdown.");

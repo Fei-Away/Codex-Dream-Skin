@@ -1455,6 +1455,11 @@ html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-sugge
 }
 
 html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button > span:last-child {
+  width: auto !important;
+  min-height: 0 !important;
+  margin-top: 0 !important;
+  flex: 1 1 auto !important;
+  justify-content: center !important;
   align-items: var(--ds-layout-card-copy-align) !important;
   text-align: var(--ds-layout-card-text-align) !important;
 }

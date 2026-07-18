@@ -872,6 +872,32 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const visibleSuggestionLabels = suggestionLabels.filter((item) => item?.visible);
     const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
       item.color === item.expectedColor);
+    const suggestionIconAlignments = cardButtons.flatMap((button) => {
+      const glyph = button.querySelector('svg');
+      const iconShell = glyph?.parentElement;
+      const labelId = button.getAttribute('aria-labelledby');
+      const label = (labelId ? document.getElementById(labelId) : null) ??
+        [...button.querySelectorAll('*')].find((node) => [...node.childNodes].some((child) =>
+          child.nodeType === 3 && child.textContent.trim()));
+      const iconShellBox = box(iconShell);
+      const glyphBox = box(glyph);
+      const labelBox = box(label);
+      const cardBox = box(button);
+      if (!iconShellBox?.visible || !glyphBox?.visible || !cardBox?.visible) return [];
+      const center = (item, axis) => item[axis] + item[axis === 'x' ? 'width' : 'height'] / 2;
+      const glyphOffsetX = Math.abs(center(iconShellBox, 'x') - center(glyphBox, 'x'));
+      const glyphOffsetY = Math.abs(center(iconShellBox, 'y') - center(glyphBox, 'y'));
+      const rowOffsetY = getComputedStyle(button).flexDirection === 'row' && labelBox?.visible
+        ? Math.abs(center(cardBox, 'y') - center(labelBox, 'y'))
+        : 0;
+      return [{
+        glyphOffsetX: Math.round(glyphOffsetX * 100) / 100,
+        glyphOffsetY: Math.round(glyphOffsetY * 100) / 100,
+        rowOffsetY: Math.round(rowOffsetY * 100) / 100,
+        centered: glyphOffsetX <= 1 && glyphOffsetY <= 1 && rowOffsetY <= 1,
+      }];
+    });
+    const suggestionIconsCentered = suggestionIconAlignments.every((item) => item.centered);
     const hero = box(home?.firstElementChild?.firstElementChild?.firstElementChild);
     const projectButton = box(home?.querySelector('.group\\\\/project-selector > button'));
     const shell = box(document.querySelector('main.main-surface'));
@@ -893,6 +919,8 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       visibleCardCount: visibleCards.length,
       suggestionLabels,
       suggestionLabelColorsMatch,
+      suggestionIconAlignments,
+      suggestionIconsCentered,
       projectButton,
       shell,
       composer,
@@ -915,7 +943,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       result.homePresent && result.hero?.visible && result.hero.width >= 280 &&
       result.hero.height >= 120 && (result.visibleCardCount === 0 || (
         visibleSuggestionLabels.length >= result.visibleCardCount &&
-        result.suggestionLabelColorsMatch
+        result.suggestionLabelColorsMatch && result.suggestionIconsCentered
       ))
     );
     result.pass = Boolean(basePass && homePass && payloadPass);

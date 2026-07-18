@@ -98,6 +98,11 @@ assert.match(
 );
 assert.match(
   css,
+  /data-dream-tokens="2"\][\s\S]{0,180}group\\\/home-suggestions button > span:last-child\s*\{[\s\S]{0,180}min-height:\s*0 !important;[\s\S]{0,120}margin-top:\s*0 !important;[\s\S]{0,160}justify-content:\s*center !important;/,
+  "Schema v2 suggestion copy must share the card center instead of retaining native bottom alignment.",
+);
+assert.match(
+  css,
   /data-dream-tokens="2"\]\[data-dream-art-wide="true"\]:has\(main\.main-surface\.dream-skin-home-shell\) body\s*\{[\s\S]{0,180}background-image:\s*none !important;/,
   "Schema v2 ultrawide artwork must stay inside the tokenized Home hero.",
 );
