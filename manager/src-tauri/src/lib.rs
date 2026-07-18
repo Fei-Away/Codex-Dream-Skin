@@ -2368,6 +2368,31 @@ fn active_theme_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(state_root.join(capabilities.paths.active_theme))
 }
 
+fn load_active_theme_package(directory: &Path) -> Result<Option<ThemePackage>, String> {
+    let metadata = match fs::symlink_metadata(directory) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("Cannot inspect active theme: {error}")),
+    };
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("Active theme must be a real directory.".into());
+    }
+    if !directory.join("theme.json").is_file() {
+        return Ok(None);
+    }
+    load_platform_theme_dir(directory)
+        .map(Some)
+        .map_err(|error| format!("Active theme is invalid: {error}"))
+}
+
+fn unmatched_active_theme(
+    directory: &Path,
+    known_ids: &HashSet<String>,
+) -> Result<Option<ThemePackage>, String> {
+    Ok(load_active_theme_package(directory)?
+        .filter(|package| !known_ids.contains(&package.config.id)))
+}
+
 fn platform_theme_store(app: &AppHandle) -> Result<PathBuf, String> {
     let (_, _, capabilities, _) = resolved_runtime(app)?;
     Ok(platform_state_root()?.join(capabilities.paths.theme_store))
@@ -2464,6 +2489,71 @@ fn prune_theme_cache_versions(root: &Path, keep: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn prune_retired_theme_cache_ids(root: &Path, allowed_ids: &HashSet<String>) -> Result<(), String> {
+    if allowed_ids.is_empty() {
+        return Err("Refusing to prune a theme cache without an allowlist.".into());
+    }
+    let root_metadata = match fs::symlink_metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("Cannot inspect builtin theme cache: {error}")),
+    };
+    if !root_metadata.is_dir() || root_metadata.file_type().is_symlink() {
+        return Err("Builtin theme cache must be a real directory.".into());
+    }
+    let canonical_root = canonicalize_platform_path(root, "builtin theme cache")?;
+    for entry in fs::read_dir(&canonical_root)
+        .map_err(|error| format!("Cannot list builtin theme cache: {error}"))?
+    {
+        let entry =
+            entry.map_err(|error| format!("Cannot list builtin theme cache entry: {error}"))?;
+        let name = match entry.file_name().to_str() {
+            Some(name) if validate_id(name).is_ok() => name.to_owned(),
+            _ => continue,
+        };
+        if allowed_ids.contains(&name) {
+            continue;
+        }
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("Cannot inspect builtin theme cache entry: {error}"))?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            continue;
+        }
+        let canonical = canonicalize_platform_path(&path, "retired builtin theme cache")?;
+        if canonical.parent() != Some(canonical_root.as_path()) {
+            return Err("Retired builtin theme cache escapes its expected root.".into());
+        }
+
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(format!(
+                    "Cannot re-inspect retired builtin theme cache: {error}"
+                ));
+            }
+        };
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            continue;
+        }
+        let canonical = canonicalize_platform_path(&path, "retired builtin theme cache")?;
+        if canonical.parent() != Some(canonical_root.as_path()) {
+            return Err("Retired builtin theme cache escapes its expected root.".into());
+        }
+        if canonical
+            .file_name()
+            .and_then(OsStr::to_str)
+            .is_some_and(|current| allowed_ids.contains(current))
+        {
+            continue;
+        }
+        fs::remove_dir_all(&canonical)
+            .map_err(|error| format!("Cannot prune retired builtin theme cache: {error}"))?;
+    }
+    Ok(())
+}
+
 fn cache_read_only_theme(
     app: &AppHandle,
     namespace: &str,
@@ -2526,7 +2616,7 @@ fn bundled_theme_sources(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
 
 fn builtin_themes(app: &AppHandle) -> Result<Vec<(PathBuf, ThemePackage)>, String> {
     let mut ids = HashSet::new();
-    let mut themes = Vec::new();
+    let mut packages = Vec::new();
     for source in bundled_theme_sources(app)? {
         let Ok(package) = load_platform_theme_dir(&source) else {
             continue;
@@ -2534,11 +2624,17 @@ fn builtin_themes(app: &AppHandle) -> Result<Vec<(PathBuf, ThemePackage)>, Strin
         if !ids.insert(package.config.id.clone()) {
             continue;
         }
+        packages.push(package);
+    }
+    if packages.is_empty() {
+        return Err("No valid bundled themes are available.".into());
+    }
+    prune_retired_theme_cache_ids(&app_data_root(app)?.join("builtin"), &ids)?;
+
+    let mut themes = Vec::new();
+    for package in packages {
         let cached = cache_read_only_theme(app, "builtin", &package)?;
         themes.push((cached, package));
-    }
-    if themes.is_empty() {
-        return Err("No valid bundled themes are available.".into());
     }
     Ok(themes)
 }
@@ -2662,6 +2758,23 @@ fn find_theme_in_source(
                     matches.push((directory, package, source));
                 }
             }
+            if matches.is_empty() {
+                let builtin_exists =
+                    find_theme_in_source(app, ThemeSource::Builtin, theme_id)?.is_some();
+                let manager_exists =
+                    find_theme_in_source(app, ThemeSource::Manager, theme_id)?.is_some();
+                let known_ids = if builtin_exists || manager_exists {
+                    HashSet::from([theme_id.to_owned()])
+                } else {
+                    HashSet::new()
+                };
+                let active_directory = active_theme_dir(app)?;
+                if let Some(package) = unmatched_active_theme(&active_directory, &known_ids)? {
+                    if package.config.id == theme_id {
+                        matches.push((active_directory, package, source));
+                    }
+                }
+            }
         }
     }
     match matches.len() {
@@ -2730,11 +2843,9 @@ fn select_active_theme_key(
 
 fn active_theme_selection(app: &AppHandle) -> Result<Option<String>, String> {
     let active_directory = active_theme_dir(app)?;
-    if !active_directory.join("theme.json").is_file() {
+    let Some(active) = load_active_theme_package(&active_directory)? else {
         return Ok(None);
-    }
-    let active = load_platform_theme_dir(&active_directory)
-        .map_err(|error| format!("Active theme is invalid: {error}"))?;
+    };
     let active_fingerprint = package_fingerprint(&active)?;
     let mut candidates = Vec::new();
     for source in [
@@ -3676,6 +3787,24 @@ fn list_themes_blocking(app: AppHandle) -> Result<Vec<ThemeSummary>, String> {
             ThemeSource::Manager,
             features,
         )?);
+    }
+
+    let known_ids = themes
+        .iter()
+        .map(|theme| theme.id.clone())
+        .collect::<HashSet<_>>();
+    if let Ok(active_directory) = active_theme_dir(&app) {
+        if let Ok(Some(package)) = unmatched_active_theme(&active_directory, &known_ids) {
+            let key = format!("platform:{}", package.config.id);
+            if keys.insert(key) {
+                themes.push(package_summary(
+                    &active_directory,
+                    &package,
+                    ThemeSource::Platform,
+                    features,
+                )?);
+            }
+        }
     }
 
     // Selection and connectivity are separate: a brief CDP probe failure must
@@ -4766,6 +4895,70 @@ mod tests {
     }
 
     #[test]
+    fn retired_saved_preset_keeps_a_read_only_source_qualified_active_card() {
+        let root = TestDir::new();
+        let mut legacy = package();
+        legacy.config.id = "preset-romantic-rose".into();
+        legacy.config.name = "Legacy active preset".into();
+        let saved = root.0.join("themes").join(&legacy.config.id);
+        let active = root.0.join("active-theme");
+        write_theme_dir_atomic(&saved, &legacy).unwrap();
+        write_theme_dir_atomic(&active, &legacy).unwrap();
+
+        fs::remove_dir_all(&saved).unwrap();
+        let mut known_ids = HashSet::from(["preset-arina-hashimoto".to_owned()]);
+        let loaded = unmatched_active_theme(&active, &known_ids)
+            .unwrap()
+            .expect("a valid unmatched active copy must remain discoverable");
+        let summary = package_summary(
+            &active,
+            &loaded,
+            ThemeSource::Platform,
+            &RuntimeThemeFeatures::default(),
+        )
+        .unwrap();
+        let fingerprint = package_fingerprint(&loaded).unwrap();
+
+        assert!(!saved.exists());
+        assert_eq!(summary.id, "preset-romantic-rose");
+        assert_eq!(summary.selection_key, "platform:preset-romantic-rose");
+        assert_eq!(summary.source, ThemeSource::Platform);
+        assert!(summary.read_only);
+        assert!(!summary.builtin);
+        assert_eq!(
+            select_active_theme_key(
+                &loaded.config.id,
+                &fingerprint,
+                &[(ThemeSource::Platform, fingerprint.clone())],
+            )
+            .as_deref(),
+            Some("platform:preset-romantic-rose")
+        );
+        assert!(
+            encode_bundle(&loaded).is_ok(),
+            "legacy active remains exportable"
+        );
+        assert_eq!(
+            load_platform_theme_dir(&active).unwrap().config.id,
+            "preset-romantic-rose",
+            "discovery must not migrate or overwrite the active copy",
+        );
+
+        known_ids.insert("preset-romantic-rose".into());
+        assert!(unmatched_active_theme(&active, &known_ids)
+            .unwrap()
+            .is_none());
+
+        let invalid = root.0.join("invalid-active");
+        fs::create_dir(&invalid).unwrap();
+        fs::write(invalid.join("theme.json"), b"{}").unwrap();
+        assert!(unmatched_active_theme(&invalid, &HashSet::new()).is_err());
+        assert!(load_active_theme_package(&root.0.join("missing-active"))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
     fn draft_round_trip_preserves_trailing_prefix_and_adaptive_omissions() {
         let mut original = package();
         original.config.project_prefix = "Choose project · ".into();
@@ -4914,6 +5107,75 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn retired_builtin_id_gc_preserves_allowlisted_and_unmanaged_entries() {
+        let root = TestDir::new();
+        let cache = root.0.join("builtin");
+        let current = cache.join("safe-theme");
+        let retired = cache.join("preset-romantic-rose");
+        let unmanaged_directory = cache.join(".staging-data");
+        let unmanaged_file = cache.join("preset-file");
+        fs::create_dir_all(current.join("current-version")).unwrap();
+        fs::create_dir_all(retired.join("old-version")).unwrap();
+        fs::create_dir(&unmanaged_directory).unwrap();
+        fs::write(&unmanaged_file, b"not a cache directory").unwrap();
+        fs::write(current.join("current-version").join("marker"), b"keep").unwrap();
+        fs::write(retired.join("old-version").join("marker"), b"retired").unwrap();
+
+        assert!(prune_retired_theme_cache_ids(&cache, &HashSet::new()).is_err());
+        assert!(retired.is_dir(), "an empty allowlist must fail closed");
+
+        #[cfg(unix)]
+        let (outside, linked) = {
+            use std::os::unix::fs::symlink;
+
+            let outside = root.0.join("outside-cache");
+            let linked = cache.join("preset-linked");
+            fs::create_dir(&outside).unwrap();
+            fs::write(outside.join("marker"), b"outside").unwrap();
+            symlink(&outside, &linked).unwrap();
+            (outside, linked)
+        };
+
+        prune_retired_theme_cache_ids(&cache, &HashSet::from(["safe-theme".to_owned()])).unwrap();
+
+        assert_eq!(
+            fs::read(current.join("current-version").join("marker")).unwrap(),
+            b"keep"
+        );
+        assert!(!retired.exists());
+        assert!(unmanaged_directory.is_dir());
+        assert_eq!(fs::read(&unmanaged_file).unwrap(), b"not a cache directory");
+        #[cfg(unix)]
+        {
+            assert_eq!(fs::read(outside.join("marker")).unwrap(), b"outside");
+            assert!(fs::symlink_metadata(&linked)
+                .unwrap()
+                .file_type()
+                .is_symlink());
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn retired_builtin_id_gc_rejects_a_symlink_root_without_touching_its_target() {
+        use std::os::unix::fs::symlink;
+
+        let root = TestDir::new();
+        let outside = root.0.join("outside-builtin");
+        let linked_root = root.0.join("builtin-link");
+        let retired = outside.join("preset-romantic-rose");
+        fs::create_dir_all(&retired).unwrap();
+        fs::write(retired.join("marker"), b"outside").unwrap();
+        symlink(&outside, &linked_root).unwrap();
+
+        let error =
+            prune_retired_theme_cache_ids(&linked_root, &HashSet::from(["safe-theme".to_owned()]))
+                .expect_err("a symlink cache root must fail closed");
+        assert!(error.contains("real directory"));
+        assert_eq!(fs::read(retired.join("marker")).unwrap(), b"outside");
     }
 
     #[test]
