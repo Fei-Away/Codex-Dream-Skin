@@ -46,7 +46,7 @@
 
 ### OpenAI China Special / OpenAI 中国特别版
 
-Windows now seeds `OpenAI 中国主题` as the default theme. It uses a red-and-gold home banner, figure-and-flag artwork, faint slogan text, and a warm light workspace. The home header shows `OpenAI 中国主题` and `Codex App 中国特别版`, with the top-right tagline `初心如磐 · 智启未来`. The sidebar, cards, project picker, and composer remain native Codex controls rather than a fake full-window screenshot.
+Windows now seeds `OpenAI 中国主题` as the default theme. It uses a red-and-gold home banner, figure-and-flag artwork, faint slogan text, and a warm light workspace. The home header shows `OpenAI 中国主题` and `Codex App 中国特别版`, with the top-right tagline `初心如磐 · 智启未来`. Normal task routes also use a low-distraction red-and-gold background layer with softened flag-raising artwork while keeping task content and the composer readable. The sidebar, cards, project picker, and composer remain native Codex controls rather than a fake full-window screenshot.
 
 <p align="center">
   <img src="docs/images/presets/openai-china-special-preview.png" alt="OpenAI China Special Windows theme preview" width="900"><br>

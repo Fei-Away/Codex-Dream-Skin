@@ -319,29 +319,35 @@ async function loadTheme(themeDir) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("Theme root must be an object");
   }
-  const image = normalizedText(raw.image, "image", null, 240);
-  if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
-  const imagePath = path.resolve(realThemeDir, image);
-  const relativeImage = path.relative(realThemeDir, imagePath);
-  if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
-    throw new Error("Theme image must remain inside the selected theme directory");
-  }
-  const extension = path.extname(imagePath).toLowerCase();
-  if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) {
-    throw new Error(`Unsupported theme image format: ${extension || "missing"}`);
-  }
-  const realImagePath = await fs.realpath(imagePath);
-  const realRelativeImage = path.relative(realThemeDir, realImagePath);
-  if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
-    throw new Error("Theme image cannot escape through a link or junction");
-  }
+  const resolveThemeImage = async (value, name, required = false) => {
+    const image = normalizedText(value, name, required ? null : "", 240);
+    if (!image) return null;
+    if (path.isAbsolute(image)) throw new Error(`${name} must be a relative path`);
+    const imagePath = path.resolve(realThemeDir, image);
+    const relativeImage = path.relative(realThemeDir, imagePath);
+    if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
+      throw new Error(`${name} must remain inside the selected theme directory`);
+    }
+    const extension = path.extname(imagePath).toLowerCase();
+    if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) {
+      throw new Error(`Unsupported ${name} format: ${extension || "missing"}`);
+    }
+    const realImagePath = await fs.realpath(imagePath);
+    const realRelativeImage = path.relative(realThemeDir, realImagePath);
+    if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
+      throw new Error(`${name} cannot escape through a link or junction`);
+    }
+    return { image, extension, realImagePath };
+  };
+  const primaryImage = await resolveThemeImage(raw.image, "image", true);
+  const taskBackground = await resolveThemeImage(raw.taskBackground, "taskBackground");
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
   const theme = {
     id: normalizedText(raw.id, "id", "custom", 80),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
-    image,
+    image: primaryImage.image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
     art: {
       focusX: normalizedUnit(art.focusX, "art.focusX"),
@@ -351,6 +357,7 @@ async function loadTheme(themeDir) {
     },
     palette: {},
   };
+  if (taskBackground) theme.taskBackground = taskBackground.image;
   if (typeof palette.accent === "string" && palette.accent.trim()) {
     const accent = palette.accent.trim();
     if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(accent)) {
@@ -358,33 +365,56 @@ async function loadTheme(themeDir) {
     }
     theme.palette.accent = accent;
   }
-  const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
+  const [themeStat, imageStat, taskImageStat] = await Promise.all([
+    fs.stat(themePath),
+    fs.stat(primaryImage.realImagePath),
+    taskBackground ? fs.stat(taskBackground.realImagePath) : Promise.resolve(null),
+  ]);
   if (!imageStat.isFile()) throw new Error("Theme image is not a file");
   if (imageStat.size < 1) throw new Error("Theme image cannot be empty");
   if (imageStat.size > MAX_ART_BYTES) {
     throw new Error(`Theme image exceeds the ${MAX_ART_BYTES / 1024 / 1024} MB limit`);
   }
-  const imageBytes = await fs.readFile(realImagePath);
+  const imageBytes = await fs.readFile(primaryImage.realImagePath);
   if (imageBytes.length < 1 || imageBytes.length > MAX_ART_BYTES) {
     throw new Error(`Theme image must be between 1 byte and ${MAX_ART_BYTES / 1024 / 1024} MB`);
   }
-  const artMetadata = readImageMetadata(imageBytes, extension);
+  const artMetadata = readImageMetadata(imageBytes, primaryImage.extension);
   if (!artMetadata) {
     throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
   }
+  let taskImageBytes = null;
+  if (taskBackground) {
+    if (!taskImageStat.isFile()) throw new Error("Task background image is not a file");
+    if (taskImageStat.size < 1) throw new Error("Task background image cannot be empty");
+    if (taskImageStat.size > MAX_ART_BYTES) {
+      throw new Error(`Task background image exceeds the ${MAX_ART_BYTES / 1024 / 1024} MB limit`);
+    }
+    taskImageBytes = await fs.readFile(taskBackground.realImagePath);
+    if (taskImageBytes.length < 1 || taskImageBytes.length > MAX_ART_BYTES) {
+      throw new Error(`Task background image must be between 1 byte and ${MAX_ART_BYTES / 1024 / 1024} MB`);
+    }
+    if (!readImageMetadata(taskImageBytes, taskBackground.extension)) {
+      throw new Error("Task background image metadata is invalid or exceeds the 16384px / 50MP safety limit");
+    }
+  }
   theme.artMetadata = artMetadata;
-  const fingerprint = createHash("sha256")
+  const hash = createHash("sha256")
     .update(themeText, "utf8")
     .update("\0")
-    .update(imageBytes)
-    .digest("hex");
+    .update(imageBytes);
+  if (taskImageBytes) hash.update("\0").update(taskImageBytes);
+  const sourceStamp = `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}` +
+    (taskImageStat ? `:${taskImageStat.size}:${taskImageStat.mtimeMs}` : "");
   return {
     theme,
     themePath,
-    imagePath: realImagePath,
+    imagePath: primaryImage.realImagePath,
     imageBytes,
-    fingerprint,
-    sourceStamp: `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`,
+    taskImagePath: taskBackground?.realImagePath ?? null,
+    taskImageBytes,
+    fingerprint: hash.digest("hex"),
+    sourceStamp,
   };
 }
 
@@ -394,15 +424,21 @@ async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme 
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
   ]);
-  const extension = path.extname(loadedTheme.imagePath).toLowerCase();
-  const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
-    : extension === ".webp" ? "image/webp" : "image/png";
-  const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
+  const mimeForPath = (value) => {
+    const extension = path.extname(value).toLowerCase();
+    return extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
+      : extension === ".webp" ? "image/webp" : "image/png";
+  };
+  const artDataUrl = `data:${mimeForPath(loadedTheme.imagePath)};base64,${loadedTheme.imageBytes.toString("base64")}`;
+  const taskArtDataUrl = loadedTheme.taskImageBytes
+    ? `data:${mimeForPath(loadedTheme.taskImagePath)};base64,${loadedTheme.taskImageBytes.toString("base64")}`
+    : "";
   const payload = template
     .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
     .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
+    .replace("__DREAM_TASK_ART_JSON__", JSON.stringify(taskArtDataUrl))
     .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme));
-  const { imageBytes: _imageBytes, ...themeState } = loadedTheme;
+  const { imageBytes: _imageBytes, taskImageBytes: _taskImageBytes, ...themeState } = loadedTheme;
   return { ...themeState, payload };
 }
 
@@ -417,11 +453,13 @@ async function fileExists(filePath) {
 }
 
 async function readThemeSourceStamp(loadedTheme) {
-  const [themeStat, imageStat] = await Promise.all([
+  const [themeStat, imageStat, taskImageStat] = await Promise.all([
     fs.stat(loadedTheme.themePath),
     fs.stat(loadedTheme.imagePath),
+    loadedTheme.taskImagePath ? fs.stat(loadedTheme.taskImagePath) : Promise.resolve(null),
   ]);
-  return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`;
+  return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}` +
+    (taskImageStat ? `:${taskImageStat.size}:${taskImageStat.mtimeMs}` : "");
 }
 
 async function probeSession(session) {
@@ -553,7 +591,7 @@ async function removeFromSession(session) {
       'dream-theme-openai-china'
     );
     for (const property of [
-      '--dream-art', '--dream-art-position', '--dream-focus-x', '--dream-focus-y',
+      '--dream-art', '--dream-task-art', '--dream-art-position', '--dream-focus-x', '--dream-focus-y',
       '--dream-accent', '--dream-accent-ink', '--dream-image-luma',
       '--dream-main-left', '--dream-main-top', '--dream-main-width'
     ]) document.documentElement?.style.removeProperty(property);
@@ -982,7 +1020,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
   } else if (options.mode === "check-payload") {
     const loaded = await loadPayload(options.themeDir);
-    const unresolved = ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_THEME_JSON__"]
+    const unresolved = ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_TASK_ART_JSON__", "__DREAM_THEME_JSON__"]
       .some((placeholder) => loaded.payload.includes(placeholder));
     if (unresolved) {
       throw new Error("Payload placeholders were not fully replaced");

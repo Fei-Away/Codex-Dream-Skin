@@ -11,6 +11,7 @@ const css = await fs.readFile(path.join(windowsRoot, "assets", "dream-skin.css")
 const buildPayload = (config = {}) => template
   .replace("__DREAM_CSS_JSON__", JSON.stringify(".fixture { color: blue; }"))
   .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
+  .replace("__DREAM_TASK_ART_JSON__", JSON.stringify(""))
   .replace("__DREAM_THEME_JSON__", JSON.stringify(config));
 const payload = buildPayload();
 
@@ -234,6 +235,7 @@ const mainResult = vm.runInNewContext(payload, main.context);
 assert.equal(mainResult.installed, true);
 assert.equal(main.rootClasses.has("codex-dream-skin"), true);
 assert.equal(main.rootStyles.get("--dream-art"), 'url("blob:fixture-1")');
+assert.equal(main.rootStyles.get("--dream-task-art"), 'url("blob:fixture-1")');
 assert.equal(main.nodes.has("codex-dream-skin-style"), true);
 assert.equal(main.nodes.has("codex-dream-skin-chrome"), true);
 assert.equal(main.rootClasses.has("dream-theme-dark"), true);
@@ -255,6 +257,7 @@ const secondState = reinjected.context.window.__CODEX_DREAM_SKIN_STATE__;
 assert.notEqual(secondState.installToken, firstState.installToken);
 assert.equal(secondState.artUrl, "blob:fixture-2");
 assert.equal(reinjected.rootStyles.get("--dream-art"), 'url("blob:fixture-2")');
+assert.equal(reinjected.rootStyles.get("--dream-task-art"), 'url("blob:fixture-2")');
 assert.deepEqual(reinjected.revokedUrls, ["blob:fixture-1"]);
 assert.equal(firstState.cleanup(), false);
 assert.equal(secondState.cleanup(), true);

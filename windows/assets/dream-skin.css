@@ -697,6 +697,33 @@ html.codex-dream-skin.dream-theme-openai-china.dream-art-wide:is(.dream-task-amb
   box-shadow: none !important;
 }
 
+html.codex-dream-skin.dream-theme-openai-china main.main-surface:not(.dream-home-shell),
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface:not(.dream-home-shell),
+html.codex-dream-skin.dream-theme-openai-china.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) {
+  background-color: var(--dream-surface) !important;
+  background-image:
+    linear-gradient(90deg, #fffaf0 0 38%, rgb(255 250 240 / .88) 58%, rgb(255 247 231 / .64) 100%),
+    linear-gradient(137deg, transparent 0 46%, rgb(220 72 45 / .055) 57%, rgb(246 198 99 / .06) 66%, transparent 82%),
+    var(--dream-task-art),
+    radial-gradient(ellipse at 84% 14%, color-mix(in oklab, #f6c663 24%, transparent) 0%, transparent 38%),
+    radial-gradient(ellipse at 78% 90%, color-mix(in oklab, #df5735 9%, transparent) 0%, transparent 42%) !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100%, 100% 100%, min(960px, 82vw) auto, 76% 46%, 88% 46% !important;
+  background-position: center, center, right -116px top 58px, right -18% top -10%, right -22% bottom -14% !important;
+  background-blend-mode: normal, normal, multiply, normal, normal !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china main.main-surface:not(.dream-home-shell) [role="main"],
+html.codex-dream-skin.dream-theme-openai-china .dream-task {
+  background: transparent !important;
+}
+
+html.codex-dream-skin.dream-theme-openai-china .dream-task::before {
+  content: none !important;
+  display: none !important;
+}
+
 html.codex-dream-skin.dream-theme-openai-china main.main-surface > header.app-header-tint,
 html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface > header.app-header-tint {
   color: #702f54 !important;
@@ -885,4 +912,17 @@ html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome:not(.dre
 html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome:not(.dream-home-shell) .dream-china-brand,
 html.codex-dream-skin.dream-theme-openai-china #codex-dream-skin-chrome:not(.dream-home-shell) .dream-china-tagline {
   display: none;
+}
+
+@media (max-width: 900px) {
+  html.codex-dream-skin.dream-theme-openai-china main.main-surface:not(.dream-home-shell),
+  html.codex-dream-skin.dream-theme-openai-china.dream-art-wide main.main-surface:not(.dream-home-shell) {
+    background-image:
+      linear-gradient(90deg, #fffaf0 0%, rgb(255 250 240 / .9) 100%),
+      linear-gradient(137deg, transparent 0 48%, rgb(220 72 45 / .04) 60%, transparent 82%),
+      radial-gradient(ellipse at 88% 8%, color-mix(in oklab, #f6c663 18%, transparent) 0%, transparent 42%) !important;
+    background-size: 100% 100%, 100% 100%, 92% 42% !important;
+    background-position: center, center, right -28% top -8% !important;
+    background-blend-mode: normal, normal, normal !important;
+  }
 }

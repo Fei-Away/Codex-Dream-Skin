@@ -28,7 +28,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
-当前 Windows 默认主题是 `OpenAI 中国主题`。它会在首页显示红金横幅、`OpenAI 中国主题`、`Codex App 中国特别版` 和右上角 `初心如磐 · 智启未来` 标语；侧栏、建议卡、项目选择和输入框仍然使用 Codex 原生控件。
+当前 Windows 默认主题是 `OpenAI 中国主题`。它会在首页显示红金横幅、`OpenAI 中国主题`、`Codex App 中国特别版` 和右上角 `初心如磐 · 智启未来` 标语；普通任务页会使用低干扰的红金背景层与弱化升旗视觉铺底，侧栏、建议卡、项目选择和输入框仍然使用 Codex 原生控件。
 
 安装命令中的 `Bypass` 只作用于这一次由用户明确发起的安装进程。安装器会先校验运行时副本的 SHA-256，再仅对 `%LOCALAPPDATA%\CodexDreamSkin\engine` 中受管的 PowerShell 副本清除下载区标记。日常快捷方式使用 `RemoteSigned`，不会绕过系统或企业组策略。
 

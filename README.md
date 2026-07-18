@@ -45,7 +45,7 @@
 
 ### OpenAI 中国特别版 / OpenAI China Special
 
-Windows 当前默认启用「OpenAI 中国主题」。这套皮肤使用红金横幅、人物与旗帜视觉、淡字标语和浅色工作台配色；首页标题区显示 `OpenAI 中国主题` 与 `Codex App 中国特别版`，右上角标语为 `初心如磐 · 智启未来`。截图中的侧栏、建议卡、项目选择和输入框仍然是 Codex 原生控件，不是整窗假截图。
+Windows 当前默认启用「OpenAI 中国主题」。这套皮肤使用红金横幅、人物与旗帜视觉、淡字标语和浅色工作台配色；首页标题区显示 `OpenAI 中国主题` 与 `Codex App 中国特别版`，右上角标语为 `初心如磐 · 智启未来`。普通任务页也会使用低干扰的红金背景层与弱化升旗视觉铺底，保留任务内容和输入框可读性。截图中的侧栏、建议卡、项目选择和输入框仍然是 Codex 原生控件，不是整窗假截图。
 
 <p align="center">
   <img src="docs/images/presets/openai-china-special-preview.png" alt="OpenAI 中国特别版 Windows 主题预览" width="900"><br>

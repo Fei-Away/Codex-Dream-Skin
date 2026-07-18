@@ -161,10 +161,22 @@ function Read-DreamSkinTheme {
     throw 'Theme image must remain inside its theme directory and exist.'
   }
   Assert-DreamSkinImageFile -Path $imagePath -SkipImageMetadata:$SkipImageMetadata
+  $taskBackgroundPath = $null
+  if ($theme.taskBackground) {
+    $taskBackground = "$($theme.taskBackground)"
+    if ([System.IO.Path]::IsPathRooted($taskBackground)) { throw 'Task background image path must be relative.' }
+    $taskBackgroundPath = [System.IO.Path]::GetFullPath((Join-Path $directory $taskBackground))
+    if (-not (Test-DreamSkinThemePathWithin -Path $taskBackgroundPath -Root $directory) -or
+      -not (Test-Path -LiteralPath $taskBackgroundPath -PathType Leaf)) {
+      throw 'Task background image must remain inside its theme directory and exist.'
+    }
+    Assert-DreamSkinImageFile -Path $taskBackgroundPath -SkipImageMetadata:$SkipImageMetadata
+  }
   return [pscustomobject]@{
     Directory = $directory
     ThemePath = $themePath
     ImagePath = $imagePath
+    TaskBackgroundPath = $taskBackgroundPath
     Theme = $theme
   }
 }
@@ -204,27 +216,41 @@ function Initialize-DreamSkinThemeStore {
   if (-not $assetImageName -or [System.IO.Path]::IsPathRooted($assetImageName)) {
     throw 'Seed theme image path must be relative.'
   }
-  $assetImage = [System.IO.Path]::GetFullPath((Join-Path $assetRoot $assetImageName))
-  if (-not (Test-DreamSkinThemePathWithin -Path $assetImage -Root $assetRoot)) {
-    throw 'Seed theme image must remain inside the assets directory.'
+  $assetImageNames = @($assetImageName)
+  if ($seedTheme.taskBackground) {
+    $assetTaskBackgroundName = "$($seedTheme.taskBackground)"
+    if ([System.IO.Path]::IsPathRooted($assetTaskBackgroundName)) {
+      throw 'Seed theme task background path must be relative.'
+    }
+    $assetImageNames += $assetTaskBackgroundName
   }
-  Assert-DreamSkinImageFile -Path $assetImage
+  $assetImages = @{}
+  foreach ($imageName in $assetImageNames) {
+    $assetImage = [System.IO.Path]::GetFullPath((Join-Path $assetRoot $imageName))
+    if (-not (Test-DreamSkinThemePathWithin -Path $assetImage -Root $assetRoot)) {
+      throw 'Seed theme image must remain inside the assets directory.'
+    }
+    Assert-DreamSkinImageFile -Path $assetImage
+    $assetImages[$imageName] = $assetImage
+  }
   $activeTheme = Join-Path $paths.Active 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $activeTheme
   if (-not (Test-Path -LiteralPath $activeTheme -PathType Leaf)) {
     Ensure-DreamSkinManagedDirectory -Path $paths.Active -Root $paths.Root
-    $activeImage = Join-Path $paths.Active $assetImageName
-    Assert-DreamSkinNoReparseComponents -Path $activeImage
-    Copy-Item -LiteralPath $assetImage `
-      -Destination $activeImage -Force
-    Assert-DreamSkinNoReparseComponents -Path $activeImage
-    Assert-DreamSkinImageFile -Path $activeImage
-    $imageArchive = Join-Path $paths.Images $assetImageName
-    Assert-DreamSkinNoReparseComponents -Path $imageArchive
-    Copy-Item -LiteralPath $assetImage `
-      -Destination $imageArchive -Force
-    Assert-DreamSkinNoReparseComponents -Path $imageArchive
-    Assert-DreamSkinImageFile -Path $imageArchive
+    foreach ($imageName in $assetImageNames) {
+      $activeImage = Join-Path $paths.Active $imageName
+      Assert-DreamSkinNoReparseComponents -Path $activeImage
+      Copy-Item -LiteralPath $assetImages[$imageName] `
+        -Destination $activeImage -Force
+      Assert-DreamSkinNoReparseComponents -Path $activeImage
+      Assert-DreamSkinImageFile -Path $activeImage
+      $imageArchive = Join-Path $paths.Images $imageName
+      Assert-DreamSkinNoReparseComponents -Path $imageArchive
+      Copy-Item -LiteralPath $assetImages[$imageName] `
+        -Destination $imageArchive -Force
+      Assert-DreamSkinNoReparseComponents -Path $imageArchive
+      Assert-DreamSkinImageFile -Path $imageArchive
+    }
     Assert-DreamSkinNoReparseComponents -Path $activeTheme
     Copy-Item -LiteralPath $assetTheme -Destination $activeTheme -Force
   }
@@ -239,12 +265,14 @@ function Initialize-DreamSkinThemeStore {
   Assert-DreamSkinNoReparseComponents -Path $presetTheme
   if (-not (Test-Path -LiteralPath $presetTheme -PathType Leaf)) {
     Ensure-DreamSkinManagedDirectory -Path $presetDirectory -Root $paths.Root
-    $presetImage = Join-Path $presetDirectory $assetImageName
-    Assert-DreamSkinNoReparseComponents -Path $presetImage
-    Copy-Item -LiteralPath $assetImage `
-      -Destination $presetImage -Force
-    Assert-DreamSkinNoReparseComponents -Path $presetImage
-    Assert-DreamSkinImageFile -Path $presetImage
+    foreach ($imageName in $assetImageNames) {
+      $presetImage = Join-Path $presetDirectory $imageName
+      Assert-DreamSkinNoReparseComponents -Path $presetImage
+      Copy-Item -LiteralPath $assetImages[$imageName] `
+        -Destination $presetImage -Force
+      Assert-DreamSkinNoReparseComponents -Path $presetImage
+      Assert-DreamSkinImageFile -Path $presetImage
+    }
     Assert-DreamSkinNoReparseComponents -Path $presetTheme
     Copy-Item -LiteralPath $assetTheme -Destination $presetTheme -Force
   }
@@ -261,6 +289,7 @@ function New-DreamSkinThemeImageName {
 function Set-DreamSkinActiveTheme {
   param(
     [Parameter(Mandatory = $true)][string]$ImagePath,
+    [string]$TaskBackgroundPath,
     [AllowNull()][object]$Theme,
     [string]$Name,
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
@@ -295,6 +324,22 @@ function Set-DreamSkinActiveTheme {
     Move-Item -LiteralPath $temporary -Destination $target -Force
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinImageFile -Path $target
+    if ($TaskBackgroundPath) {
+      $taskSource = [System.IO.Path]::GetFullPath($TaskBackgroundPath)
+      Assert-DreamSkinImageFile -Path $taskSource
+      $taskName = if ($Theme.taskBackground) {
+        "$($Theme.taskBackground)"
+      } else {
+        New-DreamSkinThemeImageName -Extension ([System.IO.Path]::GetExtension($taskSource))
+      }
+      if ([System.IO.Path]::IsPathRooted($taskName)) { throw 'Task background image path must be relative.' }
+      $taskTarget = Join-Path $paths.Active $taskName
+      Assert-DreamSkinNoReparseComponents -Path $taskTarget
+      Copy-Item -LiteralPath $taskSource -Destination $taskTarget -Force
+      Assert-DreamSkinNoReparseComponents -Path $taskTarget
+      Assert-DreamSkinImageFile -Path $taskTarget
+      $Theme | Add-Member -NotePropertyName taskBackground -NotePropertyValue $taskName -Force
+    }
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
     if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
@@ -320,6 +365,13 @@ function Set-DreamSkinActiveTheme {
   Copy-Item -LiteralPath $target -Destination $imageArchive -Force
   Assert-DreamSkinNoReparseComponents -Path $imageArchive
   Assert-DreamSkinImageFile -Path $imageArchive
+  if ($TaskBackgroundPath -and $Theme.taskBackground) {
+    $taskArchive = Join-Path $paths.Images "$($Theme.taskBackground)"
+    Assert-DreamSkinNoReparseComponents -Path $taskArchive
+    Copy-Item -LiteralPath (Join-Path $paths.Active "$($Theme.taskBackground)") -Destination $taskArchive -Force
+    Assert-DreamSkinNoReparseComponents -Path $taskArchive
+    Assert-DreamSkinImageFile -Path $taskArchive
+  }
   return Read-DreamSkinTheme -ThemeDirectory $paths.Active
 }
 
@@ -350,6 +402,16 @@ function Save-DreamSkinCurrentTheme {
   $theme.id = $id
   $theme.name = $trimmed
   $theme.image = $imageName
+  if ($active.TaskBackgroundPath) {
+    $taskExtension = [System.IO.Path]::GetExtension($active.TaskBackgroundPath).ToLowerInvariant()
+    $taskImageName = 'task-background' + $taskExtension
+    $destinationTaskImage = Join-Path $destination $taskImageName
+    Assert-DreamSkinNoReparseComponents -Path $destinationTaskImage
+    Copy-Item -LiteralPath $active.TaskBackgroundPath -Destination $destinationTaskImage -Force
+    Assert-DreamSkinNoReparseComponents -Path $destinationTaskImage
+    Assert-DreamSkinImageFile -Path $destinationTaskImage
+    $theme | Add-Member -NotePropertyName taskBackground -NotePropertyValue $taskImageName -Force
+  }
   Write-DreamSkinTheme -ThemeDirectory $destination -Theme $theme
   return Read-DreamSkinTheme -ThemeDirectory $destination
 }
@@ -391,7 +453,7 @@ function Use-DreamSkinSavedTheme {
   }
   $saved = Read-DreamSkinTheme -ThemeDirectory $directory
   $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme -StateRoot $StateRoot
+  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -TaskBackgroundPath $saved.TaskBackgroundPath -Theme $theme -StateRoot $StateRoot
 }
 
 function Set-DreamSkinPaused {

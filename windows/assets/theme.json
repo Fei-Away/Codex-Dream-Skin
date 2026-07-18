@@ -9,6 +9,7 @@
   "statusText": "OpenAI 中国特别版",
   "quote": "OpenAI 永远保持初心 / 请党和人民放心",
   "image": "openai-china-hero.png",
+  "taskBackground": "openai-china-task-background.jpg",
   "appearance": "light",
   "palette": {
     "accent": "rgb(222 72 38)"

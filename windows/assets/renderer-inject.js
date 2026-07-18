@@ -1,4 +1,4 @@
-((cssText, artDataUrl, rawConfig) => {
+((cssText, artDataUrl, taskArtDataUrl, rawConfig) => {
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
@@ -22,6 +22,7 @@
   ];
   const ROOT_PROPERTIES = [
     "--dream-art",
+    "--dream-task-art",
     "--dream-art-position",
     "--dream-focus-x",
     "--dream-focus-y",
@@ -96,14 +97,17 @@
   if (previous?.timer) clearInterval(previous.timer);
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
   if (previous?.artUrl) URL.revokeObjectURL(previous.artUrl);
-  const artUrl = (() => {
-    const comma = artDataUrl.indexOf(",");
-    const binary = atob(artDataUrl.slice(comma + 1));
+  if (previous?.taskArtUrl && previous.taskArtUrl !== previous?.artUrl) URL.revokeObjectURL(previous.taskArtUrl);
+  const objectUrlFromDataUrl = (dataUrl) => {
+    const comma = dataUrl.indexOf(",");
+    const binary = atob(dataUrl.slice(comma + 1));
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    const mime = /^data:([^;,]+)/.exec(artDataUrl)?.[1] || "image/png";
+    const mime = /^data:([^;,]+)/.exec(dataUrl)?.[1] || "image/png";
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
-  })();
+  };
+  const artUrl = objectUrlFromDataUrl(artDataUrl);
+  const taskArtUrl = taskArtDataUrl ? objectUrlFromDataUrl(taskArtDataUrl) : artUrl;
   const config = normalizeConfig(rawConfig);
   let profile = {
     ...defaultProfile,
@@ -320,6 +324,7 @@
     }
     root.classList.toggle("dream-theme-openai-china", config.variant === "openai-china");
     root.style.setProperty("--dream-art", `url("${artUrl}")`);
+    root.style.setProperty("--dream-task-art", `url("${taskArtUrl}")`);
     root.style.setProperty("--dream-art-position", `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`);
     root.style.setProperty("--dream-focus-x", String(focusX));
     root.style.setProperty("--dream-focus-y", String(focusY));
@@ -410,6 +415,7 @@
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
+    if (state?.taskArtUrl && state.taskArtUrl !== state?.artUrl) URL.revokeObjectURL(state.taskArtUrl);
     delete window[STATE_KEY];
     return true;
   };
@@ -434,7 +440,7 @@
   });
   const timer = setInterval(ensure, 5000);
   window[STATE_KEY] = {
-    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
+    ensure, cleanup, observer, timer, scheduler, artUrl, taskArtUrl, profile, config, installToken, version: "1.2.0",
   };
   ensure();
   analyzeArt().then((result) => {
@@ -445,4 +451,4 @@
     ensure();
   });
   return { installed: true, version: "1.2.0", adaptive: true };
-})(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__)
+})(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_TASK_ART_JSON__, __DREAM_THEME_JSON__)

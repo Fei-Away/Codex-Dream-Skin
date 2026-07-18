@@ -129,6 +129,7 @@ function Install-DreamSkinRuntimeEngine {
     'assets\dream-reference.jpg',
     'assets\dream-skin.css',
     'assets\openai-china-hero.png',
+    'assets\openai-china-task-background.jpg',
     'assets\renderer-inject.js',
     'assets\theme.json',
     'scripts\common-windows.ps1',

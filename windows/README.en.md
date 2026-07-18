@@ -28,7 +28,7 @@ The installer validates the official Codex Store package and Node.js, saves a re
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
-The current Windows default theme is `OpenAI 中国主题`. It renders a red-and-gold home banner, `OpenAI 中国主题`, `Codex App 中国特别版`, and the top-right tagline `初心如磐 · 智启未来`; the sidebar, suggestion cards, project picker, and composer remain native Codex controls.
+The current Windows default theme is `OpenAI 中国主题`. It renders a red-and-gold home banner, `OpenAI 中国主题`, `Codex App 中国特别版`, and the top-right tagline `初心如磐 · 智启未来`; normal task routes use a low-distraction red-and-gold background layer with softened flag-raising artwork, while the sidebar, suggestion cards, project picker, and composer remain native Codex controls.
 
 `Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
 
