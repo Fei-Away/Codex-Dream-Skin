@@ -159,6 +159,13 @@ try {
     $installSource.Contains('-ExecutionPolicy Bypass')) {
     throw 'Installer shortcuts or tray launch still bypass the PowerShell execution policy.'
   }
+  if (-not $installSource.Contains('[switch]$TrayShortcut') -or
+    -not $installSource.Contains('[switch]$StartTray') -or
+    -not $installSource.Contains('if ($TrayShortcut -or $StartTray)') -or
+    -not $installSource.Contains('if ($StartTray)') -or
+    -not $installSource.Contains('Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue')) {
+    throw 'Installer tray shortcut or hidden tray launch is not explicit opt-in, or stale tray shortcuts are not cleaned.'
+  }
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
   foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {

@@ -9,7 +9,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 
 ## Workflow
 
-1. Install Node.js 22 or newer, close Codex, then run `scripts/install-dream-skin.ps1` once. The installer preserves the user's native appearance settings, seeds the Arina Hashimoto theme, copies the runtime to `%LOCALAPPDATA%\CodexDreamSkin\engine`, and creates launch/restore/tray shortcuts that do not depend on the source checkout.
+1. Install Node.js 22 or newer, close Codex, then run `scripts/install-dream-skin.ps1` once. The installer preserves the user's native appearance settings, seeds the Arina Hashimoto theme, copies the runtime to `%LOCALAPPDATA%\CodexDreamSkin\engine`, and creates launch/restore shortcuts that do not depend on the source checkout. Pass `-TrayShortcut` or `-StartTray` only when the user explicitly wants tray controls.
 2. Use the `Codex Dream Skin` shortcut, or run `%LOCALAPPDATA%\CodexDreamSkin\engine\scripts\start-dream-skin.ps1`. The shortcut asks before restarting an already-open Codex app; CLI callers must explicitly add `-RestartExisting`.
 3. Run `scripts/verify-dream-skin.ps1 -ScreenshotPath <absolute-path>` after launch. Treat a missing continuous wallpaper, home shell, native composer, sidebar layer, or injection marker as failure. The native suggestion count is responsive and may be two to four.
 4. Inspect the screenshot against `references/qa-inventory.md`. Verify both the home screen and a normal task before signing off.
@@ -35,6 +35,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 - Keep install/start/restore/verify serialized with the per-user operation lock in `common-windows.ps1`.
 - Treat `%LOCALAPPDATA%\CodexDreamSkin\engine` as an installer-managed runtime. Exit the Dream Skin tray before reinstalling so the installer can replace that runtime atomically and update every shortcut to the same copy.
 - Keep installed shortcuts and tray child processes on `RemoteSigned`, never `Bypass`. Clear Internet-zone markers only from staged managed `.ps1` copies after their byte-content hashes match the selected source; never change the user's persistent execution policy or override Group Policy.
+- Do not create a hidden PowerShell tray shortcut or start the tray by default. Tray controls must be explicit opt-in via `-TrayShortcut` or `-StartTray`.
 
 ## Checks
 

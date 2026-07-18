@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
   [int]$Port = 9335,
-  [switch]$NoShortcuts
+  [switch]$NoShortcuts,
+  [switch]$TrayShortcut,
+  [switch]$StartTray
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,23 +72,37 @@ try {
     $restore.Description = 'Restore the official Codex appearance and close the CDP session'
     $restore.Save()
 
-    foreach ($folder in @($desktop, $startMenu)) {
-      $tray = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))
-      $tray.TargetPath = $powershell
-      $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument"
-      $tray.WorkingDirectory = $engine.Root
-      $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
-      $tray.Save()
+    $trayShortcutPaths = @(
+      (Join-Path $desktop 'Codex Dream Skin - Tray.lnk'),
+      (Join-Path $startMenu 'Codex Dream Skin - Tray.lnk')
+    )
+    if ($TrayShortcut -or $StartTray) {
+      foreach ($folder in @($desktop, $startMenu)) {
+        $tray = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))
+        $tray.TargetPath = $powershell
+        $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument"
+        $tray.WorkingDirectory = $engine.Root
+        $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
+        $tray.Save()
+      }
+    } else {
+      $trayShortcutPaths | ForEach-Object {
+        Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue
+      }
     }
-    Start-Process -FilePath $powershell -ArgumentList `
-      "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument" `
-      -WindowStyle Hidden | Out-Null
+    if ($StartTray) {
+      Start-Process -FilePath $powershell -ArgumentList `
+        "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument" `
+        -WindowStyle Hidden | Out-Null
+    }
   }
 
   if ($NoShortcuts) {
     Write-Host "Codex Dream Skin base theme installed at $($engine.Root). Run $($engine.Start) to launch it."
+  } elseif ($TrayShortcut -or $StartTray) {
+    Write-Host 'Codex Dream Skin installed with tray controls. The launch shortcut asks before restarting an open Codex window.'
   } else {
-    Write-Host 'Codex Dream Skin installed. The launch shortcut asks before restarting an open Codex window.'
+    Write-Host 'Codex Dream Skin installed. The launch shortcut asks before restarting an open Codex window. Add -TrayShortcut to install tray controls.'
   }
 } finally {
   Exit-DreamSkinOperationLock -Mutex $operationLock
