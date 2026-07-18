@@ -130,14 +130,17 @@ interface ThemeEditorDraft {
   explicitColors: Partial<ThemeColorTokens> | null;
   colorMode: ThemeColorMode;
   appearance: ThemeAppearance;
-  appearanceDirty: boolean;
+  appearancePresent: boolean;
+  appearanceRemoved: boolean;
   focusX: number;
   focusY: number;
   safeArea: ThemeSafeArea;
   taskMode: ThemeTaskMode;
   explicitArt: ThemeArt | null;
+  artRemoved: boolean;
   paletteAccent: string;
   paletteExplicit: boolean;
+  paletteRemoved: boolean;
   replacementImagePath: string | null;
   replacementPreviewPath: string;
   replacementPreviewUrl: string;
@@ -194,6 +197,11 @@ interface FocusSnapshot {
   selectionEnd: number | null;
 }
 
+
+interface ElementFocusSnapshot {
+  selector: string;
+  matchIndex: number;
+}
 const ONBOARDING_KEY = "codex-dream-skin.onboarding.v2";
 const appElement = document.querySelector<HTMLDivElement>("#app");
 const toastRegionElement = document.querySelector<HTMLDivElement>("#toast-region");
@@ -207,6 +215,8 @@ const toastRegion = toastRegionElement;
 const managerWindow = getCurrentWindow();
 let windowMaximized = false;
 let renderedModalKey: string | null = null;
+
+const modalOpenerStack: ElementFocusSnapshot[] = [];
 
 const EMPTY_THEME_FEATURES: RuntimeThemeFeatures = {
   appearance: false,
@@ -468,16 +478,10 @@ function parseThemeColor(value: unknown): RgbaColor | null {
 
   const channel = (part: string): number | null => {
     const component = part.trim();
-    const percent = component.match(/^((?:\d+(?:\.\d*)?|\.\d+))%$/);
-    if (percent) {
-      const number = Number(percent[1]);
-      if (!Number.isFinite(number) || number < 0 || number > 100) return null;
-      return Math.round(number * 2.55);
-    }
-    if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(component)) return null;
+    if (!/^\d+$/.test(component)) return null;
     const number = Number(component);
     if (!Number.isFinite(number) || number < 0 || number > 255) return null;
-    return Math.round(number);
+    return number;
   };
 
   const red = channel(parts[0]);
@@ -488,27 +492,24 @@ function parseThemeColor(value: unknown): RgbaColor | null {
   let alpha = 1;
   if (hasAlpha) {
     const alphaPart = parts[3].trim();
-    const percent = alphaPart.match(/^((?:\d+(?:\.\d*)?|\.\d+))%$/);
-    if (percent) {
-      const number = Number(percent[1]);
-      if (!Number.isFinite(number) || number < 0 || number > 100) return null;
-      alpha = number / 100;
-    } else {
-      if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(alphaPart)) return null;
-      const number = Number(alphaPart);
-      if (!Number.isFinite(number) || number < 0 || number > 1) return null;
-      alpha = number;
-    }
+    if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(alphaPart)) return null;
+    const number = Number(alphaPart);
+    if (!Number.isFinite(number) || number < 0 || number > 1) return null;
+    alpha = number;
   }
   return { red, green, blue, alpha };
 }
 
 function formatAlpha(value: number): string {
-  return Math.max(0, Math.min(1, value)).toFixed(3).replace(/0+$/, "").replace(/\.$/, "") || "0";
+  return Math.max(0, Math.min(1, value)).toFixed(6).replace(/0+$/, "").replace(/\.$/, "") || "0";
 }
 
 function formatRgba(color: RgbaColor): string {
   return `rgba(${Math.round(color.red)}, ${Math.round(color.green)}, ${Math.round(color.blue)}, ${formatAlpha(color.alpha)})`;
+}
+
+function formatRgb(color: RgbaColor): string {
+  return `rgb(${Math.round(color.red)}, ${Math.round(color.green)}, ${Math.round(color.blue)})`;
 }
 
 function originalThemeColor(value: unknown): string | null {
@@ -525,12 +526,20 @@ function supportsTransparentColorEditing(features: RuntimeThemeFeatures): boolea
   return features.rgba || features.alphaHex;
 }
 
-function formatEditedThemeColor(color: RgbaColor, features: RuntimeThemeFeatures): string | null {
+function formatEditedThemeColor(color: RgbaColor, features: RuntimeThemeFeatures, previousValue = ""): string | null {
+  const previous = previousValue.trim();
+  const preferredAlphaHex = /^#[\da-f]{4}$/i.test(previous) || /^#[\da-f]{8}$/i.test(previous);
+  const preferredRgba = /^rgba\(/i.test(previous);
   if (color.alpha < 1) {
+    if (preferredAlphaHex && features.alphaHex) return formatHexColor(color, true);
+    if (preferredRgba && features.rgba) return formatRgba(color);
     if (features.rgba) return formatRgba(color);
     if (features.alphaHex) return formatHexColor(color, true);
     return null;
   }
+  if (preferredRgba && features.rgba) return formatRgba(color);
+  if (preferredAlphaHex && features.alphaHex) return formatHexColor(color, true);
+  if (/^rgb\(/i.test(previous)) return formatRgb(color);
   return formatHexColor(color, false);
 }
 
@@ -554,7 +563,6 @@ function safePaletteColorValue(value: unknown): string | null {
     if (!safeBody || !/^[\d\s.,%+\-/eE]*$/.test(safeBody)) return null;
   }
   if (typeof CSS !== "undefined" && !CSS.supports("color", candidate)) return null;
-  if (typeof CSS === "undefined" && !parseThemeColor(candidate)) return null;
   return value;
 }
 
@@ -575,7 +583,7 @@ function encodeColorTokensForRuntime(
   for (const key of Object.keys(COLOR_FIELD_ALIASES) as Array<keyof ThemeColorTokens>) {
     const parsed = parseThemeColor(colors[key]);
     if (!parsed) return null;
-    const formatted = formatEditedThemeColor(parsed, features);
+    const formatted = formatEditedThemeColor(parsed, features, colors[key]);
     if (!formatted) return null;
     encoded[key] = formatted;
   }
@@ -696,9 +704,29 @@ function automaticPaletteAccent(draft: ThemeEditorDraft): string {
 
 function previewColorTokens(draft: ThemeEditorDraft): ThemeColorTokens {
   const base = adaptiveBaseColorTokens(draft);
-  const accent = draft.paletteExplicit ? canonicalPaletteColor(draft.paletteAccent, base.accent) : base.accent;
-  const adaptive = { ...base, accent };
-  return canonicalizeColorTokens({ ...adaptive, ...(draft.colorMode === "explicit" ? draft.explicitColors ?? {} : {}) });
+  const explicit = draft.colorMode === "explicit" ? draft.explicitColors ?? {} : {};
+  const preview = canonicalizeColorTokens({ ...base, ...explicit });
+  if (draft.paletteExplicit && !Object.prototype.hasOwnProperty.call(explicit, "accent")) {
+    preview.accent = canonicalPaletteColor(draft.paletteAccent, base.accent);
+  }
+  return preview;
+}
+
+function explicitColorCount(draft: ThemeEditorDraft): number {
+  return Object.keys(draft.explicitColors ?? {}).length;
+}
+
+function hasCompleteExplicitColors(draft: ThemeEditorDraft): boolean {
+  return explicitColorCount(draft) === EDITABLE_COLOR_FIELDS.length;
+}
+
+function materializeFullExplicitColors(draft: ThemeEditorDraft, features: RuntimeThemeFeatures): boolean {
+  const encoded = encodeColorTokensForRuntime(previewColorTokens(draft), features);
+  if (!encoded) return false;
+  draft.colorMode = "explicit";
+  draft.explicitColors = { ...encoded };
+  draft.colors = { ...encoded };
+  return true;
 }
 
 function toAssetUrl(path: string): string {
@@ -742,7 +770,10 @@ function normalizeTheme(value: unknown, index: number): ThemeSummary {
   const palette = normalizeThemePalette(pick(record, ["palette"]));
   const paletteAccent = palette?.accent || undefined;
   const derivedColors = normalizeColorTokens(pick(record, ["derivedColors", "derived_colors"]));
-  const colorTokens = normalizeColorTokens({ ...derivedColors, ...(paletteAccent ? { accent: paletteAccent } : {}), ...(explicitColors ?? {}) });
+  const colorTokens = normalizeColorTokens({ ...derivedColors, ...(explicitColors ?? {}) });
+  if (paletteAccent && !Object.prototype.hasOwnProperty.call(explicitColors ?? {}, "accent")) {
+    colorTokens.accent = paletteAccent;
+  }
   const builtin = readBoolean(record, ["builtin", "builtIn", "built_in", "isBuiltin", "is_builtin"]);
   const source = normalizeChoice(pick(record, ["source", "themeSource", "theme_source"]), ["builtin", "manager", "platform"] as const, builtin ? "builtin" : "manager");
   const id = readString(record, ["id", "themeId", "theme_id"], "theme-" + (index + 1));
@@ -977,8 +1008,9 @@ function selectedTheme(): ThemeSummary | undefined {
   return state.themes.find((theme) => themeMatchesKey(theme, state.selectedThemeId));
 }
 
-function openThemeEditor(theme: ThemeSummary): void {
-  const createCopy = theme.readOnly || themeIsActive(theme);
+function openThemeEditor(theme: ThemeSummary, opener?: Element): void {
+  rememberModalOpener(opener);
+  const createCopy = theme.readOnly || themeIsActive(theme) || !theme.compatible;
   const imageMetadata = theme.imageMetadata;
   state.editorDraft = {
     sourceId: theme.selectionKey,
@@ -992,19 +1024,22 @@ function openThemeEditor(theme: ThemeSummary): void {
     promoTitle: theme.promoTitle,
     promoSub: theme.promoSub,
     promoUrl: theme.promoUrl,
-    colors: canonicalizeColorTokens(theme.colorTokens),
+    colors: { ...theme.colorTokens },
     derivedColors: { ...theme.derivedColors },
     explicitColors: theme.explicitColors ? { ...theme.explicitColors } : null,
     colorMode: theme.explicitColors === null ? "adaptive" : "explicit",
     appearance: theme.appearance ?? "auto",
-    appearanceDirty: false,
+    appearancePresent: theme.appearance !== null,
+    appearanceRemoved: false,
     focusX: theme.art?.focusX ?? imageMetadata?.suggestedFocusX ?? 0.5,
     focusY: theme.art?.focusY ?? imageMetadata?.suggestedFocusY ?? 0.5,
     safeArea: theme.art?.safeArea ?? imageMetadata?.suggestedSafeArea ?? "auto",
     taskMode: theme.art?.taskMode ?? imageMetadata?.suggestedTaskMode ?? "auto",
     explicitArt: theme.art ? { ...theme.art } : null,
+    artRemoved: false,
     paletteAccent: theme.palette?.accent ?? theme.derivedColors.accent,
     paletteExplicit: Boolean(theme.palette?.accent),
+    paletteRemoved: false,
     replacementImagePath: null,
     replacementPreviewPath: "",
     replacementPreviewUrl: "",
@@ -1210,6 +1245,35 @@ function dialogFocusableElements(dialog: HTMLElement): HTMLElement[] {
 
 function selectorAttributeValue(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function rememberModalOpener(element: Element | null = document.activeElement): void {
+  if (!(element instanceof HTMLElement) || !app.contains(element)) return;
+  const attributes = [
+    "id", "data-action", "data-theme-id", "data-filter", "data-window-action",
+  ];
+  let selector = element.tagName.toLowerCase();
+  for (const attribute of attributes) {
+    const value = element.getAttribute(attribute);
+    if (value === null) continue;
+    selector = `${element.tagName.toLowerCase()}[${attribute}${value ? `="${selectorAttributeValue(value)}"` : ""}]`;
+    break;
+  }
+  const matches = Array.from(app.querySelectorAll<HTMLElement>(selector));
+  modalOpenerStack.push({ selector, matchIndex: Math.max(0, matches.indexOf(element)) });
+}
+
+function restoreModalOpener(fallbackSelector?: string): void {
+  const snapshot = modalOpenerStack.pop();
+  requestAnimationFrame(() => {
+    let target: HTMLElement | undefined;
+    if (snapshot) {
+      const matches = Array.from(app.querySelectorAll<HTMLElement>(snapshot.selector));
+      target = matches[snapshot.matchIndex];
+    }
+    target ??= fallbackSelector ? app.querySelector<HTMLElement>(fallbackSelector) ?? undefined : undefined;
+    target?.focus();
+  });
 }
 
 function captureDialogFocus(): FocusSnapshot | null {
@@ -1602,10 +1666,10 @@ function currentImageMetadata(draft: ThemeEditorDraft, source: ThemeSummary): Th
 
 function resolvePreviewSafeArea(draft: ThemeEditorDraft, source: ThemeSummary): Exclude<ThemeSafeArea, "auto"> {
   if (draft.safeArea !== "auto") return draft.safeArea;
-  if (draft.focusX >= 0.62) return "left";
-  if (draft.focusX <= 0.38) return "right";
   const suggested = currentImageMetadata(draft, source)?.suggestedSafeArea;
   if (suggested && suggested !== "auto") return suggested;
+  if (draft.focusX >= 0.62) return "left";
+  if (draft.focusX <= 0.38) return "right";
   return "center";
 }
 
@@ -1773,6 +1837,10 @@ function renderThemeEditor(): string {
     ? encodeColorTokensForRuntime(draft.inspectedImageColors, features)
     : null;
   const transparencyEditable = supportsTransparentColorEditing(features);
+  const explicitCount = explicitColorCount(draft);
+  const completeExplicitColors = hasCompleteExplicitColors(draft);
+  const colorEditingEnabled = draft.colorMode === "explicit" && (features.partialColors || completeExplicitColors);
+  const colorsSaveable = draft.colorMode === "adaptive" || features.partialColors || completeExplicitColors;
   const transparencyHint = features.rgba && features.alphaHex
     ? "透明度可输出 rgba() 或 #RRGGBBAA。"
     : features.rgba ? "透明度输出为 rgba()；当前运行时不接受透明 Hex。"
@@ -1791,6 +1859,7 @@ function renderThemeEditor(): string {
           <p class="step-eyebrow">LOCAL THEME STUDIO</p>
           <h2 id="theme-editor-title" tabindex="-1">${draft.createCopy ? "&#x590D;&#x5236;&#x4E3A;&#x6211;&#x7684;&#x4E3B;&#x9898;" : "&#x7F16;&#x8F91;&#x4E3B;&#x9898;"}</h2>
           <span class="editor-source-badge source-${source.source}">${escapeHtml(themeSourceLabel(source.source))}${source.readOnly ? " · 只读来源" : ""}</span>
+          ${!source.compatible ? `<div class="editor-downgrade-note">${icon("shield")} <span><strong>正在另存兼容副本</strong><small>当前运行时缺少：${escapeHtml(unsupportedFeatureSummary(source) || "未知能力")}。请使用下方“移除”或“恢复自动”清掉不支持字段；原主题不会被改动。</small></span></div>` : ""}
           <p>&#x6240;&#x6709;&#x6587;&#x6848;&#x3001;&#x56FE;&#x7247;&#x548C; RGBA &#x8272;&#x5F69;&#x90FD;&#x4F1A;&#x5373;&#x65F6;&#x540C;&#x6B65;&#x5230;&#x5DE6;&#x4FA7;&#x6A21;&#x62DF;&#x754C;&#x9762;&#x3002;</p>
         </header>
         <div class="theme-editor-content">
@@ -1807,7 +1876,7 @@ function renderThemeEditor(): string {
               <div class="editor-section-heading"><div><span>01</span><h3>&#x56FE;&#x7247;</h3></div><small>16:9 / PNG / JPG / WebP</small></div>
               <div class="editor-image-actions">
                 <button class="button button-secondary" type="button" data-action="editor-replace-image" ${state.busy ? "disabled" : ""}>${icon("image")} &#x9009;&#x62E9;&#x56FE;&#x7247;</button>
-                <button class="button button-ghost" type="button" data-action="editor-use-image-colors" ${encodedInspectedColors && features.partialColors ? "" : "disabled"}>${icon("wand")} &#x8F6C;&#x4E3A;&#x663E;&#x5F0F;&#x8272;&#x677F;</button>
+                <button class="button button-ghost" type="button" data-action="editor-use-image-colors" ${encodedInspectedColors ? "" : "disabled"}>${icon("wand")} 转为完整十色</button>
                 <button class="button button-ghost" type="button" data-action="editor-use-image-layout" ${imageMetadata && features.art ? "" : "disabled"}>${icon("spark")} &#x4F7F;&#x7528;&#x63A8;&#x8350;&#x5E03;&#x5C40;</button>
                 <button class="button button-ghost" type="button" data-action="editor-reset-image" ${draft.replacementImagePath ? "" : "disabled"}>${icon("rotate")} &#x6062;&#x590D;&#x539F;&#x56FE;</button>
               </div>
@@ -1816,25 +1885,26 @@ function renderThemeEditor(): string {
               <div class="editor-section-heading"><div><span>02</span><h3>外观与构图</h3></div><small>上游自适应主题</small></div>
               ${state.status.runtimeCompatibilityMessage ? `<div class="editor-capability-note">${icon("info")} ${escapeHtml(state.status.runtimeCompatibilityMessage)}</div>` : ""}
               <div class="editor-setting-grid">
-                <label class="editor-field">
-                  <span>外观</span>
+                <div class="editor-field">
+                  <span class="editor-field-heading">外观 <span class="editor-inline-actions">${draft.appearancePresent ? `<button type="button" data-action="editor-clear-appearance">移除 appearance</button>` : draft.appearanceRemoved && source.appearance ? `<button type="button" data-action="editor-restore-appearance">恢复原值</button>` : features.appearance ? `<button type="button" data-action="editor-enable-appearance">写入 appearance</button>` : ""}</span></span>
                   <select data-editor-setting="appearance" ${features.appearance ? "" : "disabled"}>
                     <option value="auto" ${draft.appearance === "auto" ? "selected" : ""}>自动跟随 Codex</option>
                     <option value="light" ${draft.appearance === "light" ? "selected" : ""}>浅色</option>
                     <option value="dark" ${draft.appearance === "dark" ? "selected" : ""}>深色</option>
                   </select>
-                  ${features.appearance ? "" : "<small>当前运行时未声明 appearance 能力</small>"}
-                </label>
+                  <small>${draft.appearanceRemoved ? "保存副本时将不写 appearance。" : !features.appearance ? "当前运行时不支持 appearance；可移除该字段生成降级副本。" : draft.appearancePresent ? "manifest 将保留 appearance。" : "当前未写 appearance；修改选项或点击写入即可添加。"}</small>
+                </div>
                 <div class="editor-field editor-field-wide">
                   <span>配色模式</span>
                   <div class="editor-choice-group" role="radiogroup" aria-label="配色模式">
-                    <button type="button" role="radio" aria-checked="${draft.colorMode === "adaptive"}" class="${draft.colorMode === "adaptive" ? "is-active" : ""}" data-editor-color-mode="adaptive" ${features.partialColors ? "" : "disabled"}>自适应 · 不写 colors</button>
-                    <button type="button" role="radio" aria-checked="${draft.colorMode === "explicit"}" class="${draft.colorMode === "explicit" ? "is-active" : ""}" data-editor-color-mode="explicit" ${features.partialColors ? "" : "disabled"}>显式覆盖 · ${Object.keys(draft.explicitColors ?? {}).length}/10</button>
+                    <button type="button" role="radio" aria-checked="${draft.colorMode === "adaptive"}" class="${draft.colorMode === "adaptive" ? "is-active" : ""}" data-editor-color-mode="adaptive">自适应 · 移除 colors</button>
+                    <button type="button" role="radio" aria-checked="${draft.colorMode === "explicit"}" class="${draft.colorMode === "explicit" ? "is-active" : ""}" data-editor-color-mode="explicit">显式色板 · ${explicitCount}/10</button>
                   </div>
-                  <small>${draft.colorMode === "adaptive" ? "预览色来自本地图像分析；保存时仍保持 colors 缺失。" : "只保存原有或你实际修改的色键，未设置项继续自适应。"}</small>
+                  <small>${draft.colorMode === "adaptive" ? "保存时不写 colors，可用于移除当前运行时不支持的颜色能力。" : features.partialColors ? "支持部分覆盖：只保存原有或你实际修改的色键。" : completeExplicitColors ? "旧运行时完整色板模式：保持 10/10，可编辑但不能单独移除某一色键。" : `当前只有 ${explicitCount}/10；旧运行时不能保存部分色板，请补全或切回自适应。`}</small>
+                  ${draft.colorMode === "explicit" && !features.partialColors && !completeExplicitColors ? `<button class="button button-ghost editor-materialize-colors" type="button" data-action="editor-materialize-colors">补齐为完整十色</button>` : ""}
                 </div>
                 <div class="editor-field editor-field-wide editor-palette-accent">
-                  <span>自适应强调色 <small>palette.accent</small><button type="button" class="editor-inline-reset" data-action="editor-clear-palette" ${features.paletteAccent && draft.paletteExplicit ? "" : "disabled"}>恢复自动</button></span>
+                  <span class="editor-field-heading">自适应强调色 <small>palette.accent</small><span class="editor-inline-actions"><button type="button" data-action="editor-clear-palette" ${draft.paletteExplicit ? "" : "disabled"}>移除 palette</button>${draft.paletteRemoved && source.palette?.accent ? `<button type="button" data-action="editor-restore-palette">恢复原值</button>` : ""}</span></span>
                   <div class="editor-color-control">
                     <span class="editor-alpha-swatch" data-editor-palette-alpha-swatch style="--alpha-color:${escapeAttr(draft.paletteAccent)}"></span>
                     <input type="color" data-editor-palette-swatch value="${colorInputValue(draft.paletteAccent)}" aria-label="强调色" ${features.paletteAccent ? "" : "disabled"} />
@@ -1842,6 +1912,11 @@ function renderThemeEditor(): string {
                     <output data-editor-palette-alpha-output>${Math.round(alphaInputValue(draft.paletteAccent) * 100)}%</output>
                   </div>
                   <input class="editor-alpha-range" type="range" min="0" max="100" step="1" data-editor-palette-alpha value="${Math.round(alphaInputValue(draft.paletteAccent) * 100)}" aria-label="palette.accent 透明度" aria-valuetext="${Math.round(alphaInputValue(draft.paletteAccent) * 100)}%" ${features.paletteAccent && transparencyEditable && parseThemeColor(draft.paletteAccent) ? "" : "disabled"} />
+                  <small>${draft.paletteRemoved ? "保存副本时不写 palette。" : !features.paletteAccent ? "当前运行时不支持 palette.accent；仍可用“移除 palette”生成降级副本。" : "支持 Hex、rgb(a)、hsl、oklch 与 oklab；文本输入会保留原始语法。"}</small>
+                </div>
+                <div class="editor-field editor-field-wide editor-manifest-actions">
+                  <span class="editor-field-heading">图片构图 <small>art</small><span class="editor-inline-actions"><button type="button" data-action="editor-clear-art" ${draft.explicitArt ? "" : "disabled"}>移除 art</button>${draft.artRemoved && source.art ? `<button type="button" data-action="editor-restore-art">恢复原值</button>` : ""}</span></span>
+                  <small>${draft.artRemoved ? "保存副本时不写 art，预览使用图片分析建议。" : !features.art ? "当前运行时不支持 art；仍可一键移除。" : "焦点与安全区会写入 manifest.art。"}</small>
                 </div>
                 <label class="editor-field"><span>水平焦点 <output data-editor-art-output="focusX">${Math.round(draft.focusX * 100)}%</output></span><input type="range" min="0" max="100" step="1" data-editor-art="focusX" value="${Math.round(draft.focusX * 100)}" ${features.art ? "" : "disabled"} /></label>
                 <label class="editor-field"><span>垂直焦点 <output data-editor-art-output="focusY">${Math.round(draft.focusY * 100)}%</output></span><input type="range" min="0" max="100" step="1" data-editor-art="focusY" value="${Math.round(draft.focusY * 100)}" ${features.art ? "" : "disabled"} /></label>
@@ -1874,13 +1949,13 @@ function renderThemeEditor(): string {
                 </div>
               </details>
             </section>
-            <fieldset class="editor-colors editor-section ${draft.colorMode === "adaptive" || !features.partialColors ? "is-disabled" : ""}" ${draft.colorMode === "adaptive" || !features.partialColors ? "disabled" : ""}>
+            <fieldset class="editor-colors editor-section ${colorEditingEnabled ? "" : "is-disabled"}" ${colorEditingEnabled ? "" : "disabled"}>
               <legend><span>04</span> &#x4E3B;&#x9898;&#x989C;&#x8272;&#x8986;&#x76D6;</legend>
-              <p>${!features.partialColors ? "当前运行时未声明 partialColors 能力，颜色覆盖已停用。" : draft.colorMode === "adaptive" ? "当前完全自适应；切换为显式覆盖后，只在实际修改某一色键时写入。" : `只保存你实际修改的色键。${transparencyHint}`}</p>
+              <p>${draft.colorMode === "adaptive" ? "colors 已标记为移除；切换为显式色板后再编辑。" : !features.partialColors && !completeExplicitColors ? "请先补齐为完整十色；旧运行时不能继续写部分 colors。" : !features.partialColors ? `完整 10/10 色板可编辑；单项恢复会造成部分色板，因此已禁用。${transparencyHint}` : `只保存你实际修改的色键。${transparencyHint}`}</p>
               <div class="editor-color-grid">
                 ${EDITABLE_COLOR_FIELDS.map(({ key, label }) => `
                   <div class="editor-color-field" data-editor-color-row="${key}">
-                    <div class="editor-color-heading"><span>${label}</span><span class="editor-color-heading-actions"><button type="button" data-editor-color-clear="${key}" ${Object.prototype.hasOwnProperty.call(draft.explicitColors ?? {}, key) ? "" : "disabled"}>恢复自适应</button><output data-editor-color-alpha-output="${key}">${Math.round(alphaInputValue(draft.colors[key]) * 100)}%</output></span></div>
+                    <div class="editor-color-heading"><span>${label}</span><span class="editor-color-heading-actions"><button type="button" data-editor-color-clear="${key}" ${features.partialColors && Object.prototype.hasOwnProperty.call(draft.explicitColors ?? {}, key) ? "" : "disabled"}>恢复自适应</button><output data-editor-color-alpha-output="${key}">${Math.round(alphaInputValue(draft.colors[key]) * 100)}%</output></span></div>
                     <div class="editor-color-control">
                       <span class="editor-alpha-swatch" data-editor-color-alpha-swatch="${key}" style="--alpha-color:${escapeAttr(draft.colors[key])}"></span>
                       <input type="color" data-editor-color-swatch="${key}" value="${colorInputValue(draft.colors[key])}" aria-label="${label}" />
@@ -1894,7 +1969,7 @@ function renderThemeEditor(): string {
             <div class="editor-safety-note">${icon("shield")} &#x53EA;&#x4FDD;&#x5B58;&#x672C;&#x5730;&#x56FE;&#x7247;&#x5F15;&#x7528;&#x3001;&#x6587;&#x5B57;&#x548C;&#x989C;&#x8272;&#xFF1B;&#x4E0D;&#x5141;&#x8BB8;&#x811A;&#x672C;&#x3001;CSS&#x3001;&#x8FDC;&#x7A0B;&#x8D44;&#x6E90;&#x6216;&#x547D;&#x4EE4;&#x3002;</div>
             <footer class="theme-editor-actions">
               <button class="button button-ghost" type="button" data-action="close-theme-editor">&#x53D6;&#x6D88;</button>
-              <button class="button button-primary" type="submit" ${state.busy ? "disabled" : ""}>
+              <button class="button button-primary" type="submit" ${state.busy || !colorsSaveable ? "disabled" : ""}>
                 ${state.busy === "edit" ? '<span class="spinner"></span>' : draft.createCopy ? icon("copy") : icon("check")}
                 ${draft.createCopy ? "&#x4FDD;&#x5B58;&#x4E3A;&#x65B0;&#x4E3B;&#x9898;" : "&#x4FDD;&#x5B58;&#x4FEE;&#x6539;"}
               </button>
@@ -2098,9 +2173,9 @@ function renderOnboardingApply(): string {
     <p class="onboarding-lead">${state.status.hotSwitchReady ? "当前换肤会话已就绪，选择主题后会立即切换，无需重启。" : "第一次启用需要安全重启 Codex 一次；之后可在换肤会话中立即切换主题。"}</p>
     ${themes.length ? `
       <div class="onboarding-theme-list" role="listbox" aria-label="选择要应用的主题">
-        ${themes.map((theme) => `<button type="button" role="option" aria-selected="${themeMatchesKey(theme, state.selectedThemeId)}" class="${themeMatchesKey(theme, state.selectedThemeId) ? "is-selected" : ""}" data-theme-id="${escapeAttr(theme.selectionKey)}">${renderThemePreview(theme, "onboarding-theme-image")}<span><strong>${escapeHtml(theme.name)}</strong><small>${escapeHtml(themeSourceLabel(theme.source))}${theme.readOnly ? " · 只读" : ""}</small></span><i>${icon("check")}</i></button>`).join("")}
+        ${themes.map((theme) => `<button type="button" role="option" aria-selected="${themeMatchesKey(theme, state.selectedThemeId)}" class="${themeMatchesKey(theme, state.selectedThemeId) ? "is-selected" : ""} ${theme.compatible ? "" : "is-incompatible"}" data-theme-id="${escapeAttr(theme.selectionKey)}">${renderThemePreview(theme, "onboarding-theme-image")}<span><strong>${escapeHtml(theme.name)}</strong><small>${escapeHtml(themeSourceLabel(theme.source))}${theme.readOnly ? " · 只读" : ""}</small>${theme.compatible ? "" : `<em class="onboarding-compatibility">不兼容：${escapeHtml(unsupportedFeatureSummary(theme) || "未知能力")}</em>`}</span><i>${theme.compatible ? icon("check") : icon("shield")}</i></button>`).join("")}
       </div>
-      ${selected ? canApplyTheme() ? `<div class="ready-callout"><span>${icon("spark")}</span><div><strong>${escapeHtml(selected.name)} 已准备好</strong><p>${state.status.hotSwitchReady ? "点击“立即应用”，当前 Codex 会直接刷新主题。" : "点击“启用并完成”，Codex 会安全重启一次并建立热切换会话。"}</p></div></div>` : `<div class="warning-callout"><span>${icon("info")}</span><p><strong>还差一步</strong>返回第 1 步完成环境检查，之后才能安全应用主题。</p></div>` : ""}
+      ${selected ? !selected.compatible ? `<div class="warning-callout"><span>${icon("shield")}</span><p><strong>${escapeHtml(selected.name)} 与当前运行时不兼容</strong>缺少：${escapeHtml(unsupportedFeatureSummary(selected) || "未知能力")}。可在主题库中另存降级副本并移除这些字段。</p></div>` : canApplyTheme(selected) ? `<div class="ready-callout"><span>${icon("spark")}</span><div><strong>${escapeHtml(selected.name)} 已准备好</strong><p>${state.status.hotSwitchReady ? "点击“立即应用”，当前 Codex 会直接刷新主题。" : "点击“启用并完成”，Codex 会安全重启一次并建立热切换会话。"}</p></div></div>` : `<div class="warning-callout"><span>${icon("info")}</span><p><strong>还差一步</strong>返回第 1 步完成环境检查，之后才能安全应用主题。</p></div>` : ""}
     ` : `
       <div class="mini-empty"><span>${icon("image")}</span><div><strong>还没有可应用的主题</strong><p>返回上一步添加图片或导入主题包。</p></div></div>
     `}
@@ -2109,13 +2184,15 @@ function renderOnboardingApply(): string {
 
 function renderOnboardingFooter(): string {
   const isLast = state.onboardingStep === 4;
-  const blockedByEnvironment = (state.onboardingStep === 1 || isLast) && !canApplyTheme();
+  const selected = selectedTheme();
+  const blockedByEnvironment = state.onboardingStep === 1 ? !canApplyTheme()
+    : isLast ? !selected || !canApplyTheme(selected) : false;
   return `
     <footer class="onboarding-footer">
       <button class="button button-ghost" type="button" data-action="guide-back" ${state.onboardingStep === 1 ? "disabled" : ""}>上一步</button>
       <div>
         ${isLast ? `<button class="text-button" type="button" data-action="finish-later">稍后再应用</button>` : ""}
-        <button class="button button-primary" type="button" data-action="${isLast ? "apply-and-finish" : "guide-next"}" ${(isLast && !selectedTheme()) || blockedByEnvironment || Boolean(state.busy) ? "disabled" : ""}>
+        <button class="button button-primary" type="button" data-action="${isLast ? "apply-and-finish" : "guide-next"}" ${blockedByEnvironment || Boolean(state.busy) ? "disabled" : ""}>
           ${state.busy === "apply" ? '<span class="spinner"></span>' : isLast ? icon("spark") : ""}${isLast ? state.status.hotSwitchReady ? "立即应用" : "启用并完成" : "继续"}${!isLast ? icon("arrow") : ""}
         </button>
       </div>
@@ -2443,7 +2520,7 @@ async function exportSelectedTheme(): Promise<void> {
   }
 }
 
-async function applySelectedTheme(finishGuide = false, restartExisting = false): Promise<void> {
+async function applySelectedTheme(finishGuide = false, restartExisting = false, opener?: Element): Promise<void> {
   const theme = selectedTheme();
   if (!theme) {
     showToast("请先选择一个主题", "warning");
@@ -2460,6 +2537,7 @@ async function applySelectedTheme(finishGuide = false, restartExisting = false):
   if (!state.status.hotSwitchReady && !restartExisting) {
     state.confirmApplyRestart = true;
     state.pendingApplyFinishGuide = finishGuide;
+    rememberModalOpener(opener);
     renderApp();
     return;
   }
@@ -2473,21 +2551,25 @@ async function applySelectedTheme(finishGuide = false, restartExisting = false):
     markOnboardingDone();
     state.onboardingOpen = false;
     renderApp();
+    restoreModalOpener('[data-action="open-guide"]');
   }
 }
 async function restoreOfficial(): Promise<void> {
   state.confirmRestore = false;
   renderApp();
+  restoreModalOpener();
   await runMutation("restore", "restore_official", {}, "已恢复 Codex 官方外观");
 }
 
 async function installEngine(): Promise<void> {
   state.confirmInstall = false;
   renderApp();
+  restoreModalOpener();
   await runMutation("install", "install_engine", {}, state.status.engineConfigured ? "换肤环境已修复" : "换肤环境已启用");
 }
 
-function openGuide(): void {
+function openGuide(opener?: Element): void {
+  rememberModalOpener(opener);
   state.onboardingOpen = true;
   state.onboardingStep = 1;
   renderApp();
@@ -2497,7 +2579,7 @@ function closeGuide(markDone = false): void {
   if (markDone) markOnboardingDone();
   state.onboardingOpen = false;
   renderApp();
-  requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-action="open-guide"]')?.focus());
+  restoreModalOpener('[data-action="open-guide"]');
 }
 
 function showPreviewFeedback(anchor: HTMLElement, message: string): void {
@@ -2529,14 +2611,20 @@ app.addEventListener("click", async (event) => {
   const colorModeButton = target.closest<HTMLButtonElement>("[data-editor-color-mode]");
   if (colorModeButton?.dataset.editorColorMode && state.editorDraft && !colorModeButton.disabled) {
     const nextMode = colorModeButton.dataset.editorColorMode as ThemeColorMode;
+    if (nextMode === state.editorDraft.colorMode) return;
     if (nextMode === "adaptive") {
       state.editorDraft.colorMode = "adaptive";
       state.editorDraft.explicitColors = null;
       state.editorDraft.colors = previewColorTokens(state.editorDraft);
     } else if (nextMode === "explicit") {
-      state.editorDraft.colorMode = "explicit";
-      state.editorDraft.explicitColors = {};
-      state.editorDraft.colors = previewColorTokens(state.editorDraft);
+      if (state.status.themeFeatures.partialColors) {
+        state.editorDraft.colorMode = "explicit";
+        state.editorDraft.explicitColors = {};
+        state.editorDraft.colors = previewColorTokens(state.editorDraft);
+      } else if (!materializeFullExplicitColors(state.editorDraft, state.status.themeFeatures)) {
+        showToast("无法生成旧运行时色板", "warning", "请先移除不支持的透明色或 palette，再重试完整十色。");
+        return;
+      }
     }
     renderApp();
     return;
@@ -2638,19 +2726,55 @@ app.addEventListener("click", async (event) => {
         return;
       case "open-theme-editor": {
         const theme = selectedTheme();
-        if (theme) openThemeEditor(theme);
+        if (theme) openThemeEditor(theme, actionButton);
         return;
       }
       case "close-theme-editor":
         if (state.busy) return;
         state.editorDraft = null;
         renderApp();
+        restoreModalOpener();
+        return;
+      case "editor-clear-appearance":
+        if (state.editorDraft) {
+          state.editorDraft.appearancePresent = false;
+          state.editorDraft.appearanceRemoved = true;
+          state.editorDraft.appearance = "auto";
+          renderApp();
+        }
+        return;
+      case "editor-restore-appearance":
+        if (state.editorDraft) {
+          const source = state.themes.find((theme) => themeMatchesKey(theme, state.editorDraft?.sourceId));
+          if (source?.appearance) {
+            state.editorDraft.appearance = source.appearance;
+            state.editorDraft.appearancePresent = true;
+            state.editorDraft.appearanceRemoved = false;
+            renderApp();
+          }
+        }
+        return;
+      case "editor-enable-appearance":
+        if (state.editorDraft) {
+          state.editorDraft.appearancePresent = true;
+          state.editorDraft.appearanceRemoved = false;
+          renderApp();
+        }
+        return;
+      case "editor-materialize-colors":
+        if (state.editorDraft) {
+          if (!materializeFullExplicitColors(state.editorDraft, state.status.themeFeatures)) {
+            showToast("无法补齐完整十色", "warning", "请先移除当前运行时不支持的透明色或 palette。");
+            return;
+          }
+          renderApp();
+        }
         return;
       case "editor-replace-image":
         await selectEditorReplacementImage();
         return;
       case "editor-use-image-colors":
-        if (state.editorDraft?.inspectedImageColors && state.status.themeFeatures.partialColors) {
+        if (state.editorDraft?.inspectedImageColors) {
           const encoded = encodeColorTokensForRuntime(state.editorDraft.inspectedImageColors, state.status.themeFeatures);
           if (!encoded) return;
           state.editorDraft.colors = encoded;
@@ -2669,6 +2793,7 @@ app.addEventListener("click", async (event) => {
             state.editorDraft.safeArea = metadata.suggestedSafeArea;
             state.editorDraft.taskMode = metadata.suggestedTaskMode;
             state.editorDraft.explicitArt = { focusX: metadata.suggestedFocusX, focusY: metadata.suggestedFocusY, safeArea: metadata.suggestedSafeArea, taskMode: metadata.suggestedTaskMode };
+            state.editorDraft.artRemoved = false;
             renderApp();
           }
         }
@@ -2676,9 +2801,51 @@ app.addEventListener("click", async (event) => {
       case "editor-clear-palette":
         if (state.editorDraft) {
           state.editorDraft.paletteExplicit = false;
+          state.editorDraft.paletteRemoved = true;
           state.editorDraft.paletteAccent = automaticPaletteAccent(state.editorDraft);
           state.editorDraft.colors = previewColorTokens(state.editorDraft);
           renderApp();
+        }
+        return;
+      case "editor-clear-art":
+        if (state.editorDraft) {
+          const source = state.themes.find((theme) => themeMatchesKey(theme, state.editorDraft?.sourceId));
+          const metadata = source ? currentImageMetadata(state.editorDraft, source) : state.editorDraft.replacementImageMetadata;
+          state.editorDraft.explicitArt = null;
+          state.editorDraft.artRemoved = true;
+          state.editorDraft.focusX = metadata?.suggestedFocusX ?? 0.5;
+          state.editorDraft.focusY = metadata?.suggestedFocusY ?? 0.5;
+          state.editorDraft.safeArea = metadata?.suggestedSafeArea ?? "auto";
+          state.editorDraft.taskMode = metadata?.suggestedTaskMode ?? "auto";
+          renderApp();
+        }
+        return;
+      case "editor-restore-art":
+        if (state.editorDraft) {
+          const source = state.themes.find((theme) => themeMatchesKey(theme, state.editorDraft?.sourceId));
+          if (source?.art) {
+            const metadata = currentImageMetadata(state.editorDraft, source);
+            state.editorDraft.explicitArt = { ...source.art };
+            state.editorDraft.artRemoved = false;
+            state.editorDraft.focusX = source.art.focusX ?? metadata?.suggestedFocusX ?? 0.5;
+            state.editorDraft.focusY = source.art.focusY ?? metadata?.suggestedFocusY ?? 0.5;
+            state.editorDraft.safeArea = source.art.safeArea ?? metadata?.suggestedSafeArea ?? "auto";
+            state.editorDraft.taskMode = source.art.taskMode ?? metadata?.suggestedTaskMode ?? "auto";
+            renderApp();
+          }
+        }
+        return;
+      case "editor-restore-palette":
+        if (state.editorDraft) {
+          const source = state.themes.find((theme) => themeMatchesKey(theme, state.editorDraft?.sourceId));
+          const accent = source?.palette?.accent;
+          if (accent) {
+            state.editorDraft.paletteAccent = accent;
+            state.editorDraft.paletteExplicit = true;
+            state.editorDraft.paletteRemoved = false;
+            state.editorDraft.colors = previewColorTokens(state.editorDraft);
+            renderApp();
+          }
         }
         return;
       case "editor-reset-image":
@@ -2691,10 +2858,11 @@ app.addEventListener("click", async (event) => {
           const source = state.themes.find((theme) => themeMatchesKey(theme, state.editorDraft?.sourceId));
           if (source) {
             const metadata = source.imageMetadata;
-            if (state.editorDraft.explicitArt?.focusX === undefined) state.editorDraft.focusX = source.art?.focusX ?? metadata?.suggestedFocusX ?? 0.5;
-            if (state.editorDraft.explicitArt?.focusY === undefined) state.editorDraft.focusY = source.art?.focusY ?? metadata?.suggestedFocusY ?? 0.5;
-            if (state.editorDraft.explicitArt?.safeArea === undefined) state.editorDraft.safeArea = source.art?.safeArea ?? metadata?.suggestedSafeArea ?? "auto";
-            if (state.editorDraft.explicitArt?.taskMode === undefined) state.editorDraft.taskMode = source.art?.taskMode ?? metadata?.suggestedTaskMode ?? "auto";
+            const sourceArt = state.editorDraft.artRemoved ? null : source.art;
+            if (state.editorDraft.explicitArt?.focusX === undefined) state.editorDraft.focusX = sourceArt?.focusX ?? metadata?.suggestedFocusX ?? 0.5;
+            if (state.editorDraft.explicitArt?.focusY === undefined) state.editorDraft.focusY = sourceArt?.focusY ?? metadata?.suggestedFocusY ?? 0.5;
+            if (state.editorDraft.explicitArt?.safeArea === undefined) state.editorDraft.safeArea = sourceArt?.safeArea ?? metadata?.suggestedSafeArea ?? "auto";
+            if (state.editorDraft.explicitArt?.taskMode === undefined) state.editorDraft.taskMode = sourceArt?.taskMode ?? metadata?.suggestedTaskMode ?? "auto";
           }
           state.editorDraft.colors = previewColorTokens(state.editorDraft);
           renderApp();
@@ -2704,12 +2872,13 @@ app.addEventListener("click", async (event) => {
         await exportSelectedTheme();
         return;
       case "apply-theme":
-        await applySelectedTheme();
+        await applySelectedTheme(false, false, actionButton);
         return;
       case "cancel-apply-restart":
         state.confirmApplyRestart = false;
         state.pendingApplyFinishGuide = false;
         renderApp();
+        restoreModalOpener();
         return;
       case "confirm-apply-restart": {
         const finishGuide = state.pendingApplyFinishGuide;
@@ -2717,15 +2886,18 @@ app.addEventListener("click", async (event) => {
         state.pendingApplyFinishGuide = false;
         renderApp();
         await applySelectedTheme(finishGuide, true);
+        restoreModalOpener();
         return;
       }
       case "request-restore":
+        rememberModalOpener(actionButton);
         state.confirmRestore = true;
         renderApp();
         return;
       case "cancel-restore":
         state.confirmRestore = false;
         renderApp();
+        restoreModalOpener();
         return;
       case "confirm-restore":
         await restoreOfficial();
@@ -2735,12 +2907,14 @@ app.addEventListener("click", async (event) => {
           showToast("已有换肤会话记录", "info", "如需重新配置，请先恢复官方外观。");
           return;
         }
+        rememberModalOpener(actionButton);
         state.confirmInstall = true;
         renderApp();
         return;
       case "cancel-install":
         state.confirmInstall = false;
         renderApp();
+        restoreModalOpener();
         return;
       case "confirm-install":
         await installEngine();
@@ -2754,7 +2928,7 @@ app.addEventListener("click", async (event) => {
         renderApp();
         return;
       case "open-guide":
-        openGuide();
+        openGuide(actionButton);
         return;
       case "close-guide":
         closeGuide();
@@ -2771,7 +2945,7 @@ app.addEventListener("click", async (event) => {
         closeGuide(true);
         return;
       case "apply-and-finish":
-        await applySelectedTheme(true);
+        await applySelectedTheme(true, false, actionButton);
         return;
       case "copy-logs":
         if (!state.status.logsPath) return;
@@ -2805,9 +2979,12 @@ app.addEventListener("submit", async (event) => {
   const before = new Set(state.themes.map((theme) => theme.selectionKey));
   const sourceId = draft.sourceId;
   const createCopy = draft.createCopy;
-  const source = state.themes.find((theme) => themeMatchesKey(theme, sourceId));
+  if (draft.colorMode === "explicit" && !state.status.themeFeatures.partialColors && !hasCompleteExplicitColors(draft)) {
+    showToast("旧运行时需要完整十色", "warning", "请选择“补齐为完整十色”，或切回自适应以移除 colors。");
+    return;
+  }
   const colors = draft.colorMode === "adaptive" ? null : canonicalizePartialColorTokens(draft.explicitColors);
-  const appearance = draft.appearanceDirty ? draft.appearance : source?.appearance ?? null;
+  const appearance = draft.appearancePresent ? draft.appearance : null;
   const art = draft.explicitArt ? normalizeThemeArt(draft.explicitArt) : null;
   const palette = draft.paletteExplicit ? { accent: canonicalPaletteColor(draft.paletteAccent, draft.colors.accent) } : null;
   const succeeded = await runMutation(
@@ -2862,10 +3039,11 @@ app.addEventListener("input", (event) => {
       const nextRgb = parseThemeColor(input.value);
       const previous = parseThemeColor(draft.paletteAccent);
       const alpha = supportsTransparentColorEditing(state.status.themeFeatures) ? previous?.alpha ?? 1 : 1;
-      const formatted = nextRgb ? formatEditedThemeColor({ ...nextRgb, alpha }, state.status.themeFeatures) : null;
+      const formatted = nextRgb ? formatEditedThemeColor({ ...nextRgb, alpha }, state.status.themeFeatures, draft.paletteAccent) : null;
       if (formatted) {
         draft.paletteAccent = formatted;
         draft.paletteExplicit = true;
+        draft.paletteRemoved = false;
         syncEditorPaletteControls();
         syncThemeEditorPreview();
       }
@@ -2879,6 +3057,7 @@ app.addEventListener("input", (event) => {
       if (supported) {
         draft.paletteAccent = safePaletteColorValue(value) ?? draft.paletteAccent;
         draft.paletteExplicit = true;
+        draft.paletteRemoved = false;
         syncEditorPaletteControls(true);
         syncThemeEditorPreview();
       }
@@ -2889,10 +3068,11 @@ app.addEventListener("input", (event) => {
       const parsed = parseThemeColor(draft.paletteAccent);
       if (parsed) {
         parsed.alpha = Number(input.value) / 100;
-        const formatted = formatEditedThemeColor(parsed, state.status.themeFeatures);
+        const formatted = formatEditedThemeColor(parsed, state.status.themeFeatures, draft.paletteAccent);
         if (!formatted) return;
         draft.paletteAccent = formatted;
         draft.paletteExplicit = true;
+        draft.paletteRemoved = false;
         syncEditorPaletteControls();
         syncThemeEditorPreview();
       }
@@ -2904,6 +3084,7 @@ app.addEventListener("input", (event) => {
       const value = clampUnit(Number(input.value) / 100);
       draft[artKey] = value;
       draft.explicitArt = { ...(draft.explicitArt ?? {}), [artKey]: value };
+      draft.artRemoved = false;
       const output = document.querySelector<HTMLOutputElement>(`[data-editor-art-output="${artKey}"]`);
       if (output) output.value = `${Math.round(value * 100)}%`;
       const preview = document.querySelector<HTMLElement>(".editor-theme-preview");
@@ -2917,7 +3098,7 @@ app.addEventListener("input", (event) => {
       const nextRgb = parseThemeColor(input.value);
       const previous = parseThemeColor(draft.colors[swatchKey]);
       const alpha = supportsTransparentColorEditing(state.status.themeFeatures) ? previous?.alpha ?? 1 : 1;
-      const formatted = nextRgb ? formatEditedThemeColor({ ...nextRgb, alpha }, state.status.themeFeatures) : null;
+      const formatted = nextRgb ? formatEditedThemeColor({ ...nextRgb, alpha }, state.status.themeFeatures, draft.colors[swatchKey]) : null;
       if (formatted) {
         draft.colors[swatchKey] = formatted;
         draft.explicitColors = { ...(draft.explicitColors ?? {}), [swatchKey]: formatted };
@@ -2929,13 +3110,13 @@ app.addEventListener("input", (event) => {
 
     const textKey = input.dataset.editorColorText;
     if (textKey && isThemeColorKey(textKey)) {
-      const parsed = parseThemeColor(input.value);
+      const value = input.value.trim();
+      const parsed = parseThemeColor(value);
       const supported = themeColorSupportedByRuntime(input.value, state.status.themeFeatures);
       input.setCustomValidity(supported ? "" : "请输入当前运行时支持的 Hex、rgb() 或 rgba() 颜色");
-      const formatted = parsed && supported ? formatEditedThemeColor(parsed, state.status.themeFeatures) : null;
-      if (formatted) {
-        draft.colors[textKey] = formatted;
-        draft.explicitColors = { ...(draft.explicitColors ?? {}), [textKey]: formatted };
+      if (parsed && supported) {
+        draft.colors[textKey] = value;
+        draft.explicitColors = { ...(draft.explicitColors ?? {}), [textKey]: value };
         syncEditorColorRow(textKey, true);
         syncThemeEditorPreview();
       }
@@ -2947,7 +3128,7 @@ app.addEventListener("input", (event) => {
       const parsed = parseThemeColor(draft.colors[alphaKey]);
       if (parsed) {
         parsed.alpha = Number(input.value) / 100;
-        const formatted = formatEditedThemeColor(parsed, state.status.themeFeatures);
+        const formatted = formatEditedThemeColor(parsed, state.status.themeFeatures, draft.colors[alphaKey]);
         if (!formatted) return;
         draft.colors[alphaKey] = formatted;
         draft.explicitColors = { ...(draft.explicitColors ?? {}), [alphaKey]: formatted };
@@ -2980,7 +3161,8 @@ app.addEventListener("change", (event) => {
   if (input instanceof HTMLSelectElement) {
     if (input.dataset.editorSetting === "appearance") {
       draft.appearance = normalizeChoice(input.value, ["auto", "light", "dark"] as const, "auto");
-      draft.appearanceDirty = true;
+      draft.appearancePresent = true;
+      draft.appearanceRemoved = false;
       renderApp();
       return;
     }
@@ -2988,12 +3170,14 @@ app.addEventListener("change", (event) => {
     if (artKey === "safeArea") {
       draft.safeArea = normalizeChoice(input.value, ["auto", "left", "right", "center", "none"] as const, "auto");
       draft.explicitArt = { ...(draft.explicitArt ?? {}), safeArea: draft.safeArea };
+      draft.artRemoved = false;
       renderApp();
       return;
     }
     if (artKey === "taskMode") {
       draft.taskMode = normalizeChoice(input.value, ["auto", "ambient", "banner", "off"] as const, "auto");
       draft.explicitArt = { ...(draft.explicitArt ?? {}), taskMode: draft.taskMode };
+      draft.artRemoved = false;
       renderApp();
       return;
     }
@@ -3009,6 +3193,7 @@ app.addEventListener("change", (event) => {
     } else {
       draft.paletteAccent = safePaletteColorValue(value) ?? draft.paletteAccent;
       draft.paletteExplicit = true;
+      draft.paletteRemoved = false;
       input.setCustomValidity("");
       syncEditorPaletteControls();
       syncThemeEditorPreview();
@@ -3017,18 +3202,18 @@ app.addEventListener("change", (event) => {
   }
   const key = input.dataset.editorColorText;
   if (!key || !isThemeColorKey(key)) return;
-  const parsed = parseThemeColor(input.value);
+  const value = input.value.trim();
+  const parsed = parseThemeColor(value);
   const supported = themeColorSupportedByRuntime(input.value, state.status.themeFeatures);
-  const formatted = parsed && supported ? formatEditedThemeColor(parsed, state.status.themeFeatures) : null;
-  if (!formatted) {
+  if (!parsed || !supported) {
     input.setCustomValidity("");
     input.value = draft.colors[key];
     syncEditorColorRow(key);
     syncThemeEditorPreview();
     return;
   }
-  draft.colors[key] = formatted;
-  draft.explicitColors = { ...(draft.explicitColors ?? {}), [key]: formatted };
+  draft.colors[key] = value;
+  draft.explicitColors = { ...(draft.explicitColors ?? {}), [key]: value };
   input.setCustomValidity("");
   syncEditorColorRow(key);
   syncThemeEditorPreview();
@@ -3088,25 +3273,38 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "Escape") {
+    const openPreviewMenu = document.querySelector<HTMLElement>("[data-preview-popover]:not([hidden])");
+    if (openPreviewMenu) {
+      openPreviewMenu.hidden = true;
+      const opener = openPreviewMenu.closest(".sim-header")?.querySelector<HTMLButtonElement>('[data-preview-action="open-menu"]');
+      opener?.setAttribute("aria-expanded", "false");
+      opener?.focus();
+      event.preventDefault();
+      return;
+    }
     if (state.editorDraft && !state.busy) {
       state.editorDraft = null;
       renderApp();
+      restoreModalOpener();
       return;
     }
     if (state.confirmApplyRestart) {
       state.confirmApplyRestart = false;
       state.pendingApplyFinishGuide = false;
       renderApp();
+      restoreModalOpener();
       return;
     }
     if (state.confirmInstall) {
       state.confirmInstall = false;
       renderApp();
+      restoreModalOpener();
       return;
     }
     if (state.confirmRestore) {
       state.confirmRestore = false;
       renderApp();
+      restoreModalOpener();
       return;
     }
     if (state.onboardingOpen) closeGuide();

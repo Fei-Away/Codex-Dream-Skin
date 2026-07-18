@@ -4168,3 +4168,65 @@ body.window-unfocused .window-controls {
     border-radius: 12px;
   }
 }
+
+.editor-downgrade-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 10px 12px;
+  color: #f4d7a1;
+  border: 1px solid rgba(246, 182, 96, .28);
+  border-radius: 11px;
+  background: rgba(246, 182, 96, .08);
+}
+
+.editor-downgrade-note .icon { width: 16px; height: 16px; flex: 0 0 auto; }
+.editor-downgrade-note span { display: grid; gap: 3px; }
+.editor-downgrade-note strong { font-size: 12px; }
+.editor-downgrade-note small { color: rgba(244, 215, 161, .78); line-height: 1.45; }
+
+.editor-field-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-inline-actions {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.editor-inline-actions button {
+  padding: 1px 0;
+  color: var(--purple);
+  font-size: 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.editor-inline-actions button:hover { color: #c8bbff; }
+.editor-inline-actions button:disabled { color: var(--subtle); cursor: not-allowed; }
+
+.editor-materialize-colors { align-self: flex-start; margin-top: 3px; }
+
+.onboarding-theme-list button.is-incompatible { border-color: rgba(246, 182, 96, .34); }
+.onboarding-theme-list button.is-incompatible > i { color: var(--orange); }
+.onboarding-compatibility {
+  display: block;
+  margin-top: 3px;
+  color: var(--orange);
+  font-style: normal;
+  line-height: 1.35;
+}
+
+@media (max-width: 900px) {
+  .window-frame > .modal-backdrop .theme-editor-actions {
+    position: static;
+    bottom: auto;
+    margin-top: 18px;
+  }
+}
