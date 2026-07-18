@@ -1,4 +1,7 @@
 $script:DreamSkinUtf8NoBom = [System.Text.UTF8Encoding]::new($false, $true)
+$script:DreamSkinLegacyAppearanceTheme = 'appearanceTheme = "light"'
+$script:DreamSkinManagedLightCodeTheme = 'appearanceLightCodeThemeId = "codex"'
+$script:DreamSkinManagedLightChromeTheme = 'appearanceLightChromeTheme = { accent = "#B65CFF", contrast = 64, fonts = { code = "Cascadia Code", ui = "Microsoft YaHei UI" }, ink = "#4A235F", opaqueWindows = true, semanticColors = { diffAdded = "#BCE8CF", diffRemoved = "#F7B8CE", skill = "#C47BFF" }, surface = "#FFF4FA" }'
 
 function ConvertFrom-DreamSkinUtf8Bytes {
   param(
@@ -85,6 +88,18 @@ function Write-DreamSkinUtf8FileAtomically {
   }
 }
 
+function Remove-DreamSkinAtomicArtifact {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  if ([System.IO.File]::Exists($Path)) {
+    [System.IO.File]::Delete($Path)
+  }
+}
+
 function Write-DreamSkinBytesAtomically {
   [CmdletBinding()]
   param(
@@ -99,7 +114,9 @@ function Write-DreamSkinBytesAtomically {
     [System.IO.Directory]::CreateDirectory($directory) | Out-Null
   }
   $fileName = [System.IO.Path]::GetFileName($fullPath)
-  $temporary = Join-Path $directory ".$fileName.$PID.$([guid]::NewGuid().ToString('N')).tmp"
+  $operationId = "$PID.$([guid]::NewGuid().ToString('N'))"
+  $temporary = Join-Path $directory ".$fileName.$operationId.tmp"
+  $replacementBackup = Join-Path $directory ".$fileName.$operationId.replace-backup"
 
   try {
     [System.IO.File]::WriteAllBytes($temporary, $Bytes)
@@ -107,12 +124,22 @@ function Write-DreamSkinBytesAtomically {
       Assert-DreamSkinFileUnchanged -Path $fullPath -ExpectedBytes $ExpectedBytes
     }
     if ([System.IO.File]::Exists($fullPath)) {
-      [System.IO.File]::Replace($temporary, $fullPath, $null)
+      [System.IO.File]::Replace($temporary, $fullPath, $replacementBackup)
     } else {
       [System.IO.File]::Move($temporary, $fullPath)
     }
   } finally {
-    if ([System.IO.File]::Exists($temporary)) { [System.IO.File]::Delete($temporary) }
+    foreach ($artifact in @($temporary, $replacementBackup)) {
+      try {
+        Remove-DreamSkinAtomicArtifact -Path $artifact
+      } catch {
+        try {
+          Write-Warning "Could not remove temporary atomic config artifact '$artifact': $($_.Exception.Message)"
+        } catch {
+          # Cleanup must never mask the result of the atomic write.
+        }
+      }
+    }
   }
 }
 
@@ -167,7 +194,7 @@ function Assert-DreamSkinTomlLineEditingSafe {
   if ($Content.Contains('"""') -or $Content.Contains("'''")) {
     throw 'Refusing to rewrite TOML containing multiline strings; use single-line values before installing Dream Skin.'
   }
-  foreach ($match in [regex]::Matches($Content, '(?m)^[^\r\n]*=[\t ]*\[[^\r\n]*$')) {
+  foreach ($match in [regex]::Matches($Content, '(?m)^[^\r\n]*=[\t ]*\[[^\r\n]*\r?$')) {
     if ((Get-DreamSkinTomlArrayBracketBalance -Line $match.Value) -ne 0) {
       throw 'Refusing to rewrite TOML containing multiline arrays; use single-line arrays before installing Dream Skin.'
     }
@@ -190,6 +217,20 @@ function Get-DreamSkinDesktopSectionPattern {
   return "(?ms)^[\t ]*\[[\t ]*$desktopToken[\t ]*\][\t ]*(?:#[^\r\n]*)?(?:\r?\n|(?=\z))(?<body>.*?)(?=^[\t ]*\[\[?|\z)"
 }
 
+function Test-DreamSkinDesktopNestedTable {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content,
+    [Parameter(Mandatory = $true)][string]$Key
+  )
+
+  $desktopToken = Get-DreamSkinTomlKeyTokenPattern -Key 'desktop'
+  $keyToken = Get-DreamSkinTomlKeyTokenPattern -Key $Key
+  return [regex]::IsMatch(
+    $Content,
+    "(?m)^[\t ]*\[[\t ]*$desktopToken[\t ]*\.[\t ]*$keyToken[\t ]*(?:\]|\.)"
+  )
+}
+
 function Assert-DreamSkinDesktopShapeSupported {
   param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content)
 
@@ -200,11 +241,13 @@ function Assert-DreamSkinDesktopShapeSupported {
   }
 
   $desktopToken = Get-DreamSkinTomlKeyTokenPattern -Key 'desktop'
-  if ([regex]::IsMatch($Content, "(?m)^[\t ]*\[\[[\t ]*$desktopToken[\t ]*\]\]")) {
+  if ([regex]::IsMatch($Content, "(?m)^[\t ]*\[\[[\t ]*$desktopToken[\t ]*(?:\]\]|\.)")) {
     throw 'Refusing to rewrite a config that represents desktop as an array of tables.'
   }
-  if ([regex]::IsMatch($Content, "(?m)^[\t ]*\[\[?[\t ]*$desktopToken[\t ]*\.")) {
-    throw 'Refusing to rewrite nested desktop tables; normalize them to a single [desktop] table first.'
+  foreach ($key in @('appearanceTheme', 'appearanceLightCodeThemeId')) {
+    if (Test-DreamSkinDesktopNestedTable -Content $Content -Key $key) {
+      throw "Refusing to replace '$key' because it is represented as a nested desktop table."
+    }
   }
 
   $firstTable = [regex]::Match($Content, '(?m)^[\t ]*\[\[?')
@@ -219,6 +262,11 @@ function Assert-DreamSkinDesktopShapeSupported {
     foreach ($key in @('appearanceTheme', 'appearanceLightCodeThemeId', 'appearanceLightChromeTheme')) {
       $keyToken = Get-DreamSkinTomlKeyTokenPattern -Key $key
       $settingShape = "(?m)^[\t ]*$keyToken[\t ]*(?:\.|=)"
+      if ($key -eq 'appearanceLightChromeTheme' -and
+        (Test-DreamSkinDesktopNestedTable -Content $Content -Key $key) -and
+        [regex]::IsMatch($desktop.Body, $settingShape)) {
+        throw "Refusing to rewrite '$key' because both a scalar and nested table are present."
+      }
       if ([regex]::Matches($bodyProbe, $settingShape).Count -gt
         [regex]::Matches($desktop.Body, $settingShape).Count) {
         throw "Refusing to rewrite an escaped TOML key equivalent to '$key'."
@@ -259,12 +307,12 @@ function Set-DreamSkinSectionSetting {
   param(
     [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Body,
     [Parameter(Mandatory = $true)][string]$Key,
-    [AllowNull()][string]$Line,
+    [AllowNull()][object]$Line,
     [Parameter(Mandatory = $true)][string]$NewLine
   )
 
   $keyToken = Get-DreamSkinTomlKeyTokenPattern -Key $Key
-  $pattern = "(?m)^[\t ]*$keyToken[\t ]*=.*(?:\r?\n)?"
+  $pattern = "(?m)^[\t ]*$keyToken[\t ]*=[^\r\n]*(?:\r?\n|(?=\z))"
   $matcher = [regex]::new($pattern)
   if ($matcher.Matches($Body).Count -gt 1) {
     throw "Refusing to rewrite duplicate '$Key' entries in the [desktop] section."
@@ -279,6 +327,67 @@ function Set-DreamSkinSectionSetting {
   return $Body + $separator + $normalizedLine
 }
 
+function Get-DreamSkinSectionSettingLine {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Body,
+    [Parameter(Mandatory = $true)][string]$Key
+  )
+  $keyToken = Get-DreamSkinTomlKeyTokenPattern -Key $Key
+  $matches = [regex]::Matches($Body, "(?m)^[\t ]*$keyToken[\t ]*=.*$")
+  if ($matches.Count -gt 1) { throw "Refusing to inspect duplicate '$Key' entries in the [desktop] section." }
+  if ($matches.Count -eq 0) { return $null }
+  return $matches[0].Value.Trim()
+}
+
+function Test-DreamSkinLegacyManagedLightTrio {
+  param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content)
+  $desktop = Get-DreamSkinDesktopSection -Content $Content
+  if ($null -eq $desktop) { return $false }
+  return (
+    (Get-DreamSkinSectionSettingLine -Body $desktop.Body -Key 'appearanceTheme') -ceq
+      $script:DreamSkinLegacyAppearanceTheme -and
+    (Get-DreamSkinSectionSettingLine -Body $desktop.Body -Key 'appearanceLightCodeThemeId') -ceq
+      $script:DreamSkinManagedLightCodeTheme -and
+    (Get-DreamSkinSectionSettingLine -Body $desktop.Body -Key 'appearanceLightChromeTheme') -ceq
+      $script:DreamSkinManagedLightChromeTheme
+  )
+}
+
+function Get-DreamSkinAppearanceMarkerPath {
+  param([Parameter(Mandatory = $true)][string]$BackupPath)
+  return "$BackupPath.appearance.json"
+}
+
+function Read-DreamSkinAppearanceMarker {
+  param([Parameter(Mandatory = $true)][string]$BackupPath)
+  $markerPath = Get-DreamSkinAppearanceMarkerPath -BackupPath $BackupPath
+  if (-not (Test-Path -LiteralPath $markerPath)) { return $null }
+  try {
+    $marker = (Read-DreamSkinUtf8File -Path $markerPath) | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "Dream Skin appearance marker is unreadable; config was preserved: $markerPath"
+  }
+  if ($null -eq $marker -or $marker -is [string] -or $marker -is [array] -or
+    [int]$marker.schemaVersion -ne 1 -or $marker.appearanceThemeManaged -isnot [bool] -or
+    [bool]$marker.appearanceThemeManaged) {
+    throw "Dream Skin appearance marker is invalid; config was preserved: $markerPath"
+  }
+  return $marker
+}
+
+function Write-DreamSkinAppearanceMarker {
+  param([Parameter(Mandatory = $true)][string]$BackupPath)
+  $markerPath = Get-DreamSkinAppearanceMarkerPath -BackupPath $BackupPath
+  if (Get-Command Assert-DreamSkinNoReparseComponents -ErrorAction SilentlyContinue) {
+    Assert-DreamSkinNoReparseComponents -Path $markerPath
+  }
+  $marker = [ordered]@{
+    schemaVersion = 1
+    appearanceThemeManaged = $false
+  } | ConvertTo-Json
+  Write-DreamSkinUtf8FileAtomically -Path $markerPath -Content ($marker + "`r`n")
+}
+
 function Install-DreamSkinBaseTheme {
   [CmdletBinding()]
   param(
@@ -290,8 +399,13 @@ function Install-DreamSkinBaseTheme {
   )
 
   if (-not (Test-Path -LiteralPath $ConfigPath)) { throw "Codex config not found: $ConfigPath" }
+  if (Get-Command Assert-DreamSkinNoReparseComponents -ErrorAction SilentlyContinue) {
+    Assert-DreamSkinNoReparseComponents -Path $BackupPath
+    Assert-DreamSkinNoReparseComponents -Path (Get-DreamSkinAppearanceMarkerPath -BackupPath $BackupPath)
+  }
   $originalBytes = [System.IO.File]::ReadAllBytes($ConfigPath)
   $content = ConvertFrom-DreamSkinUtf8Bytes -Bytes $originalBytes -Path $ConfigPath
+  $appearanceMarker = Read-DreamSkinAppearanceMarker -BackupPath $BackupPath
   $backupCreated = $false
   if (-not (Test-Path -LiteralPath $BackupPath)) {
     Write-DreamSkinBytesAtomically -Path $BackupPath -Bytes $originalBytes -ExpectedBytes $null
@@ -309,18 +423,33 @@ function Install-DreamSkinBaseTheme {
     }
 
     $body = $desktop.Body
-    $settings = [ordered]@{
-      appearanceTheme = 'appearanceTheme = "light"'
-      appearanceLightCodeThemeId = 'appearanceLightCodeThemeId = "codex"'
-      appearanceLightChromeTheme = 'appearanceLightChromeTheme = { accent = "#B65CFF", contrast = 64, fonts = { code = "Cascadia Code", ui = "Microsoft YaHei UI" }, ink = "#4A235F", opaqueWindows = true, semanticColors = { diffAdded = "#BCE8CF", diffRemoved = "#F7B8CE", skill = "#C47BFF" }, surface = "#FFF4FA" }'
+    $backupContent = $null
+    $legacyMigration = $null -eq $appearanceMarker -and (Test-Path -LiteralPath $BackupPath) -and
+      (Test-DreamSkinLegacyManagedLightTrio -Content $content)
+    if ($legacyMigration) {
+      $backupContent = ConvertFrom-DreamSkinUtf8Bytes -Bytes ([System.IO.File]::ReadAllBytes($BackupPath)) -Path $BackupPath
+      Assert-DreamSkinDesktopShapeSupported -Content $backupContent
+      $backupDesktop = Get-DreamSkinDesktopSection -Content $backupContent
+      $savedAppearance = if ($null -ne $backupDesktop) {
+        Get-DreamSkinSectionSettingLine -Body $backupDesktop.Body -Key 'appearanceTheme'
+      } else { $null }
+      $body = Set-DreamSkinSectionSetting -Body $body -Key 'appearanceTheme' -Line $savedAppearance -NewLine $newLine
     }
+    $settings = [ordered]@{
+      appearanceLightCodeThemeId = $script:DreamSkinManagedLightCodeTheme
+      appearanceLightChromeTheme = $script:DreamSkinManagedLightChromeTheme
+    }
+    $hasNestedLightChromeTheme = Test-DreamSkinDesktopNestedTable `
+      -Content $content -Key 'appearanceLightChromeTheme'
     foreach ($key in $settings.Keys) {
+      if ($key -eq 'appearanceLightChromeTheme' -and $hasNestedLightChromeTheme) { continue }
       $body = Set-DreamSkinSectionSetting -Body $body -Key $key -Line $settings[$key] -NewLine $newLine
     }
 
     $content = $content.Substring(0, $desktop.BodyStart) + $body +
       $content.Substring($desktop.BodyStart + $desktop.BodyLength)
     Write-DreamSkinUtf8FileAtomically -Path $ConfigPath -Content $content -ExpectedBytes $originalBytes
+    Write-DreamSkinAppearanceMarker -BackupPath $BackupPath
     $writeCompleted = $true
   } catch {
     if ($backupCreated -and -not $writeCompleted) {
@@ -341,6 +470,10 @@ function Restore-DreamSkinBaseTheme {
   )
 
   if (-not (Test-Path -LiteralPath $BackupPath)) { throw 'No pre-install config backup is available.' }
+  if (Get-Command Assert-DreamSkinNoReparseComponents -ErrorAction SilentlyContinue) {
+    Assert-DreamSkinNoReparseComponents -Path $BackupPath
+    Assert-DreamSkinNoReparseComponents -Path (Get-DreamSkinAppearanceMarkerPath -BackupPath $BackupPath)
+  }
   $backupBytes = [System.IO.File]::ReadAllBytes($BackupPath)
   $backupContent = ConvertFrom-DreamSkinUtf8Bytes -Bytes $backupBytes -Path $BackupPath
   $currentBytes = [System.IO.File]::ReadAllBytes($ConfigPath)
@@ -356,9 +489,17 @@ function Restore-DreamSkinBaseTheme {
   }
 
   $body = $currentDesktop.Body
-  foreach ($key in @('appearanceTheme', 'appearanceLightCodeThemeId', 'appearanceLightChromeTheme')) {
+  $appearanceMarker = Read-DreamSkinAppearanceMarker -BackupPath $BackupPath
+  $restoreLegacyAppearance = $null -eq $appearanceMarker -and
+    (Test-DreamSkinLegacyManagedLightTrio -Content $currentContent)
+  $restoreKeys = @('appearanceLightCodeThemeId', 'appearanceLightChromeTheme')
+  if ($restoreLegacyAppearance) { $restoreKeys = @('appearanceTheme') + $restoreKeys }
+  $hasNestedLightChromeTheme = Test-DreamSkinDesktopNestedTable `
+    -Content $currentContent -Key 'appearanceLightChromeTheme'
+  foreach ($key in $restoreKeys) {
+    if ($key -eq 'appearanceLightChromeTheme' -and $hasNestedLightChromeTheme) { continue }
     $keyToken = Get-DreamSkinTomlKeyTokenPattern -Key $key
-    $pattern = "(?m)^[\t ]*$keyToken[\t ]*=.*(?:\r?\n)?"
+    $pattern = "(?m)^[\t ]*$keyToken[\t ]*=[^\r\n]*(?:\r?\n|(?=\z))"
     $saved = if ($null -ne $backupDesktop) { [regex]::Match($backupDesktop.Body, $pattern) } else { $null }
     $line = if ($null -ne $saved -and $saved.Success) { $saved.Value } else { $null }
     $body = Set-DreamSkinSectionSetting -Body $body -Key $key -Line $line -NewLine $newLine
@@ -402,4 +543,5 @@ function Archive-DreamSkinConfigBackup {
   if (-not (Test-Path -LiteralPath $BackupPath)) { return }
   if (Test-Path -LiteralPath $ArchivePath) { throw "Config backup archive already exists: $ArchivePath" }
   Move-Item -LiteralPath $BackupPath -Destination $ArchivePath -ErrorAction Stop
+  Remove-Item -LiteralPath (Get-DreamSkinAppearanceMarkerPath -BackupPath $BackupPath) -Force -ErrorAction SilentlyContinue
 }

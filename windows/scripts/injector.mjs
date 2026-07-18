@@ -1,10 +1,15 @@
 import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readImageMetadata } from "./image-metadata.mjs";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+const scriptPath = fileURLToPath(import.meta.url);
+const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.0.0";
+const SKIN_VERSION = "1.2.0";
+const MAX_ART_BYTES = 16 * 1024 * 1024;
+const STRONG_THEME_AUDIT_MS = 30000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 
@@ -18,6 +23,8 @@ function parseArgs(argv) {
     screenshot: null,
     reload: false,
     browserId: null,
+    themeDir: path.join(root, "assets"),
+    pauseFile: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -28,6 +35,8 @@ function parseArgs(argv) {
     else if (arg === "--remove") options.mode = "remove";
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--browser-id") options.browserId = argv[++i];
+    else if (arg === "--theme-dir") options.themeDir = path.resolve(argv[++i]);
+    else if (arg === "--pause-file") options.pauseFile = path.resolve(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
     else if (arg === "--reload") options.reload = true;
     else if (arg === "--self-test") options.mode = "self-test";
@@ -57,6 +66,15 @@ function validatedDebuggerUrl(target, port) {
     throw new Error("Rejected a CDP WebSocket URL outside the allowed loopback endpoint shape");
   }
   return url.href;
+}
+
+function parseCdpMessage(data) {
+  try {
+    const message = JSON.parse(String(data));
+    return message && typeof message === "object" ? message : null;
+  } catch {
+    return null;
+  }
 }
 
 function browserIdFromVersion(version, port) {
@@ -115,10 +133,8 @@ class CdpSession {
   }
 
   onMessage(event) {
-    let message;
-    try {
-      message = JSON.parse(String(event.data));
-    } catch {
+    const message = parseCdpMessage(event.data);
+    if (!message) {
       this.close();
       return;
     }
@@ -266,16 +282,146 @@ async function connectBrowserIdentityAnchor(port, expectedBrowserId) {
   return new BrowserIdentityAnchor(validatedDebuggerUrl(version, port)).open();
 }
 
-async function loadPayload() {
-  const [css, template, art] = await Promise.all([
+const THEME_CHOICES = {
+  appearance: new Set(["auto", "light", "dark"]),
+  safeArea: new Set(["auto", "left", "right", "center", "none"]),
+  taskMode: new Set(["auto", "ambient", "banner", "off"]),
+};
+
+function normalizedUnit(value, name) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || number > 1) {
+    throw new Error(`${name} must be null or a number between 0 and 1`);
+  }
+  return number;
+}
+
+function normalizedChoice(value, name, choices, fallback) {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (!choices.has(value)) throw new Error(`${name} has an unsupported value: ${value}`);
+  return value;
+}
+
+function normalizedText(value, name, fallback, maxLength = 120) {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value !== "string" || value.length > maxLength || /[\u0000-\u001f]/.test(value)) {
+    throw new Error(`${name} must be a short single-line string`);
+  }
+  return value;
+}
+
+async function loadTheme(themeDir) {
+  const realThemeDir = await fs.realpath(themeDir);
+  const themePath = path.join(realThemeDir, "theme.json");
+  const themeText = await fs.readFile(themePath, "utf8");
+  const raw = JSON.parse(themeText);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("Theme root must be an object");
+  }
+  const image = normalizedText(raw.image, "image", null, 240);
+  if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
+  const imagePath = path.resolve(realThemeDir, image);
+  const relativeImage = path.relative(realThemeDir, imagePath);
+  if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
+    throw new Error("Theme image must remain inside the selected theme directory");
+  }
+  const extension = path.extname(imagePath).toLowerCase();
+  if (![".png", ".jpg", ".jpeg", ".webp"].includes(extension)) {
+    throw new Error(`Unsupported theme image format: ${extension || "missing"}`);
+  }
+  const realImagePath = await fs.realpath(imagePath);
+  const realRelativeImage = path.relative(realThemeDir, realImagePath);
+  if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
+    throw new Error("Theme image cannot escape through a link or junction");
+  }
+  const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
+  const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
+    ? raw.palette : {};
+  const theme = {
+    id: normalizedText(raw.id, "id", "custom", 80),
+    name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
+    image,
+    appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
+    art: {
+      focusX: normalizedUnit(art.focusX, "art.focusX"),
+      focusY: normalizedUnit(art.focusY, "art.focusY"),
+      safeArea: normalizedChoice(art.safeArea, "art.safeArea", THEME_CHOICES.safeArea, "auto"),
+      taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
+    },
+    palette: {},
+  };
+  if (typeof palette.accent === "string" && palette.accent.trim()) {
+    const accent = palette.accent.trim();
+    if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(accent)) {
+      throw new Error("palette.accent is not a supported CSS color");
+    }
+    theme.palette.accent = accent;
+  }
+  const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
+  if (!imageStat.isFile()) throw new Error("Theme image is not a file");
+  if (imageStat.size < 1) throw new Error("Theme image cannot be empty");
+  if (imageStat.size > MAX_ART_BYTES) {
+    throw new Error(`Theme image exceeds the ${MAX_ART_BYTES / 1024 / 1024} MB limit`);
+  }
+  const imageBytes = await fs.readFile(realImagePath);
+  if (imageBytes.length < 1 || imageBytes.length > MAX_ART_BYTES) {
+    throw new Error(`Theme image must be between 1 byte and ${MAX_ART_BYTES / 1024 / 1024} MB`);
+  }
+  const artMetadata = readImageMetadata(imageBytes, extension);
+  if (!artMetadata) {
+    throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
+  }
+  theme.artMetadata = artMetadata;
+  const fingerprint = createHash("sha256")
+    .update(themeText, "utf8")
+    .update("\0")
+    .update(imageBytes)
+    .digest("hex");
+  return {
+    theme,
+    themePath,
+    imagePath: realImagePath,
+    imageBytes,
+    fingerprint,
+    sourceStamp: `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`,
+  };
+}
+
+async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme = null) {
+  const loadedTheme = candidateTheme ?? await loadTheme(themeDir);
+  const [css, template] = await Promise.all([
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
-    fs.readFile(path.join(root, "assets", "dream-reference.png")),
   ]);
-  const artDataUrl = `data:image/png;base64,${art.toString("base64")}`;
-  return template
+  const extension = path.extname(loadedTheme.imagePath).toLowerCase();
+  const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
+    : extension === ".webp" ? "image/webp" : "image/png";
+  const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
+  const payload = template
     .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
-    .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl));
+    .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
+    .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme));
+  const { imageBytes: _imageBytes, ...themeState } = loadedTheme;
+  return { ...themeState, payload };
+}
+
+async function fileExists(filePath) {
+  if (!filePath) return false;
+  try {
+    return (await fs.stat(filePath)).isFile();
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function readThemeSourceStamp(loadedTheme) {
+  const [themeStat, imageStat] = await Promise.all([
+    fs.stat(loadedTheme.themePath),
+    fs.stat(loadedTheme.imagePath),
+  ]);
+  return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`;
 }
 
 async function probeSession(session) {
@@ -293,16 +439,31 @@ async function probeSession(session) {
   })()`);
 }
 
+async function waitForCodexProbe(session, timeoutMs = 1800) {
+  const deadline = Date.now() + timeoutMs;
+  let probe = null;
+  while (Date.now() < deadline) {
+    try {
+      probe = await probeSession(session);
+      if (probe?.codex) return probe;
+    } catch {
+      // The renderer may be between documents while the early payload waits.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return probe;
+}
+
 async function connectTarget(target, port) {
   return new CdpSession(target, port).open();
 }
 
-async function connectCodexTargets(port, timeoutMs) {
+async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const targets = await listAppTargets(port, options.browserId);
+      const targets = await listAppTargets(port, expectedBrowserId);
       const connected = [];
       for (const target of targets) {
         let session;
@@ -331,14 +492,71 @@ async function applyToSession(session, payload) {
   return session.evaluate(payload);
 }
 
+export function earlyPayloadFor(payload, revision) {
+  return `(() => {
+    const generationKey = "__CODEX_DREAM_SKIN_EARLY_GENERATION__";
+    const appliedKey = "__CODEX_DREAM_SKIN_EARLY_APPLIED__";
+    const generation = ${JSON.stringify(revision)};
+    window[generationKey] = generation;
+    let observer = null;
+    let timeout = null;
+    const stop = () => {
+      observer?.disconnect();
+      observer = null;
+      if (timeout) clearTimeout(timeout);
+      timeout = null;
+    };
+    const install = () => {
+      if (window[generationKey] !== generation) { stop(); return true; }
+      const root = document.documentElement;
+      if (!root || !document.body) return false;
+      const shell = document.querySelector('main.main-surface');
+      const sidebar = document.querySelector('aside.app-shell-left-panel');
+      if (!shell || !sidebar) return false;
+      stop();
+      ${payload};
+      window[appliedKey] = generation;
+      return true;
+    };
+    if (install()) return;
+    if (typeof MutationObserver === "function" && document.documentElement) {
+      observer = new MutationObserver(install);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    }
+    timeout = setTimeout(stop, 10000);
+  })()`;
+}
+
+async function registerEarlyPayload(session, payload, revision) {
+  const result = await session.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: earlyPayloadFor(payload, revision),
+  });
+  return result.identifier ?? null;
+}
+
+async function removeEarlyPayload(session, identifier) {
+  if (!identifier || session.closed) return;
+  await session.send("Page.removeScriptToEvaluateOnNewDocument", { identifier }).catch(() => {});
+}
+
 async function removeFromSession(session) {
   return session.evaluate(`(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
-    document.documentElement?.classList.remove('codex-dream-skin');
-    document.documentElement?.style.removeProperty('--dream-art');
+    document.documentElement?.classList.remove(
+      'codex-dream-skin', 'dream-theme-light', 'dream-theme-dark',
+      'dream-art-wide', 'dream-art-standard', 'dream-focus-left',
+      'dream-focus-center', 'dream-focus-right', 'dream-safe-left',
+      'dream-safe-center', 'dream-safe-right', 'dream-safe-none',
+      'dream-task-ambient', 'dream-task-banner', 'dream-task-off'
+    );
+    for (const property of [
+      '--dream-art', '--dream-art-position', '--dream-focus-x', '--dream-focus-y',
+      '--dream-accent', '--dream-accent-ink', '--dream-image-luma'
+    ]) document.documentElement?.style.removeProperty(property);
     document.querySelectorAll('.dream-home').forEach((node) => node.classList.remove('dream-home'));
+    document.querySelectorAll('.dream-task').forEach((node) => node.classList.remove('dream-task'));
     document.querySelectorAll('.dream-home-shell').forEach((node) => node.classList.remove('dream-home-shell'));
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
@@ -352,6 +570,7 @@ async function verifyRemovedSession(session) {
     !document.documentElement.classList.contains('codex-dream-skin') &&
     !document.documentElement.style.getPropertyValue('--dream-art') &&
     !document.querySelector('.dream-home') &&
+    !document.querySelector('.dream-task') &&
     !document.querySelector('.dream-home-shell') &&
     !document.getElementById('codex-dream-skin-style') &&
     !document.getElementById('codex-dream-skin-chrome') &&
@@ -417,16 +636,6 @@ async function waitForVerifiedSession(session, timeoutMs) {
 
 async function capture(session, outputPath) {
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  await session.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-  await session.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-  const viewport = await session.evaluate("({ width: innerWidth, height: innerHeight })");
-  await session.send("Input.dispatchMouseEvent", {
-    type: "mouseMoved",
-    x: Math.round(viewport.width * 0.64),
-    y: Math.round(viewport.height * 0.62),
-    button: "none",
-  });
-  await new Promise((resolve) => setTimeout(resolve, 300));
   const result = await session.send("Page.captureScreenshot", {
     format: "png",
     fromSurface: true,
@@ -436,8 +645,10 @@ async function capture(session, outputPath) {
 }
 
 async function runOneShot(options) {
-  const connected = await connectCodexTargets(options.port, options.timeoutMs);
-  const payload = (options.mode === "once" || options.reload) ? await loadPayload() : null;
+  const connected = await connectCodexTargets(options.port, options.timeoutMs, options.browserId);
+  const loadedPayload = (options.mode === "once" || options.reload)
+    ? await loadPayload(options.themeDir) : null;
+  const payload = loadedPayload?.payload ?? null;
   const results = [];
   let screenshotCaptured = false;
   try {
@@ -479,10 +690,17 @@ async function runOneShot(options) {
 async function runWatch(options) {
   const identityAnchor = await connectBrowserIdentityAnchor(options.port, options.browserId);
   const sessions = new Map();
+  const earlyScripts = new Map();
+  const fallbackTargets = new Map();
+  const fallbackListeners = new Set();
   const targetFailures = new Map();
   let stopping = false;
   let listFailures = 0;
   let lastListErrorLogAt = 0;
+  let lastThemeErrorLogAt = 0;
+  let lastStrongThemeAuditAt = 0;
+  let loadedPayload = null;
+  let paused = false;
   const stop = () => { stopping = true; };
   const rejectTarget = (target, baseDelayMs, error = null) => {
     const previous = targetFailures.get(target.id) ?? { failures: 0, lastLogAt: 0 };
@@ -495,11 +713,30 @@ async function runWatch(options) {
     }
     targetFailures.set(target.id, { failures, lastLogAt: previous.lastLogAt, until: now + delayMs });
   };
+  const attachLoadFallback = (id, target, session) => {
+    if (fallbackListeners.has(id)) return;
+    fallbackListeners.add(id);
+    let lastReinjectErrorLogAt = 0;
+    session.on("Page.loadEventFired", () => {
+      if (!fallbackTargets.get(id)) return;
+      setTimeout(() => {
+        const operation = paused ? removeFromSession(session) : applyToSession(session, loadedPayload.payload);
+        operation.catch((error) => {
+          if (Date.now() - lastReinjectErrorLogAt >= 30000) {
+            console.error(`[dream-skin] reinject failed for ${target.id}: ${error.message}`);
+            lastReinjectErrorLogAt = Date.now();
+          }
+        });
+      }, 250);
+    });
+  };
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
 
   try {
-    const payload = await loadPayload();
+    loadedPayload = await loadPayload(options.themeDir);
+    lastStrongThemeAuditAt = Date.now();
+    paused = await fileExists(options.pauseFile);
     while (!stopping) {
       if (identityAnchor.closed) {
         console.error("[dream-skin] original CDP browser identity closed; watcher is stopping instead of reconnecting");
@@ -521,12 +758,93 @@ async function runWatch(options) {
         continue;
       }
 
+      const nextPaused = await fileExists(options.pauseFile);
+      let nextPayload = loadedPayload;
+      if (!nextPaused) {
+        try {
+          const now = Date.now();
+          let shouldAudit = !loadedPayload || now - lastStrongThemeAuditAt >= STRONG_THEME_AUDIT_MS;
+          if (!shouldAudit) {
+            try {
+              shouldAudit = await readThemeSourceStamp(loadedPayload) !== loadedPayload.sourceStamp;
+            } catch {
+              shouldAudit = true;
+            }
+          }
+          if (shouldAudit) {
+            const candidateTheme = await loadTheme(options.themeDir);
+            lastStrongThemeAuditAt = now;
+            if (!loadedPayload || candidateTheme.fingerprint !== loadedPayload.fingerprint) {
+              nextPayload = await loadPayload(options.themeDir, candidateTheme);
+            } else {
+              loadedPayload.sourceStamp = candidateTheme.sourceStamp;
+            }
+          }
+        } catch (error) {
+          if (Date.now() - lastThemeErrorLogAt >= 30000) {
+            console.error(`[dream-skin] theme update rejected: ${error.message}; keeping the active theme`);
+            lastThemeErrorLogAt = Date.now();
+          }
+        }
+      }
+      const pauseChanged = nextPaused !== paused;
+      const payloadChanged = !nextPaused && nextPayload !== loadedPayload;
+      loadedPayload = nextPayload;
+      paused = nextPaused;
+
+      if (pauseChanged || payloadChanged) {
+        for (const [id, session] of sessions) {
+          try {
+            const previousEarlyScript = earlyScripts.get(id);
+            if (paused) {
+              await removeFromSession(session);
+              await removeEarlyPayload(session, previousEarlyScript);
+              earlyScripts.delete(id);
+              fallbackTargets.delete(id);
+              fallbackListeners.delete(id);
+            } else {
+              let nextEarlyScript = null;
+              try {
+                nextEarlyScript = await registerEarlyPayload(
+                  session,
+                  loadedPayload.payload,
+                  loadedPayload.fingerprint,
+                );
+                if (!nextEarlyScript) throw new Error("CDP did not return an early-script identifier");
+                fallbackTargets.set(id, false);
+              } catch (error) {
+                fallbackTargets.set(id, true);
+                console.error(`[dream-skin] early theme refresh unavailable for ${id}: ${error.message}`);
+                attachLoadFallback(id, { id }, session);
+              }
+              if (nextEarlyScript) earlyScripts.set(id, nextEarlyScript);
+              else earlyScripts.delete(id);
+              await removeEarlyPayload(session, previousEarlyScript);
+              await applyToSession(session, loadedPayload.payload);
+            }
+          } catch (error) {
+            console.error(`[dream-skin] live theme update failed for ${id}: ${error.message}`);
+            await removeEarlyPayload(session, earlyScripts.get(id));
+            earlyScripts.delete(id);
+            fallbackTargets.delete(id);
+            fallbackListeners.delete(id);
+            session.close();
+            sessions.delete(id);
+          }
+        }
+        console.log(paused ? "[dream-skin] paused" : `[dream-skin] active theme ${loadedPayload.theme.id}`);
+      }
+
       const activeIds = new Set(targets.map((target) => target.id));
       for (const id of targetFailures.keys()) {
         if (!activeIds.has(id)) targetFailures.delete(id);
       }
       for (const [id, session] of sessions) {
         if (!activeIds.has(id) || session.closed) {
+          await removeEarlyPayload(session, earlyScripts.get(id));
+          earlyScripts.delete(id);
+          fallbackTargets.delete(id);
+          fallbackListeners.delete(id);
           session.close();
           sessions.delete(id);
           targetFailures.delete(id);
@@ -538,30 +856,53 @@ async function runWatch(options) {
         if (sessions.has(target.id)) continue;
         if ((targetFailures.get(target.id)?.until ?? 0) > Date.now()) continue;
         let session;
+        let earlyScriptId = null;
         try {
           session = await connectTarget(target, options.port);
           if (identityAnchor.closed) throw new CdpIdentityMismatchError("Original CDP browser identity closed");
-          const probe = await probeSession(session);
+          let earlyInjectionFallback = false;
+          if (!paused) {
+            try {
+              earlyScriptId = await registerEarlyPayload(
+                session,
+                loadedPayload.payload,
+                loadedPayload.fingerprint,
+              );
+              if (!earlyScriptId) throw new Error("CDP did not return an early-script identifier");
+              await session.evaluate(earlyPayloadFor(loadedPayload.payload, loadedPayload.fingerprint));
+            } catch (error) {
+              await removeEarlyPayload(session, earlyScriptId);
+              earlyScriptId = null;
+              earlyInjectionFallback = true;
+              console.error(`[dream-skin] early injection unavailable for ${target.id}: ${error.message}`);
+            }
+          }
+          const probe = await waitForCodexProbe(session);
           if (!probe?.codex) {
+            await removeEarlyPayload(session, earlyScriptId);
             rejectTarget(target, 5000);
             session.close();
             continue;
           }
-          let lastReinjectErrorLogAt = 0;
-          session.on("Page.loadEventFired", () => {
-            setTimeout(() => applyToSession(session, payload).catch((error) => {
-              if (Date.now() - lastReinjectErrorLogAt >= 30000) {
-                console.error(`[dream-skin] reinject failed for ${target.id}: ${error.message}`);
-                lastReinjectErrorLogAt = Date.now();
-              }
-            }), 250);
-          });
+          fallbackTargets.set(target.id, earlyInjectionFallback);
+          if (earlyInjectionFallback) attachLoadFallback(target.id, target, session);
           if (identityAnchor.closed) throw new CdpIdentityMismatchError("Original CDP browser identity closed");
-          await applyToSession(session, payload);
+          let earlyApplied = false;
+          if (!paused && !earlyInjectionFallback) {
+            earlyApplied = await session.evaluate(
+              `window.__CODEX_DREAM_SKIN_EARLY_APPLIED__ === ${JSON.stringify(loadedPayload.fingerprint)}`,
+            ).catch(() => false);
+          }
+          if (paused) await removeFromSession(session);
+          else if (!earlyApplied) await applyToSession(session, loadedPayload.payload);
           sessions.set(target.id, session);
+          if (earlyScriptId) earlyScripts.set(target.id, earlyScriptId);
           targetFailures.delete(target.id);
           console.log(`[dream-skin] injected target ${target.id}`);
         } catch (error) {
+          await removeEarlyPayload(session, earlyScriptId);
+          fallbackTargets.delete(target.id);
+          fallbackListeners.delete(target.id);
           session?.close();
           if (identityAnchor.closed || error instanceof CdpIdentityMismatchError) break;
           rejectTarget(target, 2500, error);
@@ -571,12 +912,19 @@ async function runWatch(options) {
     }
   } finally {
     identityAnchor.close();
-    for (const session of sessions.values()) session.close();
+    for (const [id, session] of sessions) {
+      await removeEarlyPayload(session, earlyScripts.get(id));
+      session.close();
+    }
+    earlyScripts.clear();
+    fallbackTargets.clear();
+    fallbackListeners.clear();
   }
 }
 
-const options = parseArgs(process.argv.slice(2));
-if (options.mode === "self-test") {
+if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
+  const options = parseArgs(process.argv.slice(2));
+  if (options.mode === "self-test") {
   const valid = validatedDebuggerUrl({ webSocketDebuggerUrl: `ws://127.0.0.1:${options.port}/devtools/page/test` }, options.port);
   const browserId = browserIdFromVersion({
     webSocketDebuggerUrl: `ws://127.0.0.1:${options.port}/devtools/browser/test-browser`,
@@ -620,12 +968,32 @@ if (options.mode === "self-test") {
       invalidPageTargets.some((item) => isValidCdpPageTarget(item, options.port))) {
     throw new Error("CDP URL and target validation self-test failed");
   }
-  console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
-} else if (options.mode === "check-payload") {
-  const payload = await loadPayload();
-  if (payload.includes("__DREAM_CSS_JSON__") || payload.includes("__DREAM_ART_JSON__")) {
-    throw new Error("Payload placeholders were not fully replaced");
+  const validMessage = parseCdpMessage('{"id":7,"result":{"ok":true}}');
+  const invalidMessages = ["{not-json", "null", '"text"', "42", "true"];
+  if (validMessage?.id !== 7 || validMessage.result?.ok !== true ||
+      invalidMessages.some((value) => parseCdpMessage(value) !== null)) {
+    throw new Error("CDP message validation self-test failed");
   }
-  console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, payloadBytes: Buffer.byteLength(payload) }));
-} else if (options.mode === "watch") await runWatch(options);
-else await runOneShot(options);
+  if (/dispatchKeyEvent|dispatchMouseEvent/.test(capture.toString())) {
+    throw new Error("Screenshot capture must not dispatch renderer input events");
+  }
+  console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
+  } else if (options.mode === "check-payload") {
+    const loaded = await loadPayload(options.themeDir);
+    const unresolved = ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_THEME_JSON__"]
+      .some((placeholder) => loaded.payload.includes(placeholder));
+    if (unresolved) {
+      throw new Error("Payload placeholders were not fully replaced");
+    }
+    console.log(JSON.stringify({
+      pass: true,
+      version: SKIN_VERSION,
+      payloadBytes: Buffer.byteLength(loaded.payload),
+      themeId: loaded.theme.id,
+      appearance: loaded.theme.appearance,
+      art: loaded.theme.art,
+      artMetadata: loaded.theme.artMetadata ?? null,
+    }));
+  } else if (options.mode === "watch") await runWatch(options);
+  else await runOneShot(options);
+}

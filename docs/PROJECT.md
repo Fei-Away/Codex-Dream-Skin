@@ -24,7 +24,6 @@
 
 | 阶段 | 说明 |
 |------|------|
-| 素材包 | 微信传播的 Win / Mac 皮肤包（RAR/ZIP），含注入脚本与主题资源 |
 | 安全审 | 核对是否改 asar、是否静默劫持 API；结论：以本机 CDP 注入为主，开源时明确禁止静默中转劫持 |
 | 整理开源 | 按平台拆成 `macos/`、`windows/`，补 README 图库与安装入口 |
 | 本地美化 | Mac 本机引擎装在 `~/.codex/codex-dream-skin-studio`；CSS 走浅色壳 + 可选底部赞助 chip |
