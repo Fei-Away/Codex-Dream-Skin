@@ -74,13 +74,20 @@ CDP is powerful and unauthenticated on loopback. Prefer Restore when you are don
 
 ## Bundled presets
 
-A fresh install seeds two tested presets into your theme library:
-**Gothic Void Crusade** and **桥本有菜 / Arina Hashimoto**. Gothic Void Crusade
-is the default when no active theme exists. Switch to Arina Hashimoto with:
+A fresh install seeds three tested presets into your theme library:
+**Gothic Void Crusade**, **Small & Beauty / 小而美**, and
+**桥本有菜 / Arina Hashimoto**. Gothic Void Crusade is the default when no
+active theme exists. Switch presets with:
 
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-arina-hashimoto
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-small-and-beauty
 ```
+
+Small & Beauty is a Schema V2 reinterpretation of a compact, familiar chat UI.
+Its name and design direction acknowledge MyKeyVans' Telegram theme
+[“小而美 8.0”](https://t.me/MyTricksCollection/135). The bundled abstract
+background is original to this preset and contains no Telegram or WeChat assets.
 
 The user-provided source PNG is `1672 × 941`. Its pack contains a standardized
 derived `2560 × 1440` JPEG plus theme metadata; the derived export does not add

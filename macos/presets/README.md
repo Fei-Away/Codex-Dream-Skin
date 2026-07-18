@@ -6,10 +6,17 @@
 
 ## 内置实测预设
 
-当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）与
-`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）两套实机验证主题。
-前者是社区作者提供的原创哥特科幻背景；后者使用一张
+当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）、
+`preset-small-and-beauty/`（Small & Beauty / 小而美）与
+`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）三套内置主题。
+Gothic Void Crusade 是社区作者提供的原创哥特科幻背景；Small & Beauty
+使用 Schema V2 为浅色与深色界面提供紧凑、克制的聊天式视觉层级；Arina Hashimoto 使用一张
 `2560 × 1440`（16:9）纯背景：左侧低信息留白承载 Codex 原生标题，人物和花卉主视觉集中在右侧。浅色与暗色截图均来自真实 Codex 注入，不是 AI 绘制的整窗 UI。
+
+Small & Beauty 的名称与设计灵感致谢 MyKeyVans 发布的 Telegram 主题
+[「小而美 8.0」](https://t.me/MyTricksCollection/135)。本预设是面向 Codex
+原生控件的重新诠释，内置背景为本项目新创作的抽象对话构图，不包含 Telegram
+或微信的图像、图标、界面截图或其他第三方素材，也不代表相关品牌认可或合作。
 
 来源尺寸必须如实区分：归档的用户源图（不随 preset 播种）是 `1672 × 941` PNG；preset 内的 `background.jpg` 保持其近 16:9 构图，标准化导出为 `2560 × 1440` JPEG，并不代表补回或新增了源图细节。派生文件使用 `sips -z 1440 2560 -s format jpeg -s formatOptions 90` 生成。
 
@@ -24,14 +31,17 @@
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
   --id preset-arina-hashimoto
+
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-small-and-beauty
 ```
 
 ## 一套预设的结构
 
 ```
 preset-<slug>/
-├── theme.json        # schemaVersion 1，与 assets/theme.json 同一格式
-└── background.jpg    # 背景图（横向，JPEG）
+├── theme.json        # schemaVersion 1 或 2
+└── background.<ext>  # 横向纯背景，PNG / JPEG / WebP
 ```
 
 - 目录名与 `theme.json` 的 `id` **必须**都是 `preset-<slug>` 形式（`slug` 用小写英文 + 连字符）。播种只管理 `preset-*`，绝不会碰用户自己「换一张图」保存的 `custom-*` 主题。
@@ -57,7 +67,7 @@ preset-<slug>/
 
 ## 贡献方式
 
-没有 mac 或想用自制原图，也可以直接放 `preset-<slug>/background.jpg` + 手写 `theme.json`（照抄任一现有预设改配色即可）。
+没有 mac 或想用自制原图，也可以直接放 `preset-<slug>/background.<ext>` + 手写 `theme.json`。简单配色主题可参考 Schema V1 预设；需要分别控制浅色/深色语义色、排版、布局和效果时可参考 `preset-small-and-beauty/` 的 Schema V2 配置。
 
 生成纯背景前建议直接使用 [`docs/reference-background-prompt-guide.md`](../../docs/reference-background-prompt-guide.md) 的 16:9 通用模板、浅/暗兼容约束和负面词；八种概念图的逐张拆解另见 [`docs/background-generation-prompts.md`](../../docs/background-generation-prompts.md)。
 
@@ -71,4 +81,4 @@ node macos/scripts/injector.mjs --check-payload --theme-dir macos/presets/preset
 cd macos && npm test
 ```
 
-`theme.json` 字段含义见 `../assets/theme.json` 与 `scripts/write-theme.mjs`；`colors` 十个键请与背景图协调（`accent` / `secondary` / `highlight` 会体现在原生控件的强调色上）。
+`theme.json` 字段含义见 `../assets/theme.json`、`../references/theme-schema-v2.md` 与 `scripts/write-theme.mjs`。Schema V1 的 `colors` 十个键请与背景图协调；Schema V2 可通过 `tokens.shared`、`tokens.light` 与 `tokens.dark` 控制完整语义外观。

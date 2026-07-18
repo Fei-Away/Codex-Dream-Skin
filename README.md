@@ -59,6 +59,22 @@ macOS 安装后可从「已保存主题」直接切换，也可以运行：
   --id preset-gothic-void-crusade
 ```
 
+### Small & Beauty / 小而美
+
+`Small & Beauty` 是一套基于 Schema V2 的紧凑聊天界面主题：使用克制的中性色表面、低圆角、细边框与绿色强调色，并分别为浅色和深色外观调整语义色彩。名称与设计灵感致谢 MyKeyVans 发布的 Telegram 主题 [「小而美 8.0」](https://t.me/MyTricksCollection/135)。本预设是面向 Codex 原生控件的重新诠释，不包含 Telegram 或微信的图像、图标或其他第三方素材，也不代表相关品牌的认可或合作。
+
+`Small & Beauty` is a compact Schema V2 chat theme with restrained neutral surfaces, subtle corners, fine borders, and a green accent. Its name and design direction acknowledge MyKeyVans' Telegram theme [“小而美 8.0”](https://t.me/MyTricksCollection/135). This Codex preset is an original reinterpretation and does not bundle Telegram or WeChat artwork, icons, or other third-party assets.
+
+<p align="center">
+  <img src="macos/presets/preset-small-and-beauty/background.png" alt="Small & Beauty abstract chat banner" width="900"><br>
+  <sub>预设内置的无 UI 抽象对话横幅 · UI-free abstract chat banner</sub>
+</p>
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-small-and-beauty
+```
+
 ### 桥本有菜 / Arina Hashimoto
 
 下面这套「桥本有菜 / Arina Hashimoto」已经在真实 Codex 首页分别验证浅色和暗色外观。用户提供的源 PNG 为 `1672 × 941`，主题包在保持源图近 16:9 构图的前提下派生导出 `2560 × 1440` JPEG，并不代表增加了源图细节。截图中的侧栏、卡片、项目选择和输入框都是 Codex 原生控件。

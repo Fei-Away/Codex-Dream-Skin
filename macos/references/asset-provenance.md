@@ -11,3 +11,12 @@
 ## User themes
 
 Images chosen through Customize belong to the user (or their licensors).
+
+## Small & Beauty preset
+
+- File: `presets/preset-small-and-beauty/background.png`
+- SHA-256: `2033401c2036bda9976d68af359c7890036aa57b2e5c54149ccf5345ec767a7d`
+- Created: 2026-07-17 for the Small & Beauty preset
+- Purpose: UI-free ultrawide banner with an abstract green conversation motif
+- Name and design inspiration: MyKeyVans' Telegram theme [“小而美 8.0”](https://t.me/MyTricksCollection/135)
+- Rights: original generated artwork contributed under this repository's MIT license; no Telegram or WeChat assets are embedded

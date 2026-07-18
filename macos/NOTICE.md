@@ -17,6 +17,12 @@ It does **not** grant rights to:
 
 `assets/portal-hero.png` is original abstract geometric art generated for this open-source repository (no characters). Replace it with your own image before shipping a branded theme to customers.
 
+## Small & Beauty preset
+
+`presets/preset-small-and-beauty/background.png` is original abstract chat-bubble artwork generated for this preset and contributed for redistribution under this repository's MIT license. It contains no copied Telegram or WeChat artwork, icons, logos, screenshots, or other third-party assets.
+
+The preset name and design direction acknowledge MyKeyVans' Telegram theme [“小而美 8.0”](https://t.me/MyTricksCollection/135), which described a compact chat interface inspired by WeChat 8.0. This Codex preset is an independent reinterpretation and is not affiliated with, endorsed by, or sponsored by Telegram, Tencent, WeChat, or the referenced theme author.
+
 ## Arina Hashimoto reference material
 
 The following user/maintainer-supplied files are excluded from the MIT software license:
