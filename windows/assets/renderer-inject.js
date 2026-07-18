@@ -2,6 +2,9 @@
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
+  const USAGE_METER_ID = "codex-dream-skin-usage-meter";
+  const USAGE_REQUEST_BINDING = "__codexDreamSkinUsageRequest";
+  const USAGE_UPDATE_KEY = "__CODEX_DREAM_SKIN_USAGE_UPDATE__";
   const ROOT_CLASSES = [
     "codex-dream-skin",
     "dream-theme-light",
@@ -32,6 +35,13 @@
   const installToken = {};
   let samplingNativeShell = false;
   let observer = null;
+  let usageTimer = null;
+  let usageResizeObserver = null;
+  let usageObservedComposer = null;
+  let usageLayoutFrame = null;
+  let latestUsage = null;
+  let usageThreadId = null;
+  let lastUsageRequestAt = 0;
   window.__CODEX_DREAM_SKIN_DISABLED__ = false;
 
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, Number(value)));
@@ -73,6 +83,7 @@
     const taskMode = ["auto", "ambient", "banner", "off"].includes(art.taskMode)
       ? art.taskMode
       : "auto";
+    const features = config.features && typeof config.features === "object" ? config.features : {};
     const metadataRatio = Number(config?.artMetadata?.ratio);
     return {
       appearance,
@@ -82,12 +93,17 @@
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
       accent: safeAccent,
       initialAspect: Number.isFinite(metadataRatio) && metadataRatio > 0 ? metadataRatio : null,
+      usageMeter: features.usageMeter === true,
     };
   };
 
   const previous = window[STATE_KEY];
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.timer) clearInterval(previous.timer);
+  if (previous?.usageTimer) clearInterval(previous.usageTimer);
+  previous?.usageResizeObserver?.disconnect?.();
+  previous?.removeUsageResizeListener?.();
+  previous?.disconnectUsageLayout?.();
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
   if (previous?.artUrl) URL.revokeObjectURL(previous.artUrl);
   const artUrl = (() => {
@@ -285,7 +301,161 @@
     document.querySelectorAll(`.${HOME_UTILITY_CLASS}`).forEach((node) => node.classList.remove(HOME_UTILITY_CLASS));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
+    clearUsageMeter();
   };
+
+  const compactNumber = (value) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "--";
+    if (Math.abs(number) >= 1000000) return `${(number / 1000000).toFixed(number >= 10000000 ? 1 : 2)}M`;
+    if (Math.abs(number) >= 1000) return `${(number / 1000).toFixed(number >= 100000 ? 1 : 2)}K`;
+    return Math.round(number).toLocaleString();
+  };
+  const updateUsageText = (meter, role, value) => {
+    const node = meter?.querySelector?.(`[data-usage-role="${role}"]`);
+    if (node && node.textContent !== value) node.textContent = value;
+  };
+  const currentThreadId = () => {
+    const active = document.querySelector('[data-app-action-sidebar-thread-id][aria-current="page"]');
+    const value = active?.getAttribute?.("data-app-action-sidebar-thread-id") || "";
+    const normalized = value.replace(/^local:/, "");
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized)
+      ? normalized : null;
+  };
+  const isChatGptSurface = () => {
+    const brand = document.querySelector("aside.app-shell-left-panel button")?.innerText || "";
+    return /^\s*ChatGPT\b/i.test(brand);
+  };
+  const resetLabel = (rawValue) => {
+    const value = Number(rawValue);
+    if (!Number.isFinite(value) || value <= 0) return "--";
+    const milliseconds = value < 1e12 ? value * 1000 : value;
+    return new Date(milliseconds).toLocaleDateString([], { month: "2-digit", day: "2-digit" });
+  };
+  const renderUsageMeter = (meter) => {
+    if (!meter) return;
+    const usage = latestUsage?.threadId === usageThreadId ? latestUsage : null;
+    const primary = usage?.available ? usage.rateLimits?.primary : null;
+    const remaining = Number(primary?.remainingPercent);
+    const hasQuota = Number.isFinite(remaining);
+    meter.classList.toggle("is-unavailable", !hasQuota);
+    meter.dataset.level = hasQuota ? remaining <= 15 ? "critical" : remaining <= 35 ? "low" : "normal" : "unknown";
+    if (hasQuota) {
+      const target = clamp(remaining, 0, 100);
+      const fresh = meter.dataset.usageInitialized !== "true";
+      if (fresh) meter.classList.add("is-usage-initializing");
+      meter.style.setProperty("--dream-usage-remaining", `${target}%`);
+      meter.dataset.usageInitialized = "true";
+      if (fresh) {
+        meter.querySelector?.(".dream-usage-fill")?.getBoundingClientRect?.();
+        meter.classList.remove("is-usage-initializing");
+      }
+    }
+    updateUsageText(meter, "quota", hasQuota ? `${remaining.toFixed(1)}% remaining` : "Unavailable");
+    const context = usage?.context;
+    const usedTokens = Number(context?.usedTokens);
+    const windowTokens = Number(context?.windowTokens);
+    updateUsageText(meter, "context",
+      Number.isFinite(usedTokens) && Number.isFinite(windowTokens) && windowTokens > 0
+        ? `${compactNumber(usedTokens)} / ${compactNumber(windowTokens)}` : "Unavailable");
+    updateUsageText(meter, "reset", resetLabel(primary?.resetsAt));
+  };
+  function clearUsageMeter() {
+    document.getElementById(USAGE_METER_ID)?.remove();
+    usageResizeObserver?.disconnect?.();
+    usageResizeObserver = null;
+    usageObservedComposer = null;
+    if (usageLayoutFrame !== null && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(usageLayoutFrame);
+    }
+    usageLayoutFrame = null;
+  }
+  const positionUsageMeter = () => {
+    usageLayoutFrame = null;
+    const meter = document.getElementById(USAGE_METER_ID);
+    const composer = usageObservedComposer;
+    if (!meter || !composer?.getBoundingClientRect) return;
+    const rect = composer.getBoundingClientRect();
+    const viewportWidth = Number(globalThis.innerWidth) || document.documentElement?.clientWidth || rect.right;
+    const viewportHeight = Number(globalThis.innerHeight) || document.documentElement?.clientHeight || rect.bottom + 12;
+    const left = Math.max(8, rect.left);
+    const width = Math.max(120, Math.min(rect.width, viewportWidth - left - 8));
+    const top = Math.max(4, Math.min(viewportHeight - 8, rect.bottom + 1));
+    meter.style.width = `${width}px`;
+    meter.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+  };
+  const scheduleUsageLayout = () => {
+    if (usageLayoutFrame !== null) return;
+    if (typeof requestAnimationFrame === "function") {
+      usageLayoutFrame = requestAnimationFrame(positionUsageMeter);
+    } else {
+      positionUsageMeter();
+    }
+  };
+  const ensureUsageMeter = () => {
+    const composer = document.querySelector(".composer-surface-chrome");
+    const taskScroller = document.querySelector(".thread-scroll-container");
+    if (!config.usageMeter || !composer || !taskScroller || isChatGptSurface()) {
+      clearUsageMeter();
+      return null;
+    }
+    let meter = document.getElementById(USAGE_METER_ID);
+    if (!meter || meter.parentElement !== document.body) {
+      meter?.remove();
+      meter = document.createElement("div");
+      meter.id = USAGE_METER_ID;
+      meter.tabIndex = 0;
+      meter.setAttribute("aria-label", "Codex usage and context details");
+      meter.innerHTML = [
+        '<div class="dream-usage-popover">',
+        '  <div class="dream-usage-cell"><span>Remaining</span><strong data-usage-role="quota">Unavailable</strong></div>',
+        '  <div class="dream-usage-cell"><span>Context</span><strong data-usage-role="context">Unavailable</strong></div>',
+        '  <div class="dream-usage-cell"><span>Reset</span><strong data-usage-role="reset">--</strong></div>',
+        '</div>',
+        '<div class="dream-usage-track"><div class="dream-usage-fill"></div></div>',
+      ].join("");
+      document.body.appendChild(meter);
+      let pointerFocused = false;
+      meter.addEventListener("pointerdown", () => { pointerFocused = true; });
+      meter.addEventListener("pointerleave", () => {
+        if (pointerFocused && meter.contains?.(document.activeElement)) meter.blur?.();
+        pointerFocused = false;
+      });
+    }
+    if (usageObservedComposer !== composer) {
+      usageResizeObserver?.disconnect?.();
+      usageObservedComposer = composer;
+      if (typeof ResizeObserver === "function") {
+        usageResizeObserver = new ResizeObserver(scheduleUsageLayout);
+        usageResizeObserver.observe(composer);
+      }
+    }
+    positionUsageMeter();
+    renderUsageMeter(meter);
+    return meter;
+  };
+  const requestUsage = () => {
+    const meter = document.getElementById(USAGE_METER_ID);
+    if (!meter) return;
+    const threadId = currentThreadId();
+    if (threadId !== usageThreadId) {
+      usageThreadId = threadId;
+      latestUsage = null;
+      renderUsageMeter(meter);
+    }
+    if (!threadId || Date.now() - lastUsageRequestAt < 3000) return;
+    const binding = window[USAGE_REQUEST_BINDING];
+    if (typeof binding !== "function") return;
+    lastUsageRequestAt = Date.now();
+    try { binding(JSON.stringify({ action: "usage", threadId })); } catch {}
+  };
+  window[USAGE_UPDATE_KEY] = (metrics) => {
+    if (!metrics || metrics.threadId !== usageThreadId) return;
+    latestUsage = metrics;
+    renderUsageMeter(document.getElementById(USAGE_METER_ID));
+  };
+  const removeUsageResizeListener = () => window.removeEventListener?.("resize", scheduleUsageLayout);
+  window.addEventListener?.("resize", scheduleUsageLayout, { passive: true });
 
   const applyProfile = (root) => {
     const focusX = config.focusX ?? profile.focusX;
@@ -376,6 +546,8 @@
       document.body.appendChild(chrome);
     }
     chrome.classList.toggle("dream-home-shell", Boolean(home));
+    ensureUsageMeter();
+    requestUsage();
   };
 
   const cleanup = () => {
@@ -385,8 +557,13 @@
     clearSkinDom();
     state?.observer?.disconnect();
     if (state?.timer) clearInterval(state.timer);
+    if (state?.usageTimer) clearInterval(state.usageTimer);
+    state?.usageResizeObserver?.disconnect?.();
+    state?.removeUsageResizeListener?.();
+    if (usageLayoutFrame !== null && typeof cancelAnimationFrame === "function") cancelAnimationFrame(usageLayoutFrame);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
+    if (window[USAGE_UPDATE_KEY]) delete window[USAGE_UPDATE_KEY];
     delete window[STATE_KEY];
     return true;
   };
@@ -410,8 +587,14 @@
     attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode"],
   });
   const timer = setInterval(ensure, 5000);
+  usageTimer = setInterval(() => {
+    ensureUsageMeter();
+    requestUsage();
+  }, 4000);
   window[STATE_KEY] = {
-    ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
+    ensure, cleanup, observer, timer, usageTimer, usageResizeObserver, removeUsageResizeListener,
+    disconnectUsageLayout: clearUsageMeter,
+    scheduler, artUrl, profile, config, installToken, version: "1.2.0",
   };
   ensure();
   analyzeArt().then((result) => {
@@ -421,5 +604,5 @@
     state.profile = result;
     ensure();
   });
-  return { installed: true, version: "1.2.0", adaptive: true };
+  return { installed: true, version: "1.2.0", adaptive: true, usageMeter: config.usageMeter };
 })(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__)

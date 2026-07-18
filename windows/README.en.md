@@ -78,6 +78,20 @@ Open `Codex Dream Skin - Tray` to:
 
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
 
+### Optional local usage meter
+
+Themes can opt in to a thin usage line below the task composer by adding this field to their `theme.json`:
+
+```json
+{
+  "features": {
+    "usageMeter": true
+  }
+}
+```
+
+Reapply the theme after editing the file. The meter reads only `token_count` events from the current task's local Codex JSONL session log. It shows the primary rate-window remainder, context-window use, and reset date when those fields are available. Missing data is shown as unavailable rather than guessed. The reader caches the task file and reads only appended bytes after its first bounded tail read; it does not scan React internals, account menus, message bodies, or network traffic. ChatGPT surfaces do not show this meter.
+
 ## Restore and remove shortcuts
 
 Restore the stock appearance. If Codex is running, confirm its closure and relaunch:

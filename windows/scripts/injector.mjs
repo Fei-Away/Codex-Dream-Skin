@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readImageMetadata } from "./image-metadata.mjs";
@@ -10,6 +11,12 @@ const root = path.resolve(here, "..");
 const SKIN_VERSION = "1.2.0";
 const MAX_ART_BYTES = 16 * 1024 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
+const USAGE_REQUEST_BINDING = "__codexDreamSkinUsageRequest";
+const THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_SESSION_SCAN_ENTRIES = 12000;
+const MAX_INITIAL_USAGE_BYTES = 1024 * 1024;
+const sessionPathCache = new Map();
+const sessionUsageCache = new Map();
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
@@ -535,6 +542,147 @@ async function fileExists(filePath) {
     if (error?.code === "ENOENT") return false;
     throw error;
   }
+}
+
+const finiteNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
+
+function normalizeRateWindow(value) {
+  if (!value || typeof value !== "object") return null;
+  const usedPercent = finiteNumber(value.used_percent);
+  if (usedPercent === null) return null;
+  const normalizedUsed = Math.min(100, Math.max(0, usedPercent));
+  return {
+    usedPercent: normalizedUsed,
+    remainingPercent: 100 - normalizedUsed,
+    windowMinutes: finiteNumber(value.window_minutes),
+    resetsAt: finiteNumber(value.resets_at),
+  };
+}
+
+async function findSessionPath(threadId, codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex")) {
+  if (!THREAD_ID_PATTERN.test(threadId)) throw new Error("Invalid task identity");
+  const cached = sessionPathCache.get(threadId);
+  if (cached && await fileExists(cached)) return cached;
+
+  const stack = [path.join(codexHome, "sessions")];
+  const matches = [];
+  let inspected = 0;
+  while (stack.length && inspected < MAX_SESSION_SCAN_ENTRIES) {
+    const directory = stack.pop();
+    let entries;
+    try { entries = await fs.readdir(directory, { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      inspected += 1;
+      if (inspected > MAX_SESSION_SCAN_ENTRIES || entry.isSymbolicLink()) break;
+      const candidate = path.join(directory, entry.name);
+      if (entry.isDirectory()) stack.push(candidate);
+      else if (entry.isFile() && entry.name.endsWith(".jsonl") && entry.name.includes(threadId)) {
+        const stat = await fs.stat(candidate);
+        matches.push({ filePath: candidate, modified: stat.mtimeMs });
+      }
+    }
+  }
+  matches.sort((left, right) => right.modified - left.modified);
+  if (!matches.length) throw new Error("Usage data is not available yet");
+  sessionPathCache.set(threadId, matches[0].filePath);
+  return matches[0].filePath;
+}
+
+function consumeUsageRecord(state, line) {
+  if (!line.includes('"type":"token_count"')) return;
+  let record;
+  try { record = JSON.parse(line); } catch { return; }
+  const payload = record?.payload;
+  if (payload?.type !== "token_count") return;
+
+  const last = payload.info?.last_token_usage;
+  const windowTokens = finiteNumber(payload.info?.model_context_window);
+  if (last && typeof last === "object") {
+    const usedTokens = finiteNumber(last.total_tokens);
+    state.context = {
+      usedTokens,
+      windowTokens,
+      remainingTokens: usedTokens !== null && windowTokens !== null
+        ? Math.max(0, windowTokens - usedTokens) : null,
+    };
+  }
+  const primary = normalizeRateWindow(payload.rate_limits?.primary);
+  if (primary) state.primary = primary;
+  state.updatedAt = record.timestamp || state.updatedAt || null;
+}
+
+export async function readThreadUsageMetrics(threadId, options = {}) {
+  const sessionPath = await findSessionPath(threadId, options.codexHome);
+  let state = sessionUsageCache.get(threadId);
+  if (!state || state.filePath !== sessionPath) {
+    state = { filePath: sessionPath, offset: 0, remainder: "", context: null, primary: null, updatedAt: null };
+    sessionUsageCache.set(threadId, state);
+  }
+
+  const handle = await fs.open(sessionPath, "r");
+  try {
+    const stat = await handle.stat();
+    if (stat.size < state.offset) {
+      state.offset = 0;
+      state.remainder = "";
+      state.context = null;
+      state.primary = null;
+      state.updatedAt = null;
+    }
+    const firstRead = state.offset === 0;
+    const readStart = firstRead ? Math.max(0, stat.size - MAX_INITIAL_USAGE_BYTES) : state.offset;
+    const readLength = Math.max(0, stat.size - readStart);
+    if (readLength > 0) {
+      const buffer = Buffer.alloc(readLength);
+      await handle.read(buffer, 0, readLength, readStart);
+      let text = state.remainder + buffer.toString("utf8");
+      if (firstRead && readStart > 0) text = text.slice(Math.max(0, text.indexOf("\n") + 1));
+      const lines = text.split(/\r?\n/);
+      state.remainder = lines.pop() || "";
+      for (const line of lines) consumeUsageRecord(state, line);
+      state.offset = stat.size;
+    }
+  } finally {
+    await handle.close();
+  }
+
+  if (!state.context && !state.primary) {
+    return { available: false, threadId, reason: "Usage data is not available yet" };
+  }
+  return {
+    available: true,
+    threadId,
+    updatedAt: state.updatedAt,
+    context: state.context,
+    rateLimits: { primary: state.primary },
+  };
+}
+
+const reportUsage = (session, metrics) => session.evaluate(`(() => {
+  const update = window.__CODEX_DREAM_SKIN_USAGE_UPDATE__;
+  if (typeof update !== 'function') return false;
+  update(${JSON.stringify(metrics)});
+  return true;
+})()`).catch(() => false);
+
+async function attachUsageBinding(session) {
+  await session.send("Runtime.addBinding", { name: USAGE_REQUEST_BINDING });
+  let requestInFlight = false;
+  session.on("Runtime.bindingCalled", ({ name, payload }) => {
+    if (name !== USAGE_REQUEST_BINDING || requestInFlight) return;
+    let request;
+    try { request = JSON.parse(payload); } catch { return; }
+    if (request?.action !== "usage" || !THREAD_ID_PATTERN.test(request?.threadId || "")) return;
+    requestInFlight = true;
+    void readThreadUsageMetrics(request.threadId)
+      .then((metrics) => reportUsage(session, metrics))
+      .catch(() => reportUsage(session, {
+        available: false,
+        threadId: request.threadId,
+        reason: "Usage data is not available yet",
+      }))
+      .finally(() => { requestInFlight = false; });
+  });
 }
 
 async function readThemeSourceStamp(loadedTheme) {
@@ -1256,6 +1404,7 @@ async function runWatch(options) {
         let earlyScriptId = null;
         try {
           session = await connectTarget(target, options.port);
+          await attachUsageBinding(session);
           if (identityAnchor.closed) throw new CdpIdentityMismatchError("Original CDP browser identity closed");
           let earlyInjectionFallback = false;
           if (!paused) {

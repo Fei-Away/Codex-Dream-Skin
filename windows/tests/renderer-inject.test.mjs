@@ -19,6 +19,26 @@ assert.doesNotMatch(
   /main\.main-surface\s*>\s*header\.app-header-tint\s*\{[^}]*\b(?:position|z-index)\s*:/,
   "The skin must preserve Codex's native fixed header so the side-panel toggle remains reachable.",
 );
+assert.match(
+  template,
+  /ResizeObserver\(scheduleUsageLayout\)[\s\S]*observe\(composer\)/,
+  "The usage meter must follow composer size changes while side panels animate.",
+);
+assert.match(
+  template,
+  /translate3d\(\$\{left\}px, \$\{top\}px, 0\)/,
+  "The usage meter must update one composited position instead of leaving fixed-position trails.",
+);
+assert.doesNotMatch(
+  template,
+  /__reactFiber|querySelectorAll\(["']body \*["']\)/,
+  "The privacy-safe usage meter must not inspect React internals or scan the full page object graph.",
+);
+assert.match(
+  css,
+  /#codex-dream-skin-usage-meter\s*\{[\s\S]*?transition:\s*none\s*!important/,
+  "The meter container must not animate stale left or width geometry.",
+);
 
 function createFixture({
   shellPresent,

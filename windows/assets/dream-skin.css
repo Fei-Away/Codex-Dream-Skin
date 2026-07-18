@@ -640,3 +640,152 @@ html.codex-dream-skin.dream-art-wide main.main-surface
     transition-duration: .01ms !important;
   }
 }
+
+/* Optional privacy-safe task usage meter. Its fixed origin is transformed to
+   the composer edge by the renderer so sidebar and panel transitions can be
+   followed without leaving a painted copy at the previous position. */
+#codex-dream-skin-usage-meter {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 2147482990 !important;
+  height: 10px !important;
+  min-height: 10px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  outline: none !important;
+  pointer-events: auto !important;
+  transform-origin: left top !important;
+  transition: none !important;
+  -webkit-app-region: no-drag !important;
+  --dream-usage-remaining: 0%;
+  --dream-usage-line: #597e99;
+  --dream-usage-line-soft: rgb(63 91 111 / .38);
+}
+
+#codex-dream-skin-usage-meter .dream-usage-track {
+  position: absolute !important;
+  inset: 2px 0 auto !important;
+  height: 2px !important;
+  overflow: visible !important;
+  background: var(--dream-usage-line-soft) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dream-usage-line) 10%, transparent) !important;
+  cursor: help !important;
+  transition: none !important;
+}
+
+#codex-dream-skin-usage-meter:hover .dream-usage-track,
+#codex-dream-skin-usage-meter:focus-visible .dream-usage-track {
+  inset: 0 1px auto !important;
+  height: 7px !important;
+  background: color-mix(in srgb, var(--dream-usage-line) 18%, transparent) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dream-usage-line) 22%, transparent),
+    0 0 13px color-mix(in srgb, var(--dream-usage-line) 24%, transparent) !important;
+  transition: height .16s ease, inset .16s ease, box-shadow .16s ease !important;
+}
+
+#codex-dream-skin-usage-meter .dream-usage-fill {
+  width: var(--dream-usage-remaining) !important;
+  height: 100% !important;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--dream-usage-line) 72%, white), var(--dream-usage-line)) !important;
+  border-radius: inherit !important;
+  box-shadow: 0 0 7px color-mix(in srgb, var(--dream-usage-line) 42%, transparent) !important;
+  transition: width .55s cubic-bezier(.22, 1, .36, 1) !important;
+}
+
+#codex-dream-skin-usage-meter.is-usage-initializing .dream-usage-fill {
+  transition: none !important;
+}
+
+#codex-dream-skin-usage-meter[data-level="low"] { --dream-usage-line: #c9832e; }
+#codex-dream-skin-usage-meter[data-level="critical"] { --dream-usage-line: #c74852; }
+
+#codex-dream-skin-usage-meter.is-unavailable .dream-usage-fill {
+  width: 24% !important;
+  opacity: .42 !important;
+  animation: dream-usage-waiting 1.5s ease-in-out infinite alternate !important;
+}
+
+#codex-dream-skin-usage-meter .dream-usage-popover {
+  position: absolute !important;
+  left: 0 !important;
+  bottom: 13px !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  min-height: 52px !important;
+  padding: 8px 9px !important;
+  color: var(--dream-text) !important;
+  background: color-mix(in oklab, var(--dream-surface-raised) 94%, transparent) !important;
+  border: 1px solid var(--dream-line) !important;
+  border-radius: 13px !important;
+  box-shadow: 0 13px 36px color-mix(in oklab, var(--dream-canvas) 34%, transparent) !important;
+  backdrop-filter: blur(18px) saturate(.94) !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateY(7px) scaleY(.78) !important;
+  transform-origin: center bottom !important;
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+#codex-dream-skin-usage-meter:hover .dream-usage-popover,
+#codex-dream-skin-usage-meter:focus-visible .dream-usage-popover {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(0) scale(1) !important;
+  pointer-events: auto !important;
+}
+
+#codex-dream-skin-usage-meter .dream-usage-cell {
+  display: flex !important;
+  min-width: 0 !important;
+  padding: 4px 10px !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  border-left: 1px solid var(--dream-line) !important;
+}
+
+#codex-dream-skin-usage-meter .dream-usage-cell:first-child { border-left: 0 !important; }
+
+#codex-dream-skin-usage-meter .dream-usage-cell > span {
+  overflow: hidden !important;
+  color: var(--dream-text-muted) !important;
+  font-size: 9.5px !important;
+  font-weight: 650 !important;
+  letter-spacing: .07em !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#codex-dream-skin-usage-meter .dream-usage-cell > strong {
+  overflow: hidden !important;
+  color: var(--dream-text) !important;
+  font-size: 11.5px !important;
+  font-weight: 680 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html.codex-dream-skin.dream-theme-dark #codex-dream-skin-usage-meter {
+  --dream-usage-line: #b494de;
+  --dream-usage-line-soft: rgb(198 179 225 / .34);
+}
+
+@keyframes dream-usage-waiting {
+  from { transform: translateX(-20%); }
+  to { transform: translateX(320%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #codex-dream-skin-usage-meter .dream-usage-fill,
+  #codex-dream-skin-usage-meter .dream-usage-track,
+  #codex-dream-skin-usage-meter .dream-usage-popover {
+    animation: none !important;
+    transition: none !important;
+  }
+}
