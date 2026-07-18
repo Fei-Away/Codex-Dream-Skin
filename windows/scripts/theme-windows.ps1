@@ -234,6 +234,23 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $presetTheme
     Copy-Item -LiteralPath (Join-Path $assetRoot 'theme.json') -Destination $presetTheme -Force
   }
+  $gothicPresetSource = Join-Path (Split-Path $PSScriptRoot -Parent) 'presets\preset-gothic-void-crusade'
+  $gothicPresetTheme = Join-Path $gothicPresetSource 'theme.json'
+  $gothicPresetImage = Join-Path $gothicPresetSource 'background.jpg'
+  $gothicPresetDirectory = Join-Path $paths.Saved 'preset-gothic-void-crusade'
+  $gothicSavedTheme = Join-Path $gothicPresetDirectory 'theme.json'
+  if ((Test-Path -LiteralPath $gothicPresetTheme -PathType Leaf) -and
+    (Test-Path -LiteralPath $gothicPresetImage -PathType Leaf) -and
+    -not (Test-Path -LiteralPath $gothicSavedTheme -PathType Leaf)) {
+    Ensure-DreamSkinManagedDirectory -Path $gothicPresetDirectory -Root $paths.Root
+    $gothicSavedImage = Join-Path $gothicPresetDirectory 'background.jpg'
+    Assert-DreamSkinNoReparseComponents -Path $gothicSavedImage
+    Copy-Item -LiteralPath $gothicPresetImage -Destination $gothicSavedImage -Force
+    Assert-DreamSkinNoReparseComponents -Path $gothicSavedImage
+    Assert-DreamSkinImageFile -Path $gothicSavedImage
+    Assert-DreamSkinNoReparseComponents -Path $gothicSavedTheme
+    Copy-Item -LiteralPath $gothicPresetTheme -Destination $gothicSavedTheme -Force
+  }
   $null = Read-DreamSkinTheme -ThemeDirectory $paths.Active
   return $paths
 }

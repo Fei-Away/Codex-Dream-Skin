@@ -78,6 +78,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。图片上限为 16 MB；宽或高不能超过 16384 像素，总像素不能超过 5000 万。
 
+## 内置预设
+
+首次安装会播种 Windows 预设主题到本地「已保存主题」，之后可以从 `Codex Dream Skin - Tray` 切换：
+
+- `preset-arina-hashimoto`：Windows 默认播种主题。
+- `preset-gothic-void-crusade`：与 macOS 精选预设同源的哥特科幻主题，包含独立 `background.jpg` 与 `theme.json`。
+
 ## 恢复与卸载快捷方式
 
 恢复官方外观；如果 Codex 正在运行，确认后关闭并重新打开：

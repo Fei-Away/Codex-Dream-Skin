@@ -1,5 +1,16 @@
 # Windows Changelog
 
+## Unreleased
+
+### 新增
+
+- Windows 会播种 `preset-gothic-void-crusade` 到本地「已保存主题」，可从系统托盘切换到与 macOS 精选预设同源的哥特科幻主题。
+- Windows payload 兼容 macOS 预设使用的主题文案、显式颜色和首页 UI 字段，便于同一套 preset 在两端共享。
+
+### 修复
+
+- 修复系统托盘菜单在空集合项上触发 PowerShell 参数绑定异常的问题。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

@@ -78,6 +78,13 @@ Open `Codex Dream Skin - Tray` to:
 
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
 
+## Bundled presets
+
+Fresh installs seed Windows presets into the local saved-theme library. Switch between them from `Codex Dream Skin - Tray`:
+
+- `preset-arina-hashimoto`: the default Windows seeded theme.
+- `preset-gothic-void-crusade`: the gothic science-fiction featured preset shared with macOS, bundled as its own `background.jpg` and `theme.json`.
+
 ## Restore and remove shortcuts
 
 Restore the stock appearance. If Codex is running, confirm its closure and relaunch:

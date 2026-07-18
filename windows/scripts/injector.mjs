@@ -311,6 +311,26 @@ function normalizedText(value, name, fallback, maxLength = 120) {
   return value;
 }
 
+function normalizedTextArray(value, name, maxItems = 4, maxLength = 120) {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value) || value.length > maxItems) {
+    throw new Error(`${name} must be an array with at most ${maxItems} items`);
+  }
+  return value.map((item, index) => normalizedText(item, `${name}[${index}]`, "", maxLength));
+}
+
+function normalizedColor(value, name) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") {
+    throw new Error(`${name} must be a CSS color string`);
+  }
+  const trimmed = value.trim();
+  if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\)|rgba?\([^;{}]{1,96}\))$/i.test(trimmed)) {
+    throw new Error(`${name} is not a supported CSS color`);
+  }
+  return trimmed;
+}
+
 async function loadTheme(themeDir) {
   const realThemeDir = await fs.realpath(themeDir);
   const themePath = path.join(realThemeDir, "theme.json");
@@ -338,9 +358,22 @@ async function loadTheme(themeDir) {
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
+  const colors = raw.colors && typeof raw.colors === "object" && !Array.isArray(raw.colors)
+    ? raw.colors : {};
+  const ui = raw.ui && typeof raw.ui === "object" && !Array.isArray(raw.ui) ? raw.ui : {};
+  const home = ui.home && typeof ui.home === "object" && !Array.isArray(ui.home) ? ui.home : {};
   const theme = {
     id: normalizedText(raw.id, "id", "custom", 80),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
+    brandSubtitle: normalizedText(raw.brandSubtitle, "brandSubtitle", "", 120),
+    tagline: normalizedText(raw.tagline, "tagline", "", 160),
+    projectPrefix: normalizedText(raw.projectPrefix, "projectPrefix", "", 60),
+    projectLabel: normalizedText(raw.projectLabel, "projectLabel", "", 80),
+    statusText: normalizedText(raw.statusText, "statusText", "", 80),
+    quote: normalizedText(raw.quote, "quote", "", 120),
+    promoTitle: normalizedText(raw.promoTitle, "promoTitle", "", 120),
+    promoSub: normalizedText(raw.promoSub, "promoSub", "", 160),
+    promoUrl: normalizedText(raw.promoUrl, "promoUrl", "", 240),
     image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
     art: {
@@ -350,6 +383,8 @@ async function loadTheme(themeDir) {
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
     palette: {},
+    colors: {},
+    ui: {},
   };
   if (typeof palette.accent === "string" && palette.accent.trim()) {
     const accent = palette.accent.trim();
@@ -357,6 +392,52 @@ async function loadTheme(themeDir) {
       throw new Error("palette.accent is not a supported CSS color");
     }
     theme.palette.accent = accent;
+  }
+  const explicitColorKeys = [];
+  for (const key of ["background", "panel", "panelAlt", "accent", "accentAlt", "secondary", "highlight", "text", "muted", "line"]) {
+    const color = normalizedColor(colors[key], `colors.${key}`);
+    if (color) {
+      theme.colors[key] = color;
+      explicitColorKeys.push(key);
+    }
+  }
+  if (explicitColorKeys.length) {
+    theme.explicitColorKeys = explicitColorKeys;
+  }
+  if (home.enabled || home.brandTitle || home.heroTitle || home.cards || home.bottomStickerTitle) {
+    const cards = Array.isArray(home.cards) ? home.cards : [];
+    if (!Array.isArray(cards) || cards.length > 4) {
+      throw new Error("ui.home.cards must be an array with at most 4 items");
+    }
+    theme.ui.home = {
+      enabled: home.enabled !== false,
+      brandTitle: normalizedText(home.brandTitle, "ui.home.brandTitle", "", 80),
+      brandSubtitle: normalizedText(home.brandSubtitle, "ui.home.brandSubtitle", "", 120),
+      statusPill: normalizedText(home.statusPill, "ui.home.statusPill", "", 40),
+      meritBadge: normalizedText(home.meritBadge, "ui.home.meritBadge", "", 40),
+      heroTitle: normalizedText(home.heroTitle, "ui.home.heroTitle", "", 80),
+      heroSubtitle: normalizedText(home.heroSubtitle, "ui.home.heroSubtitle", "", 160),
+      speechBubble: normalizedText(home.speechBubble, "ui.home.speechBubble", "", 60),
+      metricsTitle: normalizedText(home.metricsTitle, "ui.home.metricsTitle", "", 60),
+      metricsValue: normalizedText(home.metricsValue, "ui.home.metricsValue", "", 40),
+      metricsLines: normalizedTextArray(home.metricsLines, "ui.home.metricsLines", 3, 40),
+      composerLine: normalizedText(home.composerLine, "ui.home.composerLine", "", 120),
+      composerBadge: normalizedText(home.composerBadge, "ui.home.composerBadge", "", 40),
+      bottomStickerTitle: normalizedText(home.bottomStickerTitle, "ui.home.bottomStickerTitle", "", 40),
+      bottomStickerLines: normalizedTextArray(home.bottomStickerLines, "ui.home.bottomStickerLines", 2, 30),
+      cards: cards.map((card, index) => {
+        if (!card || typeof card !== "object" || Array.isArray(card)) {
+          throw new Error(`ui.home.cards[${index}] must be an object`);
+        }
+        return {
+          badge: normalizedText(card.badge, `ui.home.cards[${index}].badge`, "", 20),
+          icon: normalizedText(card.icon, `ui.home.cards[${index}].icon`, "", 8),
+          title: normalizedText(card.title, `ui.home.cards[${index}].title`, "", 24),
+          description: normalizedText(card.description, `ui.home.cards[${index}].description`, "", 80),
+          accent: normalizedText(card.accent, `ui.home.cards[${index}].accent`, "", 16),
+        };
+      }),
+    };
   }
   const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
   if (!imageStat.isFile()) throw new Error("Theme image is not a file");
@@ -373,6 +454,7 @@ async function loadTheme(themeDir) {
     throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
   }
   theme.artMetadata = artMetadata;
+  theme.artKey = fingerprintFromThemeSource(realImagePath, imageStat, theme.id);
   const fingerprint = createHash("sha256")
     .update(themeText, "utf8")
     .update("\0")
@@ -388,20 +470,44 @@ async function loadTheme(themeDir) {
   };
 }
 
+function fingerprintFromThemeSource(imagePath, imageStat, themeId) {
+  return createHash("sha256")
+    .update(String(themeId || "custom"))
+    .update("\0")
+    .update(path.basename(imagePath))
+    .update("\0")
+    .update(String(imageStat.size))
+    .update("\0")
+    .update(String(imageStat.mtimeMs))
+    .digest("hex");
+}
+
 async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme = null) {
   const loadedTheme = candidateTheme ?? await loadTheme(themeDir);
   const [css, template] = await Promise.all([
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
   ]);
+  const styleRevision = createHash("sha256").update(css, "utf8").digest("hex").slice(0, 12);
+  const payloadRevision = createHash("sha256")
+    .update(template, "utf8")
+    .update("\0")
+    .update(css, "utf8")
+    .update("\0")
+    .update(loadedTheme.fingerprint)
+    .digest("hex")
+    .slice(0, 12);
   const extension = path.extname(loadedTheme.imagePath).toLowerCase();
   const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
     : extension === ".webp" ? "image/webp" : "image/png";
   const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
   const payload = template
-    .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
-    .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
-    .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme));
+    .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
+    .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
+    .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(payloadRevision))
+    .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
+    .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
+    .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(loadedTheme.theme));
   const { imageBytes: _imageBytes, ...themeState } = loadedTheme;
   return { ...themeState, payload };
 }
@@ -544,20 +650,28 @@ async function removeFromSession(session) {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
-    document.documentElement?.classList.remove(
-      'codex-dream-skin', 'dream-theme-light', 'dream-theme-dark',
-      'dream-art-wide', 'dream-art-standard', 'dream-focus-left',
-      'dream-focus-center', 'dream-focus-right', 'dream-safe-left',
-      'dream-safe-center', 'dream-safe-right', 'dream-safe-none',
-      'dream-task-ambient', 'dream-task-banner', 'dream-task-off'
-    );
+    document.documentElement?.classList.remove('codex-dream-skin');
+    document.documentElement?.removeAttribute('data-dream-shell');
+    for (const name of [
+      'data-dream-art-wide', 'data-dream-art-safe', 'data-dream-task-mode',
+      'data-dream-art-safe-area', 'data-dream-art-task-mode', 'data-dream-art-aspect',
+      'data-dream-art-ready'
+    ]) document.documentElement?.removeAttribute(name);
+    document.documentElement?.style.removeProperty('--dream-skin-art');
     for (const property of [
-      '--dream-art', '--dream-art-position', '--dream-focus-x', '--dream-focus-y',
-      '--dream-accent', '--dream-accent-ink', '--dream-image-luma'
+      '--ds-bg', '--ds-panel', '--ds-panel-2', '--ds-green', '--ds-lime',
+      '--ds-cyan', '--ds-purple', '--ds-text', '--ds-muted', '--ds-line',
+      '--ds-bg-rgb', '--ds-panel-rgb', '--ds-panel-2-rgb', '--ds-accent-rgb',
+      '--ds-accent-alt-rgb', '--ds-secondary-rgb', '--ds-highlight-rgb',
+      '--ds-text-rgb', '--ds-muted-rgb', '--ds-line-rgb',
+      '--dream-art-focus-x', '--dream-art-focus-y', '--dream-art-position',
+      '--dream-skin-focus-x', '--dream-skin-focus-y', '--dream-skin-art-position',
+      '--dream-skin-name', '--dream-skin-tagline', '--dream-skin-project-prefix',
+      '--dream-skin-project-label'
     ]) document.documentElement?.style.removeProperty(property);
-    document.querySelectorAll('.dream-home').forEach((node) => node.classList.remove('dream-home'));
-    document.querySelectorAll('.dream-task').forEach((node) => node.classList.remove('dream-task'));
-    document.querySelectorAll('.dream-home-shell').forEach((node) => node.classList.remove('dream-home-shell'));
+    document.querySelectorAll('.dream-skin-home').forEach((node) => node.classList.remove('dream-skin-home'));
+    document.querySelectorAll('.dream-skin-home-shell').forEach((node) => node.classList.remove('dream-skin-home-shell'));
+    document.querySelectorAll('.dream-skin-home-utility').forEach((node) => node.classList.remove('dream-skin-home-utility'));
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
@@ -568,10 +682,9 @@ async function removeFromSession(session) {
 async function verifyRemovedSession(session) {
   return session.evaluate(`(() =>
     !document.documentElement.classList.contains('codex-dream-skin') &&
-    !document.documentElement.style.getPropertyValue('--dream-art') &&
-    !document.querySelector('.dream-home') &&
-    !document.querySelector('.dream-task') &&
-    !document.querySelector('.dream-home-shell') &&
+    !document.documentElement.style.getPropertyValue('--dream-skin-art') &&
+    !document.querySelector('.dream-skin-home') &&
+    !document.querySelector('.dream-skin-home-shell') &&
     !document.getElementById('codex-dream-skin-style') &&
     !document.getElementById('codex-dream-skin-chrome') &&
     !window.__CODEX_DREAM_SKIN_STATE__
@@ -585,7 +698,7 @@ async function verifySession(session) {
       const r = node.getBoundingClientRect();
       return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
     };
-    const home = document.querySelector('.dream-home');
+    const home = document.querySelector('.dream-skin-home');
     const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
     const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
     const result = {
