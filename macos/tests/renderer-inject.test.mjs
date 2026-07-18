@@ -93,6 +93,21 @@ assert.match(
 );
 assert.match(
   css,
+  /data-dream-tokens="2"\][\s\S]{0,180}group\\\/home-suggestions button > span:first-child > span:first-child\s*\{[\s\S]{0,220}display:\s*inline-flex !important;[\s\S]{0,120}align-items:\s*center !important;[\s\S]{0,120}justify-content:\s*center !important;/,
+  "Schema v2 suggestion glyphs must remain centered despite native justify-start utilities.",
+);
+assert.match(
+  css,
+  /data-dream-tokens="2"\]\[data-dream-art-wide="true"\]:has\(main\.main-surface\.dream-skin-home-shell\) body\s*\{[\s\S]{0,180}background-image:\s*none !important;/,
+  "Schema v2 ultrawide artwork must stay inside the tokenized Home hero.",
+);
+assert.match(
+  css,
+  /data-dream-tokens="2"\]\s+\[role="tooltip"\] \*\s*\{[\s\S]{0,80}color:\s*inherit !important;/,
+  "Tooltip descendants must inherit the schema v2 foreground color.",
+);
+assert.match(
+  css,
   /\.composer-surface-chrome button:not\(\[class~="bg-token-foreground"\]\)[\s\S]{0,100}color:\s*var\(--ds-muted\) !important;/,
   "Composer controls must remain readable when Codex native tokens lag behind a forced dark appearance.",
 );

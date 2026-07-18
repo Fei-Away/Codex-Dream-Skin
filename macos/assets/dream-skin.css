@@ -1087,6 +1087,15 @@ html.codex-dream-skin [data-message-author-role] { border-radius: 16px; }
    Token defaults resolve to the adaptive core variables, so partial v2
    themes stay coherent with image analysis. */
 
+html.codex-dream-skin[data-dream-tokens="2"] {
+  --ds-task-immersive-edge: color-mix(in srgb,
+    var(--ds-color-main) var(--ds-effect-task-media-start-opacity), transparent);
+  --ds-task-immersive-mid: color-mix(in srgb,
+    var(--ds-color-main) var(--ds-effect-task-media-middle-opacity), transparent);
+  --ds-task-immersive-far: color-mix(in srgb,
+    var(--ds-color-main-alt) var(--ds-effect-task-media-end-opacity), transparent);
+}
+
 html.codex-dream-skin[data-dream-tokens="2"] body {
   background: var(--ds-color-canvas) !important;
   color: var(--ds-color-text) !important;
@@ -1181,11 +1190,40 @@ html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel a:hover 
   color: var(--ds-color-accent) !important;
 }
 
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button:is(
+  [aria-label="更新"],
+  [aria-label="Update"],
+  [title="更新"],
+  [title="Update"]
+) {
+  background: var(--ds-color-accent) !important;
+  color: var(--ds-color-accent-contrast) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button:is(
+  [aria-label="更新"],
+  [aria-label="Update"],
+  [title="更新"],
+  [title="Update"]
+):hover {
+  background: var(--ds-color-accent-hover) !important;
+  color: var(--ds-color-accent-contrast) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button:is(
+  [aria-label="更新"],
+  [aria-label="Update"],
+  [title="更新"],
+  [title="Update"]
+) * {
+  color: inherit !important;
+}
+
 html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
 html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [aria-current="page"] {
   background: var(--ds-color-sidebar-selected) !important;
   border: var(--ds-shape-border-width) solid var(--ds-color-sidebar-selected-border) !important;
-  box-shadow: none !important;
+  box-shadow: inset var(--ds-layout-selected-indicator-width) 0 var(--ds-color-accent) !important;
   color: var(--ds-color-sidebar-selected-text) !important;
   font-weight: var(--ds-typography-sidebar-selected-weight) !important;
 }
@@ -1211,6 +1249,11 @@ html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel
   height: var(--ds-layout-sidebar-icon-size) !important;
 }
 
+html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel
+  :is(button, a, div)[class*="height-token-row"] span[class~="w-4"] {
+  width: var(--ds-layout-sidebar-icon-size) !important;
+}
+
 html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel [class~="gap-px"] {
   gap: var(--ds-layout-sidebar-list-gap) !important;
 }
@@ -1232,6 +1275,12 @@ html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button[a
   html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel button[aria-label^="切换模式"] {
     font-size: var(--ds-typography-sidebar-brand-size) !important;
     font-weight: var(--ds-typography-sidebar-brand-weight) !important;
+  }
+
+  html.codex-dream-skin[data-dream-tokens="2"] aside.app-shell-left-panel
+    [class*="text-token-input-placeholder-foreground"] {
+    color: var(--ds-color-sidebar-muted) !important;
+    opacity: 1 !important;
   }
 }
 
@@ -1387,8 +1436,9 @@ html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-sugge
 html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button > span:first-child > span:first-child {
   width: var(--ds-layout-card-icon-size) !important;
   height: var(--ds-layout-card-icon-size) !important;
-  display: grid !important;
-  place-items: center;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   flex: 0 0 var(--ds-layout-card-icon-size) !important;
   margin: var(--ds-layout-card-icon-margin) !important;
   border: var(--ds-shape-border-width) solid var(--ds-color-focus-ring);
@@ -1401,7 +1451,7 @@ html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-sugge
 html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button svg {
   width: var(--ds-layout-card-glyph-size) !important;
   height: var(--ds-layout-card-glyph-size) !important;
-  color: var(--ds-color-card-icon) !important;
+  color: var(--ds-color-card-icon-text) !important;
 }
 
 html.codex-dream-skin[data-dream-tokens="2"] .dream-skin-home .group\/home-suggestions button > span:last-child {
@@ -1512,4 +1562,65 @@ html.codex-dream-skin[data-dream-tokens="2"] [role="tooltip"] {
   border-radius: var(--ds-shape-control-radius) !important;
   background: var(--ds-color-tooltip) !important;
   color: var(--ds-color-tooltip-text) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"] [role="tooltip"] * {
+  color: inherit !important;
+}
+
+/* Schema v2 themes own their Home hero geometry. Keep ultrawide artwork in
+   that tokenized hero instead of promoting a bright banner to the full window. */
+html.codex-dream-skin[data-dream-tokens="2"][data-dream-art-wide="true"]:has(main.main-surface.dream-skin-home-shell) body {
+  background-color: var(--ds-color-canvas) !important;
+  background-image: none !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"][data-dream-art-wide="true"]:has(main.main-surface.dream-skin-home-shell)
+  aside.app-shell-left-panel {
+  background: linear-gradient(180deg, var(--ds-color-sidebar), var(--ds-color-sidebar-alt)) !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-sidebar-border) !important;
+  border-left: 0 !important;
+  border-radius: var(--ds-shape-sidebar-radius) !important;
+  box-shadow: var(--ds-effect-sidebar-shadow) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"][data-dream-art-wide="true"] main.main-surface.dream-skin-home-shell {
+  background: var(--ds-color-main) !important;
+  border: var(--ds-shape-border-width) solid var(--ds-color-main-border) !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: var(--ds-shape-main-radius) !important;
+  box-shadow: var(--ds-effect-main-shadow) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"][data-dream-art-wide="true"] main.main-surface.dream-skin-home-shell
+  > header.app-header-tint {
+  background: var(--ds-color-header) !important;
+  border-bottom: var(--ds-shape-border-width) solid var(--ds-color-header-border) !important;
+  text-shadow: none !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"][data-dream-art-wide="true"] main.main-surface.dream-skin-home-shell
+  .dream-skin-home > div:first-child > div:first-child > div:first-child {
+  border: var(--ds-shape-border-width) solid var(--ds-color-hero-border) !important;
+  border-radius: var(--ds-shape-hero-radius) !important;
+  background-color: var(--ds-color-hero) !important;
+  background-image: var(--dream-skin-art) !important;
+  background-position: var(--ds-art-position) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  box-shadow: var(--ds-effect-hero-shadow) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"][data-dream-art-wide="true"] main.main-surface.dream-skin-home-shell
+  .dream-skin-home > div:first-child > div:first-child > div:first-child::before {
+  content: "" !important;
+  background: linear-gradient(90deg, var(--ds-color-hero-overlay), var(--ds-color-hero-overlay-soft) 78%, transparent 100%) !important;
+}
+
+html.codex-dream-skin[data-dream-tokens="2"][data-dream-art-wide="true"] main.main-surface.dream-skin-home-shell
+  .dream-skin-home .group\/home-suggestions button {
+  background: linear-gradient(145deg, var(--ds-color-card), var(--ds-color-card-alt)) !important;
+  box-shadow: var(--ds-effect-card-shadow) !important;
+  backdrop-filter: blur(var(--ds-blur-content)) saturate(105%) !important;
 }
