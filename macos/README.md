@@ -46,6 +46,16 @@ Install location after step 2:
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
 
+## Privacy-safe support snapshot
+
+For a compact diagnostic before opening an issue, run:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/support-snapshot-macos.sh
+```
+
+It prints a read-only JSON summary and never connects to CDP, accesses the network, writes files, takes screenshots, or uploads anything. Review it yourself before sharing: paths, ports, process and Browser IDs, logs, screenshots, theme metadata, configuration contents, environment values, credentials, and chat/task content are intentionally excluded. Use Verify or Doctor when you need live-session evidence.
+
 ## Customer ZIP (optional packaging)
 
 To build the “double-click install” folder layout for non-git users:

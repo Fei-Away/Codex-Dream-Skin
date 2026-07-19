@@ -90,6 +90,43 @@ cleanup_tests() {
 }
 trap cleanup_tests EXIT
 
+# Support Snapshot must remain a manually shared, local-only JSON summary even
+# when the state file contains fields that are unsafe to publish.
+SUPPORT_HOME="$TMP/support-snapshot-home"
+SUPPORT_STATE_ROOT="$SUPPORT_HOME/Library/Application Support/CodexDreamSkinStudio"
+/bin/mkdir -p "$SUPPORT_STATE_ROOT" "$SUPPORT_HOME/.codex"
+/usr/bin/printf '%s\n' \
+  '{"session":"active","port":9911,"injectorPid":123,"browserId":"support-private-browser"}' \
+  > "$SUPPORT_STATE_ROOT/state.json"
+/usr/bin/printf '%s\n' 'config-secret=do-not-share' > "$SUPPORT_HOME/.codex/config.toml"
+SUPPORT_SNAPSHOT="$(HOME="$SUPPORT_HOME" /bin/bash "$ROOT/scripts/support-snapshot-macos.sh")"
+"$NODE" -e '
+  const snapshot = JSON.parse(process.argv[1]);
+  const privateHome = process.argv[2];
+  const requiredRedactions = [
+    "paths", "ports", "processIds", "browserIds", "logs", "screenshots",
+    "themeMetadata", "configContents", "environment", "credentials", "chatAndTaskContent",
+  ];
+  if (snapshot.schemaVersion !== 1 || snapshot.kind !== "codex-dream-skin-support-snapshot" ||
+      snapshot.platform !== "macos" || snapshot.liveVerification !== "notChecked") process.exit(1);
+  if (snapshot.collection.networkAccessed || snapshot.collection.cdpAccessed || snapshot.collection.writesPerformed ||
+      snapshot.privacy.manualSharingRequired !== true ||
+      !requiredRedactions.every((item) => snapshot.privacy.redacted.includes(item))) process.exit(1);
+  const forbiddenKeys = new Set(["path", "paths", "port", "ports", "pid", "pids", "browserid", "browserids", "log", "logs", "screenshot", "screenshots", "themename", "configcontents", "token", "key", "chat"]);
+  const visit = (value) => {
+    if (!value || typeof value !== "object") return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key !== "redacted" && forbiddenKeys.has(key.toLowerCase())) process.exit(1);
+      visit(child);
+    }
+  };
+  visit(snapshot);
+  const serialized = JSON.stringify(snapshot);
+  for (const marker of ["9911", "support-private-browser", "config-secret", privateHome]) {
+    if (serialized.includes(marker)) process.exit(1);
+  }
+' "$SUPPORT_SNAPSHOT" "$SUPPORT_HOME"
+
 # Standalone archives flatten macos/ to their root. Prompt guides and NOTICE
 # must describe that layout and must not claim that Windows assets are bundled.
 STANDALONE_ROOT="$TMP/standalone-root"
