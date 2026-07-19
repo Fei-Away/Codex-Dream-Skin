@@ -4,6 +4,33 @@
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
   const SHELL_ATTR = "data-dream-shell";
+  const HOME_QUESTION_ATTR = "data-dream-skin-question";
+  const HOME_SUGGESTIONS_ATTR = "data-dream-skin-home-suggestions";
+  const HOME_CARD_ATTR = "data-dream-skin-home-card";
+  const HOME_NATIVE_CARD_ATTR = "data-dream-skin-native-home-card";
+  const HOME_GENERATED_SUGGESTIONS_ATTR = "data-dream-skin-generated-home-suggestions";
+  const HOME_EMPTY_SUGGESTIONS_ATTR = "data-dream-skin-empty-home-suggestions";
+  const HOME_GRID_ATTR = "data-dream-skin-home-grid";
+  const HOME_SUGGESTIONS = {
+    zh: [
+      ["explore", "探索并理解代码", "探索并理解这个项目的代码结构、核心模块和关键执行链路。"],
+      ["build", "构建新功能、应用或工具", "在这个项目中构建一个新功能、应用或工具。"],
+      ["review", "审查代码并提出修改建议", "审查这个项目的代码，并提出具体、可执行的修改建议。"],
+      ["fix", "修复问题和失败", "定位并修复这个项目中的问题和失败。"],
+    ],
+    en: [
+      ["explore", "Explore and understand the code", "Explore this project's code structure, core modules, and execution flow."],
+      ["build", "Build a new feature, app, or tool", "Build a new feature, app, or tool in this project."],
+      ["review", "Review code and suggest improvements", "Review this project's code and suggest specific, actionable improvements."],
+      ["fix", "Fix issues and failures", "Find and fix issues or failures in this project."],
+    ],
+  };
+  const HOME_SUGGESTION_ICONS = {
+    explore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 6.5 7-3 3 7-7 3"/><circle cx="9" cy="15" r="4"/><path d="m6.2 17.8-2.7 2.7m8.3-2.7 2.7 2.7"/></svg>',
+    build: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m14.7 6.3 3-3 3 3-3 3"/><path d="m13 8-9.5 9.5 3 3L16 11"/><path d="m12 3 9 9"/></svg>',
+    review: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 1-2.3-5.7"/><path d="M20 4v7h-7"/><path d="m9 12 2 2 4-4"/></svg>',
+    fix: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h8m-7-3 1.5 3m4.5-3-1.5 3"/><rect x="6" y="6" width="12" height="15" rx="6"/><path d="M3 13h3m12 0h3M4 8l3 2m13-2-3 2M4 18l3-2m13 2-3-2"/></svg>',
+  };
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
@@ -78,6 +105,24 @@
     try { previous.mediaQuery.removeEventListener("change", previous.mediaHandler); } catch {}
   }
 
+  const clearHomeEnhancements = () => {
+    document.querySelectorAll(`[${HOME_QUESTION_ATTR}]`).forEach((node) =>
+      node.removeAttribute(HOME_QUESTION_ATTR));
+    document.querySelectorAll(`[${HOME_CARD_ATTR}]`).forEach((node) => node.remove());
+    document.querySelectorAll(`[${HOME_NATIVE_CARD_ATTR}]`).forEach((node) =>
+      node.removeAttribute(HOME_NATIVE_CARD_ATTR));
+    document.querySelectorAll(`[${HOME_SUGGESTIONS_ATTR}]`).forEach((node) =>
+      node.removeAttribute(HOME_SUGGESTIONS_ATTR));
+    document.querySelectorAll(`[${HOME_GRID_ATTR}]`).forEach((node) =>
+      node.removeAttribute(HOME_GRID_ATTR));
+    document.querySelectorAll(`[${HOME_EMPTY_SUGGESTIONS_ATTR}]`).forEach((node) =>
+      node.removeAttribute(HOME_EMPTY_SUGGESTIONS_ATTR));
+    document.querySelectorAll(`[${HOME_GENERATED_SUGGESTIONS_ATTR}]`).forEach((node) =>
+      node.remove());
+  };
+
+  clearHomeEnhancements();
+
   const cssString = (value) => JSON.stringify(String(value ?? ""));
 
   const setStyleProperty = (root, name, value) => {
@@ -100,6 +145,162 @@
       node.textContent = value;
       metrics.textWrites += 1;
     }
+  };
+
+  const fillComposer = (text) => {
+    const editor = document.querySelector('.ProseMirror[contenteditable="true"]');
+    if (!editor) return;
+    editor.focus();
+    const selection = window.getSelection?.();
+    if (selection && typeof document.createRange === "function") {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    let inserted = false;
+    try {
+      inserted = document.execCommand?.("insertText", false, text) === true;
+    } catch {}
+    if (!inserted) {
+      editor.textContent = text;
+      const InputEventConstructor = window.InputEvent || window.Event;
+      if (InputEventConstructor) {
+        editor.dispatchEvent(new InputEventConstructor("input", {
+          bubbles: true,
+          inputType: "insertText",
+          data: text,
+        }));
+      }
+    }
+  };
+
+  const suggestionGridFor = (group) => {
+    if (!group) return null;
+    for (const child of group.children ?? []) {
+      if (child.classList?.contains("group/home-suggestions-header")) continue;
+      if (child.classList?.contains("grid")) return child;
+      const nested = child.querySelector?.('[class~="grid"]');
+      if (nested) return nested;
+    }
+    const legacyContainer = group.children?.[0] ?? null;
+    if (legacyContainer?.classList?.contains("group/home-suggestions-header")) return null;
+    return legacyContainer?.children?.[0] ?? null;
+  };
+
+  const findCurrentSuggestionPortal = (home, question) => {
+    for (let node = question; node && node !== home; node = node.parentElement) {
+      const sibling = node.nextElementSibling;
+      if (sibling?.classList?.contains("absolute") &&
+          sibling.classList.contains("top-full")) return sibling;
+    }
+    return null;
+  };
+
+  const resolveHomeSuggestions = (home, question, locale) => {
+    const generated = [...document.querySelectorAll(`[${HOME_GENERATED_SUGGESTIONS_ATTR}]`)];
+    const portal = locale ? findCurrentSuggestionPortal(home, question) : null;
+    const nativeGroups = home
+      ? [...home.querySelectorAll('[class~="group/home-suggestions"]')]
+        .filter((candidate) => candidate.getAttribute(HOME_GENERATED_SUGGESTIONS_ATTR) === null)
+      : [];
+    const native = nativeGroups.find((candidate) => suggestionGridFor(candidate)) ?? null;
+    for (const candidate of document.querySelectorAll(`[${HOME_EMPTY_SUGGESTIONS_ATTR}]`)) {
+      if (native || !portal || !nativeGroups.includes(candidate)) {
+        candidate.removeAttribute(HOME_EMPTY_SUGGESTIONS_ATTR);
+      }
+    }
+    if (native) {
+      for (const candidate of generated) candidate.remove();
+      return native;
+    }
+
+    if (!portal) {
+      for (const candidate of generated) candidate.remove();
+      return null;
+    }
+
+    for (const candidate of nativeGroups) setAttribute(candidate, HOME_EMPTY_SUGGESTIONS_ATTR, "");
+    let group = generated.find((candidate) => portal.contains(candidate)) ?? null;
+    for (const candidate of generated) {
+      if (candidate !== group) candidate.remove();
+    }
+    if (!group) {
+      group = document.createElement("section");
+      group.classList.add("group/home-suggestions");
+      group.setAttribute(HOME_GENERATED_SUGGESTIONS_ATTR, "");
+      const container = document.createElement("div");
+      container.appendChild(document.createElement("div"));
+      group.appendChild(container);
+      portal.appendChild(group);
+    }
+    return group;
+  };
+
+  // Codex can replace the four curated actions with fewer generated suggestions.
+  // Keep matching native buttons and their React handlers, then fill only the gaps.
+  const syncHomeSuggestions = (group, locale) => {
+    const suggestions = HOME_SUGGESTIONS[locale] ?? null;
+    for (const card of document.querySelectorAll(`[${HOME_CARD_ATTR}]`)) {
+      if (!group || !suggestions || !group.contains(card)) card.remove();
+    }
+    for (const card of document.querySelectorAll(`[${HOME_NATIVE_CARD_ATTR}]`)) {
+      if (!group || !suggestions || !group.contains(card)) {
+        card.removeAttribute(HOME_NATIVE_CARD_ATTR);
+      }
+    }
+    for (const candidate of document.querySelectorAll(`[${HOME_SUGGESTIONS_ATTR}]`)) {
+      if (candidate !== group || !suggestions) candidate.removeAttribute(HOME_SUGGESTIONS_ATTR);
+    }
+    for (const candidate of document.querySelectorAll(`[${HOME_GRID_ATTR}]`)) {
+      if (!group?.contains(candidate) || !suggestions) candidate.removeAttribute(HOME_GRID_ATTR);
+    }
+    if (!group || !suggestions) return;
+
+    setAttribute(group, HOME_SUGGESTIONS_ATTR, locale);
+    const suggestionByLabel = new Map(suggestions.map((suggestion) => [suggestion[1], suggestion]));
+    const nativeById = new Map();
+    const grid = suggestionGridFor(group);
+    if (!grid) return;
+    setAttribute(grid, HOME_GRID_ATTR, "");
+    for (const button of grid.querySelectorAll("button")) {
+      let wrapper = button;
+      while (wrapper.parentElement && wrapper.parentElement !== grid) {
+        wrapper = wrapper.parentElement;
+      }
+      if (wrapper.parentElement !== grid || wrapper.getAttribute(HOME_CARD_ATTR) !== null) continue;
+      const label = String(button.innerText || button.textContent || "").replace(/\s+/g, " ").trim();
+      const suggestion = suggestionByLabel.get(label);
+      if (suggestion && !nativeById.has(suggestion[0])) {
+        setAttribute(wrapper, HOME_NATIVE_CARD_ATTR, suggestion[0]);
+        nativeById.set(suggestion[0], wrapper);
+      } else {
+        setAttribute(wrapper, HOME_NATIVE_CARD_ATTR, "hidden");
+      }
+    }
+
+    const syntheticById = new Map([...group.querySelectorAll(`[${HOME_CARD_ATTR}]`)]
+      .map((card) => [card.getAttribute(HOME_CARD_ATTR), card]));
+    for (const [id, label, prompt] of suggestions) {
+      const existing = syntheticById.get(id);
+      if (nativeById.has(id)) {
+        existing?.remove();
+      } else if (!existing || existing.parentElement !== grid) {
+        existing?.remove();
+        const card = document.createElement("div");
+        card.setAttribute(HOME_CARD_ATTR, id);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("aria-label", label);
+        button.innerHTML = `<span class="dream-skin-home-action-icon" aria-hidden="true">${HOME_SUGGESTION_ICONS[id]}</span>` +
+          `<span class="dream-skin-home-action-copy"><span class="dream-skin-home-action-label">${label}</span></span>`;
+        button.addEventListener("click", () => fillComposer(prompt));
+        card.appendChild(button);
+        grid.appendChild(card);
+      }
+      syntheticById.delete(id);
+    }
+    for (const card of syntheticById.values()) card.remove();
   };
 
   const parseRgb = (value) => {
@@ -563,14 +764,43 @@
     shell ||= root.getAttribute(SHELL_ATTR) || resolvedShell();
     const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
     const homeIndicator = document.querySelector('[data-testid="home-icon"]');
+    const homeQuestionSignal = document.querySelector('[data-feature="game-source"]');
     const home = homeIndicator?.closest('[role="main"]') ||
+      homeQuestionSignal?.closest?.('[role="main"]') ||
       [...document.querySelectorAll('[role="main"]')].find((candidate) =>
-        candidate.querySelector('[data-feature="game-source"]') &&
-        candidate.querySelector('.group\\\\/home-suggestions')) || null;
+        candidate.querySelector('[data-feature="game-source"]')) || null;
     for (const candidate of document.querySelectorAll('[role="main"].dream-skin-home')) {
       if (candidate !== home) candidate.classList.remove("dream-skin-home");
     }
     if (home) home.classList.add("dream-skin-home");
+    const homeQuestion = home?.querySelector('[data-feature="game-source"]') ?? null;
+    let homeLocale = null;
+    for (const candidate of document.querySelectorAll(`[${HOME_QUESTION_ATTR}]`)) {
+      if (candidate !== homeQuestion) candidate.removeAttribute(HOME_QUESTION_ATTR);
+    }
+    if (homeQuestion) {
+      const questionClone = homeQuestion.cloneNode(true);
+      questionClone.querySelectorAll("button").forEach((button) => button.remove());
+      const nativeQuestion = questionClone.textContent.replace(/\s+/g, " ").trim();
+      let compactQuestion = null;
+      if (/^我们应该(?:在\s*中)?构建什么[？?]?$/.test(nativeQuestion)) {
+        compactQuestion = "我们应该构建什么？";
+        homeLocale = "zh";
+      } else if (/^我们应该(?:在\s*中)?做些什么[？?]?$/.test(nativeQuestion)) {
+        compactQuestion = "我们应该做些什么？";
+        homeLocale = "zh";
+      } else if (/^what should we build(?: in)?\s*[?？]?$/i.test(nativeQuestion)) {
+        compactQuestion = "What should we build?";
+        homeLocale = "en";
+      } else if (/^what should we work on(?: in)?\s*[?？]?$/i.test(nativeQuestion)) {
+        compactQuestion = "What should we work on?";
+        homeLocale = "en";
+      }
+      if (compactQuestion) setAttribute(homeQuestion, HOME_QUESTION_ATTR, compactQuestion);
+      else homeQuestion.removeAttribute(HOME_QUESTION_ATTR);
+    }
+    const homeSuggestions = resolveHomeSuggestions(home, homeQuestion, homeLocale);
+    syncHomeSuggestions(homeSuggestions, homeLocale);
     const homeUtilityBars = new Set(home
       ? home.querySelectorAll('[class*="_homeUtilityBar_"]')
       : []);
@@ -656,6 +886,7 @@
     document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
     document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
     document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
+    clearHomeEnhancements();
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
     state?.observer?.disconnect();

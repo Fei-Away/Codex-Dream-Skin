@@ -840,8 +840,10 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       document.querySelector('.group\\\\/home-suggestions');
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
     const home = document.querySelector('[role="main"].dream-skin-home');
-    const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
-    const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
+    const homeQuestion = home?.querySelector('[data-feature="game-source"]') ?? null;
+    const suggestions = home?.querySelector('[data-dream-skin-home-suggestions]') ?? null;
+    const suggestionGrid = suggestions?.querySelector('[data-dream-skin-home-grid]') ?? null;
+    const cardButtons = suggestionGrid ? [...suggestionGrid.querySelectorAll('button')] : [];
     const cardBoxes = cardButtons.map(box);
     const visibleCards = cardBoxes.filter((item) => item?.visible);
     const suggestionLabels = cardButtons.flatMap((button) => {
@@ -857,14 +859,15 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         }));
     });
     const visibleSuggestionLabels = suggestionLabels.filter((item) => item?.visible);
-    const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
-      item.color === item.expectedColor);
     const hero = box(home?.firstElementChild?.firstElementChild?.firstElementChild);
-    const projectButton = box(home?.querySelector('.group\\\\/project-selector > button'));
+    const projectButton = box(homeQuestion?.querySelector('button') ??
+      home?.querySelector('.group\\\\/project-selector > button'));
     const shell = box(document.querySelector('main.main-surface'));
     const composer = box(document.querySelector('.composer-surface-chrome'));
     const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
     const chrome = document.getElementById('codex-dream-skin-chrome');
+    const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
+      item.color === item.expectedColor);
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
       version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
@@ -875,7 +878,9 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       chromePointerEvents: getComputedStyle(chrome || document.body).pointerEvents,
       homeRoute: Boolean(homeRoute),
       homePresent: Boolean(home),
+      homeEnhanced: Boolean(homeQuestion?.hasAttribute('data-dream-skin-question')),
       hero,
+      suggestions: box(suggestions),
       cards: cardBoxes,
       visibleCardCount: visibleCards.length,
       suggestionLabels,
@@ -900,7 +905,11 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     // Project selector markup varies across Codex builds — soft requirement.
     const homePass = !result.homeRoute || (
       result.homePresent && result.hero?.visible && result.hero.width >= 280 &&
-      result.hero.height >= 120 && (result.visibleCardCount === 0 || (
+      result.hero.height >= 120 && (!result.homeEnhanced || (
+        result.visibleCardCount === 4 &&
+        result.suggestions?.visible && result.composer?.visible &&
+        Math.abs(result.suggestions.x - result.composer.x) <= 2 &&
+        Math.abs(result.suggestions.width - result.composer.width) <= 2 &&
         visibleSuggestionLabels.length >= result.visibleCardCount &&
         result.suggestionLabelColorsMatch
       ))
@@ -911,7 +920,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     result.softNotes = {
       projectButtonOptional: !result.projectButton?.visible,
       composerOptionalOnNonTaskRoutes: !result.composer?.visible,
-      suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
+      suggestionCardsOptional: result.homeRoute && !result.homeEnhanced,
     };
     return result;
   })()`);
