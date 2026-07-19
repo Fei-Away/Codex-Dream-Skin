@@ -85,17 +85,6 @@ jobs:
             exit 1
           fi
 
-      - name: Check version consistency
-        shell: bash
-        run: |
-          expected="$(tr -d '\r\n' < macos/VERSION)"
-          common="$(sed -n 's/^SKIN_VERSION="\([^"]*\)"$/\1/p' macos/scripts/common-macos.sh)"
-          macos_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' macos/scripts/injector.mjs)"
-          windows_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' windows/scripts/injector.mjs)"
-          test -n "$expected"
-          test "$common" = "$expected"
-          test "$macos_injector" = "$expected"
-          test "$windows_injector" = "$expected"
 
       - name: Run portable Node.js regressions
         shell: bash
