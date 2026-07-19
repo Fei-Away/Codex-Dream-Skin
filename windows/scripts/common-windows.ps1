@@ -130,6 +130,8 @@ function Install-DreamSkinRuntimeEngine {
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
     'assets\theme.json',
+    'presets\preset-gothic-void-crusade\background.jpg',
+    'presets\preset-gothic-void-crusade\theme.json',
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',
     'scripts\image-metadata.mjs',
@@ -146,7 +148,8 @@ function Install-DreamSkinRuntimeEngine {
       throw "Dream Skin runtime source is incomplete: $relative"
     }
   }
-  foreach ($directoryName in @('assets', 'scripts')) {
+  $runtimeDirectories = @('assets', 'scripts', 'presets')
+  foreach ($directoryName in $runtimeDirectories) {
     $sourceDirectory = Join-Path $sourceRoot $directoryName
     if ((Test-DreamSkinPathEqual -Left $fullStateRoot -Right $sourceDirectory) -or
       (Test-DreamSkinPathWithin -Path $fullStateRoot -Root $sourceDirectory)) {
@@ -162,7 +165,7 @@ function Install-DreamSkinRuntimeEngine {
   Ensure-DreamSkinManagedDirectory -Path $stagingRoot -Root $fullStateRoot
 
   try {
-    foreach ($directoryName in @('assets', 'scripts')) {
+    foreach ($directoryName in $runtimeDirectories) {
       Copy-Item -LiteralPath (Join-Path $sourceRoot $directoryName) -Destination $stagingRoot `
         -Recurse -Force -ErrorAction Stop
     }
@@ -174,13 +177,17 @@ function Install-DreamSkinRuntimeEngine {
     }
 
     $sourcePrefix = $sourceRoot.TrimEnd('\') + '\'
+    $sourceTrees = @(
+      foreach ($directoryName in $runtimeDirectories) { Join-Path $sourceRoot $directoryName }
+    )
+    $stagedTrees = @(
+      foreach ($directoryName in $runtimeDirectories) { Join-Path $stagingRoot $directoryName }
+    )
     $sourceFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'assets'), (Join-Path $sourceRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
+      Get-ChildItem -LiteralPath $sourceTrees -Recurse -File -Force -ErrorAction Stop
     )
     $stagedFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'assets'), (Join-Path $stagingRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
+      Get-ChildItem -LiteralPath $stagedTrees -Recurse -File -Force -ErrorAction Stop
     )
     if ($sourceFiles.Count -ne $stagedFiles.Count) {
       throw 'Staged Dream Skin runtime file count does not match its source.'

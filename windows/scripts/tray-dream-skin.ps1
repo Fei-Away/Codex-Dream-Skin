@@ -50,7 +50,9 @@ try {
 
   function Add-DreamSkinTrayItem {
     param(
-      [Parameter(Mandatory = $true)][System.Windows.Forms.ToolStripItemCollection]$Items,
+      [Parameter(Mandatory = $true)]
+      [AllowEmptyCollection()]
+      [System.Windows.Forms.ToolStripItemCollection]$Items,
       [Parameter(Mandatory = $true)][string]$Text,
       [AllowNull()][scriptblock]$Action,
       [bool]$Enabled = $true
@@ -82,14 +84,57 @@ try {
 
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '应用或重新应用' -Action {
       Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
+      $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
+      $begin = $null
+      if ($null -ne $session) {
+        $begin = Show-DreamSkinOperationUi -Session $session -Phase begin -Kind apply -TimeoutMs 3000
+      }
       Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+      # start-dream-skin is async; close the in-window loading so it does not stick for 180s.
+      if ($null -ne $session -and $null -ne $begin -and $begin.Ok) {
+        $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $begin.Token `
+          -UiState success -Message '已开始应用皮肤' -TimeoutMs 1500
+      }
+      $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '正在应用皮肤…', [System.Windows.Forms.ToolTipIcon]::Info)
     }
-    $pauseText = if ($paused) { '继续显示皮肤' } else { '暂停皮肤' }
-    $nextPaused = -not $paused
-    $pauseAction = {
-      Set-DreamSkinPaused -Paused $nextPaused -StateRoot $StateRoot | Out-Null
-    }.GetNewClosure()
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text $pauseText -Action $pauseAction
+    # Match macOS menubar: pause = mark + live remove; resume = clear pause + re-apply.
+    if ($paused) {
+      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '继续显示皮肤' -Action {
+        # Match macOS: clear pause + apply path; show in-window loading when CDP is up.
+        Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
+        $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
+        $begin = $null
+        if ($null -ne $session) {
+          $begin = Show-DreamSkinOperationUi -Session $session -Phase begin -Kind apply -TimeoutMs 3000
+        }
+        Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+        if ($null -ne $session -and $null -ne $begin -and $begin.Ok) {
+          $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $begin.Token `
+            -UiState success -Message '已开始重新应用皮肤' -TimeoutMs 1500
+        }
+        $notify.ShowBalloonTip(
+          1800,
+          'Codex Dream Skin',
+          '正在重新应用皮肤…',
+          [System.Windows.Forms.ToolTipIcon]::Info
+        )
+      }
+    } else {
+      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '暂停皮肤' -Action {
+        # Match macOS pause: marker + live remove with in-window loading / result.
+        Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot | Out-Null
+        $removal = Invoke-DreamSkinLiveRemove -StateRoot $StateRoot
+        $icon = if ($removal.Removed) {
+          [System.Windows.Forms.ToolTipIcon]::Info
+        } else {
+          [System.Windows.Forms.ToolTipIcon]::Warning
+        }
+        $notify.ShowBalloonTip(2800, 'Codex Dream Skin', $removal.Message, $icon)
+        if (-not $removal.Removed -and $removal.Attempted) {
+          Show-DreamSkinTrayError -Message $removal.Message
+        }
+      }
+    }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '更换背景图' -Action {
       $dialog = [System.Windows.Forms.OpenFileDialog]::new()
       $dialog.Title = '选择 Codex Dream Skin 背景图'
