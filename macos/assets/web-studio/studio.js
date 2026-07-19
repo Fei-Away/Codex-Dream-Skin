@@ -1,6 +1,7 @@
 import {
   StudioApiError,
   createApiClient,
+  installationMode,
   isThemeId,
   normalizeColor,
   pollJob,
@@ -166,8 +167,18 @@ async function renderThemes(themes) {
 }
 
 function renderStatus(status) {
-  element("install-panel").hidden = status.installed;
+  const mode = installationMode(status);
+  element("install-panel").hidden = mode === "none";
   element("dashboard").hidden = !status.installed;
+  if (mode === "update") {
+    setText("install-title", "更新 Dream Skin");
+    setText("install-summary", `当前安装 v${status.installedVersion}，可更新为此控制台的 v${status.version}。`);
+    setText("install-button", `更新到 v${status.version}`);
+  } else {
+    setText("install-title", "安装 Dream Skin");
+    setText("install-summary", "安装到你的用户目录，不修改官方 Codex 应用、app.asar 或代码签名。");
+    setText("install-button", "一键安装");
+  }
   setText("codex-status", status.codexRunning ? "已打开" : "未打开");
   setText("skin-status", status.session === "active" ? "运行中" : status.session === "paused" ? "已暂停" : "未启用");
   setText("cdp-status", status.cdpOk ? `已连接 · ${status.port}` : "未连接");

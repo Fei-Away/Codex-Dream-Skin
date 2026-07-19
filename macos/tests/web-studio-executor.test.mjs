@@ -134,6 +134,16 @@ test("reports source status before install and switches to installed scripts", a
   assert.equal(fixture.lastCommand().file, fixture.script("pause-dream-skin-macos.sh"));
 });
 
+test("reports when the installed engine differs from the source package", async (t) => {
+  const fixture = await executorFixture(t);
+  await fs.mkdir(path.join(fixture.installRoot, "scripts"), { recursive: true });
+  await fs.writeFile(path.join(fixture.installRoot, "VERSION"), "1.1.1\n");
+  const status = await fixture.executor.status();
+  assert.equal(status.version, "1.1.2");
+  assert.equal(status.installedVersion, "1.1.1");
+  assert.equal(status.updateAvailable, true);
+});
+
 test("requires restart authorization without verified CDP", async (t) => {
   const fixture = await executorFixture(t, { status: { codexRunning: true, cdpOk: false } });
   await fs.mkdir(path.join(fixture.installRoot, "scripts"), { recursive: true });

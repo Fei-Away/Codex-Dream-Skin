@@ -116,10 +116,6 @@ export function createWebStudioExecutor({
     return Boolean(stat?.isFile() && !stat.isSymbolicLink());
   }
 
-  async function activeRoot() {
-    return (await isInstalled()) ? installRoot : sourceRoot;
-  }
-
   async function runScript(root, name, args = []) {
     return run(path.join(root, "scripts", name), args);
   }
@@ -219,7 +215,8 @@ export function createWebStudioExecutor({
   }
 
   async function status() {
-    const root = await activeRoot();
+    const installed = await isInstalled();
+    const root = installed ? installRoot : sourceRoot;
     let parsed = {};
     try {
       const { stdout } = await runScript(root, "status-dream-skin-macos.sh", ["--json", "--deep"]);
@@ -228,10 +225,15 @@ export function createWebStudioExecutor({
       if (error instanceof WebStudioError) throw error;
       throw new WebStudioError("operation_failed", "Dream Skin status is invalid.", 500);
     }
-    const version = (await fs.readFile(path.join(root, "VERSION"), "utf8")).trim();
+    const version = (await fs.readFile(path.join(sourceRoot, "VERSION"), "utf8")).trim();
+    const installedVersion = installed
+      ? (await fs.readFile(path.join(installRoot, "VERSION"), "utf8")).trim()
+      : null;
     return {
-      installed: await isInstalled(),
+      installed,
       version,
+      installedVersion,
+      updateAvailable: installed && installedVersion !== version,
       codexRunning: parsed.codexRunning === true,
       cdpOk: parsed.cdpOk === true,
       injectorAlive: parsed.injectorAlive === true,

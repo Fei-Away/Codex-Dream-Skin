@@ -57,6 +57,11 @@ export function isThemeId(value) {
   return typeof value === "string" && THEME_ID_PATTERN.test(value);
 }
 
+export function installationMode(status) {
+  if (!status?.installed) return "install";
+  return status.updateAvailable === true ? "update" : "none";
+}
+
 export function normalizeColor(value) {
   if (typeof value !== "string" || !COLOR_PATTERN.test(value)) {
     throw new StudioApiError("validation_error", "Color must be a six-digit hex value.");

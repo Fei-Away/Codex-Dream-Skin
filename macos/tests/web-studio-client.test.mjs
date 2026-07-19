@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   StudioApiError,
   createApiClient,
+  installationMode,
   isThemeId,
   normalizeColor,
   pollJob,
@@ -147,6 +148,12 @@ test("validates browser image metadata and colors", () => {
   assert.throws(() => normalizeColor("red"), /six-digit/i);
   assert.equal(isThemeId("img-20260719153000-a1b2c3d4"), true);
   assert.equal(isThemeId("../theme"), false);
+});
+
+test("shows installation for a new setup and update for a mismatched installed version", () => {
+  assert.equal(installationMode({ installed: false, updateAvailable: false }), "install");
+  assert.equal(installationMode({ installed: true, updateAvailable: true }), "update");
+  assert.equal(installationMode({ installed: true, updateAvailable: false }), "none");
 });
 
 test("ships a local-only accessible page without unsafe DOM sinks", async () => {
