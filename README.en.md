@@ -17,6 +17,19 @@
   Unofficial. Does not modify <code>.app</code> / <code>app.asar</code> / WindowsApps.
 </p>
 
+## Install directly
+
+Ordinary users first install and quit the official Codex / ChatGPT app once,
+then download from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases):
+
+- macOS: open `CodexDreamSkin-vX.Y.Z.dmg` and drag the app to Applications.
+- Windows: run `CodexDreamSkin-Setup-vX.Y.Z.exe` and follow the wizard.
+
+No source checkout, Node.js install, `.sh`, or `.ps1` command is required. See
+the [macOS guide](./docs/install-macos.md) or
+[Windows guide](./docs/install-windows.md) for unsigned first-run approval,
+updates, and uninstall steps.
+
 ## Sponsors
 
 <p align="center">
@@ -53,12 +66,7 @@
   <sub>Real injected Codex home screen (preview only)</sub>
 </p>
 
-After installing on macOS, switch from **已保存主题** or run:
-
-```bash
-~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
-  --id preset-gothic-void-crusade
-```
+After installing on macOS, switch directly from **Saved Themes** in the menu bar.
 
 ### Arina Hashimoto / 桥本有菜
 
@@ -79,28 +87,13 @@ shown below are native Codex controls.
   <sub>Dark · real injected screenshot; unsent input hidden during capture (preview only)</sub>
 </p>
 
-Install from the repo and switch in one command on macOS:
+This portrait material remains in the source repository for reference and
+rights review; it is excluded from public DMG and Setup.exe assets. Public
+installers seed only the redistributable Gothic Void Crusade preset. Users can
+still choose **Change Background** to import UI-free artwork they are entitled
+to use and save it for one-click switching.
 
-```bash
-cd macos
-./scripts/install-dream-skin-macos.sh --no-launch
-~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
-  --id preset-arina-hashimoto
-```
-
-Windows has a persistent local theme store and system-tray controls, and seeds
-the same Arina Hashimoto preset. For the first repo-based setup:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\windows\scripts\install-dream-skin.ps1
-powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
-```
-
-After launch, switch directly through **已保存主题 → 桥本有菜**; no cross-folder
-manual import is required. **更换背景图** still imports your own UI-free
-wallpaper, which can then be saved for one-click switching.
-
-> The downloadable user source is [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png) (`1672 × 941`); the macOS one-click preset uses the normalized derived [`background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; confirm likeness and asset rights before redistributing it.
+> The downloadable user source is [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png) (`1672 × 941`); the source-only reference preset uses the normalized derived [`background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; do not put it in a public installer without confirmed likeness and asset rights.
 
 ## Concept gallery (not importable backgrounds)
 

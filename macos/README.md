@@ -21,7 +21,10 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 拖入 Applications。首次运行可能需要在“系统设置 → 隐私与安全性 → 仍要打开”确认一次；不需要
 运行 `xattr` 或安装源码。后续更新下载新的 DMG 覆盖安装即可，用户主题和图片会保留。
 
-## Quick start (from this repo)
+## Advanced: run from source
+
+The Release DMG above is the normal user path. The commands below are for
+contributors, diagnostics, and legacy deployments.
 
 ```bash
 # 1) Optional checks (needs the installed Codex/ChatGPT.app bundled Node)
@@ -40,7 +43,7 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 #    Codex Dream Skin - Verify.command
 #    Codex Dream Skin - Restore.command
 
-# 5) Optional: menu bar (SwiftBar) — apply, pause, import, and switch
+# 5) Legacy only: install the old SwiftBar menu (do not enable it beside the native app)
 ./Install\ Menu\ Bar.command
 # Look for 🎨 Skin in the top-right menu bar
 ```
@@ -53,7 +56,7 @@ Install location after step 2:
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
 
-## Customer ZIP (optional packaging)
+## Legacy customer ZIP (optional packaging)
 
 To build the “double-click install” folder layout for non-git users:
 
@@ -61,7 +64,9 @@ To build the “double-click install” folder layout for non-git users:
 ./scripts/build-client-release.sh "$HOME/Desktop/Codex 主题编辑器.zip"
 ```
 
-That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio` engine. Do not ship only CSS/images.
+That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio`
+engine. Prefer the DMG for new deliveries; keep this ZIP only for existing
+offline workflows. Do not ship only CSS/images.
 
 ## How it works (security boundary)
 
@@ -81,13 +86,11 @@ CDP is powerful and unauthenticated on loopback. Prefer Restore when you are don
 
 ## Bundled presets
 
-A fresh install seeds two tested presets into your theme library:
-**Gothic Void Crusade** and **桥本有菜 / Arina Hashimoto**. Gothic Void Crusade
-is the default when no active theme exists. Switch to Arina Hashimoto with:
-
-```bash
-~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-arina-hashimoto
-```
+The public DMG seeds **Gothic Void Crusade**, contributed through PR #134, as
+its redistributable default. A source checkout also contains the
+**桥本有菜 / Arina Hashimoto** reference material, but the public app bundle
+deliberately excludes it until independent likeness and redistribution rights
+are confirmed.
 
 The user-provided source PNG is `1672 × 941`. Its pack contains a standardized
 derived `2560 × 1440` JPEG plus theme metadata; the derived export does not add
@@ -102,7 +105,8 @@ before redistributing it.
 
 Seeding is idempotent. Upgrades remove only retired bundled preset IDs; your
 own `custom-*` themes from “换一张图” and the currently active theme copy are
-never touched.
+never touched. Existing locally saved reference themes are not deleted by an
+upgrade, but they are not copied into newly downloaded public packages.
 
 To contribute a preset, see [`presets/README.md`](./presets/README.md).
 

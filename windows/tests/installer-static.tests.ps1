@@ -54,39 +54,49 @@ foreach ($requiredDefinition in @(
   'DestDir: "{app}\payload"',
   'Flags: unchecked',
   'Flags: nowait postinstall skipifsilent',
+  'english.ConfirmUninstall=Uninstall will close Codex',
+  'chinesesimplified.ConfirmUninstall=',
   '-ExecutionPolicy RemoteSigned',
   'procedure CurStepChanged(CurStep: TSetupStep);',
   "if CurStep <> ssPostInstall then",
-  "RunBootstrap('', WizardSilent, ExitCode)",
+  "RunBootstrap('-Install', WizardSilent, ExitCode)",
   "RaiseException('Codex Dream Skin initialization could not be started.');",
-  'function InitializeUninstall(): Boolean;',
-  "RunBootstrap('-Uninstall', UninstallSilent, ExitCode)",
-  'Result := False;',
-  'Result := True;'
+  'procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);',
+  'if CurUninstallStep <> usUninstall then',
+  "RunBootstrap('-Uninstall', True, ExitCode)",
+  'RaiseException(Format('
 )) {
   if (-not $definition.Contains($requiredDefinition)) {
     throw "Inno Setup definition is missing a release safety contract: $requiredDefinition"
   }
 }
 
-$runBootstrapIndex = $definition.IndexOf(
-  "RunBootstrap('-Uninstall', UninstallSilent, ExitCode)",
+$uninstallStepIndex = $definition.IndexOf(
+  'if CurUninstallStep <> usUninstall then',
   [System.StringComparison]::Ordinal
 )
-$uninstallSuccessIndex = $definition.LastIndexOf('Result := True;', [System.StringComparison]::Ordinal)
-if ($runBootstrapIndex -lt 0 -or $uninstallSuccessIndex -le $runBootstrapIndex) {
-  throw 'The uninstaller can succeed before the restoration bootstrap completes.'
+$runBootstrapIndex = $definition.IndexOf(
+  "RunBootstrap('-Uninstall', True, ExitCode)",
+  [System.StringComparison]::Ordinal
+)
+$uninstallFailureIndex = $definition.LastIndexOf('RaiseException(Format(', [System.StringComparison]::Ordinal)
+if ($uninstallStepIndex -lt 0 -or $runBootstrapIndex -le $uninstallStepIndex -or
+  $uninstallFailureIndex -le $runBootstrapIndex -or
+  $definition.Contains('function InitializeUninstall(): Boolean;')) {
+  throw 'Uninstall restoration must run after confirmation and abort before file deletion on failure.'
 }
 if ([regex]::Matches($definition, '(?m)^Name: "startup";').Count -ne 1 -or
   [regex]::Matches($definition, '(?m)^Name: "startup";.*Flags: unchecked$').Count -ne 1) {
   throw 'The installer startup task must exist exactly once and remain unchecked by default.'
 }
 $fileSources = [regex]::Matches($definition, '(?m)^Source: .*$')
-if ($fileSources.Count -ne 2 -or
+if ($fileSources.Count -ne 4 -or
   -not $fileSources[0].Value.Contains('{#StageRoot}\setup-bootstrap.ps1') -or
-  -not $fileSources[1].Value.Contains('{#StageRoot}\payload\*') -or
+  -not $fileSources[1].Value.Contains('{#StageRoot}\LICENSE.txt') -or
+  -not $fileSources[2].Value.Contains('{#StageRoot}\NOTICE.md') -or
+  -not $fileSources[3].Value.Contains('{#StageRoot}\payload\*') -or
   $definition.Contains('[UninstallRun]')) {
-  throw 'The installed app must contain only the bootstrap and its single managed-engine seed payload.'
+  throw 'The installed app must contain the bootstrap, notices, and one managed-engine seed payload.'
 }
 
 foreach ($requiredBuilderContract in @(
@@ -94,12 +104,53 @@ foreach ($requiredBuilderContract in @(
   'Get-FileHash -LiteralPath $archivePath -Algorithm SHA256',
   'Copy-ZipEntry -Archive $zip -EntryName "$($manifest.nodeEntry)"',
   'Copy-ZipEntry -Archive $zip -EntryName "$($manifest.licenseEntry)"',
+  '$publicPresetImageSha256',
+  "'preset-gothic-void-crusade'",
+  "`$publicPresetTheme.image = 'dream-reference.jpg'",
+  '$stagedPublicImageHash',
+  'Staged installer payload did not retain the reviewed public release theme.',
+  "'LICENSE.txt'",
+  "'NOTICE.md'",
   "Write-DreamSkinIcon -Path",
   '"CodexDreamSkin-Setup-v$version.exe"'
 )) {
   if (-not $builder.Contains($requiredBuilderContract)) {
     throw "Windows release builder is missing a required operation: $requiredBuilderContract"
   }
+}
+
+foreach ($requiredRepairContract in @(
+  '[switch]$Install',
+  '$needsInstall = $Install',
+  '$requiredEngineFiles',
+  'assets\codex-dream-skin.ico',
+  'scripts\start-dream-skin.ps1',
+  'scripts\check-update.ps1',
+  'runtime\node\node.exe',
+  'runtime\node\LICENSE',
+  '$missingEngineFiles.Count -eq 0',
+  'A newer Codex Dream Skin',
+  'The installer payload is missing its bundled Node.js runtime'
+)) {
+  if (-not $bootstrap.Contains($requiredRepairContract)) {
+    throw "Installer same-version repair coverage is missing: $requiredRepairContract"
+  }
+}
+
+foreach ($requiredUninstallBinding in @(
+  '$restoreParameters = @{',
+  'Uninstall = $true',
+  'ForceRestart = $true',
+  'NoRelaunch = $true',
+  '$restoreParameters.RestoreBaseTheme = $true',
+  '& $engine.Restore @restoreParameters'
+)) {
+  if (-not $bootstrap.Contains($requiredUninstallBinding)) {
+    throw "Installer restore parameter binding is missing: $requiredUninstallBinding"
+  }
+}
+if ($bootstrap.Contains('@restoreArguments')) {
+  throw 'Installer restore switches must not use positional array splatting.'
 }
 
 $iconGenerator = $builderAst.Find({

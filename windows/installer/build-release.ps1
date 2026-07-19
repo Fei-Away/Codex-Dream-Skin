@@ -19,6 +19,13 @@ $bootstrapPath = Join-Path $installerRoot 'setup-bootstrap.ps1'
 $versionPath = Join-Path $windowsRoot 'VERSION'
 $macosVersionPath = Join-Path (Join-Path $repositoryRoot 'macos') 'VERSION'
 $macosPackagePath = Join-Path (Join-Path $repositoryRoot 'macos') 'package.json'
+$licensePath = Join-Path (Join-Path $repositoryRoot 'macos') 'LICENSE'
+$noticePath = Join-Path (Join-Path $repositoryRoot 'macos') 'NOTICE.md'
+$publicPresetRoot = Join-Path (Join-Path (Join-Path $repositoryRoot 'macos') 'presets') `
+  'preset-gothic-void-crusade'
+$publicPresetImagePath = Join-Path $publicPresetRoot 'background.jpg'
+$publicPresetThemePath = Join-Path $publicPresetRoot 'theme.json'
+$publicPresetImageSha256 = 'b76a7cbe2ff9d923846e931984d243a7ba1f25de8d190b5c6412c809c41aee42'
 
 function Read-ReleaseTextFile {
   param([Parameter(Mandatory = $true)][string]$Path)
@@ -247,6 +254,20 @@ $manifest = (Read-ReleaseTextFile -Path $manifestPath) | ConvertFrom-Json
 Assert-NodeRuntimeManifest -Manifest $manifest
 $null = Read-ReleaseTextFile -Path $definitionPath
 $null = Read-ReleaseTextFile -Path $bootstrapPath
+$null = Read-ReleaseTextFile -Path $licensePath
+$null = Read-ReleaseTextFile -Path $noticePath
+$publicPresetTheme = (Read-ReleaseTextFile -Path $publicPresetThemePath) | ConvertFrom-Json
+if ("$($publicPresetTheme.id)" -cne 'preset-gothic-void-crusade' -or
+  "$($publicPresetTheme.image)" -cne 'background.jpg') {
+  throw 'The public Windows release preset metadata is unexpected.'
+}
+if (-not (Test-Path -LiteralPath $publicPresetImagePath -PathType Leaf)) {
+  throw "The public Windows release preset image is missing: $publicPresetImagePath"
+}
+$publicPresetImageHash = (Get-FileHash -LiteralPath $publicPresetImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($publicPresetImageHash -cne $publicPresetImageSha256) {
+  throw "The reviewed public preset image changed. Expected $publicPresetImageSha256, found $publicPresetImageHash."
+}
 $compiler = Resolve-IsccExecutable -RequestedPath $IsccPath
 
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $repositoryRoot 'release' }
@@ -296,12 +317,22 @@ try {
   New-Item -ItemType Directory -Path $payloadRoot | Out-Null
   Copy-ReleaseDirectory -Source (Join-Path $windowsRoot 'assets') -Destination (Join-Path $payloadRoot 'assets')
   Copy-ReleaseDirectory -Source (Join-Path $windowsRoot 'scripts') -Destination (Join-Path $payloadRoot 'scripts')
+  Copy-Item -LiteralPath $publicPresetImagePath `
+    -Destination (Join-Path (Join-Path $payloadRoot 'assets') 'dream-reference.jpg') -Force
+  $publicPresetTheme.image = 'dream-reference.jpg'
+  [System.IO.File]::WriteAllText(
+    (Join-Path (Join-Path $payloadRoot 'assets') 'theme.json'),
+    (($publicPresetTheme | ConvertTo-Json -Depth 8) + "`r`n"),
+    [System.Text.UTF8Encoding]::new($false)
+  )
   [System.IO.File]::WriteAllText(
     (Join-Path $payloadRoot 'VERSION'),
     "$version`r`n",
     [System.Text.UTF8Encoding]::new($false)
   )
   Copy-Item -LiteralPath $bootstrapPath -Destination (Join-Path $stageRoot 'setup-bootstrap.ps1') -Force
+  Copy-Item -LiteralPath $licensePath -Destination (Join-Path $stageRoot 'LICENSE.txt') -Force
+  Copy-Item -LiteralPath $noticePath -Destination (Join-Path $stageRoot 'NOTICE.md') -Force
 
   Add-Type -AssemblyName System.IO.Compression
   Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -341,6 +372,15 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $payloadRoot $relative) -PathType Leaf)) {
       throw "Staged installer payload is incomplete: $relative"
     }
+  }
+  $stagedPublicImage = Join-Path (Join-Path $payloadRoot 'assets') 'dream-reference.jpg'
+  $stagedPublicImageHash = (Get-FileHash -LiteralPath $stagedPublicImage -Algorithm SHA256).Hash.ToLowerInvariant()
+  $stagedPublicTheme = (Read-ReleaseTextFile `
+    -Path (Join-Path (Join-Path $payloadRoot 'assets') 'theme.json')) | ConvertFrom-Json
+  if ($stagedPublicImageHash -cne $publicPresetImageSha256 -or
+    "$($stagedPublicTheme.id)" -cne 'preset-gothic-void-crusade' -or
+    "$($stagedPublicTheme.image)" -cne 'dream-reference.jpg') {
+    throw 'Staged installer payload did not retain the reviewed public release theme.'
   }
 
   $arguments = @(

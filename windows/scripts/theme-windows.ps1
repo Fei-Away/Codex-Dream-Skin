@@ -193,22 +193,25 @@ function Initialize-DreamSkinThemeStore {
     Ensure-DreamSkinManagedDirectory -Path $directory -Root $paths.Root
   }
   $assetRoot = Join-Path $SkillRoot 'assets'
-  $assetImage = Join-Path $assetRoot 'dream-reference.jpg'
-  Assert-DreamSkinImageFile -Path $assetImage
+  $bundledTheme = Read-DreamSkinTheme -ThemeDirectory $assetRoot
+  $assetImage = $bundledTheme.ImagePath
+  $assetImageName = [System.IO.Path]::GetFileName($assetImage)
+  $bundledPresetId = "$($bundledTheme.Theme.id)"
+  if ($bundledPresetId -cnotmatch '^preset-[A-Za-z0-9_-]{1,72}$') {
+    throw "Bundled theme id must be a safe preset id: $bundledPresetId"
+  }
   $activeTheme = Join-Path $paths.Active 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $activeTheme
   if (-not (Test-Path -LiteralPath $activeTheme -PathType Leaf)) {
     Ensure-DreamSkinManagedDirectory -Path $paths.Active -Root $paths.Root
-    Assert-DreamSkinNoReparseComponents -Path (Join-Path $paths.Active 'dream-reference.jpg')
-    $activeImage = Join-Path $paths.Active 'dream-reference.jpg'
-    Copy-Item -LiteralPath (Join-Path $assetRoot 'dream-reference.jpg') `
-      -Destination $activeImage -Force
+    Assert-DreamSkinNoReparseComponents -Path (Join-Path $paths.Active $assetImageName)
+    $activeImage = Join-Path $paths.Active $assetImageName
+    Copy-Item -LiteralPath $assetImage -Destination $activeImage -Force
     Assert-DreamSkinNoReparseComponents -Path $activeImage
     Assert-DreamSkinImageFile -Path $activeImage
-    $imageArchive = Join-Path $paths.Images 'dream-reference.jpg'
+    $imageArchive = Join-Path $paths.Images $assetImageName
     Assert-DreamSkinNoReparseComponents -Path $imageArchive
-    Copy-Item -LiteralPath (Join-Path $assetRoot 'dream-reference.jpg') `
-      -Destination $imageArchive -Force
+    Copy-Item -LiteralPath $assetImage -Destination $imageArchive -Force
     Assert-DreamSkinNoReparseComponents -Path $imageArchive
     Assert-DreamSkinImageFile -Path $imageArchive
     Assert-DreamSkinNoReparseComponents -Path $activeTheme
@@ -219,17 +222,15 @@ function Initialize-DreamSkinThemeStore {
   if (Test-Path -LiteralPath $retiredPresetDirectory) {
     Remove-Item -LiteralPath $retiredPresetDirectory -Recurse -Force
   }
-  # Bundled Arina Hashimoto (default active wallpaper lives under assets/).
-  $presetDirectory = Join-Path $paths.Saved 'preset-arina-hashimoto'
+  $presetDirectory = Join-Path $paths.Saved $bundledPresetId
   $presetTheme = Join-Path $presetDirectory 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $presetDirectory
   Assert-DreamSkinNoReparseComponents -Path $presetTheme
   if (-not (Test-Path -LiteralPath $presetTheme -PathType Leaf)) {
     Ensure-DreamSkinManagedDirectory -Path $presetDirectory -Root $paths.Root
-    $presetImage = Join-Path $presetDirectory 'dream-reference.jpg'
+    $presetImage = Join-Path $presetDirectory $assetImageName
     Assert-DreamSkinNoReparseComponents -Path $presetImage
-    Copy-Item -LiteralPath (Join-Path $assetRoot 'dream-reference.jpg') `
-      -Destination $presetImage -Force
+    Copy-Item -LiteralPath $assetImage -Destination $presetImage -Force
     Assert-DreamSkinNoReparseComponents -Path $presetImage
     Assert-DreamSkinImageFile -Path $presetImage
     Assert-DreamSkinNoReparseComponents -Path $presetTheme

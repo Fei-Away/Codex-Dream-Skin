@@ -20,10 +20,12 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js for manifest checks
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
 
@@ -37,6 +39,12 @@ jobs:
           tag="${RELEASE_TAG}"
           if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Release tags must look like v1.2.3: $tag" >&2
+            exit 1
+          fi
+          main_sha="$(git rev-parse origin/main)"
+          tag_sha="$(git rev-parse HEAD)"
+          if [[ "$tag_sha" != "$main_sha" ]]; then
+            echo "Release tag must point at the current origin/main commit: tag=$tag_sha main=$main_sha" >&2
             exit 1
           fi
           version="$(tr -d '[:space:]' < macos/VERSION)"
@@ -60,7 +68,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js for macOS regressions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
 
       - name: Build unsigned DMG
         shell: bash
@@ -82,7 +95,7 @@ jobs:
           hdiutil imageinfo "$artifact" >/dev/null
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-macos
           if-no-files-found: error
@@ -95,32 +108,45 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js for Windows regressions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
 
       - name: Install Inno Setup 6
         shell: pwsh
         run: |
+          $requiredVersion = '6.7.1'
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
-            choco install innosetup --no-progress --yes
+          $installedVersion = if (Test-Path -LiteralPath $iscc -PathType Leaf) {
+            "$((Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion)"
+          } else { '' }
+          if (-not $installedVersion.StartsWith($requiredVersion, [System.StringComparison]::Ordinal)) {
+            choco upgrade innosetup --version=$requiredVersion --allow-downgrade --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Could not install Inno Setup $requiredVersion." }
           }
-          $resolved = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-          if ($null -eq $resolved) {
-            $known = @(
-              (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
-              (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
-            ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
-            if ($known.Count -eq 0) { throw 'Inno Setup 6 (ISCC.exe) is not available on the runner.' }
-            "ISCC_PATH=$($known[0])" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            "ISCC_PATH=$($resolved.Source)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $resolved = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+            (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+          if (-not $resolved) { throw 'Inno Setup 6 (ISCC.exe) is not available on the runner.' }
+          $resolvedVersion = "$((Get-Item -LiteralPath $resolved).VersionInfo.ProductVersion)"
+          if (-not $resolvedVersion.StartsWith($requiredVersion, [System.StringComparison]::Ordinal)) {
+            throw "Expected Inno Setup $requiredVersion, found $resolvedVersion at $resolved."
           }
+          "ISCC_PATH=$resolved" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build Setup.exe with pinned Node runtime
         shell: pwsh
         env:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\tests\run-tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows regressions failed with exit code $LASTEXITCODE." }
           & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
             -File .\windows\tests\installer-static.tests.ps1
           if ($LASTEXITCODE -ne 0) { throw "Installer static checks failed with exit code $LASTEXITCODE." }
@@ -137,7 +163,7 @@ jobs:
           if ((Get-Item -LiteralPath $artifact).Length -le 0) { throw 'Windows artifact is empty.' }
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-windows
           if-no-files-found: error
@@ -152,10 +178,10 @@ jobs:
       contents: write
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: release-*
           path: dist
@@ -171,8 +197,8 @@ jobs:
           test -s "dist/CodexDreamSkin-Setup-v${VERSION}.exe"
           (
             cd dist
-            sha256sum "CodexDreamSkin-v${VERSION}.dmg" "CodexDreamSkin-Setup-v${VERSION}.exe" \
-              | sed 's#  #  #' > SHA256SUMS.txt
+            sha256sum "CodexDreamSkin-v${VERSION}.dmg" \
+              "CodexDreamSkin-Setup-v${VERSION}.exe" > SHA256SUMS.txt
           )
           cat > release-notes.md <<EOF
           ## Codex Dream Skin v${VERSION}
@@ -184,8 +210,8 @@ jobs:
           - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
 
           The packages are currently unsigned. Follow the graphical first-run steps in
-          [macOS installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/docs/install-macos.md)
-          or [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/docs/install-windows.md).
+          [macOS installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-macos.md)
+          or [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md).
           No terminal trust command is required for ordinary users.
 
           This release is created as a draft for a maintainer to review before publishing.
@@ -196,10 +222,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
-          gh release create "v${VERSION}" \
-            --draft \
-            --title "Codex Dream Skin v${VERSION}" \
-            --notes-file release-notes.md \
-            dist/CodexDreamSkin-v${VERSION}.dmg \
-            dist/CodexDreamSkin-Setup-v${VERSION}.exe \
-            dist/SHA256SUMS.txt
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            is_draft="$(gh release view "v${VERSION}" --json isDraft --jq .isDraft)"
+            test "$is_draft" = true || {
+              echo "Refusing to replace an already published v${VERSION} release." >&2
+              exit 1
+            }
+            gh release upload "v${VERSION}" --clobber \
+              dist/CodexDreamSkin-v${VERSION}.dmg \
+              dist/CodexDreamSkin-Setup-v${VERSION}.exe \
+              dist/SHA256SUMS.txt
+            gh release edit "v${VERSION}" --draft \
+              --title "Codex Dream Skin v${VERSION}" \
+              --notes-file release-notes.md
+          else
+            gh release create "v${VERSION}" \
+              --draft \
+              --title "Codex Dream Skin v${VERSION}" \
+              --notes-file release-notes.md \
+              dist/CodexDreamSkin-v${VERSION}.dmg \
+              dist/CodexDreamSkin-Setup-v${VERSION}.exe \
+              dist/SHA256SUMS.txt
+          fi

@@ -53,11 +53,17 @@ MinVersion=10.0
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
+[Messages]
+english.ConfirmUninstall=Uninstall will close Codex, restore its original appearance, remove the Dream Skin runtime, and keep saved themes and images.%n%nContinue?
+chinesesimplified.ConfirmUninstall=卸载将关闭 Codex、恢复官方外观并移除 Dream Skin 运行时；已保存主题和图片会保留。%n%n是否继续？
+
 [Tasks]
 Name: "startup"; Description: "Start Codex Dream Skin when I sign in"; GroupDescription: "Additional options:"; Flags: unchecked
 
 [Files]
 Source: "{#StageRoot}\setup-bootstrap.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#StageRoot}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#StageRoot}\NOTICE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StageRoot}\payload\*"; DestDir: "{app}\payload"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
@@ -107,38 +113,25 @@ begin
   if CurStep <> ssPostInstall then
     exit;
 
-  if not RunBootstrap('', WizardSilent, ExitCode) then
+  if not RunBootstrap('-Install', WizardSilent, ExitCode) then
     RaiseException('Codex Dream Skin initialization could not be started.');
   if ExitCode <> 0 then
     RaiseException(InstallInitializationFailureMessage(ExitCode));
 end;
 
-function InitializeUninstall(): Boolean;
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ExitCode: Integer;
 begin
-  Result := False;
-  if not RunBootstrap('-Uninstall', UninstallSilent, ExitCode) then
-  begin
-    if not UninstallSilent then
-      MsgBox(
-        'Codex Dream Skin restoration could not be started. No installed files were removed.',
-        mbError,
-        MB_OK
-      );
+  if CurUninstallStep <> usUninstall then
     exit;
-  end;
 
+  { The standard Inno confirmation has completed before usUninstall. }
+  if not RunBootstrap('-Uninstall', True, ExitCode) then
+    RaiseException('Codex Dream Skin restoration could not be started. No installed files were removed.');
   if ExitCode <> 0 then
-  begin
-    if not UninstallSilent then
-      MsgBox(
-        Format('Codex Dream Skin could not restore Codex (exit code %d). No installed files were removed.', [ExitCode]),
-        mbError,
-        MB_OK
-      );
-    exit;
-  end;
-
-  Result := True;
+    RaiseException(Format(
+      'Codex Dream Skin could not restore Codex (exit code %d). No installed files were removed.',
+      [ExitCode]
+    ));
 end;

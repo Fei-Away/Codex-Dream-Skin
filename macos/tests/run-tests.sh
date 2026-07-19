@@ -51,6 +51,34 @@ if /usr/bin/grep -F -q 'CODEX_EXPECTED_TEAM_ID' "$ROOT/scripts/common-macos.sh" 
   exit 1
 fi
 
+# The native menu bar control plane and XCTest require a complete, matching
+# Xcode platform. CommandLineTools-only hosts report this platform blocker;
+# build-menubar-app.sh is still independently verifiable with DREAMSKIN_SDK.
+if /usr/bin/xcrun --sdk macosx --show-sdk-platform-path >/dev/null 2>&1; then
+  /usr/bin/swift build --package-path "$ROOT/menubar-app" --product CodexDreamSkinMenuBar
+  /usr/bin/swift test --package-path "$ROOT/menubar-app"
+else
+  printf 'SKIP: native SwiftPM build/XCTest require a full matching Xcode macOS platform.\n'
+fi
+/usr/bin/plutil -lint "$ROOT/menubar-app/Resources/Info.plist.template" >/dev/null
+/usr/bin/grep -F -q '<key>LSUIElement</key>' "$ROOT/menubar-app/Resources/Info.plist.template"
+/usr/bin/grep -F -q '<key>LSMinimumSystemVersion</key>' "$ROOT/menubar-app/Resources/Info.plist.template"
+UPDATE_JSON="$({
+  CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$ROOT/tests/fixtures/latest-release.json" \
+    "$ROOT/scripts/check-update-macos.sh" --json
+})"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (value.currentVersion !== "v1.3.0" || value.latestVersion !== "v9.8.7") process.exit(1);
+  if (!value.updateAvailable) process.exit(1);
+  if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
+' "$UPDATE_JSON"
+if /usr/bin/grep -R -n -E 'xattr|spctl[[:space:]]+--master-disable' \
+  "$ROOT/menubar-app" "$ROOT/scripts/build-menubar-app.sh" "$ROOT/scripts/build-dmg.sh" >/dev/null; then
+  printf 'Native distribution must not bypass Gatekeeper or remove quarantine attributes.\n' >&2
+  exit 1
+fi
+
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
@@ -840,7 +868,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.3.0" ]' _ "$ROOT"
 if [ "${CODEX_DREAM_SKIN_SKIP_DOCTOR:-0}" = "1" ]; then
   printf 'SKIP: Doctor requires an installed, signed Codex app.\n'
   DOCTOR_RESULT="skipped"
