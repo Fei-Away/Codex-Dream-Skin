@@ -813,6 +813,29 @@ MULTILINE_ARRAY_CONFIG="$TMP/config-multiline-array.toml"
 assert_theme_config_install_rejected multiline-array "$MULTILINE_ARRAY_CONFIG" \
   "$TMP/config-multiline-array-backup.json"
 
+# A multiline array outside [desktop] must not block install/restore. Codex
+# itself sometimes serializes top-level arrays like `notify = [ ... ]` across
+# several lines; theme-config.mjs only rewrites keys inside [desktop] and must
+# tolerate that layout everywhere else.
+OUTSIDE_MULTILINE_CONFIG="$TMP/config-outside-multiline-array.toml"
+OUTSIDE_MULTILINE_BACKUP="$TMP/config-outside-multiline-array-backup.json"
+/usr/bin/printf '%s\n' \
+  'notify = [' \
+  '    "/opt/notify",' \
+  '    "turn-ended",' \
+  ']' \
+  'model = "gpt-5"' \
+  '' \
+  '[desktop]' \
+  'appearanceTheme = "system"' \
+  > "$OUTSIDE_MULTILINE_CONFIG"
+/bin/cp "$OUTSIDE_MULTILINE_CONFIG" "$TMP/original-outside-multiline.toml"
+"$NODE" "$ROOT/scripts/theme-config.mjs" install \
+  "$OUTSIDE_MULTILINE_CONFIG" "$OUTSIDE_MULTILINE_BACKUP" >/dev/null
+"$NODE" "$ROOT/scripts/theme-config.mjs" restore \
+  "$OUTSIDE_MULTILINE_CONFIG" "$OUTSIDE_MULTILINE_BACKUP" >/dev/null
+/usr/bin/cmp -s "$OUTSIDE_MULTILINE_CONFIG" "$TMP/original-outside-multiline.toml"
+
 CRLF_CONFIG="$TMP/config-crlf.toml"
 CRLF_BACKUP="$TMP/config-crlf-backup.json"
 /usr/bin/printf '\357\273\277model = "gpt-5"\r\nproject = "中文项目"\r\n\r\n[desktop]\r\nappearanceTheme = "system"\r\n' \

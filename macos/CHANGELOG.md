@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 修复
+
+- `theme-config.mjs` 将「多行数组」检查从整份 `config.toml` 收窄到 `[desktop]` 段内。此前 Codex 桌面自身会把 `notify` 等顶层数组序列化为跨行形式，导致安装或切主题时抛出 `Refusing to rewrite TOML containing multiline arrays.`，即便脚本从不改写这些字段；现在仅当 `[desktop]` 段内本身出现跨行数组时才拒绝写入，其余保护（多行字符串、重复段、软链、非 UTF-8、字节校验、原子替换、备份 schema）保持不变。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

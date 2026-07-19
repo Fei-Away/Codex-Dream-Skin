@@ -232,8 +232,13 @@ async function main() {
   if (content.includes('"""') || content.includes("'''")) {
     throw new Error("Refusing to rewrite TOML containing multiline strings.");
   }
-  assertSupportedTomlLayout(content);
   let section = desktopSection(content);
+  // Only enforce the multiline-array restriction inside the [desktop] section
+  // that we actually rewrite. Multiline arrays elsewhere in config.toml
+  // (e.g. a top-level `notify = [ ... ]` that Codex itself formats across
+  // multiple lines) do not affect the [desktop] replacements and must not
+  // block installs or theme switches.
+  if (section) assertSupportedTomlLayout(section.body);
 
   if (mode === "install") {
     if (!section) {
