@@ -40,6 +40,10 @@ PAYLOAD_JSON="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload --theme-dir
 "$NODE" "$ROOT/scripts/write-theme.mjs" reset-demo --output-dir "$TMP/theme" >/dev/null
 [ ! -e "$TMP/theme" ]
 
+while IFS= read -r test_file; do
+  "$NODE" --test "$test_file"
+done < <(/usr/bin/find "$ROOT/tests" -maxdepth 1 -type f -name 'web-studio-*.test.mjs' -print | /usr/bin/sort)
+
 CONFIG="$TMP/config.toml"
 BACKUP="$TMP/theme-backup.json"
 /usr/bin/printf '%s\n' \
