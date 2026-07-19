@@ -23,9 +23,10 @@
   --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 72%, transparent);
   --dream-immersive-composer: color-mix(in oklab, var(--dream-surface-raised) 76%, var(--dream-accent) 4%);
   --dream-immersive-line: color-mix(in oklab, var(--dream-line) 76%, transparent);
-  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 86%, transparent);
-  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 78%, transparent);
-  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 66%, transparent);
+  /* Lighter task wash so the wallpaper stays visible and text is not under a heavy fog. */
+  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 62%, transparent);
+  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 40%, transparent);
+  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 22%, transparent);
 }
 
 :root.codex-dream-skin.dream-theme-dark {
@@ -50,9 +51,9 @@
   --dream-task-immersive-sidebar: color-mix(in oklab, var(--dream-sidebar) 70%, transparent);
   --dream-immersive-composer: color-mix(in oklab, var(--dream-surface-raised) 88%, var(--dream-accent) 5%);
   --dream-immersive-line: color-mix(in oklab, var(--dream-line) 82%, transparent);
-  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 82%, transparent);
-  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 74%, transparent);
-  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 60%, transparent);
+  --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 58%, transparent);
+  --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 36%, transparent);
+  --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 18%, transparent);
 }
 
 html.codex-dream-skin body {
@@ -134,7 +135,7 @@ html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"]
 }
 
 html.codex-dream-skin [role="main"] {
-  color: var(--dream-text);
+  color: var(--dream-text) !important;
 }
 
 /* Task routes use the art as a quiet atmospheric layer. Wide banners are shown
@@ -143,6 +144,7 @@ html.codex-dream-skin .dream-task {
   position: relative;
   isolation: isolate;
   min-height: 100%;
+  color: var(--dream-text) !important;
   background: var(--dream-surface) !important;
 }
 
@@ -187,9 +189,70 @@ html.codex-dream-skin .dream-task > * {
   z-index: 1;
 }
 
+/* Task message readability — force theme text over native purple/light tokens
+   and give bubbles a light panel so copy is not painted directly on the wash. */
 html.codex-dream-skin .dream-task article,
-html.codex-dream-skin .dream-task [data-message-author-role] {
-  color: var(--dream-text);
+html.codex-dream-skin .dream-task [data-message-author-role],
+html.codex-dream-skin [data-message-author-role],
+html.codex-dream-skin article {
+  color: var(--dream-text) !important;
+}
+
+html.codex-dream-skin .dream-task article,
+html.codex-dream-skin .dream-task [data-message-author-role],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) article,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [data-message-author-role] {
+  border: 1px solid color-mix(in oklab, var(--dream-line) 42%, transparent);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--dream-surface) 54%, transparent) !important;
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--dream-canvas) 12%, transparent);
+  backdrop-filter: blur(8px) saturate(1.04);
+}
+
+html.codex-dream-skin.dream-theme-light .dream-task article,
+html.codex-dream-skin.dream-theme-light .dream-task [data-message-author-role],
+html.codex-dream-skin.dream-theme-light.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) article,
+html.codex-dream-skin.dream-theme-light.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [data-message-author-role] {
+  background: color-mix(in oklab, var(--dream-surface) 78%, transparent) !important;
+}
+
+html.codex-dream-skin .dream-task [class*="text-token"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [class*="text-token"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [class*="_markdown"] {
+  color: inherit !important;
+}
+
+html.codex-dream-skin .dream-task [class*="text-token-text-secondary"],
+html.codex-dream-skin .dream-task [class*="text-token-text-tertiary"],
+html.codex-dream-skin .dream-task [class*="text-token-text-secondary"] *,
+html.codex-dream-skin .dream-task [class*="text-token-text-tertiary"] *,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [class*="text-token-text-secondary"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [class*="text-token-text-tertiary"] {
+  color: var(--dream-text-muted) !important;
+}
+
+html.codex-dream-skin.dream-theme-dark.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [role="main"],
+html.codex-dream-skin.dream-theme-dark.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [class*="_markdown"] {
+  text-shadow:
+    0 1px 2px color-mix(in oklab, var(--dream-canvas) 70%, transparent),
+    0 0 10px color-mix(in oklab, var(--dream-canvas) 40%, transparent);
+}
+
+html.codex-dream-skin.dream-theme-light.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [role="main"],
+html.codex-dream-skin.dream-theme-light.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [class*="_markdown"] {
+  text-shadow: none;
 }
 
 /* The home route keeps the source image expressive, with a semantic safe-area
@@ -387,7 +450,7 @@ html.codex-dream-skin button[class~="bg-token-foreground"] {
 
 html.codex-dream-skin [data-message-author-role],
 html.codex-dream-skin article {
-  color: var(--dream-text);
+  color: var(--dream-text) !important;
 }
 
 /* A 16:9 or wider image is painted once on the native window. The sidebar,
@@ -471,6 +534,7 @@ html.codex-dream-skin.dream-art-wide main.main-surface > header.app-header-tint 
 
 html.codex-dream-skin.dream-art-wide main.main-surface [role="main"] {
   background: transparent !important;
+  color: var(--dream-text) !important;
 }
 
 html.codex-dream-skin.dream-art-wide main.main-surface.dream-home-shell
