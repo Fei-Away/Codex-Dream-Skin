@@ -125,3 +125,25 @@ jobs:
       - name: Run Windows regression suite
         shell: cmd
         run: ${{ matrix.executable }} -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\run-tests.ps1
+
+  macos-tests:
+    name: macOS repository regressions
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Locate runner Node.js
+        id: node
+        shell: bash
+        run: echo "path=$(command -v node)" >> "$GITHUB_OUTPUT"
+
+      - name: Run macOS regressions without installed-app checks
+        shell: bash
+        env:
+          NODE: ${{ steps.node.outputs.path }}
+          CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS: "1"
+          CODEX_DREAM_SKIN_SKIP_DOCTOR: "1"
+        run: ./macos/tests/run-tests.sh
