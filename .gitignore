@@ -4,6 +4,7 @@
 .DS_Store
 .idea/
 .vscode/
+.worktrees/
 README.preview.html
 docs/readme-preview.html
 release/
