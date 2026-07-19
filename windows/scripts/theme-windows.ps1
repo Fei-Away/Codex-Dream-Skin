@@ -402,7 +402,80 @@ function Test-DreamSkinPaused {
   return (Test-Path -LiteralPath (Get-DreamSkinThemePaths -StateRoot $StateRoot).PauseFile -PathType Leaf)
 }
 
-# Mirror macOS pause: mark paused, then immediately strip the live skin over CDP.
+function Get-DreamSkinLiveSessionContext {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $state = $null
+  try { $state = Read-DreamSkinState -Path $paths.State } catch { $state = $null }
+  if ($null -eq $state -or -not $state.port -or -not $state.browserId) { return $null }
+  $port = 0
+  if (-not [int]::TryParse("$($state.port)", [ref]$port)) { return $null }
+  Assert-DreamSkinPort -Port $port
+  $browserId = "$($state.browserId)".Trim()
+  if (-not (Test-DreamSkinBrowserId -Value $browserId)) { return $null }
+  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue) -or
+    -not (Get-Command Invoke-DreamSkinNative -ErrorAction SilentlyContinue)) {
+    return $null
+  }
+  $node = Get-DreamSkinNodeRuntime
+  $injector = Join-Path $PSScriptRoot 'injector.mjs'
+  if (-not (Test-Path -LiteralPath $injector)) { return $null }
+  return [pscustomobject]@{
+    Paths = $paths
+    State = $state
+    Port = $port
+    BrowserId = $browserId
+    NodePath = $node.Path
+    Injector = $injector
+  }
+}
+
+function New-DreamSkinOperationToken {
+  $pidPart = [string]$PID
+  $ms = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $seq = Get-Random -Minimum 1 -Maximum 99999999
+  return "${pidPart}:${ms}:${seq}"
+}
+
+function Show-DreamSkinOperationUi {
+  param(
+    [Parameter(Mandatory = $true)][object]$Session,
+    [Parameter(Mandatory = $true)][ValidateSet('begin', 'finish')][string]$Phase,
+    [string]$Kind = 'apply',
+    [string]$Token,
+    [ValidateSet('success', 'error', 'cancelled')][string]$UiState = 'success',
+    [string]$Message = '',
+    [int]$TimeoutMs = 3000
+  )
+  $argumentList = @($Session.Injector, "--port", "$($Session.Port)", "--browser-id", $Session.BrowserId, "--timeout-ms", "$TimeoutMs")
+  if ($Phase -eq 'begin') {
+    if ($Kind -notin @('apply', 'pause', 'switch')) { throw "Invalid operation kind: $Kind" }
+    $token = if ($Token) { $Token } else { New-DreamSkinOperationToken }
+    $argumentList += @('--begin-operation', '--operation-kind', $Kind, '--operation-token', $token)
+    $probe = Invoke-DreamSkinNative -FilePath $Session.NodePath -ArgumentList $argumentList -DiscardStderr
+    $printed = (($probe.Output -join "`n").Trim() -split "`n" | Select-Object -Last 1).Trim()
+    if ($probe.ExitCode -ne 0 -or -not $printed) {
+      return [pscustomobject]@{ Ok = $false; Token = $token; Message = '无法在 Codex 窗口显示进度。' }
+    }
+    return [pscustomobject]@{ Ok = $true; Token = $printed; Message = '' }
+  }
+  if (-not $Token) { throw 'Finish operation requires a token.' }
+  if ($Message.Length -gt 240 -or $Message -match "[\r\n]") { throw 'Invalid operation message.' }
+  $argumentList += @(
+    '--finish-operation',
+    '--operation-ui-state', $UiState,
+    '--operation-message', $Message,
+    '--operation-token', $Token
+  )
+  $probe = Invoke-DreamSkinNative -FilePath $Session.NodePath -ArgumentList $argumentList -DiscardStderr
+  return [pscustomobject]@{
+    Ok = ($probe.ExitCode -eq 0)
+    Token = $Token
+    Message = if ($probe.ExitCode -eq 0) { '' } else { '无法更新 Codex 窗口内的操作状态。' }
+  }
+}
+
+# Mirror macOS pause: mark paused, show in-app loading, then strip the live skin over CDP.
 # Writing only the pause file leaves CSS in the renderer until the watcher polls.
 function Invoke-DreamSkinLiveRemove {
   param(
@@ -412,10 +485,8 @@ function Invoke-DreamSkinLiveRemove {
   if ($TimeoutMs -lt 250 -or $TimeoutMs -gt 120000) {
     throw "Invalid live-remove timeout: $TimeoutMs"
   }
-  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
-  $state = $null
-  try { $state = Read-DreamSkinState -Path $paths.State } catch { $state = $null }
-  if ($null -eq $state -or -not $state.port -or -not $state.browserId) {
+  $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
+  if ($null -eq $session) {
     return [pscustomobject]@{
       Attempted = $false
       Removed = $false
@@ -423,61 +494,37 @@ function Invoke-DreamSkinLiveRemove {
     }
   }
 
-  $port = 0
-  if (-not [int]::TryParse("$($state.port)", [ref]$port)) {
-    return [pscustomobject]@{
-      Attempted = $false
-      Removed = $false
-      Message = '状态文件中的端口无效；已记录暂停，但未能卸下当前皮肤。'
-    }
-  }
-  Assert-DreamSkinPort -Port $port
-  $browserId = "$($state.browserId)".Trim()
-  if (-not (Test-DreamSkinBrowserId -Value $browserId)) {
-    return [pscustomobject]@{
-      Attempted = $false
-      Removed = $false
-      Message = '状态文件中的 Browser ID 无效；已记录暂停，但未能卸下当前皮肤。'
-    }
-  }
-
-  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue) -or
-    -not (Get-Command Invoke-DreamSkinNative -ErrorAction SilentlyContinue)) {
-    return [pscustomobject]@{
-      Attempted = $false
-      Removed = $false
-      Message = 'Node 运行时不可用；已记录暂停，但未能卸下当前皮肤。'
-    }
-  }
-
-  $node = Get-DreamSkinNodeRuntime
-  $injector = Join-Path $PSScriptRoot 'injector.mjs'
-  if (-not (Test-Path -LiteralPath $injector)) {
-    return [pscustomobject]@{
-      Attempted = $false
-      Removed = $false
-      Message = '找不到 injector；已记录暂停，但未能卸下当前皮肤。'
-    }
-  }
+  $token = $null
+  $begin = Show-DreamSkinOperationUi -Session $session -Phase begin -Kind pause -TimeoutMs 3000
+  if ($begin.Ok) { $token = $begin.Token }
 
   $argumentList = @(
-    $injector,
+    $session.Injector,
     '--remove',
-    '--port', "$port",
-    '--browser-id', $browserId,
+    '--port', "$($session.Port)",
+    '--browser-id', $session.BrowserId,
     '--timeout-ms', "$TimeoutMs"
   )
-  if (Test-Path -LiteralPath $paths.Active) {
-    $argumentList += @('--theme-dir', $paths.Active)
+  if ($token) { $argumentList += @('--operation-token', $token) }
+  if (Test-Path -LiteralPath $session.Paths.Active) {
+    $argumentList += @('--theme-dir', $session.Paths.Active)
   }
 
-  $removal = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList $argumentList -DiscardStderr
+  $removal = Invoke-DreamSkinNative -FilePath $session.NodePath -ArgumentList $argumentList -DiscardStderr
   if ($removal.ExitCode -eq 0) {
+    if ($token) {
+      $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $token `
+        -UiState success -Message '皮肤已暂停' -TimeoutMs 1500
+    }
     return [pscustomobject]@{
       Attempted = $true
       Removed = $true
-      Message = '皮肤已从当前窗口移除。'
+      Message = '皮肤已暂停'
     }
+  }
+  if ($token) {
+    $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $token `
+      -UiState error -Message '暂停失败，请重试' -TimeoutMs 1500
   }
   return [pscustomobject]@{
     Attempted = $true

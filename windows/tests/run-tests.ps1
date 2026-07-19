@@ -768,12 +768,27 @@ try {
   $themeWindowsSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-windows.ps1')
   foreach ($requiredLiveRemoveToken in @(
     'function Invoke-DreamSkinLiveRemove',
+    'function Show-DreamSkinOperationUi',
     "'--remove'",
     "'--browser-id'",
+    "'--begin-operation'",
     'Invoke-DreamSkinNative'
   )) {
     if (-not $themeWindowsSource.Contains($requiredLiveRemoveToken)) {
       throw "Live remove helper is missing required token: $requiredLiveRemoveToken"
+    }
+  }
+  $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
+  foreach ($requiredOperationUi in @(
+    'chatgpt-dream-skin-operation',
+    'begin-operation',
+    'finish-operation',
+    '正在暂停皮肤…',
+    'presentOperationUi',
+    'operationUiExpression'
+  )) {
+    if (-not $injectorSource.Contains($requiredOperationUi)) {
+      throw "Windows injector operation UI is missing: $requiredOperationUi"
     }
   }
   if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 1 -or
