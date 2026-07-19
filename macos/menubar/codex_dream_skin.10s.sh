@@ -129,8 +129,13 @@ case "$OPERATION_LINE" in
   *)
     case "$SESSION_LINE" in
       active)
+        # Same pair as Windows tray when running: re-apply + pause (live remove).
         echo "重新应用皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
         echo "暂停皮肤 | bash=\"$PAUSE\" terminal=false refresh=true"
+        ;;
+      paused)
+        # Same resume affordance as Windows tray "继续显示皮肤": clear pause and apply.
+        echo "继续显示皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
         ;;
       stale|unknown)
         echo "修复并应用 | bash=\"$APPLY\" terminal=false refresh=true"

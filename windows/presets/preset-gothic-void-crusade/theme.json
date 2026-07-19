@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-gothic-void-crusade",
+  "name": "Gothic Void Crusade",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "A solemn cathedral-world horizon for focused work.",
+  "projectPrefix": "Select project · ",
+  "projectLabel": "◉  Select project",
+  "statusText": "VOID CRUSADE ONLINE",
+  "quote": "MAKE SOMETHING WONDERFUL",
+  "image": "background.jpg",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.76,
+    "focusY": 0.45,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#0d0d0e",
+    "panel": "#171513",
+    "panelAlt": "#211d18",
+    "accent": "#c8a55a",
+    "accentAlt": "#e3c27a",
+    "secondary": "#74352e",
+    "highlight": "#8a2f27",
+    "text": "#f3ead7",
+    "muted": "#b5a386",
+    "line": "rgba(200, 165, 90, .28)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "Gothic Void Crusade",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}
