@@ -190,6 +190,7 @@ All API responses use JSON. Mutation endpoints return `202 Accepted` with a job 
 | --- | --- | --- |
 | `GET` | `/api/status` | Installation, Codex, CDP, injector, theme, and version status |
 | `GET` | `/api/themes` | List saved user themes and the bundled demo |
+| `GET` | `/api/themes/:id/image` | Read a managed saved-theme image for authenticated preview |
 | `POST` | `/api/install` | Install to the stable path without launching Codex |
 | `POST` | `/api/themes` | Upload, prepare, save, and optionally apply a theme |
 | `POST` | `/api/themes/:id/apply` | Apply a saved theme |
@@ -198,6 +199,7 @@ All API responses use JSON. Mutation endpoints return `202 Accepted` with a job 
 | `POST` | `/api/session/reapply` | Reapply the active theme |
 | `POST` | `/api/session/pause` | Remove the live skin while leaving Codex running |
 | `POST` | `/api/verify` | Run live verification and optionally create a screenshot |
+| `GET` | `/api/verification/screenshot` | Read the latest managed verification screenshot |
 | `POST` | `/api/restore` | Restore the official appearance after confirmation |
 | `GET` | `/api/jobs/:id` | Read bounded job state, progress, and errors |
 
