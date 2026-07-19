@@ -6,6 +6,10 @@
 *.sh text eol=lf
 *.command text eol=lf
 
+# Release-reviewed preset metadata is hashed byte-for-byte.
+macos/presets/preset-gothic-void-crusade/theme.json text eol=lf
+windows/presets/preset-gothic-void-crusade/theme.json text eol=lf
+
 # Keep artwork out of text normalization and text diffs.
 *.png binary
 *.jpg binary
