@@ -249,7 +249,8 @@ UNTRUSTED_VERSION="1.1.2 \$(touch \"$STATE_EVAL_MARKER\") ; echo pwned"
 UNTRUSTED_TEAM_ID="TEAM'ID"
 /bin/mkdir -p "$RUNTIME_STATE_ROOT" "$UNTRUSTED_BUNDLE/Contents/MacOS"
 /usr/bin/printf '#!/bin/bash\n/usr/bin/touch "${UNTRUSTED_NODE_MARKER:?}"\nexit 97\n' > "$UNTRUSTED_EXE"
-/bin/chmod +x "$UNTRUSTED_EXE""$NODE" -e '
+/bin/chmod +x "$UNTRUSTED_EXE"
+"$NODE" -e '
   const fs = require("node:fs");
   const [file, codexBundle, codexExe, codexVersion, codexTeamId] = process.argv.slice(1);
   fs.writeFileSync(file, `${JSON.stringify({ codexBundle, codexExe, codexVersion, codexTeamId })}\n`);
