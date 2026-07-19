@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Codex Dream Skin 本地主题控制台</title>
+  <link rel="stylesheet" href="/studio.css">
+</head>
+<body>
+  <main id="studio" aria-busy="true">
+    <header class="studio-header">
+      <div>
+        <p class="eyebrow">CODEX DREAM SKIN</p>
+        <h1>本地主题控制台</h1>
+        <p class="lede">选一张喜欢的图片，在浏览器里完成安装、换肤、验证与恢复。</p>
+      </div>
+      <output id="connection-status" class="status-pill" role="status">正在连接…</output>
+    </header>
+
+    <section id="install-panel" class="panel install-panel" hidden aria-labelledby="install-title">
+      <div>
+        <p class="section-kicker">首次使用</p>
+        <h2 id="install-title">安装 Dream Skin</h2>
+        <p id="install-summary">安装到你的用户目录，不修改官方 Codex 应用、app.asar 或代码签名。</p>
+      </div>
+      <button id="install-button" class="primary-button" type="button">一键安装</button>
+    </section>
+
+    <section id="dashboard" hidden>
+      <section class="status-grid" aria-label="运行状态">
+        <article class="status-card"><span>Codex</span><strong id="codex-status">—</strong></article>
+        <article class="status-card"><span>皮肤会话</span><strong id="skin-status">—</strong></article>
+        <article class="status-card"><span>调试连接</span><strong id="cdp-status">—</strong></article>
+        <article class="status-card"><span>当前主题</span><strong id="current-theme">—</strong></article>
+      </section>
+
+      <section class="workspace-grid">
+        <form id="theme-form" class="panel editor-panel">
+          <div class="panel-heading">
+            <div><p class="section-kicker">新主题</p><h2>选择图片并预览</h2></div>
+            <span class="hint">推荐宽度 ≥ 2000 px</span>
+          </div>
+
+          <label id="drop-zone" class="drop-zone" for="theme-image">
+            <span class="drop-icon" aria-hidden="true">＋</span>
+            <strong>拖入或选择一张横向图片</strong>
+            <span>PNG · JPEG · HEIC · TIFF · WebP，最大 50 MB</span>
+          </label>
+          <input id="theme-image" class="visually-hidden" name="image" type="file"
+            accept="image/png,image/jpeg,image/webp,image/heic,image/heif,image/tiff,.heic,.heif,.tif,.tiff" required>
+
+          <div id="preview-grid" class="preview-grid" hidden>
+            <figure class="preview-card preview-home">
+              <img id="image-preview" alt="首页横幅裁切预览">
+              <figcaption>首页横幅 · 主体偏右</figcaption>
+            </figure>
+            <figure class="preview-card preview-task">
+              <img id="task-preview" alt="任务页背景裁切预览">
+              <span class="preview-glass" aria-hidden="true"></span>
+              <figcaption>任务背景 · 磨砂内容层</figcaption>
+            </figure>
+          </div>
+
+          <label class="field-label" for="theme-name">主题名称</label>
+          <input id="theme-name" name="name" maxlength="80" value="我的 Codex Dream Skin" required>
+
+          <details id="advanced-settings">
+            <summary>高级设置：文案与配色</summary>
+            <div class="advanced-grid">
+              <label>首页标语
+                <input id="theme-tagline" name="tagline" maxlength="160" value="把喜欢的画面变成可交互的 Codex 工作台。">
+              </label>
+              <label>装饰引语
+                <input id="theme-quote" name="quote" maxlength="80" value="MAKE SOMETHING WONDERFUL">
+              </label>
+              <label class="color-field">主色
+                <input id="theme-accent" name="accent" type="color" value="#7cff46">
+              </label>
+              <label class="color-field">辅色
+                <input id="theme-secondary" name="secondary" type="color" value="#36d7e8">
+              </label>
+              <label class="color-field">高光
+                <input id="theme-highlight" name="highlight" type="color" value="#642a8c">
+              </label>
+            </div>
+          </details>
+
+          <button id="apply-theme" class="primary-button full-button" type="submit">保存并应用到 Codex</button>
+        </form>
+
+        <aside class="side-column">
+          <section id="saved-themes" class="panel" aria-live="polite">
+            <div class="panel-heading"><div><p class="section-kicker">主题库</p><h2>已保存主题</h2></div></div>
+            <ul id="theme-list" class="theme-list"></ul>
+          </section>
+
+          <section id="maintenance-actions" class="panel">
+            <div class="panel-heading"><div><p class="section-kicker">控制</p><h2>当前会话</h2></div></div>
+            <div class="button-grid">
+              <button id="reapply-button" type="button">重新应用</button>
+              <button id="pause-button" type="button">暂停皮肤</button>
+              <button id="verify-button" type="button">验证并截图</button>
+              <button id="demo-button" type="button">恢复演示主题</button>
+              <button id="restore-button" class="danger-button" type="button">恢复官方界面</button>
+            </div>
+          </section>
+
+          <details id="diagnostics-panel" class="panel diagnostics-panel">
+            <summary>诊断信息</summary>
+            <pre id="diagnostic-log">暂无日志</pre>
+            <button id="copy-log" type="button">复制诊断信息</button>
+          </details>
+        </aside>
+      </section>
+    </section>
+
+    <section id="job-panel" class="job-panel" hidden aria-live="polite">
+      <div><h2 id="job-title">正在处理</h2><p id="job-message"></p></div>
+      <progress id="job-progress"></progress>
+      <pre id="job-log"></pre>
+    </section>
+
+    <dialog id="confirm-dialog">
+      <form method="dialog">
+        <p class="section-kicker">需要确认</p>
+        <h2 id="confirm-title">继续操作？</h2>
+        <p id="confirm-message"></p>
+        <div class="dialog-actions">
+          <button value="cancel">取消</button>
+          <button id="confirm-action" class="primary-button" value="confirm">确认</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="screenshot-dialog">
+      <form method="dialog">
+        <div class="panel-heading"><h2>Codex 验证截图</h2><button value="close">关闭</button></div>
+        <img id="screenshot-image" alt="Codex Dream Skin 验证截图">
+      </form>
+    </dialog>
+  </main>
+  <script type="module" src="/studio.js"></script>
+</body>
+</html>
