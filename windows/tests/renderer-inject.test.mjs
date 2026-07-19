@@ -8,9 +8,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const windowsRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(windowsRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(windowsRoot, "assets", "dream-skin.css"), "utf8");
-const buildPayload = (config = {}) => template
+const buildPayload = (config = {}, subjectDataUrl = null) => template
   .replace("__DREAM_CSS_JSON__", () => JSON.stringify(".fixture { color: blue; }"))
   .replace("__DREAM_ART_JSON__", () => JSON.stringify("data:image/png;base64,AA=="))
+  .replace("__DREAM_SUBJECT_JSON__", () => JSON.stringify(subjectDataUrl))
   .replace("__DREAM_THEME_JSON__", () => JSON.stringify(config))
   .replace("__DREAM_SELECTORS_JSON__", () => JSON.stringify({
     shell: ["main.main-surface", "main"],
@@ -32,6 +33,7 @@ function createFixture({
   shellPresent,
   modernMainPresent = false,
   entryPage = false,
+  entryHref = null,
   staleSkin = false,
   homePresent = false,
   utilityPresent = false,
@@ -40,6 +42,7 @@ function createFixture({
   osAppearance = "light",
   analysisFixture = null,
   resolvedColors = {},
+  motionFixture = null,
 }) {
   const nodes = new Map();
   const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
@@ -49,6 +52,11 @@ function createFixture({
   let objectUrlCount = 0;
   let hasShell = shellPresent;
   let root;
+  const motionFrames = [];
+  if (motionFixture) {
+    motionFixture.draws = [];
+    motionFixture.rotations = [];
+  }
 
   const queueRootClassMutation = () => {
     for (const observer of observers) {
@@ -127,6 +135,57 @@ function createFixture({
   const staleShell = { classList: makeClassList(new Set(["dream-home-shell"])) };
 
   const createElement = (tagName) => {
+    if (tagName === "canvas" && motionFixture) {
+      let rotation = 0;
+      const rotationStack = [];
+      const canvas = {
+        id: "",
+        width: 0,
+        height: 0,
+        style: {},
+        parentElement: null,
+        setAttribute() {},
+        remove() { nodes.delete(this.id); },
+      };
+      const context = {
+        setTransform() { rotation = 0; },
+        clearRect() {},
+        fillRect() {},
+        beginPath() {},
+        closePath() {},
+        moveTo() {},
+        lineTo() {},
+        bezierCurveTo() {},
+        arc() {},
+        clip() {},
+        stroke() {},
+        fill() {},
+        translate() {},
+        scale() {},
+        save() { rotationStack.push(rotation); },
+        restore() { rotation = rotationStack.pop() ?? 0; },
+        rotate(value) {
+          rotation += value;
+          motionFixture.rotations.push(value);
+        },
+        drawImage(...args) {
+          motionFixture.draws.push({ args, rotation });
+        },
+        createLinearGradient() { return { addColorStop() {} }; },
+        getImageData() {
+          const pixels = new Uint8ClampedArray(Math.max(1, canvas.width * canvas.height) * 4);
+          for (let offset = 0; offset < pixels.length; offset += 4) {
+            pixels[offset] = 174;
+            pixels[offset + 1] = 211;
+            pixels[offset + 2] = 226;
+            pixels[offset + 3] = 255;
+          }
+          return { data: pixels };
+        },
+      };
+      canvas.getContext = () => context;
+      return canvas;
+    }
     if (tagName === "canvas" && Object.keys(resolvedColors).length) {
       const colors = new Map([
         ["#010203", [1, 2, 3, 255]],
@@ -163,6 +222,7 @@ function createFixture({
         },
       };
     }
+    const children = [];
     return {
       id: "",
       dataset: {},
@@ -171,8 +231,20 @@ function createFixture({
       parentElement: null,
       textContent: "",
       innerHTML: "",
+      children,
       setAttribute() {},
-      remove() { nodes.delete(this.id); },
+      appendChild(node) {
+        node.parentElement = this;
+        children.push(node);
+        if (node.id) nodes.set(node.id, node);
+      },
+      remove() {
+        nodes.delete(this.id);
+        if (this.parentElement?.children) {
+          const index = this.parentElement.children.indexOf(this);
+          if (index >= 0) this.parentElement.children.splice(index, 1);
+        }
+      },
     };
   };
   if (staleSkin) {
@@ -188,8 +260,11 @@ function createFixture({
     documentElement: root,
     head: root,
     body,
-    title: entryPage ? "Codex" : "Auxiliary",
+    title: entryPage || entryHref !== null ? "Codex" : "Auxiliary",
+    hidden: false,
     createElement,
+    addEventListener() {},
+    removeEventListener() {},
     getElementById(id) { return nodes.get(id) ?? null; },
     querySelector(selector) {
       if (selector === "main.main-surface") return hasShell ? shellMain : null;
@@ -219,12 +294,21 @@ function createFixture({
   };
   const context = {
     window: {
+      innerWidth: motionFixture ? 1920 : undefined,
+      innerHeight: motionFixture ? 1080 : undefined,
+      devicePixelRatio: 1,
+      addEventListener() {},
+      removeEventListener() {},
+      requestAnimationFrame: motionFixture
+        ? (callback) => { motionFrames.push(callback); return motionFrames.length; }
+        : undefined,
+      cancelAnimationFrame() {},
       matchMedia() { return { matches: osAppearance === "dark" }; },
     },
     document,
     location: {
       protocol: "app:",
-      href: entryPage ? "app://-/index.html" : "app://-/auxiliary.html",
+      href: entryHref ?? (entryPage ? "app://-/index.html" : "app://-/auxiliary.html"),
     },
     MutationObserver: class {
       constructor(callback) {
@@ -261,11 +345,13 @@ function createFixture({
     clearTimeout: () => {},
     getComputedStyle() { return { colorScheme: computedColorScheme }; },
   };
-  if (analysisFixture) {
+  if (analysisFixture || motionFixture) {
     context.Image = class {
-      naturalWidth = analysisFixture.naturalWidth;
-      naturalHeight = analysisFixture.naturalHeight;
-      set src(_) { this.onload(); }
+      naturalWidth = analysisFixture?.naturalWidth ?? 1920;
+      naturalHeight = analysisFixture?.naturalHeight ?? 1080;
+      width = this.naturalWidth;
+      height = this.naturalHeight;
+      set src(_) { this.onload?.(); }
     };
   }
 
@@ -279,6 +365,11 @@ function createFixture({
     routeClasses,
     modernMainClasses,
     utilityClasses,
+    flushMotionFrame(timestamp) {
+      const callback = motionFrames.shift();
+      assert.equal(typeof callback, "function", "Expected a queued animation frame.");
+      callback(timestamp);
+    },
     setShellPresent(value) { hasShell = value; },
   };
 }
@@ -332,6 +423,25 @@ const modernMainResult = vm.runInNewContext(payload, modernMain.context);
 assert.equal(modernMainResult.installed, true);
 assert.equal(modernMain.rootClasses.has("codex-dream-skin"), true);
 assert.equal(modernMain.modernMainClasses.has("dream-task"), true);
+
+const routedCompact = createFixture({
+  shellPresent: false,
+  modernMainPresent: true,
+  entryHref: "app://-/index.html?initialRoute=%2Favatar-overlay#compact",
+});
+vm.runInNewContext(payload, routedCompact.context);
+assert.equal(routedCompact.rootClasses.has("codex-dream-skin"), true,
+  "A routed compact Codex window must receive the wallpaper.");
+assert.equal(routedCompact.nodes.has("codex-dream-skin-chrome"), true);
+
+const entryLookalike = createFixture({
+  shellPresent: false,
+  modernMainPresent: true,
+  entryHref: "app://-/index.html/auxiliary?initialRoute=%2Favatar-overlay",
+});
+vm.runInNewContext(payload, entryLookalike.context);
+assert.equal(entryLookalike.rootClasses.has("codex-dream-skin"), false,
+  "A lookalike auxiliary path must remain unskinned.");
 
 const configured = createFixture({
   shellPresent: true,
@@ -447,5 +557,58 @@ const metadataWide = createFixture({ shellPresent: true });
 vm.runInNewContext(buildPayload({ artMetadata: { ratio: 16 / 9 } }), metadataWide.context);
 assert.equal(metadataWide.rootClasses.has("dream-art-wide"), true);
 assert.equal(metadataWide.rootClasses.has("dream-art-standard"), false);
+
+const animated = createFixture({ shellPresent: true });
+const animatedResult = vm.runInNewContext(buildPayload({
+  motion: {
+    enabled: true,
+    preset: "concert",
+    intensity: .72,
+    speed: .52,
+    parallax: .3,
+    particles: true,
+    waveform: true,
+    pauseWhenHidden: true,
+  },
+}, "data:image/png;base64,AA=="), animated.context);
+assert.equal(animatedResult.motion, true);
+assert.equal(animated.rootClasses.has("dream-motion-active"), true);
+assert.equal(animated.rootClasses.has("dream-motion-concert"), true);
+assert.equal(animated.nodes.has("codex-dream-skin-motion"), true);
+assert.equal(Boolean(animated.context.window.__CODEX_DREAM_SKIN_STATE__.motion), true);
+assert.equal(animated.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+assert.deepEqual(animated.revokedUrls, ["blob:fixture-1", "blob:fixture-2"]);
+
+const texturedHairCanvas = {};
+const texturedHair = createFixture({ shellPresent: true, motionFixture: texturedHairCanvas });
+vm.runInNewContext(buildPayload({
+  motion: {
+    enabled: true,
+    preset: "concert",
+    intensity: .72,
+    speed: .52,
+    parallax: .3,
+    particles: false,
+    waveform: false,
+    pauseWhenHidden: true,
+  },
+}, "data:image/png;base64,AA=="), texturedHair.context);
+assert.equal(texturedHair.context.window.__CODEX_DREAM_SKIN_STATE__.motion.hairTextureReady, true);
+assert.equal(texturedHair.context.window.__CODEX_DREAM_SKIN_STATE__.motion.hairTextureCount, 5);
+texturedHairCanvas.draws.length = 0;
+texturedHair.flushMotionFrame(1000);
+const firstHairFrame = texturedHairCanvas.draws
+  .filter(({ args }) => args.length === 9)
+  .map(({ rotation }) => Number(rotation.toFixed(6)));
+assert.equal(firstHairFrame.length, 5, "Every hair lock must draw real subject-image texture.");
+texturedHairCanvas.draws.length = 0;
+texturedHair.flushMotionFrame(1800);
+const secondHairFrame = texturedHairCanvas.draws
+  .filter(({ args }) => args.length === 9)
+  .map(({ rotation }) => Number(rotation.toFixed(6)));
+assert.equal(secondHairFrame.length, 5);
+assert.notDeepEqual(secondHairFrame, firstHairFrame,
+  "Hair texture transforms must change over time instead of remaining a static highlight.");
+assert.equal(texturedHair.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
 
 console.log("PASS: renderer applies adaptive theme metadata and preserves transparent auxiliary windows.");

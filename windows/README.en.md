@@ -65,6 +65,14 @@ The verification script confirms:
 - The decorative skin layer does not intercept pointer events.
 - When the current route is home, the themed home structure has loaded.
 
+When the active theme contains a transparent `motion.subject`, motion mode also
+animates the wallpaper's parallax, particles, and waveform, plus an independent
+subject layer. The built-in singer preset includes five texture-based hair locks:
+the ponytails are re-rendered around their roots with different phases, rather
+than animating only a highlight line. The tray exposes **Motion off**, **Calm
+motion**, and **Concert motion** presets. Hidden windows pause the loop, and
+`prefers-reduced-motion` falls back to a static composition.
+
 Next, use the generated screenshot to check horizontal overflow and text contrast. On both the home and normal task routes, manually check the project menu and composer interaction. See [`references/qa-inventory.md`](./references/qa-inventory.md) for the complete visual checklist.
 
 ## Change and save themes
@@ -73,6 +81,8 @@ Open `Codex Dream Skin - Tray` to:
 
 - Import a PNG, JPEG, or WebP background.
 - Save the active theme and switch through saved themes.
+- Keep an optional transparent `motion.subject` PNG beside the background when
+  a theme needs independent character and hair movement.
 - Pause or resume the skin.
 - Reapply the theme or fully restore Codex.
 

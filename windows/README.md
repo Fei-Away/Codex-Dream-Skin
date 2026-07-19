@@ -65,6 +65,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 - 皮肤装饰层不会拦截鼠标事件。
 - 当前为首页时，首页主题结构已经正确加载。
 
+主题包含透明 `motion.subject` 人物层时，还会启用壁纸视差、粒子、波形和
+人物独立动效。内置演唱会预设把双马尾拆成 5 个真实纹理发束，围绕发根以
+不同相位重新绘制，因此移动的是头发像素本身，不只是高光线。托盘提供「关闭
+动效」「柔和动效」和「演唱会动效」三档；窗口隐藏时会暂停，系统开启
+`prefers-reduced-motion` 时会降级为静态构图。
+
 随后用生成的截图检查横向溢出和文字对比度，再分别在首页与普通任务页手动检查项目菜单和输入框交互。完整视觉检查项见 [`references/qa-inventory.md`](./references/qa-inventory.md)。
 
 ## 更换和保存主题
@@ -73,6 +79,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 - 更换 PNG、JPEG 或 WebP 背景图。
 - 保存当前主题并从「已保存主题」切换。
+- 如需人物独立动效，可在主题目录保留透明 PNG，并在 `theme.json` 的
+  `motion.subject` 中填写相对文件名。
 - 暂停或继续显示皮肤。
 - 重新应用主题，或完整恢复 Codex。
 

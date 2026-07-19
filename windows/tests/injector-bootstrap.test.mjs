@@ -3,11 +3,32 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { earlyPayloadFor } from "../scripts/injector.mjs";
+import { earlyPayloadFor, isCodexEntryUrl } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
+
+for (const href of [
+  "app://-/index.html",
+  "app://-/index.html?initialRoute=%2Favatar-overlay",
+  "app://-/index.html#new-task",
+  "app://-/index.html?initialRoute=%2Favatar-overlay#compact",
+  "app://codex/",
+  "app://codex/task/123?view=compact#latest",
+]) {
+  assert.equal(isCodexEntryUrl(href), true, `Expected a Codex entry URL: ${href}`);
+}
+for (const href of [
+  "app://-/auxiliary.html",
+  "app://-/index.html/auxiliary",
+  "app://codex.example/task",
+  "https://codex/index.html",
+  "",
+  null,
+]) {
+  assert.equal(isCodexEntryUrl(href), false, `Expected a non-entry URL: ${href}`);
+}
 
 function createFixture({ href = "app://-/auxiliary.html", title = "Codex" } = {}) {
   const observers = [];
@@ -61,6 +82,13 @@ vm.runInNewContext(earlyPayloadFor('window.installs.push("current")', "current")
 assert.deepEqual(currentCodex.context.window.installs, ["current"],
   "The current Codex entry page must not wait for retired shell selectors.");
 
+const routedCodex = createFixture({
+  href: "app://-/index.html?initialRoute=%2Favatar-overlay#compact",
+});
+vm.runInNewContext(earlyPayloadFor('window.installs.push("routed")', "routed"), routedCodex.context);
+assert.deepEqual(routedCodex.context.window.installs, ["routed"],
+  "A newly opened Codex route with query and hash must receive the early payload.");
+
 const generations = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);
 vm.runInNewContext(earlyPayloadFor('window.installs.push("new")', "new"), generations.context);
@@ -85,5 +113,7 @@ assert.match(source, /if \(!fallbackTargets\.get\(id\)\) return;/,
   "Fallback listeners must stay inert after a successful early registration.");
 assert.match(source, /Page\.removeScriptToEvaluateOnNewDocument/,
   "Watcher shutdown and theme refresh must unregister persistent Page scripts.");
+assert.match(source, /const currentShell = entry && markers\.main;/,
+  "Compact Codex windows must be accepted without a sidebar or composer.");
 
-console.log("PASS: Windows early injection is shell-guarded, generation-safe, ordered before probing, and fallback-scoped.");
+console.log("PASS: Windows early injection covers routed compact windows and remains generation-safe and fallback-scoped.");

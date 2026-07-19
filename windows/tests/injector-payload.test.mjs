@@ -38,6 +38,17 @@ try {
     image: "fixture.jpg",
     appearance: "auto",
     art: { focusX: null, focusY: null, safeArea: "auto", taskMode: "auto" },
+    motion: {
+      enabled: true,
+      preset: "concert",
+      intensity: .72,
+      speed: .52,
+      parallax: .3,
+      particles: true,
+      waveform: true,
+      pauseWhenHidden: true,
+      subject: "fixture.jpg",
+    },
     palette: {},
   }, null, 2)}\n`, "utf8");
 
@@ -47,6 +58,19 @@ try {
   const report = JSON.parse(result.stdout.trim());
   assert.equal(report.pass, true);
   assert.equal(report.themeId, "payload-dollar-test");
+  assert.equal(report.motion.enabled, true);
+  assert.equal(report.motion.preset, "concert");
+  assert.equal(report.motion.subject, "fixture.jpg");
+
+  await fs.writeFile(path.join(fixtureRoot, "theme.json"), `${JSON.stringify({
+    id: "invalid-motion-test",
+    name: "Invalid motion",
+    image: "fixture.jpg",
+    motion: { enabled: true, intensity: 1.5 },
+  }, null, 2)}\n`, "utf8");
+  const invalidMotion = await runPayloadCheck();
+  assert.notEqual(invalidMotion.code, 0, "Motion intensity outside 0..1 must be rejected.");
+  assert.match(`${invalidMotion.stdout}\n${invalidMotion.stderr}`, /motion\.intensity must be/);
 
   await fs.writeFile(path.join(fixtureRoot, "theme.json"), `${JSON.stringify({
     schemaVersion: 2,

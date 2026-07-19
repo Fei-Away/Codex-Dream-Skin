@@ -15,5 +15,16 @@
     "focusY": 0.45,
     "safeArea": "left",
     "taskMode": "ambient"
+  },
+  "motion": {
+    "enabled": true,
+    "preset": "calm",
+    "intensity": 0.42,
+    "speed": 0.34,
+    "parallax": 0.18,
+    "particles": true,
+    "waveform": true,
+    "pauseWhenHidden": true,
+    "subject": null
   }
 }

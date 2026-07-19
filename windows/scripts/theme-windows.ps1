@@ -171,10 +171,23 @@ function Read-DreamSkinTheme {
     throw 'Theme image must remain inside its theme directory and exist.'
   }
   Assert-DreamSkinImageFile -Path $imagePath -SkipImageMetadata:$SkipImageMetadata
+  $subjectPath = $null
+  if ($theme.PSObject.Properties.Name -contains 'motion' -and $null -ne $theme.motion -and
+    $theme.motion.PSObject.Properties.Name -contains 'subject' -and $theme.motion.subject) {
+    $subject = "$($theme.motion.subject)"
+    if ([System.IO.Path]::IsPathRooted($subject)) { throw 'Motion subject path must be relative.' }
+    $subjectPath = [System.IO.Path]::GetFullPath((Join-Path $directory $subject))
+    if (-not (Test-DreamSkinThemePathWithin -Path $subjectPath -Root $directory) -or
+      -not (Test-Path -LiteralPath $subjectPath -PathType Leaf)) {
+      throw 'Motion subject must remain inside its theme directory and exist.'
+    }
+    Assert-DreamSkinImageFile -Path $subjectPath -SkipImageMetadata:$SkipImageMetadata
+  }
   return [pscustomobject]@{
     Directory = $directory
     ThemePath = $themePath
     ImagePath = $imagePath
+    SubjectPath = $subjectPath
     Theme = $theme
   }
 }
@@ -268,6 +281,7 @@ function Set-DreamSkinActiveTheme {
     [Parameter(Mandatory = $true)][string]$ImagePath,
     [AllowNull()][object]$Theme,
     [string]$Name,
+    [AllowNull()][string]$SubjectPath,
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
   )
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
@@ -276,21 +290,47 @@ function Set-DreamSkinActiveTheme {
   Ensure-DreamSkinManagedDirectory -Path $paths.Images -Root $paths.Root
   $source = [System.IO.Path]::GetFullPath($ImagePath)
   Assert-DreamSkinImageFile -Path $source
+  if (-not $SubjectPath -and $Theme -and $Theme.motion -and $Theme.motion.subject) {
+    $inferredSubject = Join-Path (Split-Path -Parent $source) "$($Theme.motion.subject)"
+    if (Test-Path -LiteralPath $inferredSubject -PathType Leaf) { $SubjectPath = $inferredSubject }
+  }
+  if ($SubjectPath) {
+    $SubjectPath = [System.IO.Path]::GetFullPath($SubjectPath)
+    Assert-DreamSkinImageFile -Path $SubjectPath
+  }
   $extension = [System.IO.Path]::GetExtension($source).ToLowerInvariant()
   $oldImage = $null
-  try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
+  $oldSubject = $null
+  try {
+    $oldActive = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+    $oldImage = $oldActive.ImagePath
+    $oldSubject = $oldActive.SubjectPath
+  } catch {}
   if ($null -eq $Theme) {
     $Theme = [pscustomobject]@{
       id = 'custom'
       name = '自定义主题'
       appearance = 'auto'
       art = [pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }
+      motion = [pscustomobject]@{
+        enabled = $true; preset = 'calm'; intensity = 0.42; speed = 0.34; parallax = 0.18
+        particles = $true; waveform = $true; pauseWhenHidden = $true; subject = $null
+      }
       palette = [pscustomobject]@{}
     }
   }
   $imageName = New-DreamSkinThemeImageName -Extension $extension
   $target = Join-Path $paths.Active $imageName
   $temporary = Join-Path $paths.Active ('.dream-tmp-' + [guid]::NewGuid().ToString('N') + $extension)
+  $subjectName = $null
+  $subjectTarget = $null
+  $subjectTemporary = $null
+  if ($SubjectPath) {
+    $subjectExtension = [System.IO.Path]::GetExtension($SubjectPath).ToLowerInvariant()
+    $subjectName = 'subject-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + $subjectExtension
+    $subjectTarget = Join-Path $paths.Active $subjectName
+    $subjectTemporary = Join-Path $paths.Active ('.dream-tmp-' + [guid]::NewGuid().ToString('N') + $subjectExtension)
+  }
   try {
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinNoReparseComponents -Path $temporary
@@ -300,6 +340,16 @@ function Set-DreamSkinActiveTheme {
     Move-Item -LiteralPath $temporary -Destination $target -Force
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinImageFile -Path $target
+    if ($SubjectPath) {
+      Assert-DreamSkinNoReparseComponents -Path $subjectTarget
+      Assert-DreamSkinNoReparseComponents -Path $subjectTemporary
+      Copy-Item -LiteralPath $SubjectPath -Destination $subjectTemporary -Force
+      Assert-DreamSkinNoReparseComponents -Path $subjectTemporary
+      Assert-DreamSkinImageFile -Path $subjectTemporary
+      Move-Item -LiteralPath $subjectTemporary -Destination $subjectTarget -Force
+      Assert-DreamSkinNoReparseComponents -Path $subjectTarget
+      Assert-DreamSkinImageFile -Path $subjectTarget
+    }
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
     if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
@@ -308,23 +358,44 @@ function Set-DreamSkinActiveTheme {
       $Theme | Add-Member -NotePropertyName art -NotePropertyValue `
         ([pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }) -Force
     }
+    if (-not $Theme.motion) {
+      $Theme | Add-Member -NotePropertyName motion -NotePropertyValue ([pscustomobject]@{
+        enabled = $true; preset = 'calm'; intensity = 0.42; speed = 0.34; parallax = 0.18
+        particles = $true; waveform = $true; pauseWhenHidden = $true; subject = $null
+      }) -Force
+    }
+    $Theme.motion | Add-Member -NotePropertyName subject -NotePropertyValue $subjectName -Force
     if (-not $Theme.palette) {
       $Theme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
     }
     Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $Theme
   } finally {
     Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+    if ($subjectTemporary) { Remove-Item -LiteralPath $subjectTemporary -Force -ErrorAction SilentlyContinue }
   }
   $sameImage = $oldImage -and ([System.IO.Path]::GetFullPath($oldImage) -ieq [System.IO.Path]::GetFullPath($target))
   if ($oldImage -and -not $sameImage -and
     (Test-DreamSkinThemePathWithin -Path $oldImage -Root $paths.Active)) {
     Remove-Item -LiteralPath $oldImage -Force -ErrorAction SilentlyContinue
   }
+  $sameSubject = $oldSubject -and $subjectTarget -and
+    ([System.IO.Path]::GetFullPath($oldSubject) -ieq [System.IO.Path]::GetFullPath($subjectTarget))
+  if ($oldSubject -and -not $sameSubject -and
+    (Test-DreamSkinThemePathWithin -Path $oldSubject -Root $paths.Active)) {
+    Remove-Item -LiteralPath $oldSubject -Force -ErrorAction SilentlyContinue
+  }
   $imageArchive = Join-Path $paths.Images $imageName
   Assert-DreamSkinNoReparseComponents -Path $imageArchive
   Copy-Item -LiteralPath $target -Destination $imageArchive -Force
   Assert-DreamSkinNoReparseComponents -Path $imageArchive
   Assert-DreamSkinImageFile -Path $imageArchive
+  if ($subjectTarget) {
+    $subjectArchive = Join-Path $paths.Images $subjectName
+    Assert-DreamSkinNoReparseComponents -Path $subjectArchive
+    Copy-Item -LiteralPath $subjectTarget -Destination $subjectArchive -Force
+    Assert-DreamSkinNoReparseComponents -Path $subjectArchive
+    Assert-DreamSkinImageFile -Path $subjectArchive
+  }
   return Read-DreamSkinTheme -ThemeDirectory $paths.Active
 }
 
@@ -355,6 +426,19 @@ function Save-DreamSkinCurrentTheme {
   $theme.id = $id
   $theme.name = $trimmed
   $theme.image = $imageName
+  if ($active.SubjectPath) {
+    $subjectExtension = [System.IO.Path]::GetExtension($active.SubjectPath).ToLowerInvariant()
+    $subjectName = 'subject' + $subjectExtension
+    $destinationSubject = Join-Path $destination $subjectName
+    Assert-DreamSkinNoReparseComponents -Path $destinationSubject
+    Copy-Item -LiteralPath $active.SubjectPath -Destination $destinationSubject -Force
+    Assert-DreamSkinNoReparseComponents -Path $destinationSubject
+    Assert-DreamSkinImageFile -Path $destinationSubject
+    if (-not $theme.motion) { $theme | Add-Member -NotePropertyName motion -NotePropertyValue ([pscustomobject]@{}) -Force }
+    $theme.motion | Add-Member -NotePropertyName subject -NotePropertyValue $subjectName -Force
+  } elseif ($theme.motion) {
+    $theme.motion | Add-Member -NotePropertyName subject -NotePropertyValue $null -Force
+  }
   Write-DreamSkinTheme -ThemeDirectory $destination -Theme $theme
   return Read-DreamSkinTheme -ThemeDirectory $destination
 }
@@ -396,7 +480,37 @@ function Use-DreamSkinSavedTheme {
   }
   $saved = Read-DreamSkinTheme -ThemeDirectory $directory
   $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme -StateRoot $StateRoot
+  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -SubjectPath $saved.SubjectPath `
+    -Theme $theme -StateRoot $StateRoot
+}
+
+function Set-DreamSkinMotionPreset {
+  param(
+    [Parameter(Mandatory = $true)][ValidateSet('off', 'calm', 'concert')][string]$Preset,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata
+  $theme = $active.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  if (-not $theme.motion) { $theme | Add-Member -NotePropertyName motion -NotePropertyValue ([pscustomobject]@{}) -Force }
+  $values = switch ($Preset) {
+    'off' { [pscustomobject]@{ enabled = $false; preset = 'calm'; intensity = 0; speed = 0; parallax = 0; particles = $false; waveform = $false; pauseWhenHidden = $true; subject = $theme.motion.subject } }
+    'calm' { [pscustomobject]@{ enabled = $true; preset = 'calm'; intensity = 0.42; speed = 0.34; parallax = 0.18; particles = $true; waveform = $true; pauseWhenHidden = $true; subject = $theme.motion.subject } }
+    'concert' { [pscustomobject]@{ enabled = $true; preset = 'concert'; intensity = 0.72; speed = 0.52; parallax = 0.3; particles = $true; waveform = $true; pauseWhenHidden = $true; subject = $theme.motion.subject } }
+  }
+  $theme | Add-Member -NotePropertyName motion -NotePropertyValue $values -Force
+  Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $theme
+  return Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata
+}
+
+function Get-DreamSkinMotionPreset {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  try {
+    $active = Read-DreamSkinTheme -ThemeDirectory (Get-DreamSkinThemePaths -StateRoot $StateRoot).Active -SkipImageMetadata
+    if (-not $active.Theme.motion -or $active.Theme.motion.enabled -ne $true) { return 'off' }
+    if ($active.Theme.motion.preset -in @('calm', 'concert')) { return "$($active.Theme.motion.preset)" }
+  } catch {}
+  return 'off'
 }
 
 function Set-DreamSkinPaused {

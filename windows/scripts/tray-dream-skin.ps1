@@ -150,6 +150,23 @@ try {
       }
     }
 
+    $motionMenu = [System.Windows.Forms.ToolStripMenuItem]::new('动态壁纸')
+    $currentMotionPreset = Get-DreamSkinMotionPreset -StateRoot $StateRoot
+    foreach ($motionOption in @(
+      [pscustomobject]@{ Key = 'off'; Label = '关闭动效' },
+      [pscustomobject]@{ Key = 'calm'; Label = '柔和动效' },
+      [pscustomobject]@{ Key = 'concert'; Label = '演唱会动效' }
+    )) {
+      $motionKey = $motionOption.Key
+      $motionItem = Add-DreamSkinTrayItem -Items $motionMenu.DropDownItems -Text $motionOption.Label -Action {
+        $null = Set-DreamSkinMotionPreset -Preset $motionKey -StateRoot $StateRoot
+        $message = if ($motionKey -eq 'off') { '已关闭动态壁纸。' } else { "已切换为$($motionOption.Label)。" }
+        $notify.ShowBalloonTip(1800, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
+      }.GetNewClosure()
+      $motionItem.Checked = $motionKey -eq $currentMotionPreset
+    }
+    [void]$menu.Items.Add($motionMenu)
+
     $savedMenu = [System.Windows.Forms.ToolStripMenuItem]::new('已保存主题')
     $savedThemes = @(Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata)
     if ($savedThemes.Count -eq 0) {

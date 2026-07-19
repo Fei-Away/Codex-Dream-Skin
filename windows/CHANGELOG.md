@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+### 新增
+
+- 动态壁纸从单纯背景视差扩展为人物层、粒子、波形和发丝纹理动效；透明 `motion.subject` 可承载独立人物层，内置双马尾预设以 5 个真实纹理裁片围绕发根分相位摆动，不再只绘制高光线。
+- 增加 `calm` / `concert` 动效预设、隐藏窗口暂停和 `prefers-reduced-motion` 静态降级；发丝纹理使用低分辨率离屏缓存并按约 120ms 更新，降低 Chromium 合成负载。
+
 ### 修复
 
+- 新打开的紧凑 Codex 页面即使使用 `app://-/index.html?initialRoute=...` 或带 hash 的入口 URL，也会被 watcher 识别并应用主题；不再因缺少侧栏或输入框而漏掉背景。
 - 主题 payload 使用字面替换并增加 JavaScript 语法校验，主题名称中的 `$&`、`$'`、``$` `` 与 `$$` 不再破坏注入脚本。
 - 自定义强调色通过浏览器 Canvas 解析为最终颜色，并按 WCAG 对比度选择黑色或白色按钮前景。
 - 图片元数据检查统一经过 PowerShell 5.1 原生命令包装器；全部 Windows PowerShell 脚本统一使用 UTF-8 BOM，空托盘菜单集合可正常重建。

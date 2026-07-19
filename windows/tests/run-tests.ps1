@@ -698,6 +698,8 @@ try {
     $initialTheme.Theme.appearance -cne 'auto' -or
     $initialTheme.Theme.art.safeArea -cne 'left' -or
     $initialTheme.Theme.art.taskMode -cne 'ambient' -or
+    $initialTheme.Theme.motion.enabled -ne $true -or
+    $initialTheme.Theme.motion.preset -cne 'calm' -or
     [System.IO.Path]::GetExtension($initialTheme.ImagePath) -cne '.jpg') {
     throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
   }
@@ -718,12 +720,15 @@ try {
     throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -SubjectPath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
   if ($updatedTheme.Theme.schemaVersion -ne 1 -or
     $updatedTheme.Theme.name -cne '测试主题' -or
     $updatedTheme.Theme.id -cne 'custom' -or
     $updatedTheme.Theme.art.safeArea -cne 'auto' -or
     $updatedTheme.Theme.art.taskMode -cne 'auto' -or
+    $updatedTheme.Theme.motion.enabled -ne $true -or
+    -not $updatedTheme.SubjectPath -or
     -not (Test-DreamSkinThemePathWithin -Path $updatedTheme.ImagePath -Root $themePaths.Active)) {
     throw 'Imported image did not reset to the generic adaptive contract inside the managed directory.'
   }
@@ -734,10 +739,15 @@ try {
     throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled preset.'
   }
   $savedTheme = Save-DreamSkinCurrentTheme -Name '已保存主题' -StateRoot $themeStateRoot
-  if ($savedTheme.Theme.name -cne '已保存主题' -or @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 2) {
+  if ($savedTheme.Theme.name -cne '已保存主题' -or -not $savedTheme.SubjectPath -or
+    @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 2) {
     throw 'Saved theme creation or discovery failed.'
   }
   $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot
+  $afterUse = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
+  if (-not $afterUse.SubjectPath -or -not (Test-Path -LiteralPath $afterUse.SubjectPath -PathType Leaf)) {
+    throw 'Saved theme subject layer was not copied into the active theme.'
+  }
 
   $outsideTheme = Join-Path $temporaryRoot 'outside-theme'
   New-Item -ItemType Directory -Path $outsideTheme | Out-Null
@@ -818,12 +828,16 @@ try {
     'background-position: var(--dream-art-position)',
     '.dream-home-utility',
     ':has(.dream-home-utility) .composer-surface-chrome',
-    ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))'
+    ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))',
+    '.dream-motion-subject',
+    '.dream-motion-glow',
+    'dream-motion-reduced',
+    'background-image: none !important'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '动态壁纸', '演唱会动效', '已保存主题', '完全恢复 Codex')) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
@@ -874,7 +888,9 @@ try {
   }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
-  foreach ($requiredRendererBehavior in @('dream-home-utility', 'artMetadata', 'detectShellAppearance')) {
+  foreach ($requiredRendererBehavior in @('dream-home-utility', 'artMetadata', 'detectShellAppearance',
+    'requestAnimationFrame', 'drawHairTexture', 'drawHairHighlights', 'subjectImageReady',
+    'pauseWhenHidden', '__DREAM_SUBJECT_JSON__')) {
     if (-not $rendererSource.Contains($requiredRendererBehavior)) {
       throw "Renderer adaptive behavior is missing: $requiredRendererBehavior"
     }

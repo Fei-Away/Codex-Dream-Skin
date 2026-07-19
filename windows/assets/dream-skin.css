@@ -26,6 +26,8 @@
   --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 86%, transparent);
   --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 78%, transparent);
   --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 66%, transparent);
+  --dream-motion-opacity: .78;
+  --dream-motion-subject-opacity: .94;
 }
 
 :root.codex-dream-skin.dream-theme-dark {
@@ -53,9 +55,13 @@
   --dream-task-immersive-edge: color-mix(in oklab, var(--dream-surface) 82%, transparent);
   --dream-task-immersive-mid: color-mix(in oklab, var(--dream-surface) 74%, transparent);
   --dream-task-immersive-far: color-mix(in oklab, var(--dream-surface) 60%, transparent);
+  --dream-motion-opacity: .88;
+  --dream-motion-subject-opacity: .98;
 }
 
 html.codex-dream-skin body {
+  position: relative !important;
+  isolation: isolate;
   background: var(--dream-canvas) !important;
   color: var(--dream-text) !important;
   font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif !important;
@@ -131,6 +137,110 @@ html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"]
 #codex-dream-skin-chrome {
   display: none !important;
   pointer-events: none !important;
+}
+
+/* The animated wallpaper is a negative stacking-level background inside the
+   body stacking context. Native Codex controls therefore paint above it. */
+html.codex-dream-skin.dream-motion-active #codex-dream-skin-chrome {
+  display: block !important;
+  position: fixed !important;
+  z-index: -1 !important;
+  inset: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  contain: strict;
+  isolation: isolate;
+}
+
+html.codex-dream-skin.dream-motion-active #codex-dream-skin-chrome > * {
+  position: absolute;
+  pointer-events: none;
+}
+
+html.codex-dream-skin.dream-motion-active .dream-motion-art {
+  z-index: 0;
+  inset: -4vmax;
+  background: var(--dream-art) no-repeat var(--dream-art-position) / cover;
+  opacity: var(--dream-motion-opacity);
+  filter: none;
+  transform-origin: 74% 48%;
+  will-change: transform;
+}
+
+html.codex-dream-skin.dream-motion-active .dream-motion-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 24% 38% at 76% 28%, rgba(177, 245, 255, .18), transparent 72%),
+    radial-gradient(ellipse 28% 42% at 88% 61%, rgba(211, 156, 255, .12), transparent 74%),
+    radial-gradient(ellipse 48% 30% at 42% 79%, rgba(255, 178, 223, .06), transparent 74%);
+  mix-blend-mode: normal;
+}
+
+html.codex-dream-skin.dream-motion-active .dream-motion-glow {
+  z-index: 1;
+  inset: -10%;
+  background:
+    radial-gradient(ellipse 24% 38% at 76% 28%, rgba(177, 245, 255, .22), transparent 72%),
+    radial-gradient(ellipse 28% 42% at 88% 61%, rgba(211, 156, 255, .16), transparent 74%),
+    radial-gradient(ellipse 48% 30% at 42% 79%, rgba(255, 178, 223, .08), transparent 74%);
+  mix-blend-mode: normal;
+  opacity: .68;
+  filter: none;
+  will-change: transform, opacity;
+}
+
+html.codex-dream-skin.dream-motion-active .dream-motion-subject {
+  z-index: 2;
+  inset: -4vmax;
+  background: var(--dream-subject) no-repeat var(--dream-art-position) / cover;
+  opacity: var(--dream-motion-subject-opacity);
+  transform-origin: 73% 52%;
+  filter: none;
+  will-change: transform;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+html.codex-dream-skin.dream-motion-active .dream-motion-subject-fallback {
+  opacity: .14;
+  mix-blend-mode: normal;
+  filter: blur(1.2px) saturate(1.18);
+  -webkit-mask-image: radial-gradient(ellipse 52% 70% at 76% 48%, #000 0 46%, rgba(0, 0, 0, .5) 69%, transparent 100%);
+  mask-image: radial-gradient(ellipse 52% 70% at 76% 48%, #000 0 46%, rgba(0, 0, 0, .5) 69%, transparent 100%);
+}
+
+html.codex-dream-skin.dream-motion-active #codex-dream-skin-motion {
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: .96;
+  mix-blend-mode: normal;
+  backface-visibility: hidden;
+}
+
+html.codex-dream-skin.dream-motion-calm {
+  --dream-motion-opacity: .72;
+  --dream-motion-subject-opacity: .9;
+}
+
+html.codex-dream-skin.dream-motion-concert {
+  --dream-motion-opacity: .9;
+  --dream-motion-subject-opacity: .98;
+}
+
+html.codex-dream-skin.dream-motion-reduced .dream-motion-art,
+html.codex-dream-skin.dream-motion-reduced .dream-motion-subject,
+html.codex-dream-skin.dream-motion-reduced .dream-motion-glow {
+  transform: none !important;
+  transition: none !important;
+}
+
+html.codex-dream-skin.dream-motion-reduced #codex-dream-skin-motion {
+  display: none !important;
 }
 
 html.codex-dream-skin [role="main"] {
@@ -401,6 +511,15 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
   background-size: cover !important;
   background-repeat: no-repeat !important;
   background-attachment: fixed !important;
+}
+
+/* Motion mode owns the wallpaper plane; avoid painting a second static copy
+   on the body underneath it. Keep the selector specificity above the route
+   background rules so this remains true on both home and task routes. */
+html.codex-dream-skin.dream-motion-active.dream-art-wide:has(main.main-surface.dream-home-shell) body,
+html.codex-dream-skin.dream-motion-active.dream-art-wide:is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell)) body,
+html.codex-dream-skin.dream-motion-active body {
+  background-image: none !important;
 }
 
 html.codex-dream-skin.dream-art-wide:has(main.main-surface.dream-home-shell)
@@ -701,5 +820,16 @@ html.codex-dream-skin :is(
   html.codex-dream-skin *::after {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
+  }
+
+  html.codex-dream-skin #codex-dream-skin-motion {
+    display: none !important;
+  }
+
+  html.codex-dream-skin .dream-motion-art,
+  html.codex-dream-skin .dream-motion-subject,
+  html.codex-dream-skin .dream-motion-glow {
+    transform: none !important;
+    animation: none !important;
   }
 }
