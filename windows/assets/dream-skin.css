@@ -628,9 +628,9 @@ html.codex-dream-skin .dream-home-utility [role="button"] svg {
   color: currentColor !important;
 }
 
-/* Plugins, scheduled tasks and search routes ship opaque sticky wrappers.
-   Clear only full-window or sticky route chrome, leaving functional cards and
-   their hover states intact. */
+/* Plugins, scheduled tasks, search and settings ship opaque native surfaces.
+   Re-skin them with theme tokens so light Codex shells do not paint a pink/white
+   slab over gothic wallpapers, and secondary copy does not stay purple. */
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
   main.main-surface:not(.dream-home-shell) div.sticky:has(input[type="text"]),
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
@@ -639,17 +639,104 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
 }
 
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
-  main.main-surface:not(.dream-home-shell) div.no-drag:has(> input[type="text"]) {
+  main.main-surface:not(.dream-home-shell) div.no-drag:has(> input[type="text"]),
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) input[type="text"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) input[type="search"] {
+  color: var(--dream-text) !important;
+  caret-color: var(--dream-accent) !important;
   background: var(--dream-immersive-composer) !important;
-  border: 0 !important;
+  border-color: var(--dream-line-soft) !important;
   box-shadow: inset 0 0 0 1px var(--dream-immersive-line) !important;
   backdrop-filter: none !important;
 }
 
 html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) input::placeholder,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [class*="placeholder"] {
+  color: var(--dream-text-muted) !important;
+  opacity: 1 !important;
+}
+
+/* Full-route opaque slabs (settings body, utility pages). */
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
   main.main-surface:not(.dream-home-shell)
-  [class~="bg-token-main-surface-primary"][class~="h-full"][class~="w-full"] {
-  background: transparent !important;
+  [class~="bg-token-main-surface-primary"][class~="h-full"][class~="w-full"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class~="bg-token-main-surface-primary"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class~="bg-token-main-surface-secondary"] {
+  color: var(--dream-text) !important;
+  background: color-mix(in oklab, var(--dream-surface) 72%, transparent) !important;
+  border-color: var(--dream-line-soft) !important;
+  box-shadow: none !important;
+}
+
+/* Settings / scheduled cards and list rows. */
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class~="bg-token-main-surface-tertiary"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class*="bg-token-surface"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class*="border-token"] {
+  color: var(--dream-text) !important;
+  background: color-mix(in oklab, var(--dream-surface-raised) 78%, transparent) !important;
+  border-color: var(--dream-line-soft) !important;
+}
+
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class*="text-token"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) h1,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) h2,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) h3,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) p,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) li,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) span {
+  color: var(--dream-text) !important;
+}
+
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class*="text-token-text-secondary"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class*="text-token-text-tertiary"],
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class*="text-token-text-secondary"] *,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell)
+  [class*="text-token-text-tertiary"] * {
+  color: var(--dream-text-muted) !important;
+}
+
+/* Keep interactive controls legible without forcing native light chips. */
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) button:not([class~="bg-token-foreground"]),
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [role="button"]:not([class~="bg-token-foreground"]) {
+  color: var(--dream-text) !important;
+}
+
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) button:not([class~="bg-token-foreground"]) svg,
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
+  main.main-surface:not(.dream-home-shell) [role="button"] svg {
+  color: currentColor !important;
 }
 
 html.codex-dream-skin.dream-art-wide main.main-surface .app-shell-main-content-frame {

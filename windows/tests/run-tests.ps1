@@ -761,7 +761,10 @@ try {
     ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))',
     'color: var(--dream-text) !important',
     '[class*="text-token"]',
-    'background: color-mix(in oklab, var(--dream-surface) 54%, transparent) !important'
+    'background: color-mix(in oklab, var(--dream-surface) 54%, transparent) !important',
+    'bg-token-main-surface-primary',
+    'color-mix(in oklab, var(--dream-surface) 72%, transparent)',
+    'text-token-text-secondary'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
