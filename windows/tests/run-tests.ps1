@@ -755,6 +755,8 @@ try {
     '--dream-immersive-composer',
     'background-position: var(--dream-art-position)',
     '.dream-home-utility',
+    'width: 100% !important',
+    'margin-inline: 0 !important',
     ':has(.dream-home-utility) .composer-surface-chrome',
     ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))'
   )) {

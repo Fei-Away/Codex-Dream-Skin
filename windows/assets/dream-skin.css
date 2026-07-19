@@ -510,21 +510,58 @@ html.codex-dream-skin.dream-art-wide .composer-surface-chrome::before {
 }
 
 /* Current Codex builds render the home project picker in a hashed utility bar.
-   Merge it with the composer so the bottom control reads as one surface. */
+   Match the composer width/edges so the two native controls read as one stack
+   (same idea as macOS .dream-skin-home-utility). */
 html.codex-dream-skin .dream-home-utility {
-  border: 1px solid var(--dream-line) !important;
-  border-bottom: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  margin-bottom: 0 !important;
+  padding-inline: 18px !important;
+  box-sizing: border-box !important;
+  border: 0 !important;
   border-radius: 18px 18px 0 0 !important;
   background: var(--dream-immersive-composer) !important;
-  box-shadow: none !important;
+  box-shadow:
+    inset 1px 0 var(--dream-immersive-line),
+    inset -1px 0 var(--dream-immersive-line),
+    inset 0 1px var(--dream-immersive-line) !important;
+  backdrop-filter: none !important;
 }
 
 html.codex-dream-skin .dream-home:has(.dream-home-utility) .composer-surface-chrome {
+  border: 0 !important;
   border-radius: 0 0 18px 18px !important;
-  box-shadow: 0 10px 30px color-mix(in oklab, var(--dream-canvas) 20%, transparent),
+  box-shadow:
+    0 10px 30px color-mix(in oklab, var(--dream-canvas) 20%, transparent),
     inset 1px 0 var(--dream-immersive-line),
     inset -1px 0 var(--dream-immersive-line),
     inset 0 -1px var(--dream-immersive-line) !important;
+}
+
+/* Keep wide-art home stacks on the same continuous surface as the composer. */
+html.codex-dream-skin.dream-art-wide .dream-home-utility {
+  background: var(--dream-immersive-composer) !important;
+}
+
+html.codex-dream-skin.dream-art-wide .dream-home:has(.dream-home-utility) .composer-surface-chrome {
+  box-shadow:
+    0 10px 30px color-mix(in oklab, var(--dream-canvas) 20%, transparent),
+    inset 1px 0 var(--dream-immersive-line),
+    inset -1px 0 var(--dream-immersive-line),
+    inset 0 -1px var(--dream-immersive-line) !important;
+}
+
+/* Utility chips/buttons should share composer chrome color, not a floating card. */
+html.codex-dream-skin .dream-home-utility button,
+html.codex-dream-skin .dream-home-utility [role="button"] {
+  color: var(--dream-text-muted) !important;
+}
+
+html.codex-dream-skin .dream-home-utility button svg,
+html.codex-dream-skin .dream-home-utility [role="button"] svg {
+  color: currentColor !important;
 }
 
 /* Plugins, scheduled tasks and search routes ship opaque sticky wrappers.
