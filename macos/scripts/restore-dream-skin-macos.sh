@@ -51,6 +51,7 @@ fi
 
 /bin/rm -f "$STATE_PATH"
 if [ "$UNINSTALL" = "true" ]; then
+  /bin/rm -f "$HOME/Desktop/Codex Dream Skin Studio.command"
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin.command"
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Customize.command"
   /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Verify.command"

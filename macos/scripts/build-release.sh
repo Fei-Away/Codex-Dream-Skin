@@ -17,7 +17,8 @@ if [ "${1:-}" != "--skip-tests" ]; then "$ROOT/tests/run-tests.sh"; fi
   --exclude 'release/' \
   "$ROOT/" "$TMP/codex-dream-skin-studio/"
 /bin/chmod 755 "$TMP/codex-dream-skin-studio"/*.command
-/bin/chmod 755 "$TMP/codex-dream-skin-studio"/scripts/*.sh "$TMP/codex-dream-skin-studio"/tests/*.sh
+/bin/chmod 755 "$TMP/codex-dream-skin-studio"/scripts/*.sh \
+  "$TMP/codex-dream-skin-studio"/tests/*.sh
 /bin/rm -f "$ARCHIVE"
 /usr/bin/ditto -c -k --keepParent "$TMP/codex-dream-skin-studio" "$ARCHIVE"
 SHA256="$(/usr/bin/shasum -a 256 "$ARCHIVE" | /usr/bin/awk '{print $1}')"

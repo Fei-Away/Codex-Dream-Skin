@@ -23,6 +23,12 @@ if /usr/bin/grep -R -n -E '(writeFile|rename|copyFile|rm).*app\.asar' "$ROOT/scr
   exit 1
 fi
 
+[ -x "$ROOT/Open Dream Skin Studio.command" ]
+[ -x "$ROOT/scripts/open-web-studio-macos.sh" ]
+/usr/bin/grep -q 'Open Dream Skin Studio.command' "$ROOT/scripts/build-client-release.sh"
+/usr/bin/grep -q 'Codex Dream Skin Studio.command' "$ROOT/scripts/install-dream-skin-macos.sh"
+! /usr/bin/grep -R -n -E 'web-studio-server\.mjs.*--token|DREAM_SKIN_WEB_TOKEN' "$ROOT" >/dev/null
+
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
