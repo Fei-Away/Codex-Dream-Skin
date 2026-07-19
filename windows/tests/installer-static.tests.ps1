@@ -58,6 +58,7 @@ foreach ($requiredDefinition in @(
   'Flags: unchecked',
   'Flags: nowait postinstall skipifsilent',
   'english.ConfirmUninstall=Uninstall will close Codex',
+  'Name: "chinesesimplified"; MessagesFile: "compiler:Languages\Unofficial\ChineseSimplified.isl"',
   'chinesesimplified.ConfirmUninstall=',
   '-ExecutionPolicy RemoteSigned',
   'procedure CurStepChanged(CurStep: TSetupStep);',
