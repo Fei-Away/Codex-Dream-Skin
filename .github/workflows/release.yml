@@ -122,7 +122,7 @@ jobs:
           $requiredVersion = '6.7.1'
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           $installedVersion = if (Test-Path -LiteralPath $iscc -PathType Leaf) {
-            "$((Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion)"
+            "$((Get-Item -LiteralPath $iscc).VersionInfo.FileVersion)"
           } else { '' }
           if (-not $installedVersion.StartsWith($requiredVersion, [System.StringComparison]::Ordinal)) {
             choco upgrade innosetup --version=$requiredVersion --allow-downgrade --no-progress --yes
@@ -134,7 +134,7 @@ jobs:
             (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
           ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
           if (-not $resolved) { throw 'Inno Setup 6 (ISCC.exe) is not available on the runner.' }
-          $resolvedVersion = "$((Get-Item -LiteralPath $resolved).VersionInfo.ProductVersion)"
+          $resolvedVersion = "$((Get-Item -LiteralPath $resolved).VersionInfo.FileVersion)"
           if (-not $resolvedVersion.StartsWith($requiredVersion, [System.StringComparison]::Ordinal)) {
             throw "Expected Inno Setup $requiredVersion, found $resolvedVersion at $resolved."
           }

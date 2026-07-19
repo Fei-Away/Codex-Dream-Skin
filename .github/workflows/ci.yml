@@ -148,7 +148,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not install Inno Setup $requiredVersion." }
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw 'ISCC.exe is missing.' }
-          $actual = "$((Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion)"
+          $actual = "$((Get-Item -LiteralPath $iscc).VersionInfo.FileVersion)"
           if (-not $actual.StartsWith($requiredVersion, [System.StringComparison]::Ordinal)) {
             throw "Expected Inno Setup $requiredVersion, found $actual."
           }
