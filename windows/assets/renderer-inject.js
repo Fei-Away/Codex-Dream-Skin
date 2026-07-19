@@ -27,6 +27,27 @@
     "--dream-accent",
     "--dream-accent-ink",
     "--dream-image-luma",
+    "--dream-canvas",
+    "--dream-surface",
+    "--dream-surface-raised",
+    "--dream-sidebar",
+    "--dream-text",
+    "--dream-text-muted",
+    "--dream-line",
+    "--dream-line-soft",
+    "--dream-accent-soft",
+    "--dream-accent-hover",
+    "--dream-hero-shade",
+    "--dream-immersive-edge",
+    "--dream-immersive-mid",
+    "--dream-immersive-far",
+    "--dream-immersive-sidebar",
+    "--dream-task-immersive-sidebar",
+    "--dream-immersive-composer",
+    "--dream-immersive-line",
+    "--dream-task-immersive-edge",
+    "--dream-task-immersive-mid",
+    "--dream-task-immersive-far",
   ];
   const HOME_UTILITY_CLASS = "dream-home-utility";
   const installToken = {};
@@ -55,15 +76,23 @@
   const normalizeConfig = (value) => {
     const config = value && typeof value === "object" ? value : {};
     const art = config.art && typeof config.art === "object" ? config.art : {};
+    const colors = config.colors && typeof config.colors === "object" && !Array.isArray(config.colors)
+      ? config.colors : {};
     const hasNumber = (candidate) =>
       (typeof candidate === "number" || (typeof candidate === "string" && candidate.trim() !== "")) &&
       Number.isFinite(Number(candidate));
+    const colorPattern = /^(?:#[\da-f]{3,8}|(?:rgba?|hsla?|oklch|oklab)\([^;{}]{1,120}\))$/i;
+    const pickColor = (candidate) => {
+      if (typeof candidate !== "string") return null;
+      const trimmed = candidate.trim();
+      return colorPattern.test(trimmed) ? trimmed : null;
+    };
     const requestedAccent = typeof config?.palette?.accent === "string"
       ? config.palette.accent.trim()
       : "";
-    const safeAccent = /^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(requestedAccent)
-      ? requestedAccent
-      : null;
+    const accentFromPalette = colorPattern.test(requestedAccent) ? requestedAccent : null;
+    const accentFromColors = pickColor(colors.accent);
+    const safeAccent = accentFromPalette || accentFromColors;
     const appearance = ["auto", "light", "dark"].includes(config.appearance)
       ? config.appearance
       : "auto";
@@ -74,6 +103,21 @@
       ? art.taskMode
       : "auto";
     const metadataRatio = Number(config?.artMetadata?.ratio);
+    const explicitKeys = Array.isArray(config.explicitColorKeys)
+      ? config.explicitColorKeys.filter((key) => typeof key === "string")
+      : Object.keys(colors).filter((key) => pickColor(colors[key]));
+    const normalizedColors = {};
+    for (const key of explicitKeys) {
+      const color = pickColor(colors[key]);
+      if (color) normalizedColors[key] = color;
+    }
+    // If theme only has colors without explicitColorKeys, still honor present keys.
+    if (!explicitKeys.length) {
+      for (const [key, value] of Object.entries(colors)) {
+        const color = pickColor(value);
+        if (color) normalizedColors[key] = color;
+      }
+    }
     return {
       appearance,
       safeArea,
@@ -81,6 +125,8 @@
       focusX: hasNumber(art.focusX) ? clamp(art.focusX) : null,
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
       accent: safeAccent,
+      colors: normalizedColors,
+      explicitColorKeys: Object.keys(normalizedColors),
       initialAspect: Number.isFinite(metadataRatio) && metadataRatio > 0 ? metadataRatio : null,
     };
   };
@@ -287,6 +333,27 @@
     document.getElementById(CHROME_ID)?.remove();
   };
 
+  const parseCssRgb = (value) => {
+    if (typeof value !== "string") return null;
+    const hex = value.trim().match(/^#([\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i);
+    if (hex) {
+      let body = hex[1];
+      if (body.length === 3) body = body.split("").map((c) => c + c).join("");
+      if (body.length === 8) body = body.slice(0, 6);
+      const int = Number.parseInt(body, 16);
+      return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
+    }
+    const rgb = value.trim().match(/^rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)/i);
+    if (rgb) {
+      return {
+        r: Math.max(0, Math.min(255, Number(rgb[1]))),
+        g: Math.max(0, Math.min(255, Number(rgb[2]))),
+        b: Math.max(0, Math.min(255, Number(rgb[3]))),
+      };
+    }
+    return null;
+  };
+
   const applyProfile = (root) => {
     const focusX = config.focusX ?? profile.focusX;
     const focusY = config.focusY ?? profile.focusY;
@@ -297,8 +364,17 @@
     const taskMode = config.taskMode === "auto"
       ? profile.aspect >= 2.25 ? "banner" : "ambient"
       : config.taskMode;
-    const accent = config.accent || `rgb(${profile.accent.join(" ")})`;
-    const accentInk = luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
+    const colors = config.colors || {};
+    const explicit = new Set(config.explicitColorKeys || Object.keys(colors));
+    const has = (key) => explicit.has(key) && typeof colors[key] === "string" && colors[key];
+    const accent = config.accent || (has("accent") ? colors.accent : null) ||
+      `rgb(${profile.accent.join(" ")})`;
+    const accentRgb = parseCssRgb(accent) || {
+      r: profile.accent[0], g: profile.accent[1], b: profile.accent[2],
+    };
+    const accentInk = luminance(accentRgb.r, accentRgb.g, accentRgb.b) > .42
+      ? "rgb(26 24 28)"
+      : "rgb(250 248 251)";
     root.classList.toggle("dream-theme-light", appearance === "light");
     root.classList.toggle("dream-theme-dark", appearance === "dark");
     root.classList.toggle("dream-art-wide", profile.aspect >= 1.75);
@@ -319,6 +395,62 @@
     root.style.setProperty("--dream-accent", accent);
     root.style.setProperty("--dream-accent-ink", accentInk);
     root.style.setProperty("--dream-image-luma", profile.luma.toFixed(3));
+
+    // Honor macOS-compatible colors{} so gothic packs keep dark structure colors
+    // instead of falling back to the light shell palette.
+    const clearStructural = [
+      "--dream-canvas", "--dream-surface", "--dream-surface-raised", "--dream-sidebar",
+      "--dream-text", "--dream-text-muted", "--dream-line", "--dream-line-soft",
+      "--dream-accent-soft", "--dream-accent-hover", "--dream-hero-shade",
+      "--dream-immersive-edge", "--dream-immersive-mid", "--dream-immersive-far",
+      "--dream-immersive-sidebar", "--dream-task-immersive-sidebar",
+      "--dream-immersive-composer", "--dream-immersive-line",
+      "--dream-task-immersive-edge", "--dream-task-immersive-mid", "--dream-task-immersive-far",
+    ];
+    for (const property of clearStructural) root.style.removeProperty(property);
+
+    if (has("background") || has("panel") || has("panelAlt") || has("text") || has("muted") || has("line")) {
+      const bg = has("background") ? colors.background : null;
+      const panel = has("panel") ? colors.panel : (bg || null);
+      const panelAlt = has("panelAlt") ? colors.panelAlt : (panel || bg || null);
+      const text = has("text") ? colors.text : null;
+      const muted = has("muted") ? colors.muted : null;
+      const line = has("line") ? colors.line : null;
+      if (bg) root.style.setProperty("--dream-canvas", bg);
+      if (panel) {
+        root.style.setProperty("--dream-surface", panel);
+        root.style.setProperty("--dream-sidebar", panel);
+      }
+      if (panelAlt) root.style.setProperty("--dream-surface-raised", panelAlt);
+      if (text) root.style.setProperty("--dream-text", text);
+      if (muted) root.style.setProperty("--dream-text-muted", muted);
+      if (line) {
+        root.style.setProperty("--dream-line", line);
+        root.style.setProperty("--dream-line-soft", line);
+        root.style.setProperty("--dream-immersive-line", line);
+      }
+      // Soft overlays derived from explicit structure colors so immersives match gothic packs.
+      if (panel) {
+        root.style.setProperty("--dream-accent-soft", `color-mix(in oklab, ${accent} 16%, ${panel})`);
+        root.style.setProperty("--dream-accent-hover", `color-mix(in oklab, ${accent} 24%, ${panel})`);
+        root.style.setProperty("--dream-hero-shade", `color-mix(in oklab, ${panel} 92%, transparent)`);
+        root.style.setProperty("--dream-immersive-edge", `color-mix(in oklab, ${panel} 46%, transparent)`);
+        root.style.setProperty("--dream-immersive-mid", `color-mix(in oklab, ${panel} 28%, transparent)`);
+        root.style.setProperty("--dream-immersive-far", `color-mix(in oklab, ${panel} 14%, transparent)`);
+        root.style.setProperty("--dream-immersive-sidebar", `color-mix(in oklab, ${panel} 50%, transparent)`);
+        root.style.setProperty("--dream-task-immersive-sidebar", `color-mix(in oklab, ${panel} 72%, transparent)`);
+        root.style.setProperty("--dream-task-immersive-edge", `color-mix(in oklab, ${panel} 86%, transparent)`);
+        root.style.setProperty("--dream-task-immersive-mid", `color-mix(in oklab, ${panel} 78%, transparent)`);
+        root.style.setProperty("--dream-task-immersive-far", `color-mix(in oklab, ${panel} 66%, transparent)`);
+      }
+      if (panelAlt || panel) {
+        const raised = panelAlt || panel;
+        root.style.setProperty(
+          "--dream-immersive-composer",
+          `color-mix(in oklab, ${raised} 88%, ${accent} 5%)`,
+        );
+      }
+    }
   };
 
   const ensure = () => {

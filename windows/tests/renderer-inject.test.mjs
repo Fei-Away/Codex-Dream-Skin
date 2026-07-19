@@ -330,6 +330,32 @@ assert.equal(configured.rootClasses.has("dream-task-off"), true);
 assert.equal(configured.rootStyles.get("--dream-art-position"), "15% 80%");
 assert.equal(configured.rootStyles.get("--dream-accent"), "#d45a70");
 assert.equal(configured.routeClasses.has("dream-home"), true);
+
+// Gothic-style packs use colors{} (macOS contract). Windows must honor them so
+// dark structure surfaces do not fall back to the light shell palette.
+const gothic = createFixture({ shellPresent: true, shellAppearance: "light" });
+const gothicPayload = buildPayload({
+  appearance: "auto",
+  colors: {
+    background: "#0d0d0e",
+    panel: "#171513",
+    panelAlt: "#211d18",
+    accent: "#c8a55a",
+    text: "#f3ead7",
+    muted: "#b5a386",
+    line: "rgba(200, 165, 90, .28)",
+  },
+  art: { focusX: .76, focusY: .45, safeArea: "left", taskMode: "ambient" },
+});
+vm.runInNewContext(gothicPayload, gothic.context);
+assert.equal(gothic.rootStyles.get("--dream-accent"), "#c8a55a");
+assert.equal(gothic.rootStyles.get("--dream-canvas"), "#0d0d0e");
+assert.equal(gothic.rootStyles.get("--dream-surface"), "#171513");
+assert.equal(gothic.rootStyles.get("--dream-surface-raised"), "#211d18");
+assert.equal(gothic.rootStyles.get("--dream-text"), "#f3ead7");
+assert.equal(gothic.rootStyles.get("--dream-text-muted"), "#b5a386");
+// Accent ink is derived from the configured accent color, not image analysis RGB.
+assert.match(gothic.rootStyles.get("--dream-accent-ink"), /^rgb\(/);
 assert.equal(configured.routeClasses.has("dream-task"), false);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), true);
 assert.equal(configured.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);

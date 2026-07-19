@@ -459,6 +459,19 @@ async function loadTheme(themeDir) {
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
+  const rawColors = raw.colors && typeof raw.colors === "object" && !Array.isArray(raw.colors)
+    ? raw.colors : null;
+  const colorKeys = [
+    "background", "panel", "panelAlt", "accent", "accentAlt", "secondary",
+    "highlight", "text", "muted", "line",
+  ];
+  const colorPattern = /^(?:#[\da-f]{3,8}|(?:rgba?|hsla?|oklch|oklab)\([^;{}]{1,120}\))$/i;
+  const normalizeCssColor = (value, name) => {
+    if (typeof value !== "string" || !value.trim()) return null;
+    const color = value.trim();
+    if (!colorPattern.test(color)) throw new Error(`${name} is not a supported CSS color`);
+    return color;
+  };
   const theme = {
     id: normalizedText(raw.id, "id", "custom", 80),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
@@ -471,13 +484,22 @@ async function loadTheme(themeDir) {
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
     palette: {},
+    colors: {},
+    explicitColorKeys: [],
   };
-  if (typeof palette.accent === "string" && palette.accent.trim()) {
-    const accent = palette.accent.trim();
-    if (!/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(accent)) {
-      throw new Error("palette.accent is not a supported CSS color");
+  // Prefer palette.accent (Windows legacy), then colors.accent (macOS / gothic packs).
+  const accentFromPalette = normalizeCssColor(palette.accent, "palette.accent");
+  const accentFromColors = rawColors ? normalizeCssColor(rawColors.accent, "colors.accent") : null;
+  if (accentFromPalette) theme.palette.accent = accentFromPalette;
+  else if (accentFromColors) theme.palette.accent = accentFromColors;
+  if (rawColors) {
+    for (const key of colorKeys) {
+      if (!Object.prototype.hasOwnProperty.call(rawColors, key)) continue;
+      const color = normalizeCssColor(rawColors[key], `colors.${key}`);
+      if (!color) continue;
+      theme.colors[key] = color;
+      theme.explicitColorKeys.push(key);
     }
-    theme.palette.accent = accent;
   }
   const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
   if (!imageStat.isFile()) throw new Error("Theme image is not a file");
