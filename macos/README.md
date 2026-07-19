@@ -22,6 +22,7 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 
 浏览器会打开本机主题控制台。首次使用点击“安装到本机”，之后桌面会生成
 `Codex Dream Skin Studio.command`，以后双击它即可再次打开。
+如果本机已有旧版本，页面会显示“更新到当前版本”，可直接在浏览器中完成覆盖更新。
 
 网页中可以完成：
 
