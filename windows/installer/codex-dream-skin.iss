@@ -111,7 +111,8 @@ end;
 function InstallInitializationFailureMessage(const ExitCode: Integer): String;
 begin
   Result := Format(
-    'Codex Dream Skin could not be initialized (exit code %d). No installed application files were changed.',
+    'Codex Dream Skin could not be initialized (exit code %d). ' +
+    'No installed application files were changed.',
     [ExitCode]
   );
 end;
