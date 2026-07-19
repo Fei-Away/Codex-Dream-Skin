@@ -110,11 +110,8 @@ end;
 
 function InstallInitializationFailureMessage(const ExitCode: Integer): String;
 begin
-  Result := Format(
-    'Codex Dream Skin could not be initialized (exit code %d). ' +
-    'No installed application files were changed.',
-    [ExitCode]
-  );
+  Result := 'Codex Dream Skin could not be initialized (exit code ' +
+    IntToStr(ExitCode) + '). No installed application files were changed.';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -145,8 +142,8 @@ begin
   if not RunBootstrap(ExpandConstant('{app}\setup-bootstrap.ps1'), '-Uninstall', True, ExitCode) then
     RaiseException('Codex Dream Skin restoration could not be started. No installed files were removed.');
   if ExitCode <> 0 then
-    RaiseException(Format(
-      'Codex Dream Skin could not restore Codex (exit code %d). No installed files were removed.',
-      [ExitCode]
-    ));
+    RaiseException(
+      'Codex Dream Skin could not restore Codex (exit code ' +
+      IntToStr(ExitCode) + '). No installed files were removed.'
+    );
 end;

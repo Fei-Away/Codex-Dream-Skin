@@ -70,7 +70,8 @@ foreach ($requiredDefinition in @(
   'procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);',
   'if CurUninstallStep <> usUninstall then',
   "RunBootstrap(ExpandConstant('{app}\setup-bootstrap.ps1'), '-Uninstall', True, ExitCode)",
-  'RaiseException(Format('
+  "'Codex Dream Skin could not restore Codex (exit code ' +",
+  "IntToStr(ExitCode) + '). No installed files were removed.'"
 )) {
   if (-not $definition.Contains($requiredDefinition)) {
     throw "Inno Setup definition is missing a release safety contract: $requiredDefinition"
@@ -85,7 +86,10 @@ $runBootstrapIndex = $definition.IndexOf(
   "RunBootstrap(ExpandConstant('{app}\setup-bootstrap.ps1'), '-Uninstall', True, ExitCode)",
   [System.StringComparison]::Ordinal
 )
-$uninstallFailureIndex = $definition.LastIndexOf('RaiseException(Format(', [System.StringComparison]::Ordinal)
+$uninstallFailureIndex = $definition.LastIndexOf(
+  "'Codex Dream Skin could not restore Codex (exit code ' +",
+  [System.StringComparison]::Ordinal
+)
 if ($uninstallStepIndex -lt 0 -or $runBootstrapIndex -le $uninstallStepIndex -or
   $uninstallFailureIndex -le $runBootstrapIndex -or
   $definition.Contains('function InitializeUninstall(): Boolean;')) {
