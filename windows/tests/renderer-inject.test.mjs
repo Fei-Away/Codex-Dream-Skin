@@ -9,9 +9,17 @@ const windowsRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(windowsRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(windowsRoot, "assets", "dream-skin.css"), "utf8");
 const buildPayload = (config = {}) => template
-  .replace("__DREAM_CSS_JSON__", JSON.stringify(".fixture { color: blue; }"))
-  .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
-  .replace("__DREAM_THEME_JSON__", JSON.stringify(config));
+  .replace("__DREAM_CSS_JSON__", () => JSON.stringify(".fixture { color: blue; }"))
+  .replace("__DREAM_ART_JSON__", () => JSON.stringify("data:image/png;base64,AA=="))
+  .replace("__DREAM_THEME_JSON__", () => JSON.stringify(config))
+  .replace("__DREAM_SELECTORS_JSON__", () => JSON.stringify({
+    shell: ["main.main-surface", "main"],
+    sidebar: ["aside.app-shell-left-panel", "aside"],
+    composer: [".composer-surface-chrome", '[contenteditable="true"]', "textarea"],
+    main: ['[role="main"]', "main"],
+    home: ['[role="main"]:has([data-testid="home-icon"])'],
+    utility: ['[class*="_homeUtilityBar_"]'],
+  }));
 const payload = buildPayload();
 
 assert.doesNotMatch(
@@ -22,6 +30,8 @@ assert.doesNotMatch(
 
 function createFixture({
   shellPresent,
+  modernMainPresent = false,
+  entryPage = false,
   staleSkin = false,
   homePresent = false,
   utilityPresent = false,
@@ -29,6 +39,7 @@ function createFixture({
   computedColorScheme = "",
   osAppearance = "light",
   analysisFixture = null,
+  resolvedColors = {},
 }) {
   const nodes = new Map();
   const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
@@ -95,6 +106,13 @@ function createFixture({
       return { left: 290, top: 36, width: 990, height: 784 };
     },
   };
+  const modernMainClasses = new Set();
+  const modernMain = {
+    classList: makeClassList(modernMainClasses),
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 1280, height: 820 };
+    },
+  };
   const routeClasses = new Set();
   const utilityClasses = new Set();
   const utilityNode = { classList: makeClassList(utilityClasses) };
@@ -109,6 +127,30 @@ function createFixture({
   const staleShell = { classList: makeClassList(new Set(["dream-home-shell"])) };
 
   const createElement = (tagName) => {
+    if (tagName === "canvas" && Object.keys(resolvedColors).length) {
+      const colors = new Map([
+        ["#010203", [1, 2, 3, 255]],
+        ["#040506", [4, 5, 6, 255]],
+        ...Object.entries(resolvedColors),
+      ]);
+      let serialized = "#000000";
+      let pixels = [0, 0, 0, 255];
+      const context = {
+        clearRect() { pixels = [0, 0, 0, 0]; },
+        fillRect() {},
+        getImageData() { return { data: Uint8ClampedArray.from(pixels) }; },
+      };
+      Object.defineProperty(context, "fillStyle", {
+        get() { return serialized; },
+        set(value) {
+          const next = colors.get(String(value));
+          if (!next) return;
+          serialized = String(value);
+          pixels = next;
+        },
+      });
+      return { width: 0, height: 0, getContext() { return context; } };
+    }
     if (tagName === "canvas" && analysisFixture) {
       return {
         width: 0,
@@ -146,10 +188,12 @@ function createFixture({
     documentElement: root,
     head: root,
     body,
+    title: entryPage ? "Codex" : "Auxiliary",
     createElement,
     getElementById(id) { return nodes.get(id) ?? null; },
     querySelector(selector) {
       if (selector === "main.main-surface") return hasShell ? shellMain : null;
+      if (selector === "main") return modernMainPresent ? modernMain : null;
       if (selector === "aside.app-shell-left-panel") return hasShell ? {} : null;
       if (selector === '[role="main"]:has([data-testid="home-icon"])') {
         return hasShell && homePresent ? routeMain : null;
@@ -157,6 +201,11 @@ function createFixture({
       return null;
     },
     querySelectorAll(selector) {
+      if (selector === "main.main-surface") return hasShell ? [shellMain] : [];
+      if (selector === "main") return modernMainPresent ? [modernMain] : [];
+      if (selector === '[role="main"]:has([data-testid="home-icon"])') {
+        return hasShell && homePresent ? [routeMain] : [];
+      }
       if (selector === '[role="main"]') return hasShell ? [routeMain] : [];
       if (selector === ".dream-task") return routeClasses.has("dream-task") ? [routeMain] : [];
       if (selector === ".dream-home-utility") {
@@ -173,6 +222,10 @@ function createFixture({
       matchMedia() { return { matches: osAppearance === "dark" }; },
     },
     document,
+    location: {
+      protocol: "app:",
+      href: entryPage ? "app://-/index.html" : "app://-/auxiliary.html",
+    },
     MutationObserver: class {
       constructor(callback) {
         this.callback = callback;
@@ -224,6 +277,7 @@ function createFixture({
     rootStyles,
     revokedUrls,
     routeClasses,
+    modernMainClasses,
     utilityClasses,
     setShellPresent(value) { hasShell = value; },
   };
@@ -273,10 +327,17 @@ assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), true);
 
+const modernMain = createFixture({ shellPresent: false, modernMainPresent: true, entryPage: true });
+const modernMainResult = vm.runInNewContext(payload, modernMain.context);
+assert.equal(modernMainResult.installed, true);
+assert.equal(modernMain.rootClasses.has("codex-dream-skin"), true);
+assert.equal(modernMain.modernMainClasses.has("dream-task"), true);
+
 const configured = createFixture({
   shellPresent: true,
   homePresent: true,
   utilityPresent: true,
+  resolvedColors: { "#d45a70": [212, 90, 112, 255] },
 });
 const configuredPayload = buildPayload({
   appearance: "light",
@@ -292,11 +353,30 @@ assert.equal(configured.rootClasses.has("dream-safe-right"), true);
 assert.equal(configured.rootClasses.has("dream-task-off"), true);
 assert.equal(configured.rootStyles.get("--dream-art-position"), "15% 80%");
 assert.equal(configured.rootStyles.get("--dream-accent"), "#d45a70");
+assert.equal(configured.rootStyles.get("--dream-accent-ink"), "rgb(0 0 0)");
 assert.equal(configured.routeClasses.has("dream-home"), true);
 assert.equal(configured.routeClasses.has("dream-task"), false);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), true);
 assert.equal(configured.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
 assert.equal(configured.utilityClasses.has("dream-home-utility"), false);
+
+const accentContrastCases = [
+  { accent: "#fff", rgba: [255, 255, 255, 255], ink: "rgb(0 0 0)" },
+  { accent: "#000", rgba: [0, 0, 0, 255], ink: "rgb(255 255 255)" },
+  { accent: "rgb(128 128 128)", rgba: [128, 128, 128, 255], ink: "rgb(0 0 0)" },
+  { accent: "hsl(240 100% 25%)", rgba: [0, 0, 128, 255], ink: "rgb(255 255 255)" },
+  { accent: "oklch(0.9 0.1 100)", rgba: [244, 224, 166, 255], ink: "rgb(0 0 0)" },
+];
+for (const { accent, rgba, ink } of accentContrastCases) {
+  const fixture = createFixture({ shellPresent: true, resolvedColors: { [accent]: rgba } });
+  vm.runInNewContext(buildPayload({
+    appearance: "light",
+    palette: { accent },
+  }), fixture.context);
+  assert.equal(fixture.rootStyles.get("--dream-accent"), accent);
+  assert.equal(fixture.rootStyles.get("--dream-accent-ink"), ink,
+    `Accent ${accent} must select the higher-contrast WCAG black or white foreground.`);
+}
 
 const analysisPixels = new Uint8ClampedArray(48 * 12 * 4);
 for (let index = 0; index < 48 * 12; index += 1) {

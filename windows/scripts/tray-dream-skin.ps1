@@ -50,7 +50,7 @@ try {
 
   function Add-DreamSkinTrayItem {
     param(
-      [Parameter(Mandatory = $true)][System.Windows.Forms.ToolStripItemCollection]$Items,
+      [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Windows.Forms.ToolStripItemCollection]$Items,
       [Parameter(Mandatory = $true)][string]$Text,
       [AllowNull()][scriptblock]$Action,
       [bool]$Enabled = $true
@@ -66,14 +66,50 @@ try {
     return $item
   }
 
+  function Get-DreamSkinTrayRuntimeStatus {
+    if (-not (Test-Path -LiteralPath $paths.State -PathType Leaf)) {
+      return [pscustomobject]@{ Status = 'stopped'; Reason = 'no-state' }
+    }
+    try {
+      $savedState = Read-DreamSkinState -Path $paths.State
+      return Get-DreamSkinRuntimeStatus -State $savedState
+    } catch {
+      return [pscustomobject]@{ Status = 'stale'; Reason = 'unreadable-state' }
+    }
+  }
+
+  function Get-DreamSkinThemeSelectionMessage {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    $runtime = Get-DreamSkinTrayRuntimeStatus
+    $nextStep = if ($runtime.Status -in @('verified', 'applying')) {
+      '运行中的皮肤将自动更新。'
+    } else {
+      '将在下次启动皮肤时应用。'
+    }
+    return "已选择：$Name。$nextStep"
+  }
+
   function Rebuild-DreamSkinTrayMenu {
     $menu.Items.Clear()
     $paused = Test-DreamSkinPaused -StateRoot $StateRoot
-    $state = $null
-    try { $state = Read-DreamSkinState -Path $paths.State } catch {}
+    $runtime = Get-DreamSkinTrayRuntimeStatus
     $active = $null
     try { $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata } catch {}
-    $status = if ($paused) { '状态：已暂停' } elseif ($state) { '状态：运行中' } else { '状态：未运行' }
+    $status = if ($paused) {
+      switch ($runtime.Status) {
+        'verified' { '状态：已暂停（运行时已验证）' }
+        'applying' { '状态：已暂停（运行时等待验证）' }
+        'stale' { '状态：已暂停（状态已过期）' }
+        default { '状态：已暂停（未运行）' }
+      }
+    } else {
+      switch ($runtime.Status) {
+        'verified' { '状态：运行中（已验证）' }
+        'applying' { '状态：正在应用或等待验证' }
+        'stale' { '状态：状态文件已过期' }
+        default { '状态：未运行' }
+      }
+    }
     if ($null -ne $active -and $null -ne $active.Theme -and $active.Theme.name) {
       $status += " · $($active.Theme.name)"
     }
@@ -99,7 +135,8 @@ try {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
           $null = Set-DreamSkinActiveTheme -ImagePath $dialog.FileName -Theme $null -StateRoot $StateRoot
           Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '背景图已更新。', [System.Windows.Forms.ToolTipIcon]::Info)
+          $message = Get-DreamSkinThemeSelectionMessage -Name '自定义背景图'
+          $notify.ShowBalloonTip(2200, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
         }
       } finally {
         $dialog.Dispose()
@@ -126,7 +163,8 @@ try {
         $savedAction = {
           $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedPath -StateRoot $StateRoot
           Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已应用：$savedName", [System.Windows.Forms.ToolTipIcon]::Info)
+          $message = Get-DreamSkinThemeSelectionMessage -Name $savedName
+          $notify.ShowBalloonTip(2200, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
         }.GetNewClosure()
         $null = Add-DreamSkinTrayItem -Items $savedMenu.DropDownItems -Text $savedName -Action $savedAction
       }

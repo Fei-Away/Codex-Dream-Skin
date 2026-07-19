@@ -76,7 +76,7 @@ Open `Codex Dream Skin - Tray` to:
 - Pause or resume the skin.
 - Reapply the theme or fully restore Codex.
 
-Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
+Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 12 MB, 4096 pixels on either side, and 12 million total pixels.
 
 ## Restore and remove shortcuts
 

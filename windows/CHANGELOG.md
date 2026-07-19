@@ -1,5 +1,16 @@
 # Windows Changelog
 
+## Unreleased
+
+### 修复
+
+- 主题 payload 使用字面替换并增加 JavaScript 语法校验，主题名称中的 `$&`、`$'`、``$` `` 与 `$$` 不再破坏注入脚本。
+- 自定义强调色通过浏览器 Canvas 解析为最终颜色，并按 WCAG 对比度选择黑色或白色按钮前景。
+- 图片元数据检查统一经过 PowerShell 5.1 原生命令包装器；全部 Windows PowerShell 脚本统一使用 UTF-8 BOM，空托盘菜单集合可正常重建。
+- 托盘只在 PID、命令行、启动时间、Store 包、CDP 与 Browser ID 全部匹配时显示“运行中（已验证）”，失效 state 不再误报成功，主题切换改为“已选择”。
+- Windows 主题显式拒绝未知 `schemaVersion`，新写入主题统一为版本 1；图片预算收紧为 12 MB、4096px 单边和 12MP。
+- Codex DOM 能力选择器集中管理并增加当前入口回退与缺失标记诊断；键盘焦点和 Windows 强制颜色模式保持可见、可读。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

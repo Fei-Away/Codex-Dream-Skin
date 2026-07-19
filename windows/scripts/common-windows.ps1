@@ -1,4 +1,4 @@
-. (Join-Path $PSScriptRoot 'config-utf8.ps1')
+﻿. (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
 function Enter-DreamSkinOperationLock {
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -717,12 +717,37 @@ function Get-DreamSkinProcessStartedAt {
   }
 }
 
-function Stop-DreamSkinRecordedInjector {
+function Get-DreamSkinRecordedInjectorStatus {
   param([AllowNull()][object]$State)
-  if ($null -eq $State -or -not $State.injectorPid) { return $true }
-  $processId = [int]$State.injectorPid
+  if ($null -eq $State -or -not $State.injectorPid) {
+    return [pscustomobject]@{
+      ProcessId = $null
+      ProcessExists = $false
+      IdentityInspectable = $true
+      IdentityMatches = $false
+      Reason = 'not-recorded'
+    }
+  }
+  $processId = 0
+  if (-not [int]::TryParse("$($State.injectorPid)", [ref]$processId) -or $processId -le 0) {
+    return [pscustomobject]@{
+      ProcessId = $null
+      ProcessExists = $false
+      IdentityInspectable = $false
+      IdentityMatches = $false
+      Reason = 'invalid-pid'
+    }
+  }
   $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
-  if (-not $process) { return $true }
+  if (-not $process) {
+    return [pscustomobject]@{
+      ProcessId = $processId
+      ProcessExists = $false
+      IdentityInspectable = $true
+      IdentityMatches = $false
+      Reason = 'not-running'
+    }
+  }
 
   $expectedInjector = if ($State.injectorPath) {
     "$($State.injectorPath)"
@@ -734,7 +759,13 @@ function Stop-DreamSkinRecordedInjector {
   $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $process
   $commandLine = "$($process.CommandLine)"
   if (-not $processPath -or -not $commandLine) {
-    throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
+    return [pscustomobject]@{
+      ProcessId = $processId
+      ProcessExists = $true
+      IdentityInspectable = $false
+      IdentityMatches = $false
+      Reason = 'uninspectable'
+    }
   }
   $isNodeExecutable = [System.IO.Path]::GetFileName("$processPath") -ieq 'node.exe'
   $nodeMatches = -not $State.nodePath -or
@@ -755,8 +786,58 @@ function Stop-DreamSkinRecordedInjector {
   $startedAt = Get-DreamSkinProcessStartedAt -ProcessId $processId
   $startMatches = -not $State.injectorStartedAt -or $startedAt -eq "$($State.injectorStartedAt)"
   $identityMatches = [bool]($isNodeExecutable -and $nodeMatches -and $injectorMatches -and $startMatches)
+  return [pscustomobject]@{
+    ProcessId = $processId
+    ProcessExists = $true
+    IdentityInspectable = $true
+    IdentityMatches = $identityMatches
+    Reason = if ($identityMatches) { 'verified' } else { 'mismatch' }
+  }
+}
 
-  if (-not $identityMatches) {
+function Get-DreamSkinRuntimeStatus {
+  param([AllowNull()][object]$State)
+  if ($null -eq $State) {
+    return [pscustomobject]@{ Status = 'stopped'; Reason = 'no-state'; InjectorPid = $null; Port = $null }
+  }
+  $injector = Get-DreamSkinRecordedInjectorStatus -State $State
+  if (-not $injector.ProcessExists -or -not $injector.IdentityMatches) {
+    return [pscustomobject]@{
+      Status = 'stale'
+      Reason = $injector.Reason
+      InjectorPid = $injector.ProcessId
+      Port = $State.port
+    }
+  }
+  $port = 0
+  if (-not [int]::TryParse("$($State.port)", [ref]$port) -or
+    -not (Test-DreamSkinBrowserId -Value "$($State.browserId)")) {
+    return [pscustomobject]@{ Status = 'stale'; Reason = 'invalid-cdp-state'; InjectorPid = $injector.ProcessId; Port = $null }
+  }
+  $codex = Get-DreamSkinCodexInstallFromState -State $State
+  if ($null -eq $codex) {
+    return [pscustomobject]@{ Status = 'stale'; Reason = 'unverified-package'; InjectorPid = $injector.ProcessId; Port = $port }
+  }
+  try { $cdp = Get-DreamSkinVerifiedCdpIdentity -Port $port -Codex $codex } catch { $cdp = $null }
+  if ($null -eq $cdp) {
+    return [pscustomobject]@{ Status = 'applying'; Reason = 'cdp-not-ready'; InjectorPid = $injector.ProcessId; Port = $port }
+  }
+  if ("$($cdp.BrowserId)" -cne "$($State.browserId)") {
+    return [pscustomobject]@{ Status = 'stale'; Reason = 'browser-id-mismatch'; InjectorPid = $injector.ProcessId; Port = $port }
+  }
+  return [pscustomobject]@{ Status = 'verified'; Reason = 'verified'; InjectorPid = $injector.ProcessId; Port = $port }
+}
+
+function Stop-DreamSkinRecordedInjector {
+  param([AllowNull()][object]$State)
+  $status = Get-DreamSkinRecordedInjectorStatus -State $State
+  if (-not $status.ProcessExists) { return $true }
+  $processId = [int]$status.ProcessId
+  if (-not $status.IdentityInspectable) {
+    throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
+  }
+
+  if (-not $status.IdentityMatches) {
     throw "The recorded injector PID $processId is running, but its visible identity does not match the saved Dream Skin process. State was preserved."
   }
 

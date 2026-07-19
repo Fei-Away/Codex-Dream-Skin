@@ -2,7 +2,7 @@
   . (Join-Path $PSScriptRoot 'config-utf8.ps1')
 }
 
-$script:DreamSkinMaxImageBytes = 16 * 1024 * 1024
+$script:DreamSkinMaxImageBytes = 12 * 1024 * 1024
 
 function Assert-DreamSkinNoReparseComponents {
   param([Parameter(Mandatory = $true)][string]$Path)
@@ -49,20 +49,24 @@ function Ensure-DreamSkinManagedDirectory {
 
 function Get-DreamSkinValidatedImageMetadata {
   param([Parameter(Mandatory = $true)][string]$Path)
-  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue)) {
+  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue) -or
+    -not (Get-Command Invoke-DreamSkinNative -ErrorAction SilentlyContinue)) {
     throw 'Node.js runtime validation is unavailable for image metadata checks.'
   }
   $node = Get-DreamSkinNodeRuntime
   $metadataScript = Join-Path $PSScriptRoot 'image-metadata.mjs'
-  $output = @(& $node.Path $metadataScript '--check' ([System.IO.Path]::GetFullPath($Path)) 2>&1)
-  if ($LASTEXITCODE -ne 0) {
-    throw "Image metadata is invalid or exceeds the 16384px / 50MP safety limit: $Path"
+  $probe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    $metadataScript, '--check', ([System.IO.Path]::GetFullPath($Path))
+  )
+  if ($probe.ExitCode -ne 0) {
+    throw "Image metadata is invalid or exceeds the 4096px / 12MP safety limit: $Path"
   }
+  $output = $probe.Output
   try { $metadata = ($output -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch {
     throw "Image metadata helper returned invalid output: $Path"
   }
   if ($null -eq $metadata -or $null -eq $metadata.width -or $null -eq $metadata.height) {
-    throw "Image metadata is invalid or exceeds the 16384px / 50MP safety limit: $Path"
+    throw "Image metadata is invalid or exceeds the 4096px / 12MP safety limit: $Path"
   }
 }
 
@@ -82,7 +86,7 @@ function Assert-DreamSkinImageFile {
   $length = (Get-Item -LiteralPath $fullPath -Force).Length
   if ($length -lt 1) { throw 'Theme image cannot be empty.' }
   if ($length -gt $script:DreamSkinMaxImageBytes) {
-    throw 'Theme image exceeds the 16 MB limit.'
+    throw 'Theme image exceeds the 12 MB limit.'
   }
   if (-not $SkipImageMetadata) {
     Get-DreamSkinValidatedImageMetadata -Path $fullPath
@@ -153,6 +157,12 @@ function Read-DreamSkinTheme {
   if ($null -eq $theme -or $theme -is [string] -or $theme -is [array] -or -not $theme.image) {
     throw "Theme metadata must be an object with a relative image path: $themePath"
   }
+  if ($theme.PSObject.Properties.Name -contains 'schemaVersion') {
+    $schemaVersion = 0
+    if (-not [int]::TryParse("$($theme.schemaVersion)", [ref]$schemaVersion) -or $schemaVersion -ne 1) {
+      throw "Unsupported theme schemaVersion: $($theme.schemaVersion)"
+    }
+  }
   $image = "$($theme.image)"
   if ([System.IO.Path]::IsPathRooted($image)) { throw 'Theme image path must be relative.' }
   $imagePath = [System.IO.Path]::GetFullPath((Join-Path $directory $image))
@@ -177,6 +187,15 @@ function Write-DreamSkinTheme {
   Assert-DreamSkinNoReparseComponents -Path $ThemeDirectory
   New-Item -ItemType Directory -Force -Path $ThemeDirectory | Out-Null
   Assert-DreamSkinNoReparseComponents -Path $ThemeDirectory
+  if (-not ($Theme.PSObject.Properties.Name -contains 'schemaVersion')) {
+    $Theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1 -Force
+  } else {
+    $schemaVersion = 0
+    if (-not [int]::TryParse("$($Theme.schemaVersion)", [ref]$schemaVersion) -or $schemaVersion -ne 1) {
+      throw "Unsupported theme schemaVersion: $($Theme.schemaVersion)"
+    }
+    $Theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1 -Force
+  }
   $json = $Theme | ConvertTo-Json -Depth 8
   $themePath = Join-Path $ThemeDirectory 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $themePath

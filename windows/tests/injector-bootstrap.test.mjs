@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
-function createFixture() {
+function createFixture({ href = "app://-/auxiliary.html", title = "Codex" } = {}) {
   const observers = [];
   const timers = new Map();
   let nextTimer = 1;
@@ -19,12 +19,14 @@ function createFixture() {
     document: {
       documentElement: {},
       body: {},
+      title,
       querySelector(selector) {
         if (selector === "main.main-surface") return markers.shell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
         return null;
       },
     },
+    location: { protocol: "app:", href },
     MutationObserver: class {
       constructor(callback) {
         this.callback = callback;
@@ -53,6 +55,11 @@ assert.deepEqual(guarded.context.window.installs, [], "A main surface without th
 guarded.markers.sidebar = true;
 guarded.observers[0].callback([]);
 assert.deepEqual(guarded.context.window.installs, ["guarded"], "The guarded payload should install once the shell is complete.");
+
+const currentCodex = createFixture({ href: "app://-/index.html" });
+vm.runInNewContext(earlyPayloadFor('window.installs.push("current")', "current"), currentCodex.context);
+assert.deepEqual(currentCodex.context.window.installs, ["current"],
+  "The current Codex entry page must not wait for retired shell selectors.");
 
 const generations = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);

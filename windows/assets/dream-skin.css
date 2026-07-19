@@ -632,6 +632,69 @@ html.codex-dream-skin.dream-art-wide main.main-surface
   }
 }
 
+/* Keep keyboard navigation visible after the skin restyles native controls. */
+html.codex-dream-skin :is(
+  button,
+  a[href],
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  [role="button"],
+  [role="menuitem"],
+  [role="option"],
+  [role="tab"],
+  [role="treeitem"]
+):focus-visible {
+  outline: 3px solid var(--dream-accent) !important;
+  outline-offset: 3px !important;
+}
+
+@media (forced-colors: active) {
+  html.codex-dream-skin {
+    --dream-canvas: Canvas;
+    --dream-surface: Canvas;
+    --dream-surface-raised: Canvas;
+    --dream-sidebar: Canvas;
+    --dream-text: CanvasText;
+    --dream-text-muted: GrayText;
+    --dream-line: ButtonText;
+    --dream-line-soft: ButtonText;
+    --dream-accent: Highlight;
+    --dream-accent-ink: HighlightText;
+  }
+
+  html.codex-dream-skin .dream-task::before,
+  html.codex-dream-skin .dream-home > div:first-child > div:first-child > div:first-child::before,
+  html.codex-dream-skin .dream-home > div:first-child > div:first-child > div:first-child::after,
+  html.codex-dream-skin #codex-dream-skin-chrome {
+    display: none !important;
+  }
+
+  html.codex-dream-skin :is(
+    button,
+    a[href],
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="button"],
+    [role="menuitem"],
+    [role="option"],
+    [role="tab"],
+    [role="treeitem"]
+  ):focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  html.codex-dream-skin button[class~="bg-token-foreground"] {
+    color: ButtonText !important;
+    background: ButtonFace !important;
+    border: 1px solid ButtonText !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.codex-dream-skin *,
   html.codex-dream-skin *::before,

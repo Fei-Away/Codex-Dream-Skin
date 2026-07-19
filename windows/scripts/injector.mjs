@@ -2,16 +2,25 @@ import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Script as VmScript } from "node:vm";
 import { readImageMetadata } from "./image-metadata.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
 const SKIN_VERSION = "1.2.0";
-const MAX_ART_BYTES = 16 * 1024 * 1024;
+const MAX_ART_BYTES = 12 * 1024 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
+const CODEX_DOM_SELECTORS = Object.freeze({
+  shell: ["main.main-surface", "main"],
+  sidebar: ["aside.app-shell-left-panel", "aside"],
+  composer: [".composer-surface-chrome", '[contenteditable="true"]', "textarea"],
+  main: ['[role="main"]', "main"],
+  home: ['[role="main"]:has([data-testid="home-icon"])'],
+  utility: ['[class*="_homeUtilityBar_"]'],
+});
 
 class CdpIdentityMismatchError extends Error {}
 
@@ -319,6 +328,9 @@ async function loadTheme(themeDir) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("Theme root must be an object");
   }
+  if (raw.schemaVersion !== undefined && raw.schemaVersion !== 1) {
+    throw new Error(`Unsupported theme schemaVersion: ${raw.schemaVersion}`);
+  }
   const image = normalizedText(raw.image, "image", null, 240);
   if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
   const imagePath = path.resolve(realThemeDir, image);
@@ -339,6 +351,7 @@ async function loadTheme(themeDir) {
   const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
     ? raw.palette : {};
   const theme = {
+    schemaVersion: 1,
     id: normalizedText(raw.id, "id", "custom", 80),
     name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
     image,
@@ -370,7 +383,7 @@ async function loadTheme(themeDir) {
   }
   const artMetadata = readImageMetadata(imageBytes, extension);
   if (!artMetadata) {
-    throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
+    throw new Error("Theme image metadata is invalid or exceeds the 4096px / 12MP safety limit");
   }
   theme.artMetadata = artMetadata;
   const fingerprint = createHash("sha256")
@@ -399,9 +412,10 @@ async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme 
     : extension === ".webp" ? "image/webp" : "image/png";
   const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
   const payload = template
-    .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
-    .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
-    .replace("__DREAM_THEME_JSON__", JSON.stringify(loadedTheme.theme));
+    .replace("__DREAM_CSS_JSON__", () => JSON.stringify(css))
+    .replace("__DREAM_ART_JSON__", () => JSON.stringify(artDataUrl))
+    .replace("__DREAM_THEME_JSON__", () => JSON.stringify(loadedTheme.theme))
+    .replace("__DREAM_SELECTORS_JSON__", () => JSON.stringify(CODEX_DOM_SELECTORS));
   const { imageBytes: _imageBytes, ...themeState } = loadedTheme;
   return { ...themeState, payload };
 }
@@ -426,17 +440,41 @@ async function readThemeSourceStamp(loadedTheme) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
-    const markers = {
-      shell: Boolean(document.querySelector('main.main-surface')),
-      sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
-      composer: Boolean(document.querySelector('.composer-surface-chrome')),
-      main: Boolean(document.querySelector('[role="main"]')),
-    };
+    const selectorGroups = ${JSON.stringify(CODEX_DOM_SELECTORS)};
+    const queryAny = (selectors) => selectors.some((selector) => {
+      try { return Boolean(document.querySelector(selector)); } catch { return false; }
+    });
+    const entry = location.protocol === 'app:' && document.title === 'Codex' &&
+      (location.href === 'app://-/index.html' || location.href === 'app://codex/' ||
+        location.href.startsWith('app://codex/'));
+    const markers = Object.fromEntries(
+      Object.entries(selectorGroups).map(([name, selectors]) => [name, queryAny(selectors)]),
+    );
+    markers.entry = entry;
+    const legacyShell = queryAny([selectorGroups.shell[0]]) &&
+      queryAny([selectorGroups.sidebar[0]]) && (markers.composer || markers.main);
+    const currentShell = entry && markers.main && (markers.shell || markers.sidebar || markers.composer);
     return {
       markers,
-      codex: location.protocol === 'app:' && markers.shell && markers.sidebar && (markers.composer || markers.main),
+      codex: location.protocol === 'app:' && (legacyShell || currentShell),
     };
   })()`);
+}
+
+function assertPayloadIntegrity(loaded) {
+  const placeholders = [
+    "__DREAM_CSS_JSON__",
+    "__DREAM_ART_JSON__",
+    "__DREAM_THEME_JSON__",
+    "__DREAM_SELECTORS_JSON__",
+  ];
+  if (placeholders.some((placeholder) => loaded.payload.includes(placeholder))) {
+    throw new Error("Payload placeholders were not fully replaced");
+  }
+  if (!loaded.payload.includes(JSON.stringify(loaded.theme))) {
+    throw new Error("Payload did not preserve the serialized theme");
+  }
+  new VmScript(loaded.payload, { filename: "codex-dream-skin-payload.js" });
 }
 
 async function waitForCodexProbe(session, timeoutMs = 1800) {
@@ -465,11 +503,13 @@ async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
     try {
       const targets = await listAppTargets(port, expectedBrowserId);
       const connected = [];
+      const probes = [];
       for (const target of targets) {
         let session;
         try {
           session = await connectTarget(target, port);
           const probe = await probeSession(session);
+          probes.push({ targetId: target.id, markers: probe?.markers ?? null });
           if (probe?.codex) connected.push({ target, session, probe });
           else session.close();
         } catch (error) {
@@ -478,7 +518,9 @@ async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
         }
       }
       if (connected.length) return connected;
-      lastError = new Error("No page matched the expected Codex shell markers");
+      lastError = new Error(
+        `No page matched the expected Codex capabilities: ${JSON.stringify(probes).slice(0, 1600)}`,
+      );
     } catch (error) {
       if (error instanceof CdpIdentityMismatchError) throw error;
       lastError = error;
@@ -497,6 +539,7 @@ export function earlyPayloadFor(payload, revision) {
     const generationKey = "__CODEX_DREAM_SKIN_EARLY_GENERATION__";
     const appliedKey = "__CODEX_DREAM_SKIN_EARLY_APPLIED__";
     const generation = ${JSON.stringify(revision)};
+    const selectorGroups = ${JSON.stringify(CODEX_DOM_SELECTORS)};
     window[generationKey] = generation;
     let observer = null;
     let timeout = null;
@@ -510,9 +553,14 @@ export function earlyPayloadFor(payload, revision) {
       if (window[generationKey] !== generation) { stop(); return true; }
       const root = document.documentElement;
       if (!root || !document.body) return false;
-      const shell = document.querySelector('main.main-surface');
-      const sidebar = document.querySelector('aside.app-shell-left-panel');
-      if (!shell || !sidebar) return false;
+      const queryAny = (selectors) => selectors.some((selector) => {
+        try { return Boolean(document.querySelector(selector)); } catch { return false; }
+      });
+      const entry = location.protocol === "app:" && document.title === "Codex" &&
+        (location.href === "app://-/index.html" || location.href === "app://codex/" ||
+          location.href.startsWith("app://codex/"));
+      const legacyShell = queryAny([selectorGroups.shell[0]]) && queryAny([selectorGroups.sidebar[0]]);
+      if (!entry && !legacyShell) return false;
       stop();
       ${payload};
       window[appliedKey] = generation;
@@ -580,6 +628,22 @@ async function verifyRemovedSession(session) {
 
 async function verifySession(session) {
   return session.evaluate(`(() => {
+    const selectorGroups = ${JSON.stringify(CODEX_DOM_SELECTORS)};
+    const queryFirst = (selectors) => {
+      for (const selector of selectors) {
+        try {
+          const node = document.querySelector(selector);
+          if (node) return node;
+        } catch {}
+      }
+      return null;
+    };
+    const capabilities = Object.fromEntries(Object.entries(selectorGroups).map(
+      ([name, selectors]) => [name, Boolean(queryFirst(selectors))],
+    ));
+    capabilities.entry = location.protocol === 'app:' && document.title === 'Codex' &&
+      (location.href === 'app://-/index.html' || location.href === 'app://codex/' ||
+        location.href.startsWith('app://codex/'));
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
@@ -599,8 +663,9 @@ async function verifySession(session) {
       suggestionsPresent: Boolean(suggestions),
       hero: box(home?.firstElementChild?.firstElementChild?.firstElementChild),
       cards,
-      composer: box(document.querySelector('.composer-surface-chrome')),
-      sidebar: box(document.querySelector('aside.app-shell-left-panel')),
+      composer: box(queryFirst(selectorGroups.composer)),
+      sidebar: box(queryFirst(selectorGroups.sidebar)),
+      capabilities,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -609,7 +674,8 @@ async function verifySession(session) {
     };
     result.pass = result.installed && result.version === result.expectedVersion &&
       result.stylePresent && result.chromePresent &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
+      result.chromePointerEvents === 'none' && result.capabilities.main &&
+      (result.capabilities.entry || (result.capabilities.shell && result.capabilities.sidebar)) &&
       (!result.homePresent || (Boolean(result.hero) &&
         (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
     return result;
@@ -980,10 +1046,8 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
   } else if (options.mode === "check-payload") {
     const loaded = await loadPayload(options.themeDir);
-    const unresolved = ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_THEME_JSON__"]
-      .some((placeholder) => loaded.payload.includes(placeholder));
-    if (unresolved) {
-      throw new Error("Payload placeholders were not fully replaced");
+    try { assertPayloadIntegrity(loaded); } catch (error) {
+      throw new Error(`Generated payload is invalid: ${error?.message ?? error}`);
     }
     console.log(JSON.stringify({
       pass: true,

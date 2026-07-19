@@ -38,8 +38,11 @@ assert.deepEqual(classifyImageDimensions({ width: 800, height: 1200 }), {
   aspect: "portrait",
   taskMode: "ambient",
 });
-assert.equal(MAX_IMAGE_DIMENSION, 16384);
-assert.equal(MAX_IMAGE_PIXELS, 50_000_000);
+assert.equal(MAX_IMAGE_DIMENSION, 4096);
+assert.equal(MAX_IMAGE_PIXELS, 12_000_000);
+assert.notEqual(classifyImageDimensions({ width: 4000, height: 3000 }), null);
+assert.equal(classifyImageDimensions({ width: 4000, height: 3001 }), null);
+assert.equal(classifyImageDimensions({ width: 4097, height: 1 }), null);
 assert.equal(classifyImageDimensions({ width: 10000, height: 6000 }), null);
 assert.equal(classifyImageDimensions({ width: 20000, height: 1 }), null);
 assert.equal(classifyImageDimensions({ width: 2560.5, height: 1440 }), null);

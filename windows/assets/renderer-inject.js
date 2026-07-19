@@ -1,4 +1,4 @@
-((cssText, artDataUrl, rawConfig) => {
+((cssText, artDataUrl, rawConfig, rawSelectors) => {
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
@@ -41,6 +41,44 @@
       return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
     });
     return .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
+  };
+  const resolveCssColor = (value) => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext?.("2d", { willReadFrequently: true });
+      if (!context) return null;
+      const acceptsColor = (sentinel) => {
+        context.fillStyle = sentinel;
+        const baseline = context.fillStyle;
+        try { context.fillStyle = value; } catch { return false; }
+        return context.fillStyle !== baseline;
+      };
+      if (!acceptsColor("#010203") && !acceptsColor("#040506")) return null;
+      context.clearRect?.(0, 0, 1, 1);
+      context.fillStyle = value;
+      context.fillRect?.(0, 0, 1, 1);
+      const pixels = context.getImageData?.(0, 0, 1, 1)?.data;
+      if (!pixels || pixels.length < 4) return null;
+      return [pixels[0], pixels[1], pixels[2], pixels[3] / 255];
+    } catch {
+      return null;
+    }
+  };
+  const accentInkFor = (rgba, appearance, fallback) => {
+    const color = rgba ?? [...fallback, 1];
+    const alpha = Math.min(1, Math.max(0, Number(color[3] ?? 1)));
+    const backdrop = appearance === "dark" ? [31, 33, 36] : [250, 249, 247];
+    const channels = color.slice(0, 3).map((channel, index) => {
+      const value = Number(channel);
+      const clamped = Number.isFinite(value) ? Math.min(255, Math.max(0, value)) : backdrop[index];
+      return clamped * alpha + backdrop[index] * (1 - alpha);
+    });
+    const backgroundLuminance = luminance(...channels);
+    const blackContrast = (backgroundLuminance + .05) / .05;
+    const whiteContrast = 1.05 / (backgroundLuminance + .05);
+    return blackContrast >= whiteContrast ? "rgb(0 0 0)" : "rgb(255 255 255)";
   };
   const defaultProfile = {
     appearance: "dark",
@@ -85,6 +123,41 @@
     };
   };
 
+  const defaultSelectorGroups = {
+    shell: ["main.main-surface", "main"],
+    sidebar: ["aside.app-shell-left-panel", "aside"],
+    composer: [".composer-surface-chrome", '[contenteditable="true"]', "textarea"],
+    main: ['[role="main"]', "main"],
+    home: ['[role="main"]:has([data-testid="home-icon"])'],
+    utility: ['[class*="_homeUtilityBar_"]'],
+  };
+  const selectorGroups = Object.fromEntries(Object.entries(defaultSelectorGroups).map(([name, fallback]) => {
+    const requested = rawSelectors?.[name];
+    return [name, Array.isArray(requested) && requested.every((selector) => typeof selector === "string")
+      ? requested : fallback];
+  }));
+  const queryAll = (name, scope = document) => {
+    const matches = [];
+    for (const selector of selectorGroups[name] || []) {
+      try {
+        for (const node of scope.querySelectorAll(selector)) {
+          if (!matches.includes(node)) matches.push(node);
+        }
+      } catch {}
+    }
+    return matches;
+  };
+  const queryFirst = (name, scope = document) => queryAll(name, scope)[0] || null;
+  const isCodexEntryPage = () => {
+    try {
+      return location.protocol === "app:" && document.title === "Codex" &&
+        (location.href === "app://-/index.html" || location.href === "app://codex/" ||
+          location.href.startsWith("app://codex/"));
+    } catch {
+      return false;
+    }
+  };
+
   const previous = window[STATE_KEY];
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.timer) clearInterval(previous.timer);
@@ -99,6 +172,7 @@
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
   })();
   const config = normalizeConfig(rawConfig);
+  const configuredAccent = config.accent ? resolveCssColor(config.accent) : null;
   let profile = {
     ...defaultProfile,
     aspect: config.initialAspect ?? defaultProfile.aspect,
@@ -297,8 +371,8 @@
     const taskMode = config.taskMode === "auto"
       ? profile.aspect >= 2.25 ? "banner" : "ambient"
       : config.taskMode;
-    const accent = config.accent || `rgb(${profile.accent.join(" ")})`;
-    const accentInk = luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
+    const accent = configuredAccent ? config.accent : `rgb(${profile.accent.join(" ")})`;
+    const accentInk = accentInkFor(configuredAccent, appearance, profile.accent);
     root.classList.toggle("dream-theme-light", appearance === "light");
     root.classList.toggle("dream-theme-dark", appearance === "dark");
     root.classList.toggle("dream-art-wide", profile.aspect >= 1.75);
@@ -326,9 +400,15 @@
     const root = document.documentElement;
     if (!root || !document.body) return;
 
-    const shellMain = document.querySelector("main.main-surface");
-    const shellSidebar = document.querySelector("aside.app-shell-left-panel");
-    if (!shellMain || !shellSidebar) {
+    const legacyShell = document.querySelector("main.main-surface") &&
+      document.querySelector("aside.app-shell-left-panel");
+    const modernShell = isCodexEntryPage() && queryFirst("main");
+    if (!legacyShell && !modernShell) {
+      clearSkinDom();
+      return;
+    }
+    const shellMain = queryFirst("shell") || queryFirst("main");
+    if (!shellMain) {
       clearSkinDom();
       return;
     }
@@ -347,12 +427,14 @@
       style.dataset.dreamVersion = "3";
     }
 
-    const home = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
-    for (const candidate of document.querySelectorAll('[role="main"]')) {
+    const home = queryFirst("home");
+    const mainCandidates = queryAll("main");
+    if (!mainCandidates.length) mainCandidates.push(shellMain);
+    for (const candidate of mainCandidates) {
       candidate.classList.toggle("dream-home", candidate === home);
       candidate.classList.toggle("dream-task", candidate !== home);
     }
-    const utilityBars = new Set(home ? home.querySelectorAll('[class*="_homeUtilityBar_"]') : []);
+    const utilityBars = new Set(home ? queryAll("utility", home) : []);
     for (const candidate of document.querySelectorAll(`.${HOME_UTILITY_CLASS}`)) {
       if (!utilityBars.has(candidate)) candidate.classList.remove(HOME_UTILITY_CLASS);
     }
@@ -414,4 +496,4 @@
     ensure();
   });
   return { installed: true, version: "1.2.0", adaptive: true };
-})(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__)
+})(__DREAM_CSS_JSON__, __DREAM_ART_JSON__, __DREAM_THEME_JSON__, __DREAM_SELECTORS_JSON__)

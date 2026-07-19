@@ -3,6 +3,24 @@ param([switch]$EngineOnly)
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
+
+$powerShellFiles = @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.ps1' -File)
+foreach ($powerShellFile in $powerShellFiles) {
+  $sourceBytes = [System.IO.File]::ReadAllBytes($powerShellFile.FullName)
+  if ($sourceBytes.Length -lt 3 -or $sourceBytes[0] -ne 0xEF -or
+    $sourceBytes[1] -ne 0xBB -or $sourceBytes[2] -ne 0xBF) {
+    throw "Windows PowerShell source is missing a UTF-8 BOM: $($powerShellFile.FullName)"
+  }
+  $parseTokens = $null
+  $parseErrors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile(
+    $powerShellFile.FullName, [ref]$parseTokens, [ref]$parseErrors
+  ) | Out-Null
+  if ($parseErrors.Count -gt 0) {
+    throw "Windows PowerShell 5.1 could not parse $($powerShellFile.FullName): $($parseErrors[0].Message)"
+  }
+}
+
 . (Join-Path $Root 'scripts\common-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
 
@@ -181,6 +199,24 @@ try {
   if ($EngineOnly) {
     Write-Host 'PASS: managed runtime staging, replacement, invalid-source guard, and source-independent shortcuts.'
     return
+  }
+
+  Add-Type -AssemblyName System.Windows.Forms
+  function Test-DreamSkinEmptyTrayItems {
+    param(
+      [Parameter(Mandatory = $true)]
+      [AllowEmptyCollection()]
+      [System.Windows.Forms.ToolStripItemCollection]$Items
+    )
+    return $Items.Count
+  }
+  $emptyTrayMenu = [System.Windows.Forms.ContextMenuStrip]::new()
+  try {
+    if ((Test-DreamSkinEmptyTrayItems -Items $emptyTrayMenu.Items) -ne 0) {
+      throw 'An empty tray item collection did not bind as an empty collection.'
+    }
+  } finally {
+    $emptyTrayMenu.Dispose()
   }
 
   $atomicReplacePath = Join-Path $temporaryRoot 'atomic-replace.txt'
@@ -539,6 +575,17 @@ try {
   $loadedState = Read-DreamSkinState -Path $statePath
   if ($loadedState.schemaVersion -ne 3 -or $loadedState.port -ne 9335 -or
     $loadedState.browserId -cne 'browser-123') { throw 'State round-trip failed.' }
+  if ((Get-DreamSkinRuntimeStatus -State $null).Status -cne 'stopped') {
+    throw 'A missing runtime state was not reported as stopped.'
+  }
+  $staleRuntime = Get-DreamSkinRuntimeStatus -State ([pscustomobject]@{
+    injectorPid = 2147483647
+    port = 9335
+    browserId = 'browser-123'
+  })
+  if ($staleRuntime.Status -cne 'stale' -or $staleRuntime.Reason -cne 'not-running') {
+    throw 'A state whose injector no longer exists was not reported as stale.'
+  }
   $missingIdentityState = [pscustomobject]@{ schemaVersion = 3; platform = 'windows'; port = 9335 }
   Write-DreamSkinState -Path $statePath -State $missingIdentityState
   $missingIdentityRejected = $false
@@ -645,7 +692,8 @@ try {
     throw 'Theme-store migration did not retire the old preset ID while preserving custom themes.'
   }
   $initialTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($initialTheme.Theme.id -cne 'preset-arina-hashimoto' -or
+  if ($initialTheme.Theme.schemaVersion -ne 1 -or
+    $initialTheme.Theme.id -cne 'preset-arina-hashimoto' -or
     $initialTheme.Theme.name -cne '桥本有菜' -or
     $initialTheme.Theme.appearance -cne 'auto' -or
     $initialTheme.Theme.art.safeArea -cne 'left' -or
@@ -653,6 +701,16 @@ try {
     [System.IO.Path]::GetExtension($initialTheme.ImagePath) -cne '.jpg') {
     throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
   }
+  $unsupportedTheme = Join-Path $temporaryRoot 'unsupported-schema-theme'
+  New-Item -ItemType Directory -Path $unsupportedTheme | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Destination (Join-Path $unsupportedTheme 'fixture.jpg')
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $unsupportedTheme 'theme.json') `
+    -Content "{`"schemaVersion`":2,`"image`":`"fixture.jpg`"}`r`n"
+  $unsupportedThemeRejected = $false
+  try { $null = Read-DreamSkinTheme -ThemeDirectory $unsupportedTheme -SkipImageMetadata }
+  catch { $unsupportedThemeRejected = $_.Exception.Message -like 'Unsupported theme schemaVersion:*' }
+  if (-not $unsupportedThemeRejected) { throw 'PowerShell accepted an explicit future theme schema.' }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
   if ($preseededThemes.Count -ne 1 -or
     $preseededThemes[0].Id -cne 'preset-arina-hashimoto' -or
@@ -661,7 +719,8 @@ try {
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
-  if ($updatedTheme.Theme.name -cne '测试主题' -or
+  if ($updatedTheme.Theme.schemaVersion -ne 1 -or
+    $updatedTheme.Theme.name -cne '测试主题' -or
     $updatedTheme.Theme.id -cne 'custom' -or
     $updatedTheme.Theme.art.safeArea -cne 'auto' -or
     $updatedTheme.Theme.art.taskMode -cne 'auto' -or
@@ -704,7 +763,7 @@ try {
   New-Item -ItemType Directory -Path $oversizedTheme | Out-Null
   $oversizedImage = Join-Path $oversizedTheme 'oversized.jpg'
   $oversizedStream = [System.IO.File]::Open($oversizedImage, [System.IO.FileMode]::CreateNew)
-  try { $oversizedStream.SetLength((16 * 1024 * 1024) + 1) } finally { $oversizedStream.Dispose() }
+  try { $oversizedStream.SetLength((12 * 1024 * 1024) + 1) } finally { $oversizedStream.Dispose() }
   Write-DreamSkinUtf8FileAtomically -Path (Join-Path $oversizedTheme 'theme.json') `
     -Content "{`"image`":`"oversized.jpg`"}`r`n"
   $oversizedReadRejected = $false
@@ -714,7 +773,7 @@ try {
     $null = Set-DreamSkinActiveTheme -ImagePath $oversizedImage -Theme $null -StateRoot $themeStateRoot
   } catch { $oversizedSetRejected = $true }
   if (-not $oversizedReadRejected -or -not $oversizedSetRejected) {
-    throw 'The 16 MB image limit was not enforced before theme copy or payload construction.'
+    throw 'The 12 MB image limit was not enforced before theme copy or payload construction.'
   }
 
   $oversizedDimensionImage = Join-Path $temporaryRoot 'oversized-dimension.png'
@@ -726,8 +785,16 @@ try {
   $pngHeader[20] = 0; $pngHeader[21] = 0; $pngHeader[22] = 0x17; $pngHeader[23] = 0x70
   [System.IO.File]::WriteAllBytes($oversizedDimensionImage, $pngHeader)
   $oversizedDimensionRejected = $false
-  try { $null = Set-DreamSkinActiveTheme -ImagePath $oversizedDimensionImage -Theme $null -StateRoot $themeStateRoot } catch { $oversizedDimensionRejected = $true }
-  if (-not $oversizedDimensionRejected) { throw 'A 16384px/50MP-invalid import was copied into the active theme.' }
+  $oversizedDimensionError = $null
+  try { $null = Set-DreamSkinActiveTheme -ImagePath $oversizedDimensionImage -Theme $null -StateRoot $themeStateRoot }
+  catch {
+    $oversizedDimensionRejected = $true
+    $oversizedDimensionError = $_.Exception.Message
+  }
+  if (-not $oversizedDimensionRejected) { throw 'A 4096px/12MP-invalid import was copied into the active theme.' }
+  if ($oversizedDimensionError -notmatch 'Image metadata is invalid or exceeds') {
+    throw "Image metadata validation leaked a native stderr error instead of returning a controlled message: $oversizedDimensionError"
+  }
 
   $reparseStateRoot = Join-Path $temporaryRoot 'reparse-state'
   New-Item -ItemType Directory -Path $reparseStateRoot | Out-Null
@@ -761,6 +828,12 @@ try {
   }
   if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
     throw 'Tray pause/restore closures do not terminate cleanly.'
+  }
+  if (-not $traySource.Contains('[AllowEmptyCollection()]') -or
+    -not $traySource.Contains('Get-DreamSkinTrayRuntimeStatus') -or
+    -not $traySource.Contains("'verified' { '状态：运行中（已验证）' }") -or
+    $traySource.Contains('"已应用：$savedName"')) {
+    throw 'Tray collection binding or verified runtime status reporting regressed.'
   }
   if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 1 -or
     $traySource.Contains('-ExecutionPolicy Bypass')) {
@@ -808,7 +881,7 @@ try {
   }
   $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
   foreach ($requiredInjectorBehavior in @(
-    'MAX_ART_BYTES', 'createHash', 'readImageMetadata', '50MP safety limit', 'STRONG_THEME_AUDIT_MS',
+    'MAX_ART_BYTES', 'createHash', 'readImageMetadata', '12MP safety limit', 'STRONG_THEME_AUDIT_MS',
     'Page.addScriptToEvaluateOnNewDocument', 'Page.removeScriptToEvaluateOnNewDocument', 'earlyPayloadFor'
   )) {
     if (-not $injectorSource.Contains($requiredInjectorBehavior)) {
@@ -820,13 +893,17 @@ try {
     '[System.IO.FileAttributes]::ReparsePoint',
     'Ensure-DreamSkinManagedDirectory',
     'Get-DreamSkinValidatedImageMetadata',
-    '16384px / 50MP safety limit',
+    '4096px / 12MP safety limit',
     'Assert-DreamSkinImageFile -Path $temporary',
     'Assert-DreamSkinImageFile -Path $imageArchive'
   )) {
     if (-not $themeSource.Contains($requiredThemeSafety)) {
       throw "PowerShell theme-store safety is missing: $requiredThemeSafety"
     }
+  }
+  if (-not $themeSource.Contains('Invoke-DreamSkinNative -FilePath $node.Path') -or
+    $themeSource.Contains('@(& $node.Path')) {
+    throw 'PowerShell image metadata validation bypasses the native-command wrapper.'
   }
   $commonSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\common-windows.ps1')
   if (-not $commonSource.Contains('State was preserved.')) {
@@ -851,15 +928,21 @@ try {
   $payloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload')
   if ($payloadTest.ExitCode -ne 0) { throw 'Injector self-test failed.' }
+  $payloadDollarTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'injector-payload.test.mjs'))
+  if ($payloadDollarTest.ExitCode -ne 0) { throw 'Injector dollar-token payload regression test failed.' }
   $managedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
   if ($managedPayloadTest.ExitCode -ne 0) { throw 'Managed theme payload validation failed.' }
   $oversizedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $oversizedTheme)
-  if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }
+  if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 12 MB limit.' }
   $rendererTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'renderer-inject.test.mjs'))
   if ($rendererTest.ExitCode -ne 0) { throw 'Renderer auxiliary-window regression test failed.' }
+  $accessibilityTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'accessibility-css.test.mjs'))
+  if ($accessibilityTest.ExitCode -ne 0) { throw 'Windows accessibility CSS regression test failed.' }
   $bootstrapTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'injector-bootstrap.test.mjs'))
   if ($bootstrapTest.ExitCode -ne 0) { throw 'Injector early-bootstrap regression test failed.' }

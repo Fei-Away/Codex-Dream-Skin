@@ -10,6 +10,10 @@ trim_trailing_whitespace = true
 [*.md]
 trim_trailing_whitespace = false
 
+# Windows PowerShell 5.1 reads BOM-less scripts with the ANSI code page.
+[*.ps1]
+charset = utf-8-bom
+
 [*.sh]
 end_of_line = lf
 

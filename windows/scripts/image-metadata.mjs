@@ -6,8 +6,8 @@ const SOF_MARKERS = new Set([
   0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7,
   0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
 ]);
-export const MAX_IMAGE_DIMENSION = 16384;
-export const MAX_IMAGE_PIXELS = 50_000_000;
+export const MAX_IMAGE_DIMENSION = 4096;
+export const MAX_IMAGE_PIXELS = 12_000_000;
 
 function uint16be(bytes, offset) {
   return bytes[offset] * 256 + bytes[offset + 1];
@@ -147,7 +147,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       const resolved = path.resolve(imagePath);
       const bytes = await fs.readFile(resolved);
       const metadata = readImageMetadata(bytes, path.extname(resolved));
-      if (!metadata) throw new Error("Image metadata is invalid or exceeds the 16384px / 50MP safety limit");
+      if (!metadata) throw new Error("Image metadata is invalid or exceeds the 4096px / 12MP safety limit");
       console.log(JSON.stringify(metadata));
     } catch (error) {
       console.error(error?.message ?? String(error));
