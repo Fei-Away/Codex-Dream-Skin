@@ -57,11 +57,12 @@ The customer package includes `Open Dream Skin Studio.command`. Double-clicking 
 1. Locates the official Codex bundle.
 2. Validates the Codex signature, Team ID, architecture, and bundled Node.js runtime.
 3. Selects an available control-panel port from a small dedicated range that does not overlap the CDP range.
-4. Generates a cryptographically random session token.
+4. Creates a private one-use FIFO for the readiness handshake.
 5. Starts the local control service on `127.0.0.1`.
-6. Opens a URL such as `http://127.0.0.1:<port>/#token=<token>`.
+6. The service generates a cryptographically random session token and writes its ready URL once through the FIFO.
+7. The launcher reads the URL, removes the FIFO, and opens a URL such as `http://127.0.0.1:<port>/#token=<token>`.
 
-The URL fragment is not sent in the initial HTTP request. Client JavaScript reads it, removes it from the visible URL with `history.replaceState`, retains it only in `sessionStorage`, and sends it in an `X-Dream-Skin-Token` header for API requests.
+The FIFO has mode `0600`, is never a regular file, and is removed immediately after the handshake. The token is not passed in process arguments or environment variables. The URL fragment is not sent in the initial HTTP request. Client JavaScript reads it, removes it from the visible URL with `history.replaceState`, retains it only in `sessionStorage`, and sends it in an `X-Dream-Skin-Token` header for API requests.
 
 Each launcher invocation starts a new short-lived service with a new in-memory token. An older control-panel service may remain alive until its idle timeout, but a cross-process mutation lock under the state root prevents two panels from changing installation or theme state concurrently. The launcher does not reuse another service because doing so would require persisting or transferring its bearer token.
 
@@ -136,6 +137,7 @@ launcher validation and server bootstrap
 #### `scripts/web-studio-server.mjs`
 
 - Uses only built-in Node modules.
+- Generates the session token internally and reports it only through the one-use readiness FIFO.
 - Serves static assets from a fixed web asset directory.
 - Validates request method, path, `Host`, `Origin`, content type, content length, and session token.
 - Parses bounded JSON and multipart requests.
