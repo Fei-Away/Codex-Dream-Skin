@@ -244,11 +244,117 @@ function Install-DreamSkinRuntimeEngine {
   }
 }
 
+function ConvertFrom-DreamSkinStrictCommandLine {
+  param([string]$CommandLine)
+  if (-not $CommandLine) { return $null }
+
+  $tokens = [System.Collections.Generic.List[string]]::new()
+  $index = 0
+  while ($index -lt $CommandLine.Length) {
+    while ($index -lt $CommandLine.Length -and [char]::IsWhiteSpace($CommandLine[$index])) {
+      $index++
+    }
+    if ($index -ge $CommandLine.Length) { break }
+
+    $quoted = $CommandLine[$index] -eq '"'
+    if ($quoted) { $index++ }
+    $builder = [System.Text.StringBuilder]::new()
+    $closed = -not $quoted
+    while ($index -lt $CommandLine.Length) {
+      $character = $CommandLine[$index]
+      if ($quoted -and $character -eq '"') {
+        $closed = $true
+        $index++
+        break
+      }
+      if (-not $quoted -and [char]::IsWhiteSpace($character)) { break }
+      if (-not $quoted -and $character -eq '"') { return $null }
+      [void]$builder.Append($character)
+      $index++
+    }
+    if (-not $closed) { return $null }
+    if ($index -lt $CommandLine.Length -and -not [char]::IsWhiteSpace($CommandLine[$index])) {
+      return $null
+    }
+    $tokens.Add($builder.ToString())
+  }
+  return $tokens.ToArray()
+}
+
 function Test-DreamSkinCommandLineToken {
   param([string]$CommandLine, [string]$Token)
   if (-not $CommandLine -or -not $Token) { return $false }
-  $pattern = '(?i)(?:^|[\s"])' + [regex]::Escape($Token) + '(?=$|[\s"])'
-  return [regex]::IsMatch($CommandLine, $pattern)
+  $arguments = @(ConvertFrom-DreamSkinStrictCommandLine -CommandLine $CommandLine)
+  return @($arguments | Where-Object { $_ -ieq $Token }).Count -eq 1
+}
+
+function Test-DreamSkinNamedArgument {
+  param([string[]]$Arguments, [string]$Name, [string]$Value)
+  if (-not $Arguments -or -not $Name -or $null -eq $Value) { return $false }
+  $matches = 0
+  for ($index = 0; $index -lt $Arguments.Count; $index++) {
+    if ($Arguments[$index] -ieq $Name) {
+      if ($index + 1 -ge $Arguments.Count -or $Arguments[$index + 1] -cne $Value) { return $false }
+      $matches++
+      $index++
+      continue
+    }
+    $prefix = "$Name="
+    if ($Arguments[$index].StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+      if ($Arguments[$index].Substring($prefix.Length) -cne $Value) { return $false }
+      $matches++
+    }
+  }
+  return $matches -eq 1
+}
+
+function Test-DreamSkinInjectorCommandLine {
+  param([string]$CommandLine, [string]$InjectorPath, [int]$Port, [string]$BrowserId)
+  $arguments = @(ConvertFrom-DreamSkinStrictCommandLine -CommandLine $CommandLine)
+  if ($arguments.Count -lt 3 -or
+      -not (Test-DreamSkinPathEqual -Left $arguments[1] -Right $InjectorPath) -or
+      $arguments[2] -cne '--watch') {
+    return $false
+  }
+  return (Test-DreamSkinNamedArgument -Arguments $arguments -Name '--port' -Value "$Port") -and
+    (Test-DreamSkinNamedArgument -Arguments $arguments -Name '--browser-id' -Value $BrowserId)
+}
+
+function Test-DreamSkinPowerShellFileCommandLine {
+  param([string]$CommandLine, [string]$ScriptPath)
+  $arguments = @(ConvertFrom-DreamSkinStrictCommandLine -CommandLine $CommandLine)
+  if ($arguments.Count -lt 3) { return $false }
+  $hostName = [System.IO.Path]::GetFileName($arguments[0])
+  if ($hostName -ine 'powershell.exe' -and $hostName -ine 'pwsh.exe') { return $false }
+
+  for ($index = 1; $index -lt $arguments.Count; $index++) {
+    $argument = $arguments[$index]
+    if ($argument -ieq '-File') {
+      return $index + 1 -lt $arguments.Count -and
+        (Test-DreamSkinPathEqual -Left $arguments[$index + 1] -Right $ScriptPath)
+    }
+    if ($argument -iin @('-NoProfile', '-NoLogo', '-NonInteractive', '-STA', '-MTA')) {
+      continue
+    }
+    if ($argument -ieq '-WindowStyle') {
+      if ($index + 1 -ge $arguments.Count -or
+          $arguments[$index + 1] -inotmatch '^(Normal|Minimized|Maximized|Hidden)$') {
+        return $false
+      }
+      $index++
+      continue
+    }
+    if ($argument -ieq '-ExecutionPolicy') {
+      if ($index + 1 -ge $arguments.Count -or
+          $arguments[$index + 1] -inotmatch '^(AllSigned|Bypass|Default|RemoteSigned|Restricted|Undefined|Unrestricted)$') {
+        return $false
+      }
+      $index++
+      continue
+    }
+    return $false
+  }
+  return $false
 }
 
 function ConvertTo-DreamSkinProcessArgument {
@@ -739,19 +845,9 @@ function Stop-DreamSkinRecordedInjector {
   $isNodeExecutable = [System.IO.Path]::GetFileName("$processPath") -ieq 'node.exe'
   $nodeMatches = -not $State.nodePath -or
     (Test-DreamSkinPathEqual -Left $processPath -Right "$($State.nodePath)")
-  $injectorMatches = [bool]($expectedInjector -and
-    (Test-DreamSkinCommandLineToken -CommandLine $commandLine -Token $expectedInjector) -and
-    (Test-DreamSkinCommandLineToken -CommandLine $commandLine -Token '--watch'))
-  if ($State.port) {
-    $portPattern = '(?i)(?:^|\s)--port(?:=|\s+)' + [regex]::Escape("$($State.port)") + '(?=$|\s)'
-    $injectorMatches = $injectorMatches -and [regex]::IsMatch($commandLine, $portPattern)
-  } else {
-    $injectorMatches = $false
-  }
-  if ($State.browserId) {
-    $browserPattern = '(?:^|\s)(?i:--browser-id)(?:=|\s+)' + [regex]::Escape("$($State.browserId)") + '(?=$|\s)'
-    $injectorMatches = $injectorMatches -and [regex]::IsMatch($commandLine, $browserPattern)
-  }
+  $injectorMatches = [bool]($expectedInjector -and $State.port -and $State.browserId -and
+    (Test-DreamSkinInjectorCommandLine -CommandLine $commandLine `
+      -InjectorPath $expectedInjector -Port ([int]$State.port) -BrowserId "$($State.browserId)"))
   $startedAt = Get-DreamSkinProcessStartedAt -ProcessId $processId
   $startMatches = -not $State.injectorStartedAt -or $startedAt -eq "$($State.injectorStartedAt)"
   $identityMatches = [bool]($isNodeExecutable -and $nodeMatches -and $injectorMatches -and $startMatches)
