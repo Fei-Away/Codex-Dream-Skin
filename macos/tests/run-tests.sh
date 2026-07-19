@@ -78,7 +78,12 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$NO_DESKTOP_CONFIG" "$NO_DESKTOP_BACKUP" >/dev/null
 /usr/bin/cmp -s "$NO_DESKTOP_CONFIG" "$TMP/original-without-desktop.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.2" ]' _ "$ROOT"
+EXPECTED_VERSION="$(/usr/bin/tr -d '[:space:]' < "$ROOT/VERSION")"
+PACKAGE_VERSION="$("$NODE" -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' "$ROOT/package.json")"
+[ "$EXPECTED_VERSION" = "$PACKAGE_VERSION" ]
+/usr/bin/grep -q "SKIN_VERSION=\"$EXPECTED_VERSION\"" "$ROOT/scripts/common-macos.sh"
+/usr/bin/grep -q "const SKIN_VERSION = \"$EXPECTED_VERSION\";" "$ROOT/scripts/injector.mjs"
+/usr/bin/env -u HOME EXPECTED_VERSION="$EXPECTED_VERSION" /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "$EXPECTED_VERSION" ]' _ "$ROOT"
 "$ROOT/scripts/doctor-macos.sh" >/dev/null
 
 printf 'PASS: syntax, payload, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'

@@ -20,7 +20,7 @@
 1. 找到我上传的 ZIP 和图片附件的本机绝对路径，解压完整 ZIP 到一个不会被中途清理的工作目录。所有包含空格或中文的路径都要正确引用。
 
 2. 解压后的客户目录根部应能看到：
-   - `安装 Codex 主题编辑器.command`
+   - `打开 Codex 主题控制台.command`
    - `使用说明.txt`
    - `给 Codex 的部署提示词.md`
    完整引擎位于隐藏目录 `.codex-dream-skin-studio`。这是正常结构，不要删除、改名或只复制其中的 CSS/图片。Finder 默认看不到隐藏目录时，直接从终端使用其绝对路径。
@@ -31,13 +31,13 @@
    - `<ENGINE>/references/qa-inventory.md`
    然后运行 `<ENGINE>/tests/run-tests.sh`。测试失败时先定位并修复，禁止跳过。
 
-4. 确认官方 Codex 至少运行过一次，且 `~/.codex/config.toml` 已存在。运行：
-   `<ENGINE>/scripts/install-dream-skin-macos.sh --no-launch`
-   完整项目应被安装到 `~/.codex/codex-dream-skin-studio`，并生成桌面启动、定制、验证和恢复入口。
+4. 确认官方 Codex 至少运行过一次，且 `~/.codex/config.toml` 已存在。双击客户目录中的
+   `打开 Codex 主题控制台.command`，确认浏览器打开 `http://127.0.0.1:<端口>/` 的本机页面。
+   首次使用在页面中点击安装按钮。完整项目应被安装到
+   `~/.codex/codex-dream-skin-studio`，并生成桌面 `Codex Dream Skin Studio.command`。
 
-5. 如果我上传了主题图片，使用安装后的脚本处理素材：
-   `~/.codex/codex-dream-skin-studio/scripts/customize-theme-macos.sh --image "<图片绝对路径>" --name "我的 Codex Dream Skin" --no-apply`
-   如果我在消息中另写了主题名称、口号或配色，则优先使用我提供的内容。必须让脚本完成图片转换与压缩，不要手工覆盖项目源文件。若没有图片，保留项目内置示例主题。
+5. 如果我上传了主题图片，在网页中选择该图片，填写主题名称、口号和配色，点击保存并应用。
+   必须让控制台完成图片验证、转换与压缩，不要手工覆盖项目源文件。若没有图片，使用页面中的内置演示主题。
 
 6. 我明确授权你在本次部署中关闭并重启官方 Codex 一次，以启用本机回环 CDP。只允许处理官方 Codex 及本项目可核验身份的注入守护进程，不得关闭其他应用。使用安装后的启动脚本执行真实重启，不要让我自行猜测是否生效。
 
@@ -46,7 +46,9 @@
    - `~/.codex/codex-dream-skin-studio/scripts/verify-dream-skin-macos.sh --reload --screenshot "<首页验收截图绝对路径>"`
    验证器必须真实返回 `pass: true`。随后还要检查一个正常任务页面，确认背景存在且正文、菜单、侧栏和输入框仍清晰可用，并保存任务页截图。
 
-8. 检查桌面已存在以下四个入口：
+8. 检查桌面至少存在网页入口：
+   - `Codex Dream Skin Studio.command`
+   同时保留以下兼容入口：
    - `Codex Dream Skin.command`
    - `Codex Dream Skin - Customize.command`
    - `Codex Dream Skin - Verify.command`
@@ -60,7 +62,7 @@
 - tests、doctor、verify 的真实结果，其中 verify 必须注明是否 `pass: true`；
 - 首页与任务页实机截图绝对路径；
 - 安装目录；
-- 桌面四个入口是否齐全；
+- 桌面网页入口和四个兼容入口是否齐全；
 - 一键恢复入口；
 - 官方应用代码签名是否仍有效；
 - 明确说明官方 `.app` 和 `app.asar` 均未被修改。

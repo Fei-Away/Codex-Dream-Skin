@@ -14,30 +14,25 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 - Official Codex Desktop installed and launched at least once (`~/.codex/config.toml` exists)
 - No global Node.js install required (uses Codex’s signed bundled Node after validation)
 
-## Quick start (from this repo)
+## 网页控制台快速开始
 
 ```bash
-# 1) Optional static checks (needs Codex.app present for bundled Node path)
-./tests/run-tests.sh
-
-# 2) Install to the stable path and create Desktop launchers
-./scripts/install-dream-skin-macos.sh --no-launch
-
-# 3) Customize with your image (Finder picker if you omit flags)
-~/.codex/codex-dream-skin-studio/scripts/customize-theme-macos.sh
-
-# 4) Start / re-apply, verify, or restore via Desktop:
-#    Codex Dream Skin.command
-#    Codex Dream Skin - Customize.command
-#    Codex Dream Skin - Verify.command
-#    Codex Dream Skin - Restore.command
-
-# 5) Optional: menu bar (SwiftBar) — apply / pause / change image
-./Install\ Menu\ Bar.command
-# Look for 🎨 Skin in the top-right menu bar
+./Open\ Dream\ Skin\ Studio.command
 ```
 
-Install location after step 2:
+浏览器会打开本机主题控制台。首次使用点击“安装到本机”，之后桌面会生成
+`Codex Dream Skin Studio.command`，以后双击它即可再次打开。
+
+网页中可以完成：
+
+- 拖放或选择 PNG、JPEG、HEIC、TIFF、WebP 图片，并预览首页与任务页裁切效果；
+- 自定义主题名称、标语、引文和三组颜色；
+- 保存多套主题并一键切换，或恢复内置演示主题；
+- 应用、重新应用、暂停皮肤，查看任务进度与诊断结果；
+- 生成真实 Codex 验证截图；
+- 完全恢复官方外观。重启正在运行的 Codex 和完全恢复都需要二次确认。
+
+安装后路径：
 
 | Item | Path |
 | --- | --- |
@@ -45,7 +40,9 @@ Install location after step 2:
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
 
-## Customer ZIP (optional packaging)
+原有命令行脚本和 SwiftBar 菜单仍可使用；网页控制台是默认推荐入口。
+
+## 客户 ZIP（可选）
 
 To build the “double-click install” folder layout for non-git users:
 
@@ -53,18 +50,20 @@ To build the “double-click install” folder layout for non-git users:
 ./scripts/build-client-release.sh "$HOME/Desktop/Codex 主题编辑器.zip"
 ```
 
-That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio` engine. Do not ship only CSS/images.
+ZIP 中可见入口是 `打开 Codex 主题控制台.command`，完整引擎位于隐藏目录
+`.codex-dream-skin-studio`。不要只分发 CSS 或图片。
 
-## How it works (security boundary)
+## 工作原理与安全边界
 
-1. Discover `com.openai.codex` and validate signature / Team ID / arch / bundled Node.
-2. Start Codex via user `launchd` with CDP bound to `127.0.0.1` only.
-3. Accept the debug port only when it belongs to Codex (or a legitimate child).
-4. Inject only into expected `app://` renderer targets.
-5. Keep a small injector alive across reloads and route changes.
-6. Restore stops the injector only when PID, path, and start time match the recorded job.
+1. 发现 `com.openai.codex`，校验官方应用与内置 Node 的签名、Team ID 和架构。
+2. 控制台 HTTP 服务与 Codex CDP 都仅绑定 IPv4 `127.0.0.1`，不监听局域网。
+3. 每次打开控制台生成临时随机令牌；令牌从 URL fragment 转入当前标签页会话，不写日志。
+4. 页面不加载 CDN、远程字体、分析脚本或其他公网资源；服务同时校验 Host、Origin 与令牌。
+5. API 只暴露固定的安装、主题、应用、暂停、验证和恢复动作，不接受任意命令或文件路径。
+6. 只向预期的 `app://` Codex renderer 注入，并验证 CDP 端口归属；不修改 `.app`、`app.asar` 或签名。
+7. 无活动 30 分钟后控制服务自动退出；关闭标签页后也可等待它自行退出。
 
-CDP is powerful and unauthenticated on loopback. Prefer Restore when you are done theming.
+CDP 本身是强能力的本机调试接口。无需继续使用皮肤时，请在网页中选择“完全恢复官方外观”。
 
 ## Image guidelines
 

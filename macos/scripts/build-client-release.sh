@@ -25,7 +25,7 @@ trap '/bin/rm -rf "$TMP"' EXIT
   > "$CLIENT_ROOT/打开 Codex 主题控制台.command"
 
 /usr/bin/printf '%s\n' \
-  'Codex 主题编辑器 1.1.2' \
+  'Codex 主题编辑器 1.2.0' \
   '' \
   '推荐方式：把这个完整 ZIP、你喜欢的图片和“给 Codex 的部署提示词.md”一起发给自己的 Codex。' \
   '' \
