@@ -102,8 +102,8 @@ async function readBoundedBody(request, maximum) {
 }
 
 function assertContentType(request, expected) {
-  const value = String(request.headers["content-type"] ?? "").toLowerCase();
-  if (!value.startsWith(expected)) {
+  const value = String(request.headers["content-type"] ?? "");
+  if (!value.toLowerCase().startsWith(expected)) {
     throw new WebStudioError("unsupported_media_type", `Expected ${expected}.`, 415);
   }
   return value;

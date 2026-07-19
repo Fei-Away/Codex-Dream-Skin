@@ -262,6 +262,38 @@ test("parses a bounded multipart theme upload and rejects unknown fields", async
   assert.equal((await invalidResponse.json()).error.code, "validation_error");
 });
 
+test("preserves a mixed-case Chrome multipart boundary", async (t) => {
+  const fixture = await serverFixture(t);
+  const boundary = "----WebKitFormBoundaryAbC123xYz";
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="theme.jpg"\r\n` +
+      "Content-Type: image/jpeg\r\n\r\n",
+      "utf8",
+    ),
+    Buffer.from("ffd8ffe0", "hex"),
+    Buffer.from(
+      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\n` +
+      `Chrome 主题\r\n--${boundary}--\r\n`,
+      "utf8",
+    ),
+  ]);
+  const response = await fetch(`${fixture.origin}/api/themes`, {
+    method: "POST",
+    headers: {
+      ...fixture.apiHeaders({ withOrigin: true }),
+      "Content-Type": `multipart/form-data; boundary=${boundary}`,
+    },
+    body,
+  });
+  assert.equal(response.status, 202);
+  const job = await fixture.job((await response.json()).jobId);
+  assert.equal(job.state, "succeeded");
+  const call = fixture.calls.find((entry) => entry.operation === "createTheme");
+  assert.equal(call.input.fields.name, "Chrome 主题");
+  assert.equal(call.input.bytes.toString("hex"), "ffd8ffe0");
+});
+
 test("rejects oversized and unexpected request bodies before execution", async (t) => {
   const fixture = await serverFixture(t);
   const oversized = await fetch(`${fixture.origin}/api/session/pause`, {
