@@ -19,21 +19,25 @@ Run the installer after Codex has fully exited. Normal use does not require admi
 Open PowerShell in the repository's `windows` directory and run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-dream-skin.ps1
 ```
 
-The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
+The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it creates these shortcuts:
 
 - `Codex Dream Skin`: launch or reapply the skin.
-- `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
-`Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
+Add `-TrayShortcut` explicitly if you also want the system-tray theme controls. If a downloaded ZIP leaves Internet-zone markers on the scripts, unblock this source copy first, then install with `RemoteSigned`. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
+
+```powershell
+Get-ChildItem .\scripts -Filter *.ps1 | Unblock-File
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-dream-skin.ps1 -TrayShortcut
+```
 
 Pass `-Port` during installation to use a fixed custom port. Valid ports range from `1024` through `65535`.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -Port 9444
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-dream-skin.ps1 -Port 9444
 ```
 
 ## Update
@@ -47,13 +51,13 @@ The `Codex Dream Skin` shortcut is the recommended launcher. It asks for confirm
 Command-line launch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\start-dream-skin.ps1 -PromptRestart
 ```
 
 Run verification after launch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-skin.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-dream-skin.ps1 `
   -ScreenshotPath "$env:TEMP\codex-dream-skin.png"
 ```
 
@@ -69,7 +73,7 @@ Next, use the generated screenshot to check horizontal overflow and text contras
 
 ## Change and save themes
 
-Open `Codex Dream Skin - Tray` to:
+After installing with `-TrayShortcut`, open `Codex Dream Skin - Tray` to:
 
 - Import a PNG, JPEG, or WebP background.
 - Save the active theme and switch through saved themes.
@@ -83,14 +87,14 @@ Import a UI-free wallpaper rather than a preview containing a window, sidebar, c
 Restore the stock appearance. If Codex is running, confirm its closure and relaunch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-skin.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\restore-dream-skin.ps1 `
   -RestoreBaseTheme -PromptRestart
 ```
 
 Add `-Uninstall` to also remove the shortcuts created by Dream Skin:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-skin.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\restore-dream-skin.ps1 `
   -RestoreBaseTheme -PromptRestart -Uninstall
 ```
 
@@ -134,7 +138,7 @@ Close every Codex window and run the installer again. Installation requires stab
 
 ### Antivirus reports the old tray shortcut
 
-Older tray shortcuts combined hidden PowerShell with `ExecutionPolicy Bypass`, which can trigger behavior-based LNK detections. Do not whitelist the detection blindly. Update the source and rerun the installer so the shortcuts use `RemoteSigned`. If the updated shortcut is still detected, leave it quarantined and report the antivirus product, version, detection name, and shortcut properties without sharing secrets or private data.
+Older tray shortcuts combined hidden PowerShell with `ExecutionPolicy Bypass`, which can trigger behavior-based LNK detections. Do not whitelist the detection blindly. Update the source and rerun the installer. The current installer does not create a tray shortcut by default; it installs the tray entry only when `-TrayShortcut` is explicitly passed, and the shortcut uses `RemoteSigned`. If the updated shortcut is still detected, leave it quarantined and report the antivirus product, version, detection name, and shortcut properties without sharing secrets or private data.
 
 ### The port is occupied
 

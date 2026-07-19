@@ -1,5 +1,12 @@
 # Windows Changelog
 
+## Unreleased
+
+### 修复
+
+- 默认安装不再创建系统托盘快捷方式，也不再立即隐藏启动托盘进程；需要托盘控制时显式传入 `-TrayShortcut` 或 `-StartTray`。这降低了部分杀毒软件对「LNK 启动隐藏 PowerShell」行为的启发式误报概率。
+- Windows 使用说明的默认命令改用 `RemoteSigned`，并提示 ZIP 下载用户先显式 `Unblock-File` 源码脚本，减少用户复制 `ExecutionPolicy Bypass` 命令造成的安全软件告警。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增
