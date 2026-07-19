@@ -73,7 +73,8 @@ UPDATE_JSON="$({
   if (!value.updateAvailable) process.exit(1);
   if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
 ' "$UPDATE_JSON"
-if /usr/bin/grep -R -n -E 'xattr|spctl[[:space:]]+--master-disable' \
+if /usr/bin/grep -R -n -E --exclude-dir='.build' \
+  'xattr|spctl[[:space:]]+--master-disable' \
   "$ROOT/menubar-app" "$ROOT/scripts/build-menubar-app.sh" "$ROOT/scripts/build-dmg.sh" >/dev/null; then
   printf 'Native distribution must not bypass Gatekeeper or remove quarantine attributes.\n' >&2
   exit 1

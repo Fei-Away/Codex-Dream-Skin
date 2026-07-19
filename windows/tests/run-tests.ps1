@@ -228,18 +228,21 @@ try {
     return
   }
 
-  $atomicReplacePath = Join-Path $temporaryRoot 'atomic-replace.txt'
+  $atomicTestRoot = Join-Path $temporaryRoot 'atomic-writer'
+  New-Item -ItemType Directory -Path $atomicTestRoot | Out-Null
+  $atomicReplacePath = Join-Path $atomicTestRoot 'atomic-replace.txt'
   [System.IO.File]::WriteAllText($atomicReplacePath, 'before')
   Write-DreamSkinUtf8FileAtomically -Path $atomicReplacePath -Content 'after'
   if ((Read-DreamSkinUtf8File -Path $atomicReplacePath) -cne 'after') {
     throw 'Atomic writer did not replace an existing file under Windows PowerShell.'
   }
-  $atomicArtifacts = @(Get-ChildItem -LiteralPath $temporaryRoot -Force |
+  $atomicArtifacts = @(Get-ChildItem -LiteralPath $atomicTestRoot -Force |
     Where-Object { $_.FullName -ne $atomicReplacePath })
   if ($atomicArtifacts.Count -ne 0) {
     throw 'Atomic writer left internal replacement artifacts behind.'
   }
   Remove-Item -LiteralPath $atomicReplacePath -Force
+  Remove-Item -LiteralPath $atomicTestRoot -Force
 
   $realAtomicCleanup = (Get-Command Remove-DreamSkinAtomicArtifact -CommandType Function).ScriptBlock
   $previousWarningPreference = $WarningPreference
