@@ -26,6 +26,7 @@ $publicPresetRoot = Join-Path (Join-Path (Join-Path $repositoryRoot 'macos') 'pr
 $publicPresetImagePath = Join-Path $publicPresetRoot 'background.jpg'
 $publicPresetThemePath = Join-Path $publicPresetRoot 'theme.json'
 $publicPresetImageSha256 = 'b76a7cbe2ff9d923846e931984d243a7ba1f25de8d190b5c6412c809c41aee42'
+$publicPresetThemeSha256 = 'fd250dc6c0ec1eea724f59a86c7c126a6bd9b90798289483a00948d57e23e52e'
 
 function Read-ReleaseTextFile {
   param([Parameter(Mandatory = $true)][string]$Path)
@@ -268,6 +269,10 @@ $publicPresetImageHash = (Get-FileHash -LiteralPath $publicPresetImagePath -Algo
 if ($publicPresetImageHash -cne $publicPresetImageSha256) {
   throw "The reviewed public preset image changed. Expected $publicPresetImageSha256, found $publicPresetImageHash."
 }
+$publicPresetThemeHash = (Get-FileHash -LiteralPath $publicPresetThemePath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($publicPresetThemeHash -cne $publicPresetThemeSha256) {
+  throw "The reviewed public preset metadata changed. Expected $publicPresetThemeSha256, found $publicPresetThemeHash."
+}
 $compiler = Resolve-IsccExecutable -RequestedPath $IsccPath
 
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $repositoryRoot 'release' }
@@ -317,6 +322,8 @@ try {
   New-Item -ItemType Directory -Path $payloadRoot | Out-Null
   Copy-ReleaseDirectory -Source (Join-Path $windowsRoot 'assets') -Destination (Join-Path $payloadRoot 'assets')
   Copy-ReleaseDirectory -Source (Join-Path $windowsRoot 'scripts') -Destination (Join-Path $payloadRoot 'scripts')
+  Copy-ReleaseDirectory -Source $publicPresetRoot `
+    -Destination (Join-Path $payloadRoot 'presets\preset-gothic-void-crusade')
   Copy-Item -LiteralPath $publicPresetImagePath `
     -Destination (Join-Path (Join-Path $payloadRoot 'assets') 'dream-reference.jpg') -Force
   $publicPresetTheme.image = 'dream-reference.jpg'
@@ -354,6 +361,8 @@ try {
     'assets\renderer-inject.js',
     'assets\theme.json',
     'assets\codex-dream-skin.ico',
+    'presets\preset-gothic-void-crusade\background.jpg',
+    'presets\preset-gothic-void-crusade\theme.json',
     'scripts\check-update.ps1',
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',
@@ -375,9 +384,13 @@ try {
   }
   $stagedPublicImage = Join-Path (Join-Path $payloadRoot 'assets') 'dream-reference.jpg'
   $stagedPublicImageHash = (Get-FileHash -LiteralPath $stagedPublicImage -Algorithm SHA256).Hash.ToLowerInvariant()
+  $stagedPublicThemePath = Join-Path (Join-Path $payloadRoot 'presets') `
+    'preset-gothic-void-crusade\theme.json'
+  $stagedPublicThemeHash = (Get-FileHash -LiteralPath $stagedPublicThemePath -Algorithm SHA256).Hash.ToLowerInvariant()
   $stagedPublicTheme = (Read-ReleaseTextFile `
     -Path (Join-Path (Join-Path $payloadRoot 'assets') 'theme.json')) | ConvertFrom-Json
   if ($stagedPublicImageHash -cne $publicPresetImageSha256 -or
+    $stagedPublicThemeHash -cne $publicPresetThemeSha256 -or
     "$($stagedPublicTheme.id)" -cne 'preset-gothic-void-crusade' -or
     "$($stagedPublicTheme.image)" -cne 'dream-reference.jpg') {
     throw 'Staged installer payload did not retain the reviewed public release theme.'

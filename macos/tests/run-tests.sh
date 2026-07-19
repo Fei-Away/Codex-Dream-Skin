@@ -78,6 +78,26 @@ if /usr/bin/grep -R -n -E 'xattr|spctl[[:space:]]+--master-disable' \
   printf 'Native distribution must not bypass Gatekeeper or remove quarantine attributes.\n' >&2
   exit 1
 fi
+if /usr/bin/grep -n -F -q 'xattr' \
+  "$ROOT/scripts/build-client-release.sh" "$ROOT/scripts/build-release.sh" >/dev/null; then
+  printf 'Standalone release builders must not strip quarantine or include the restricted Arina preset.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q "presets/preset-arina-hashimoto/" \
+  "$ROOT/scripts/build-client-release.sh" "$ROOT/scripts/build-release.sh"; then
+  printf 'Standalone release builders must explicitly exclude the restricted Arina preset.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q 'DEPLOY_PREVIOUS' "$ROOT/scripts/install-dream-skin-macos.sh" ||
+   ! /usr/bin/grep -F -q 'rollback_deployed_project' "$ROOT/scripts/install-dream-skin-macos.sh"; then
+  printf 'The macOS outer installer must roll back a failed engine deployment.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q '# CodexDreamSkinStudio launcher' \
+   "$ROOT/scripts/restore-dream-skin-macos.sh"; then
+  printf 'macOS uninstall must remove only launchers owned by Dream Skin.\n' >&2
+  exit 1
+fi
 
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
@@ -148,6 +168,8 @@ STANDALONE_DOCS="$TMP/standalone-source-docs"
 /usr/bin/grep -F -q 'https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/assets/theme.json' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 [ -f "$STANDALONE_ROOT/docs/images/hero-banner-red-white.png" ]
+[ ! -e "$STANDALONE_ROOT/docs/images/presets/arina-hashimoto-source.png" ]
+/usr/bin/grep -F -q 'arina-hashimoto' "$STANDALONE_ROOT/NOTICE.md"
 /usr/bin/grep -F -q '`docs/images/presets/arina-hashimoto-source.png`' \
   "$STANDALONE_ROOT/NOTICE.md"
 /usr/bin/grep -F -q 'not included in this macOS archive' \

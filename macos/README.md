@@ -10,7 +10,7 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 
 ## Requirements
 
-- macOS
+- macOS 13 Ventura or newer (the native DMG app declares macOS 13 as its minimum)
 - Official Codex Desktop installed and launched at least once (`~/.codex/config.toml` exists)
 - No global Node.js install required (uses Codex’s signed bundled Node after validation)
 
@@ -56,7 +56,7 @@ Install location after step 2:
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
 
-## Legacy customer ZIP (optional packaging)
+## Legacy standalone ZIP (maintainer/offline packaging only)
 
 To build the “double-click install” folder layout for non-git users:
 
@@ -65,8 +65,11 @@ To build the “double-click install” folder layout for non-git users:
 ```
 
 That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio`
-engine. Prefer the DMG for new deliveries; keep this ZIP only for existing
-offline workflows. Do not ship only CSS/images.
+engine and is staged as a rights-clean package with only the redistributable
+Gothic Void Crusade preset. It is retained for existing offline workflows;
+prefer the DMG for ordinary users, and do not share a source checkout or an
+archive containing the excluded Arina reference files. Do not ship only
+CSS/images.
 
 ## How it works (security boundary)
 

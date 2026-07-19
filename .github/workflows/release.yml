@@ -85,6 +85,7 @@ jobs:
             CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS=1 \
             CODEX_DREAM_SKIN_SKIP_DOCTOR=1 \
             ./macos/tests/run-tests.sh
+          swift test --package-path macos/menubar-app
           test -x macos/scripts/build-dmg.sh || chmod +x macos/scripts/build-dmg.sh
           # The builder owns app assembly, engine staging, and ad-hoc signing.
           # Release signing/notarization remains optional and is intentionally

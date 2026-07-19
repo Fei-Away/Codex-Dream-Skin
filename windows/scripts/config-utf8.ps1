@@ -456,7 +456,7 @@ function Install-DreamSkinBaseTheme {
     Write-DreamSkinUtf8FileAtomically -Path $ConfigPath -Content $content -ExpectedBytes $originalBytes
     $writeCompleted = $true
   } catch {
-    if ($backupCreated -and -not $writeCompleted) {
+    if (-not $writeCompleted) {
       $configUnchanged = $false
       try {
         $configUnchanged = (Test-Path -LiteralPath $ConfigPath -PathType Leaf) -and
@@ -473,7 +473,7 @@ function Install-DreamSkinBaseTheme {
             $markerCleanupSucceeded = $false
           }
         }
-        if ($markerCleanupSucceeded) {
+        if ($markerCleanupSucceeded -and $backupCreated) {
           Remove-Item -LiteralPath $BackupPath -Force -ErrorAction SilentlyContinue
         }
       }

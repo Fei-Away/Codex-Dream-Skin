@@ -115,6 +115,8 @@ try {
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
     'assets\theme.json',
+    'presets\preset-gothic-void-crusade\background.jpg',
+    'presets\preset-gothic-void-crusade\theme.json',
     'scripts\check-update.ps1',
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',

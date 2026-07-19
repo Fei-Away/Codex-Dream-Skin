@@ -61,6 +61,11 @@ chinesesimplified.ConfirmUninstall=卸载将关闭 Codex、恢复官方外观并
 Name: "startup"; Description: "Start Codex Dream Skin when I sign in"; GroupDescription: "Additional options:"; Flags: unchecked
 
 [Files]
+; Keep a second, temporary copy so initialization runs before Inno starts
+; copying/registering the installed application files. Exceptions from
+; CurStepChanged(ssInstall) are fatal and therefore stop Setup cleanly.
+Source: "{#StageRoot}\setup-bootstrap.ps1"; DestDir: "{tmp}"; Flags: dontcopy noencryption
+Source: "{#StageRoot}\payload\*"; DestDir: "{tmp}\payload"; Flags: dontcopy noencryption recursesubdirs createallsubdirs
 Source: "{#StageRoot}\setup-bootstrap.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StageRoot}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StageRoot}\NOTICE.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -74,15 +79,20 @@ Name: "{userstartup}\Codex Dream Skin"; Filename: "{#PowerShellPath}"; Parameter
 Filename: "{#PowerShellPath}"; Parameters: "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ""{app}\setup-bootstrap.ps1"" -LaunchTray"; WorkingDir: "{app}"; Description: "Launch Codex Dream Skin"; Flags: nowait postinstall skipifsilent
 
 [Code]
-function PowerShellArguments(const ActionArguments: String; const Silent: Boolean): String;
+function PowerShellArguments(
+  const ScriptPath: String;
+  const ActionArguments: String;
+  const Silent: Boolean
+): String;
 begin
   Result := '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' +
-    AddQuotes(ExpandConstant('{app}\setup-bootstrap.ps1')) + ' ' + ActionArguments;
+    AddQuotes(ScriptPath) + ' ' + ActionArguments;
   if Silent then
     Result := Result + ' -Silent';
 end;
 
 function RunBootstrap(
+  const ScriptPath: String;
   const ActionArguments: String;
   const Silent: Boolean;
   var ExitCode: Integer
@@ -90,8 +100,8 @@ function RunBootstrap(
 begin
   Result := Exec(
     ExpandConstant('{#PowerShellPath}'),
-    PowerShellArguments(ActionArguments, Silent),
-    ExpandConstant('{app}'),
+    PowerShellArguments(ScriptPath, ActionArguments, Silent),
+    ExtractFileDir(ScriptPath),
     SW_HIDE,
     ewWaitUntilTerminated,
     ExitCode
@@ -101,7 +111,7 @@ end;
 function InstallInitializationFailureMessage(const ExitCode: Integer): String;
 begin
   Result := Format(
-    'Codex Dream Skin could not be initialized (exit code %d). Setup will roll back the installed files.',
+    'Codex Dream Skin could not be initialized (exit code %d). No installed application files were changed.',
     [ExitCode]
   );
 end;
@@ -109,11 +119,15 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ExitCode: Integer;
+  TemporaryBootstrap: String;
 begin
-  if CurStep <> ssPostInstall then
+  if CurStep <> ssInstall then
     exit;
 
-  if not RunBootstrap('-Install', WizardSilent, ExitCode) then
+  ExtractTemporaryFiles('{tmp}\setup-bootstrap.ps1');
+  ExtractTemporaryFiles('{tmp}\payload\*');
+  TemporaryBootstrap := ExpandConstant('{tmp}\setup-bootstrap.ps1');
+  if not RunBootstrap(TemporaryBootstrap, '-Install', WizardSilent, ExitCode) then
     RaiseException('Codex Dream Skin initialization could not be started.');
   if ExitCode <> 0 then
     RaiseException(InstallInitializationFailureMessage(ExitCode));
@@ -127,7 +141,7 @@ begin
     exit;
 
   { The standard Inno confirmation has completed before usUninstall. }
-  if not RunBootstrap('-Uninstall', True, ExitCode) then
+  if not RunBootstrap(ExpandConstant('{app}\setup-bootstrap.ps1'), '-Uninstall', True, ExitCode) then
     RaiseException('Codex Dream Skin restoration could not be started. No installed files were removed.');
   if ExitCode <> 0 then
     RaiseException(Format(

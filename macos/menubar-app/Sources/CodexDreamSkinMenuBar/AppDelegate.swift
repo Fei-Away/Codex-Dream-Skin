@@ -150,17 +150,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     addDisabledItem("版本：v\(appVersion)")
 
     menu.addItem(.separator())
+    let busy = operationInFlight || engineInstallInFlight || snapshot.busy
     let needsEngineInstall = engineNeedsInstall()
     if engineInstallInFlight {
       addDisabledItem("正在安装引擎…")
     } else {
       addActionItem(
         needsEngineInstall ? "安装 / 升级引擎…" : "修复 / 重新安装引擎…",
-        action: #selector(reinstallEngine)
+        action: #selector(reinstallEngine),
+        enabled: !busy
       )
     }
 
-    let busy = operationInFlight || engineInstallInFlight || snapshot.busy
     let applyTitle: String
     switch snapshot.session {
     case "active": applyTitle = "重新应用皮肤"
@@ -311,6 +312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   @objc private func reinstallEngine() {
+    guard !operationInFlight, !snapshot.busy else { return }
     installBundledEngineIfNeeded(force: true)
   }
 
@@ -524,7 +526,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func installBundledEngineIfNeeded(force: Bool) {
-    guard !engineInstallInFlight else { return }
+    guard !engineInstallInFlight, !operationInFlight, !snapshot.busy else { return }
     if !force && !engineNeedsInstall() { return }
     guard let bundledVersion = version(at: bundledEngineURL?.appendingPathComponent("VERSION")) else {
       showError(title: "安装资源损坏", message: "App 内的版本信息无效，请重新下载。")

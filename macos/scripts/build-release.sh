@@ -1,6 +1,9 @@
 #!/bin/bash
 
 set -euo pipefail
+export LC_ALL=C
+export LANG=C
+export LC_CTYPE=C
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 VERSION="$(/usr/bin/tr -d '[:space:]' < "$ROOT/VERSION")"
 RELEASE_DIR="$ROOT/release"
@@ -15,6 +18,7 @@ if [ "${1:-}" != "--skip-tests" ]; then "$ROOT/tests/run-tests.sh"; fi
   --exclude '.git/' \
   --exclude '.DS_Store' \
   --exclude 'release/' \
+  --exclude 'presets/preset-arina-hashimoto/' \
   "$ROOT/" "$TMP/codex-dream-skin-studio/"
 
 # The macOS tree is also published as a standalone ZIP. Bundle prompt guides
@@ -37,6 +41,12 @@ if [ -f "$PRESET_README" ]; then
   /bin/mv "$temporary" "$PRESET_README"
 fi
 /usr/bin/find "$TMP/codex-dream-skin-studio" -type f \( -name '.DS_Store' -o -name '._*' \) -delete
+[ ! -e "$TMP/codex-dream-skin-studio/presets/preset-arina-hashimoto" ] \
+  || { printf 'Restricted Arina preset entered the standalone ZIP.\n' >&2; exit 1; }
+if /usr/bin/find "$TMP/codex-dream-skin-studio" -type f -name 'arina-hashimoto-*' -print -quit | /usr/bin/grep -q .; then
+  printf 'Restricted Arina documentation asset entered the standalone ZIP.\n' >&2
+  exit 1
+fi
 /bin/chmod 755 "$TMP/codex-dream-skin-studio"/*.command
 /bin/chmod 755 "$TMP/codex-dream-skin-studio"/scripts/*.sh "$TMP/codex-dream-skin-studio"/tests/*.sh
 /bin/rm -f "$ARCHIVE"

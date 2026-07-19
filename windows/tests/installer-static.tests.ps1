@@ -46,6 +46,9 @@ if ($definition.Contains('-ExecutionPolicy Bypass') -or
   $bootstrap.Contains('-ExecutionPolicy Bypass')) {
   throw 'The installer layer must never bypass the PowerShell execution policy.'
 }
+if ($definition.Contains('ssPostInstall')) {
+  throw 'Installer initialization must not rely on non-fatal ssPostInstall exceptions.'
+}
 foreach ($requiredDefinition in @(
   'PrivilegesRequired=lowest',
   'ArchitecturesAllowed=x64compatible',
@@ -58,12 +61,14 @@ foreach ($requiredDefinition in @(
   'chinesesimplified.ConfirmUninstall=',
   '-ExecutionPolicy RemoteSigned',
   'procedure CurStepChanged(CurStep: TSetupStep);',
-  "if CurStep <> ssPostInstall then",
-  "RunBootstrap('-Install', WizardSilent, ExitCode)",
+  "if CurStep <> ssInstall then",
+  "ExtractTemporaryFiles('{tmp}\setup-bootstrap.ps1');",
+  "ExtractTemporaryFiles('{tmp}\payload\*');",
+  "RunBootstrap(TemporaryBootstrap, '-Install', WizardSilent, ExitCode)",
   "RaiseException('Codex Dream Skin initialization could not be started.');",
   'procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);',
   'if CurUninstallStep <> usUninstall then',
-  "RunBootstrap('-Uninstall', True, ExitCode)",
+  "RunBootstrap(ExpandConstant('{app}\setup-bootstrap.ps1'), '-Uninstall', True, ExitCode)",
   'RaiseException(Format('
 )) {
   if (-not $definition.Contains($requiredDefinition)) {
@@ -76,7 +81,7 @@ $uninstallStepIndex = $definition.IndexOf(
   [System.StringComparison]::Ordinal
 )
 $runBootstrapIndex = $definition.IndexOf(
-  "RunBootstrap('-Uninstall', True, ExitCode)",
+  "RunBootstrap(ExpandConstant('{app}\setup-bootstrap.ps1'), '-Uninstall', True, ExitCode)",
   [System.StringComparison]::Ordinal
 )
 $uninstallFailureIndex = $definition.LastIndexOf('RaiseException(Format(', [System.StringComparison]::Ordinal)
@@ -90,11 +95,15 @@ if ([regex]::Matches($definition, '(?m)^Name: "startup";').Count -ne 1 -or
   throw 'The installer startup task must exist exactly once and remain unchecked by default.'
 }
 $fileSources = [regex]::Matches($definition, '(?m)^Source: .*$')
-if ($fileSources.Count -ne 4 -or
+if ($fileSources.Count -ne 6 -or
   -not $fileSources[0].Value.Contains('{#StageRoot}\setup-bootstrap.ps1') -or
-  -not $fileSources[1].Value.Contains('{#StageRoot}\LICENSE.txt') -or
-  -not $fileSources[2].Value.Contains('{#StageRoot}\NOTICE.md') -or
-  -not $fileSources[3].Value.Contains('{#StageRoot}\payload\*') -or
+  -not $fileSources[0].Value.Contains('Flags: dontcopy noencryption') -or
+  -not $fileSources[1].Value.Contains('{#StageRoot}\payload\*') -or
+  -not $fileSources[1].Value.Contains('Flags: dontcopy noencryption') -or
+  -not $fileSources[2].Value.Contains('{#StageRoot}\setup-bootstrap.ps1') -or
+  -not $fileSources[3].Value.Contains('{#StageRoot}\LICENSE.txt') -or
+  -not $fileSources[4].Value.Contains('{#StageRoot}\NOTICE.md') -or
+  -not $fileSources[5].Value.Contains('{#StageRoot}\payload\*') -or
   $definition.Contains('[UninstallRun]')) {
   throw 'The installed app must contain the bootstrap, notices, and one managed-engine seed payload.'
 }
@@ -105,7 +114,9 @@ foreach ($requiredBuilderContract in @(
   'Copy-ZipEntry -Archive $zip -EntryName "$($manifest.nodeEntry)"',
   'Copy-ZipEntry -Archive $zip -EntryName "$($manifest.licenseEntry)"',
   '$publicPresetImageSha256',
+  '$publicPresetThemeSha256',
   "'preset-gothic-void-crusade'",
+  "'presets\preset-gothic-void-crusade'",
   "`$publicPresetTheme.image = 'dream-reference.jpg'",
   '$stagedPublicImageHash',
   'Staged installer payload did not retain the reviewed public release theme.',
@@ -124,6 +135,7 @@ foreach ($requiredRepairContract in @(
   '$needsInstall = $Install',
   '$requiredEngineFiles',
   'assets\codex-dream-skin.ico',
+  'presets\preset-gothic-void-crusade\theme.json',
   'scripts\start-dream-skin.ps1',
   'scripts\check-update.ps1',
   'runtime\node\node.exe',

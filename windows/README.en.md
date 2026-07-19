@@ -8,6 +8,7 @@ Codex Dream Skin loads an external theme into the official Codex Windows desktop
 
 ## Requirements
 
+- Windows 10 or newer on x64 (the installer declares Windows 10 as its minimum).
 - The official `OpenAI.Codex` app installed from Microsoft Store and registered for the current user.
 - Release Setup.exe bundles Node.js. Only source-based use needs Node.js 22 or
   newer on `PATH`.

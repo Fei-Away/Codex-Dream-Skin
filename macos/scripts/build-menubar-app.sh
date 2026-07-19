@@ -112,12 +112,17 @@ done
 /usr/bin/rsync -a "$ROOT/assets/" "$ENGINE/assets/"
 PUBLIC_PRESET="preset-gothic-void-crusade"
 PUBLIC_PRESET_SHA256="b76a7cbe2ff9d923846e931984d243a7ba1f25de8d190b5c6412c809c41aee42"
+PUBLIC_PRESET_THEME_SHA256="fd250dc6c0ec1eea724f59a86c7c126a6bd9b90798289483a00948d57e23e52e"
 [ -d "$ROOT/presets/$PUBLIC_PRESET" ] \
   || { printf 'Public release preset missing: %s\n' "$PUBLIC_PRESET" >&2; exit 1; }
 actual_public_preset_sha256="$(LC_ALL=C /usr/bin/shasum -a 256 \
   "$ROOT/presets/$PUBLIC_PRESET/background.jpg" | /usr/bin/awk '{print $1}')"
 [ "$actual_public_preset_sha256" = "$PUBLIC_PRESET_SHA256" ] \
   || { printf 'Reviewed public preset hash changed: %s\n' "$actual_public_preset_sha256" >&2; exit 1; }
+actual_public_preset_theme_sha256="$(LC_ALL=C /usr/bin/shasum -a 256 \
+  "$ROOT/presets/$PUBLIC_PRESET/theme.json" | /usr/bin/awk '{print $1}')"
+[ "$actual_public_preset_theme_sha256" = "$PUBLIC_PRESET_THEME_SHA256" ] \
+  || { printf 'Reviewed public preset metadata hash changed: %s\n' "$actual_public_preset_theme_sha256" >&2; exit 1; }
 /bin/mkdir -p "$ENGINE/presets/$PUBLIC_PRESET"
 /usr/bin/rsync -a "$ROOT/presets/$PUBLIC_PRESET/" "$ENGINE/presets/$PUBLIC_PRESET/"
 /bin/cp "$ROOT/VERSION" "$ENGINE/VERSION"
