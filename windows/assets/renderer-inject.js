@@ -326,9 +326,15 @@
     const root = document.documentElement;
     if (!root || !document.body) return;
 
-    const shellMain = document.querySelector("main.main-surface");
-    const shellSidebar = document.querySelector("aside.app-shell-left-panel");
-    if (!shellMain || !shellSidebar) {
+    // Main Codex shell is the content surface. The left rail is optional: Codex
+    // removes or rebuilds aside.app-shell-left-panel while collapsing/expanding
+    // it, and clearing the skin there flashes native colors over the active theme.
+    // True auxiliary windows (pets, blank targets) still have no main surface, so
+    // they continue to clear residual skin state.
+    const shellMain = document.querySelector("main.main-surface") ||
+      document.querySelector("main") ||
+      document.querySelector('[role="main"]');
+    if (!shellMain) {
       clearSkinDom();
       return;
     }
@@ -348,7 +354,9 @@
     }
 
     const home = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
-    for (const candidate of document.querySelectorAll('[role="main"]')) {
+    const mainCandidates = [...document.querySelectorAll('[role="main"]')];
+    if (!mainCandidates.length) mainCandidates.push(shellMain);
+    for (const candidate of mainCandidates) {
       candidate.classList.toggle("dream-home", candidate === home);
       candidate.classList.toggle("dream-task", candidate !== home);
     }

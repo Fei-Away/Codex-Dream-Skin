@@ -22,6 +22,8 @@ assert.doesNotMatch(
 
 function createFixture({
   shellPresent,
+  mainPresent = shellPresent,
+  sidebarPresent = shellPresent,
   staleSkin = false,
   homePresent = false,
   utilityPresent = false,
@@ -36,7 +38,8 @@ function createFixture({
   const revokedUrls = [];
   const observers = [];
   let objectUrlCount = 0;
-  let hasShell = shellPresent;
+  let hasMain = mainPresent;
+  let hasSidebar = sidebarPresent;
   let root;
 
   const queueRootClassMutation = () => {
@@ -149,15 +152,17 @@ function createFixture({
     createElement,
     getElementById(id) { return nodes.get(id) ?? null; },
     querySelector(selector) {
-      if (selector === "main.main-surface") return hasShell ? shellMain : null;
-      if (selector === "aside.app-shell-left-panel") return hasShell ? {} : null;
+      if (selector === "main.main-surface") return hasMain ? shellMain : null;
+      if (selector === "main") return hasMain ? shellMain : null;
+      if (selector === "aside.app-shell-left-panel") return hasSidebar ? {} : null;
       if (selector === '[role="main"]:has([data-testid="home-icon"])') {
-        return hasShell && homePresent ? routeMain : null;
+        return hasMain && homePresent ? routeMain : null;
       }
+      if (selector === '[role="main"]') return hasMain ? routeMain : null;
       return null;
     },
     querySelectorAll(selector) {
-      if (selector === '[role="main"]') return hasShell ? [routeMain] : [];
+      if (selector === '[role="main"]') return hasMain ? [routeMain] : [];
       if (selector === ".dream-task") return routeClasses.has("dream-task") ? [routeMain] : [];
       if (selector === ".dream-home-utility") {
         return utilityClasses.has("dream-home-utility") ? [utilityNode] : [];
@@ -225,7 +230,12 @@ function createFixture({
     revokedUrls,
     routeClasses,
     utilityClasses,
-    setShellPresent(value) { hasShell = value; },
+    setShellPresent(value) {
+      hasMain = value;
+      hasSidebar = value;
+    },
+    setSidebarPresent(value) { hasSidebar = value; },
+    setMainPresent(value) { hasMain = value; },
   };
 }
 
@@ -272,6 +282,33 @@ auxiliary.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
 assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), true);
+
+// Collapsing the left rail removes aside.app-shell-left-panel while the main
+// surface remains. The active theme must stay applied instead of flashing the
+// native Codex chrome.
+const collapsedSidebar = createFixture({
+  shellPresent: true,
+  mainPresent: true,
+  sidebarPresent: false,
+  staleSkin: true,
+});
+const collapsedResult = vm.runInNewContext(payload, collapsedSidebar.context);
+assert.equal(collapsedResult.installed, true);
+assert.equal(collapsedSidebar.rootClasses.has("codex-dream-skin"), true);
+assert.equal(collapsedSidebar.rootStyles.has("--dream-art"), true);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-style"), true);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-chrome"), true);
+assert.equal(collapsedSidebar.rootClasses.has("dream-theme-dark"), true);
+
+collapsedSidebar.setSidebarPresent(false);
+collapsedSidebar.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
+assert.equal(collapsedSidebar.rootClasses.has("codex-dream-skin"), true);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-style"), true);
+
+collapsedSidebar.setMainPresent(false);
+collapsedSidebar.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
+assert.equal(collapsedSidebar.rootClasses.has("codex-dream-skin"), false);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-style"), false);
 
 const configured = createFixture({
   shellPresent: true,
@@ -368,4 +405,4 @@ vm.runInNewContext(buildPayload({ artMetadata: { ratio: 16 / 9 } }), metadataWid
 assert.equal(metadataWide.rootClasses.has("dream-art-wide"), true);
 assert.equal(metadataWide.rootClasses.has("dream-art-standard"), false);
 
-console.log("PASS: renderer applies adaptive theme metadata and preserves transparent auxiliary windows.");
+console.log("PASS: renderer applies adaptive theme metadata, keeps skin without a sidebar, and preserves transparent auxiliary windows.");
