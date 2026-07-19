@@ -6,9 +6,11 @@
 *.sh text eol=lf
 *.command text eol=lf
 
-# Release-reviewed preset metadata is hashed byte-for-byte.
+# Release-reviewed build inputs are hashed byte-for-byte.
 macos/presets/preset-gothic-void-crusade/theme.json text eol=lf
 windows/presets/preset-gothic-void-crusade/theme.json text eol=lf
+windows/installer/languages/ChineseSimplified.isl text eol=lf
+windows/installer/languages/Inno-Setup-License.txt text eol=lf
 
 # Keep artwork out of text normalization and text diffs.
 *.png binary

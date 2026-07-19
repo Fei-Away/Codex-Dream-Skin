@@ -21,6 +21,11 @@ $macosVersionPath = Join-Path (Join-Path $repositoryRoot 'macos') 'VERSION'
 $macosPackagePath = Join-Path (Join-Path $repositoryRoot 'macos') 'package.json'
 $licensePath = Join-Path (Join-Path $repositoryRoot 'macos') 'LICENSE'
 $noticePath = Join-Path (Join-Path $repositoryRoot 'macos') 'NOTICE.md'
+$innoLanguageRoot = Join-Path $installerRoot 'languages'
+$innoChineseLanguagePath = Join-Path $innoLanguageRoot 'ChineseSimplified.isl'
+$innoSetupLicensePath = Join-Path $innoLanguageRoot 'Inno-Setup-License.txt'
+$innoChineseLanguageSha256 = '7d544b9bb1d142cfa11f2e5d3cc8abe2e55f8e066c5124e3772675aa236e1278'
+$innoSetupLicenseSha256 = '0c81595601bce47eeef8d865d5da7f9ca2c6a12235b7482b29f5ab23ed02ee5a'
 $publicPresetRoot = Join-Path (Join-Path (Join-Path $repositoryRoot 'macos') 'presets') `
   'preset-gothic-void-crusade'
 $publicPresetImagePath = Join-Path $publicPresetRoot 'background.jpg'
@@ -257,6 +262,16 @@ $null = Read-ReleaseTextFile -Path $definitionPath
 $null = Read-ReleaseTextFile -Path $bootstrapPath
 $null = Read-ReleaseTextFile -Path $licensePath
 $null = Read-ReleaseTextFile -Path $noticePath
+$null = Read-ReleaseTextFile -Path $innoChineseLanguagePath
+$null = Read-ReleaseTextFile -Path $innoSetupLicensePath
+$innoChineseLanguageHash = (Get-FileHash -LiteralPath $innoChineseLanguagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($innoChineseLanguageHash -cne $innoChineseLanguageSha256) {
+  throw "The pinned Inno Setup Simplified Chinese messages changed. Expected $innoChineseLanguageSha256, found $innoChineseLanguageHash."
+}
+$innoSetupLicenseHash = (Get-FileHash -LiteralPath $innoSetupLicensePath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($innoSetupLicenseHash -cne $innoSetupLicenseSha256) {
+  throw "The pinned Inno Setup license changed. Expected $innoSetupLicenseSha256, found $innoSetupLicenseHash."
+}
 $publicPresetTheme = (Read-ReleaseTextFile -Path $publicPresetThemePath) | ConvertFrom-Json
 if ("$($publicPresetTheme.id)" -cne 'preset-gothic-void-crusade' -or
   "$($publicPresetTheme.image)" -cne 'background.jpg') {
@@ -319,7 +334,9 @@ try {
   $stageRoot = Join-Path $WorkingDirectory 'stage'
   $payloadRoot = Join-Path $stageRoot 'payload'
   $nodeRoot = Join-Path (Join-Path $payloadRoot 'runtime') 'node'
+  $languageRoot = Join-Path $stageRoot 'languages'
   New-Item -ItemType Directory -Path $payloadRoot | Out-Null
+  New-Item -ItemType Directory -Path $languageRoot | Out-Null
   Copy-ReleaseDirectory -Source (Join-Path $windowsRoot 'assets') -Destination (Join-Path $payloadRoot 'assets')
   Copy-ReleaseDirectory -Source (Join-Path $windowsRoot 'scripts') -Destination (Join-Path $payloadRoot 'scripts')
   Copy-ReleaseDirectory -Source $publicPresetRoot `
@@ -340,6 +357,8 @@ try {
   Copy-Item -LiteralPath $bootstrapPath -Destination (Join-Path $stageRoot 'setup-bootstrap.ps1') -Force
   Copy-Item -LiteralPath $licensePath -Destination (Join-Path $stageRoot 'LICENSE.txt') -Force
   Copy-Item -LiteralPath $noticePath -Destination (Join-Path $stageRoot 'NOTICE.md') -Force
+  Copy-Item -LiteralPath $innoChineseLanguagePath `
+    -Destination (Join-Path $languageRoot 'ChineseSimplified.isl') -Force
 
   Add-Type -AssemblyName System.IO.Compression
   Add-Type -AssemblyName System.IO.Compression.FileSystem

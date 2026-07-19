@@ -51,7 +51,7 @@ MinVersion=10.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\Unofficial\ChineseSimplified.isl"
+Name: "chinesesimplified"; MessagesFile: "{#StageRoot}\languages\ChineseSimplified.isl"
 
 [Messages]
 english.ConfirmUninstall=Uninstall will close Codex, restore its original appearance, remove the Dream Skin runtime, and keep saved themes and images.%n%nContinue?
