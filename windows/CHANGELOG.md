@@ -9,6 +9,15 @@
 - Windows 注入器补齐与 macOS 相同的窗口内操作浮层（loading / 成功 / 失败）；暂停、继续与重新应用时在 Codex 主区显示「正在暂停皮肤…」「正在应用皮肤…」等进度，不再只有托盘气泡。
 - 安装/主题库初始化会把 macOS 同款「Gothic Void Crusade / 哥特虚空远征」播种到已保存主题（`presets/preset-gothic-void-crusade`），可与「桥本有菜」一并在托盘切换；默认活动主题仍为桥本有菜。
 
+## 1.3.0 — 2026-07-19
+
+### 发布
+
+- 新增面向普通用户的 Inno Setup 安装包；安装器内置经过 SHA-256 校验的 Node.js 运行时，按当前用户安装，不需要源码目录或全局 Node.js。
+- 新增 SmartScreen 未签名发行包的图形界面放行说明。只在确认文件来自项目 Release 后使用“更多信息 → 仍要运行”，不要求关闭 Defender 或执行 PowerShell 放行命令。
+- 新增手动覆盖更新流程与状态保留说明；主题、图片和配置备份不会因更新安装器而删除。
+- 新增 Release workflow：校验 tag 与双端版本一致性，构建 Setup.exe、生成 SHA-256 校验和并创建待审核的 Draft Release。
+
 ## 1.2.0 — 2026-07-17
 
 ### 新增

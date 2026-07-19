@@ -14,6 +14,13 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 - Official Codex Desktop installed and launched at least once (`~/.codex/config.toml` exists)
 - No global Node.js install required (uses Codex’s signed bundled Node after validation)
 
+## Release install (recommended)
+
+普通用户请从 [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载
+`CodexDreamSkin-vX.Y.Z.dmg`，按 [`docs/install-macos.md`](../docs/install-macos.md) 的图形界面步骤
+拖入 Applications。首次运行可能需要在“系统设置 → 隐私与安全性 → 仍要打开”确认一次；不需要
+运行 `xattr` 或安装源码。后续更新下载新的 DMG 覆盖安装即可，用户主题和图片会保留。
+
 ## Quick start (from this repo)
 
 ```bash

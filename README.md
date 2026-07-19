@@ -148,6 +148,22 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 
 ## 快速开始
 
+### 普通用户：下载安装包
+
+不需要 clone 仓库，也不需要安装 Node.js 或运行 `.sh` / `.ps1`。从
+[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载对应平台的最新安装包，
+按平台文档完成一次图形界面安装：
+
+| 平台 | 下载 | 安装说明 |
+|------|------|----------|
+| macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
+| Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
+
+安装后从菜单栏（macOS）或系统托盘（Windows）使用。更新时下载新安装包覆盖安装，主题和图片会保留；
+未签名的新下载文件在个别系统上仍可能再次出现一次安全提示，文档列出了放行方法。
+
+### 开发者：从源码运行
+
 仓库内按平台放了现成脚本（实现细节不同，效果都是「主题化 Codex」）：
 
 | 平台 | 目录 | 入口 |
@@ -158,7 +174,7 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 更细的说明：
 
 - Mac：[`macos/README.md`](./macos/README.md)
-- Windows：[`windows/SKILL.md`](./windows/SKILL.md)
+- Windows：[`windows/README.md`](./windows/README.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
 - 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
 - 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)

@@ -161,6 +161,26 @@ for the eight individual styles.
 
 ## Quick start
 
+### For users: download an installer
+
+You do not need to clone the repository, install Node.js, or run `.sh` / `.ps1`
+files. Download the latest package for your platform from
+[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases), then
+follow the graphical first-run guide:
+
+| Platform | Download | Install guide |
+|------|------|----------|
+| macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
+| Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
+
+After installation, use the menu bar (macOS) or system tray (Windows). Updates
+are manual: download the new package and install over the existing one; themes
+and images are preserved. Because the public packages are unsigned, a new
+download may show a one-time OS security warning; the guides explain the safe
+GUI approval path.
+
+### For developers: run from source
+
 Platform scripts are ready — different plumbing, same goal: theme Codex.
 
 | Platform | Dir | Entry |
@@ -171,7 +191,7 @@ Platform scripts are ready — different plumbing, same goal: theme Codex.
 More detail:
 
 - Mac: [`macos/README.md`](./macos/README.md)
-- Windows: [`windows/SKILL.md`](./windows/SKILL.md)
+- Windows: [`windows/README.md`](./windows/README.en.md)
 - Paths: [`docs/platforms.md`](./docs/platforms.md)
 - Copy-ready reference prompt guide: [`docs/reference-background-prompt-guide.en.md`](./docs/reference-background-prompt-guide.en.md)
 - Eight concept prompt breakdowns: [`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)

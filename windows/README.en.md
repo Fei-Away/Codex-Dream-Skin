@@ -12,6 +12,18 @@ Codex Dream Skin loads an external theme into the official Codex Windows desktop
 - Node.js 22 or newer, with `node.exe` available on `PATH`.
 - Windows PowerShell 5.1 or newer.
 
+## Release install (recommended for users)
+
+Download `CodexDreamSkin-Setup-vX.Y.Z.exe` from
+[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) and
+follow [`docs/install-windows.md`](../docs/install-windows.md). The installer
+contains the pinned Node runtime, so users do not need a source checkout or to
+run a `.ps1` file. It installs per-user and should not request administrator
+access. An unsigned download may occasionally trigger SmartScreen; use
+**More info → Run anyway** only after checking the file came from this Release,
+and never disable Defender. Updates are new Setup.exe packages installed over
+the existing copy; themes and images are retained.
+
 Run the installer after Codex has fully exited. Normal use does not require administrator access or ownership changes under WindowsApps.
 
 ## Install
