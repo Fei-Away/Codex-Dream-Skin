@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-golden-ki-ascension",
+  "name": "七星·金焰觉醒",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "集齐七星，让灵感突破极限。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "KI ASCENSION ONLINE",
+  "quote": "BREAK YOUR LIMITS",
+  "image": "background.jpg",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.76,
+    "focusY": 0.43,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#10182F",
+    "panel": "#17223D",
+    "panelAlt": "#21304C",
+    "accent": "#F6A313",
+    "accentAlt": "#FFD05A",
+    "secondary": "#2B9DA6",
+    "highlight": "#F26A1B",
+    "text": "#FFF4D6",
+    "muted": "#C5B886",
+    "line": "rgba(246, 163, 19, .28)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "Golden Ki Ascension",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}
