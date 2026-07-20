@@ -175,6 +175,29 @@ try {
     -not $traySource.Contains("'-FastRestart'")) {
     throw 'Tray auto-apply no longer uses the guarded fast restart path.'
   }
+  if (-not (Test-Path -LiteralPath (Join-Path $Root 'assets\dream-skin.ico') -PathType Leaf) -or
+    -not $traySource.Contains("assets\dream-skin.ico") -or
+    -not $traySource.Contains('[System.Drawing.Icon]::new($trayIconPath)')) {
+    throw 'Tray icon asset is missing or the tray no longer loads it.'
+  }
+  Add-Type -AssemblyName System.Drawing
+  $trayIconPath = Join-Path $Root 'assets\dream-skin.ico'
+  $trayIcon = [System.Drawing.Icon]::new($trayIconPath)
+  try {
+    $trayIconBitmap = $trayIcon.ToBitmap()
+    try {
+      if ($trayIconBitmap.GetPixel(16, 16).A -eq 0) {
+        throw 'Tray icon center is transparent and can disappear on the Windows taskbar.'
+      }
+    } finally {
+      $trayIconBitmap.Dispose()
+    }
+  } finally {
+    $trayIcon.Dispose()
+  }
+  if (-not $traySource.Contains('[AllowEmptyCollection()][System.Windows.Forms.ToolStripItemCollection]$Items')) {
+    throw 'Tray menu item helper no longer accepts an initially empty menu item collection.'
+  }
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
   foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {

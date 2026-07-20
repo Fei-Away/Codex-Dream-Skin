@@ -26,8 +26,19 @@ try {
   try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
   if (-not $acquired) { exit 0 }
 
+  $trayIcon = $null
+  $trayIconPath = Join-Path $SkillRoot 'assets\dream-skin.ico'
   $notify = [System.Windows.Forms.NotifyIcon]::new()
-  $notify.Icon = [System.Drawing.SystemIcons]::Application
+  if (Test-Path -LiteralPath $trayIconPath -PathType Leaf) {
+    try {
+      $trayIcon = [System.Drawing.Icon]::new($trayIconPath)
+      $notify.Icon = $trayIcon
+    } catch {
+      $notify.Icon = [System.Drawing.SystemIcons]::Application
+    }
+  } else {
+    $notify.Icon = [System.Drawing.SystemIcons]::Application
+  }
   $notify.Text = 'Codex Dream Skin'
   $notify.Visible = $true
   $menu = [System.Windows.Forms.ContextMenuStrip]::new()
@@ -142,7 +153,7 @@ try {
 
   function Add-DreamSkinTrayItem {
     param(
-      [Parameter(Mandatory = $true)][System.Windows.Forms.ToolStripItemCollection]$Items,
+      [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Windows.Forms.ToolStripItemCollection]$Items,
       [Parameter(Mandatory = $true)][string]$Text,
       [AllowNull()][scriptblock]$Action,
       [bool]$Enabled = $true
@@ -266,6 +277,7 @@ try {
     $timer.Dispose()
   }
   if ($null -ne $notify) { $notify.Dispose() }
+  if ($null -ne $trayIcon) { $trayIcon.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
   $mutex.Dispose()
 }
