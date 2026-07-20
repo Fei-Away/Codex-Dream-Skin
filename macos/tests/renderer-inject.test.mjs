@@ -378,6 +378,38 @@ defaults.shellBox.width = 1084;
 defaults.resizeObservers[0].callback([]);
 defaults.flushTimers(64);
 assert.equal(defaultMetrics.layoutReads, 2, "Shell ResizeObserver changes must refresh chrome geometry.");
+
+const sameClassChanges = createFixture({
+  id: "same-class-changes",
+  appearance: "auto",
+  art: { safeArea: "auto", taskMode: "auto" },
+});
+vm.runInNewContext(sameClassChanges.payload, sameClassChanges.context);
+const noisyMetrics = sameClassChanges.window.__CODEX_DREAM_SKIN_STATE__.metrics;
+const initialRootPasses = noisyMetrics.rootPasses;
+sameClassChanges.observers[1].callback(new Array(120).fill(null).map(() => ({
+  type: "attributes",
+  attributeName: "class",
+  target: sameClassChanges.root,
+})));
+sameClassChanges.flushTimers(64);
+assert.equal(noisyMetrics.rootPasses, initialRootPasses, "Class updates without shell marker change should not force root/theme re-application.");
+sameClassChanges.root.className = "electron-dark highlight";
+sameClassChanges.observers[1].callback([{
+  type: "attributes",
+  attributeName: "class",
+  target: sameClassChanges.root,
+}]);
+sameClassChanges.flushTimers(64);
+assert.equal(noisyMetrics.rootPasses, initialRootPasses + 1, "Shell-relevant class changes should still trigger a root refresh.");
+sameClassChanges.body.setAttribute("data-theme", "dark");
+sameClassChanges.observers[1].callback([{
+  type: "attributes",
+  attributeName: "data-theme",
+  target: sameClassChanges.body,
+}]);
+sameClassChanges.flushTimers(64);
+assert.equal(noisyMetrics.rootPasses, initialRootPasses + 2, "Body theme changes should still trigger a root refresh.");
 const defaultChrome = defaults.nodes.get("codex-dream-skin-chrome");
 assert.equal(defaultChrome.style.values.get("left"), "196px");
 assert.equal(defaultChrome.style.values.get("width"), "1084px");

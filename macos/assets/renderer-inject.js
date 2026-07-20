@@ -37,6 +37,8 @@
   let analysisTimer = null;
   let samplingNativeShell = false;
   let rootObserver = null;
+  let observedRootThemeSignature = null;
+  let observedBodyThemeSignature = null;
   const now = () => typeof performance === "object" && typeof performance.now === "function"
     ? performance.now() : Date.now();
   const metrics = {
@@ -79,6 +81,58 @@
   }
 
   const cssString = (value) => JSON.stringify(String(value ?? ""));
+  const normalizeThemeClass = (value) => {
+    const normalized = String(value || "").toLowerCase();
+    const parts = new Set();
+    if (/\b(?:theme-|appearance-|)dark\b/.test(normalized)) parts.add("dark");
+    if (/\b(?:theme-|appearance-|)light\b/.test(normalized)) parts.add("light");
+    if (/\bsystem\b/.test(normalized)) parts.add("system");
+    return [...parts].sort().join(".");
+  };
+
+  const collectNonSkinInlineStyle = (element) => {
+    const style = element?.style;
+    if (!style || typeof style.getPropertyValue !== "function") return "";
+    const pairs = [];
+    const isSkinManaged = (name) => name.startsWith("--ds-") || name.startsWith("--dream-skin-");
+    if (typeof style.length === "number" && style.item) {
+      for (let index = 0; index < style.length; index += 1) {
+        const name = style.item(index);
+        if (!name || isSkinManaged(name)) continue;
+        const value = style.getPropertyValue(name);
+        const priority = typeof style.getPropertyPriority === "function"
+          ? style.getPropertyPriority(name)
+          : "";
+        pairs.push(`${name}:${value}${priority ? `!${priority}` : ""}`);
+      }
+    } else if (typeof style.cssText === "string") {
+      const text = style.cssText;
+      for (const declaration of text.split(";")) {
+        const parts = declaration.split(":");
+        if (parts.length < 2) continue;
+        const name = parts.shift().trim();
+        if (!name || isSkinManaged(name)) continue;
+        pairs.push(`${name}:${parts.join(":").trim()}`);
+      }
+    }
+    return pairs.sort().join("|");
+  };
+
+  const getThemeSignature = (target) => {
+    if (!target) return null;
+    return [
+      `class=${normalizeThemeClass(target.className || target.getAttribute?.("class"))}`,
+      `theme=${target.getAttribute?.("data-theme") || ""}`,
+      `appearance=${target.getAttribute?.("data-appearance") || ""}`,
+      `mode=${target.getAttribute?.("data-color-mode") || ""}`,
+      `style=${collectNonSkinInlineStyle(target)}`,
+    ].join("|");
+  };
+
+  const refreshThemeSignatures = () => {
+    observedRootThemeSignature = getThemeSignature(document.documentElement);
+    observedBodyThemeSignature = document.body ? getThemeSignature(document.body) : null;
+  };
 
   const setStyleProperty = (root, name, value) => {
     if (root.style.getPropertyValue(name) !== value) {
@@ -641,6 +695,7 @@
     if (!root) return;
     metrics.ensureCalls += 1;
     const shell = rootPass ? applyRootState(root) : null;
+    if (rootPass) refreshThemeSignatures();
     if (route) syncRouteState(shell, { layout });
   };
 
@@ -703,9 +758,32 @@
     }
   };
   const observer = new MutationObserver(() => scheduleEnsure({ route: true }));
-  rootObserver = new MutationObserver(() => {
+  rootObserver = new MutationObserver((records) => {
     if (samplingNativeShell) return;
-    scheduleEnsure({ root: true, route: true });
+    let shouldUpdate = false;
+    for (const record of records ?? []) {
+      if (record.type !== "attributes") continue;
+      const target = record.target;
+      if (target === document.documentElement) {
+        const signature = getThemeSignature(target);
+        if (!signature || signature !== observedRootThemeSignature) {
+          observedRootThemeSignature = signature;
+          shouldUpdate = true;
+          break;
+        }
+      } else if (target === document.body) {
+        const signature = getThemeSignature(target);
+        if (!signature || signature !== observedBodyThemeSignature) {
+          observedBodyThemeSignature = signature;
+          shouldUpdate = true;
+          break;
+        }
+      } else {
+        shouldUpdate = true;
+        break;
+      }
+    }
+    if (shouldUpdate) scheduleEnsure({ root: true, route: true });
   });
   const resizeHandler = () => scheduleEnsure({ route: true, layout: true });
   if (typeof ResizeObserver === "function") {
@@ -742,6 +820,7 @@
   };
   const firstEnsureStartedAt = now();
   ensure({ layout: !previous || !document.getElementById(CHROME_ID) });
+  refreshThemeSignatures();
   metrics.firstEnsureMs = Number((now() - firstEnsureStartedAt).toFixed(3));
   if (previous?.artUrl && previous.artUrl !== artUrl) URL.revokeObjectURL(previous.artUrl);
 
