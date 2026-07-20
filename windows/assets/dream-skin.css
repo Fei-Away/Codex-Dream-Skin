@@ -1054,12 +1054,10 @@ html.codex-dream-skin[data-dream-art-wide="true"] main.main-surface.dream-skin-h
 
 html.codex-dream-skin[data-dream-art-wide="true"] main.main-surface.dream-skin-home-shell
   > header.app-header-tint {
-  background: linear-gradient(180deg,
-    rgb(var(--ds-panel-rgb) / .88),
-    rgb(var(--ds-panel-rgb) / .60)) !important;
+  background: transparent !important;
   border-bottom: 0 !important;
-  box-shadow: 0 8px 18px rgb(var(--ds-bg-rgb) / .16) !important;
-  backdrop-filter: blur(14px) saturate(106%) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
 html.codex-dream-skin[data-dream-art-wide="true"] main.main-surface
