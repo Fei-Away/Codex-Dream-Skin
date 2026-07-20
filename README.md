@@ -1,4 +1,9 @@
-# Codex Dream Skin
+# Codex Dream Skin - Windows Fix
+
+这是 `Codex Dream Skin` 的 Windows 修正版，主要修复：
+
+- Windows PowerShell 5.1 打开托盘菜单时，空的 `ToolStripItemCollection` 无法绑定到 `Items` 参数。
+- 宽屏背景延伸到原生应用菜单栏时，浅色模式缺少稳定底色，导致菜单文字对比度不足。
 
 <p align="center">
   <strong>中文</strong> · <a href="./README.en.md">English</a>
@@ -82,14 +87,22 @@ cd macos
   --id preset-arina-hashimoto
 ```
 
-Windows 使用本地主题仓库与系统托盘，并会预置同一套「桥本有菜」。首次从仓库使用：
+Windows 使用本地主题仓库与系统托盘，并会预置同一套「桥本有菜」。首次使用时，在 PowerShell 进入仓库的 `windows` 目录，先确认 Node.js 版本不低于 22，再运行测试：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\windows\scripts\install-dream-skin.ps1
-powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
+cd .\windows
+node --version
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 ```
 
-启动后可直接从「已保存主题 → 桥本有菜」切换；不需要跨目录手动导入。托盘里的「更换背景图」仍可导入你自己的纯背景，保存后继续一键切换。
+测试显示 `PASS` 后，完全退出 Codex 和已有的 Dream Skin 托盘，再安装并启动：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+```
+
+启动 `Codex Dream Skin - Tray`，右键托盘图标即可更换背景、保存当前主题或从「已保存主题」切换。要让图片作为整窗背景显示，请使用接近 `16:9` 的横图（程序的宽屏判断为宽高比不低于 `1.75`）；比例更窄的图片会以首页横幅形式展示，并使用 `cover` 裁切。
 
 > 可下载的用户源图是 [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png)（`1672 × 941`）；macOS 一键预设使用 [`macos/presets/preset-arina-hashimoto/background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；公开再分发前请确认人物与素材权利。
 
@@ -155,10 +168,13 @@ powershell -ExecutionPolicy Bypass -File .\windows\scripts\start-dream-skin.ps1
 | Apple Silicon / Intel Mac | [`macos/`](./macos/) | 双击 `Install Codex Dream Skin.command` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
 
+Windows 用户请先阅读 [`windows/README.md`](./windows/README.md)。安装脚本运行时必须完全退出 Codex；源码更新后也需要退出托盘和 Codex，再重新运行安装器，已保存主题和导入图片不会被删除。
+
 更细的说明：
 
 - Mac：[`macos/README.md`](./macos/README.md)
-- Windows：[`windows/SKILL.md`](./windows/SKILL.md)
+- Windows 使用说明：[`windows/README.md`](./windows/README.md)
+- Windows 实现约束：[`windows/SKILL.md`](./windows/SKILL.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
 - 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
 - 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)

@@ -113,7 +113,20 @@ html.codex-dream-skin main.main-surface > header.app-header-tint {
 }
 
 /* Wide art also reaches the native application menu, which sits outside the
-   main surface and needs its own dark-theme legibility layer. */
+   main surface and needs a stable backdrop in both appearance modes. */
+html.codex-dream-skin [class~="group/application-menu-top-bar"] {
+  color: var(--dream-text) !important;
+  background: color-mix(in oklab, var(--dream-surface) 88%, transparent) !important;
+  border-bottom: 1px solid var(--dream-line-soft) !important;
+  box-shadow: 0 1px 12px color-mix(in oklab, var(--dream-canvas) 26%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(.9) !important;
+}
+
+html.codex-dream-skin [class~="group/application-menu-top-bar"] button,
+html.codex-dream-skin [class~="group/application-menu-top-bar"] svg {
+  color: var(--dream-text) !important;
+}
+
 html.codex-dream-skin.dream-theme-dark [class~="group/application-menu-top-bar"] {
   color: var(--dream-text) !important;
   background: color-mix(in oklab, var(--dream-sidebar) 90%, transparent) !important;

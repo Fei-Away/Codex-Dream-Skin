@@ -1,10 +1,12 @@
-# Codex Dream Skin for Windows
+# Codex Dream Skin for Windows - Fix
 
 <p align="center">
   <strong>中文</strong> · <a href="./README.en.md">English</a>
 </p>
 
 Codex Dream Skin 通过本机回环 CDP 给官方 Codex Windows 桌面应用加载外部主题。它保留原生侧栏、项目选择、任务内容和输入框，不修改 WindowsApps、`app.asar` 或应用签名。
+
+此修正版补充了 Windows PowerShell 5.1 托盘菜单兼容性，并为宽屏背景上的浅色应用菜单栏增加可读性底层。
 
 ## 运行要求
 
@@ -14,9 +16,24 @@ Codex Dream Skin 通过本机回环 CDP 给官方 Codex Windows 桌面应用加�
 
 安装脚本需要在 Codex 完全退出后运行。普通使用不需要管理员权限，也不需要接管 WindowsApps 目录。
 
-## 安装
+## 首次安装
 
-在 PowerShell 中进入仓库的 `windows` 目录，然后运行：
+在 PowerShell 中进入仓库的 `windows` 目录，先检查环境：
+
+```powershell
+node --version
+Get-AppxPackage -Name OpenAI.Codex | Select-Object Name, Version, InstallLocation
+```
+
+Node.js 应为 22 或更高版本，第二条命令应显示官方 `OpenAI.Codex` Store 包。随后运行项目测试：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
+```
+
+测试中的 `forced ... failure` 警告是故意注入的异常场景；最终出现 `PASS:` 才表示测试通过。
+
+复制好下面的安装命令，然后完全退出 Codex 和已有的 Dream Skin 托盘，再运行：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
@@ -50,6 +67,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
 ```
 
+输出 `Codex Dream Skin is active on verified loopback port ...` 表示注入器已经连接。以后建议使用安装器创建的 `Codex Dream Skin` 快捷方式启动，不要直接从普通 Codex 快捷方式启动主题会话。
+
 启动后运行验证脚本：
 
 ```powershell
@@ -69,7 +88,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 
 ## 更换和保存主题
 
-打开 `Codex Dream Skin - Tray` 后可以：
+从开始菜单打开 `Codex Dream Skin - Tray`，在系统托盘右键图标后可以：
 
 - 更换 PNG、JPEG 或 WebP 背景图。
 - 保存当前主题并从「已保存主题」切换。
@@ -77,6 +96,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-s
 - 重新应用主题，或完整恢复 Codex。
 
 导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。图片上限为 16 MB；宽或高不能超过 16384 像素，总像素不能超过 5000 万。
+
+推荐使用 `16:9` 横图，例如 `1672 × 941`、`1920 × 1080` 或 `2560 × 1440`。程序把宽高比不低于 `1.75` 的图片作为整窗宽屏背景；比例低于 `1.75` 的图片会进入首页横幅布局，并由 `background-size: cover` 裁切，因此可能只看到图片中间的一部分。
+
+自定义主题的常用流程：
+
+1. 右键托盘图标，选择「更换背景图」。
+2. 选择纯背景 PNG、JPEG 或 WebP。
+3. 确认显示效果后选择「保存当前主题」。
+4. 输入名称；以后从「已保存主题」直接切换。
 
 ## 恢复与卸载快捷方式
 
