@@ -17,6 +17,11 @@
   非 OpenAI 官方产品。不修改 <code>.app</code> / <code>app.asar</code> / WindowsApps。
 </p>
 
+<p align="center">
+  <a href="https://codex-skin.cc"><strong>在线预览 · Codex Skin Atlas</strong></a><br>
+  <sub>我们为 Codex Dream Skin 开发的线上主题目录：浏览、预览与分享 Codex Desktop skin。</sub>
+</p>
+
 ## 赞助商
 
 <p align="center">
