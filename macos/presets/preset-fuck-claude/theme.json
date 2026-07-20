@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-fuck-claude",
+  "name": "fuck-claude",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "八模入局，围猎 Claude。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "FUCK CLAUDE ONLINE",
+  "quote": "EIGHT MODELS. ONE BATTLEFIELD.",
+  "image": "background.jpg",
+  "appearance": "dark",
+  "art": {
+    "focusX": 0.59,
+    "focusY": 0.48,
+    "safeArea": "none",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#070B12",
+    "panel": "#10151D",
+    "panelAlt": "#181E29",
+    "accent": "#D97757",
+    "accentAlt": "#F0A07F",
+    "secondary": "#8C5DCC",
+    "highlight": "#73A5FF",
+    "text": "#F3F5F7",
+    "muted": "#9BA6B7",
+    "line": "rgba(217, 119, 87, .28)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "fuck-claude",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}
