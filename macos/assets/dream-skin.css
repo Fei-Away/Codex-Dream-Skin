@@ -982,6 +982,29 @@ html.codex-dream-skin:is([data-dream-task-mode="ambient"], [data-dream-art-task-
   background: transparent !important;
 }
 
+/* The native thread detail panel uses the opaque dropdown token for both its
+   shell and sticky headings. Give this right-edge surface the same translucent
+   treatment as the immersive composer without changing unrelated dropdowns. */
+html.codex-dream-skin:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]
+  main.main-surface:not(.dream-skin-home-shell)
+  [class~="top-(--thread-floating-content-top-inset)"][class~="right-0"][class~="z-40"]
+  [class~="rounded-3xl"][class~="bg-token-dropdown-background"] {
+  background: var(--ds-immersive-composer) !important;
+  box-shadow:
+    0 12px 32px rgb(var(--ds-bg-rgb) / .22),
+    inset 0 0 0 1px var(--ds-immersive-line) !important;
+  backdrop-filter: blur(16px) saturate(108%) !important;
+}
+
+html.codex-dream-skin:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]
+  main.main-surface:not(.dream-skin-home-shell)
+  [class~="top-(--thread-floating-content-top-inset)"][class~="right-0"][class~="z-40"]
+  [class~="rounded-3xl"][class~="bg-token-dropdown-background"]
+  header[class~="bg-token-dropdown-background"] {
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
 html.codex-dream-skin[data-dream-art-wide="true"] main.main-surface
   .app-shell-main-content-frame {
   border-top: 0 !important;

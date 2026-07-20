@@ -130,6 +130,16 @@ assert.match(
   /\[class~="bg-token-main-surface-primary"\]\[class~="h-full"\]\[class~="w-full"\][\s\S]{0,100}background:\s*transparent !important;/,
   "Full-size utility route wrappers should not hide the selected artwork.",
 );
+assert.match(
+  css,
+  /\[class~="top-\(--thread-floating-content-top-inset\)"\]\[class~="right-0"\]\[class~="z-40"\][\s\S]{0,220}\[class~="rounded-3xl"\]\[class~="bg-token-dropdown-background"\]\s*\{[\s\S]{0,220}background:\s*var\(--ds-immersive-composer\) !important;[\s\S]{0,220}backdrop-filter:\s*blur\(16px\) saturate\(108%\) !important;/,
+  "The native thread detail panel should reveal wide task artwork through a blurred theme surface.",
+);
+assert.match(
+  css,
+  /\[class~="rounded-3xl"\]\[class~="bg-token-dropdown-background"\][\s\S]{0,220}header\[class~="bg-token-dropdown-background"\]\s*\{[\s\S]{0,180}background:\s*transparent !important;[\s\S]{0,120}backdrop-filter:\s*none !important;/,
+  "Sticky thread detail headings should inherit the panel glass instead of adding dark overlay strips.",
+);
 
 function createStyleDeclaration() {
   const values = new Map();
