@@ -6,10 +6,13 @@
 
 ## 内置实测预设
 
-当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）与
-`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）两套实机验证主题。
-前者是社区作者提供的原创哥特科幻背景；后者使用一张
+当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）、
+`preset-cyan-virtual-diva/`（青蓝虚拟歌姬）与
+`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）三套实机验证主题。
+前两套是可进入公开安装包的原创虚构作品；后者使用一张
 `2560 × 1440`（16:9）纯背景：左侧低信息留白承载 Codex 原生标题，人物和花卉主视觉集中在右侧。浅色与暗色截图均来自真实 Codex 注入，不是 AI 绘制的整窗 UI。
+
+青蓝虚拟歌姬背景为维护者提供的原创虚构成年角色作品，未使用真人肖像、第三方角色名称或官方 Codex/OpenAI 素材；`2400 × 1350` JPEG 与主题元数据按贡献声明授权随本项目公开安装包再分发。具体哈希由 macOS 构建脚本锁定，素材声明见 [`../NOTICE.md`](../NOTICE.md)。
 
 来源尺寸必须如实区分：归档的用户源图（不随 preset 播种）是 `1672 × 941` PNG；preset 内的 `background.jpg` 保持其近 16:9 构图，标准化导出为 `2560 × 1440` JPEG，并不代表补回或新增了源图细节。派生文件使用 `sips -z 1440 2560 -s format jpeg -s formatOptions 90` 生成。
 
@@ -23,7 +26,7 @@
 
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
-  --id preset-arina-hashimoto
+  --id preset-cyan-virtual-diva
 ```
 
 ## 一套预设的结构

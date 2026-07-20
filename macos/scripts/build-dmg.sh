@@ -62,6 +62,8 @@ MOUNTED_APP="$MOUNT/Codex Dream Skin.app"
   || { printf 'Mounted app is missing license notices.\n' >&2; exit 1; }
 [ -f "$MOUNTED_APP/Contents/Resources/engine/presets/preset-gothic-void-crusade/theme.json" ] \
   || { printf 'Mounted app is missing the public release preset.\n' >&2; exit 1; }
+[ -f "$MOUNTED_APP/Contents/Resources/engine/presets/preset-cyan-virtual-diva/theme.json" ] \
+  || { printf 'Mounted app is missing the Cyan Virtual Diva preset.\n' >&2; exit 1; }
 [ ! -e "$MOUNTED_APP/Contents/Resources/engine/presets/preset-arina-hashimoto" ] \
   || { printf 'Mounted app contains a rights-restricted preset.\n' >&2; exit 1; }
 for excluded in build-client-release.sh build-dmg.sh build-menubar-app.sh build-release.sh \

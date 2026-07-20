@@ -40,6 +40,21 @@ assert.deepEqual(readImageMetadata(gothic, ".jpg"), {
   taskMode: "ambient",
 });
 
+const cyanVirtualDiva = await fs.readFile(path.join(
+  macosRoot,
+  "presets",
+  "preset-cyan-virtual-diva",
+  "background.jpg",
+));
+assert.deepEqual(readImageMetadata(cyanVirtualDiva, ".jpg"), {
+  width: 2400,
+  height: 1350,
+  ratio: 2400 / 1350,
+  wide: true,
+  aspect: "wide",
+  taskMode: "ambient",
+});
+
 assert.deepEqual(classifyImageDimensions({ width: 2400, height: 1350 }), {
   width: 2400,
   height: 1350,

@@ -79,8 +79,8 @@
   <sub>暗色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
 </p>
 
-这组人物素材留在源码仓库用于参考与权利核验，不进入公开 DMG / Setup.exe；公开安装包只预置已确认
-可分发的 Gothic Void Crusade。普通用户仍可从菜单里的「更换背景图」导入自己有权使用的纯背景，
+这组人物素材留在源码仓库用于参考与权利核验，不进入公开 DMG / Setup.exe；公开 macOS 安装包预置已确认
+可分发的 Gothic Void Crusade 与原创「青蓝虚拟歌姬」。普通用户仍可从菜单里的「更换背景图」导入自己有权使用的纯背景，
 保存后继续一键切换。
 
 > 可下载的用户源图是 [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png)（`1672 × 941`）；源码参考预设使用 [`macos/presets/preset-arina-hashimoto/background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；未确认人物与素材权利前不得把它打进公开安装包。

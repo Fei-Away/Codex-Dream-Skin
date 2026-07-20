@@ -89,8 +89,8 @@ CDP is powerful and unauthenticated on loopback. Prefer Restore when you are don
 
 ## Bundled presets
 
-The public DMG seeds **Gothic Void Crusade**, contributed through PR #134, as
-its redistributable default. A source checkout also contains the
+The public DMG seeds **Gothic Void Crusade**, contributed through PR #134, and
+the original **青蓝虚拟歌姬 / Cyan Virtual Diva** light preset. A source checkout also contains the
 **桥本有菜 / Arina Hashimoto** reference material, but the public app bundle
 deliberately excludes it until independent likeness and redistribution rights
 are confirmed.
