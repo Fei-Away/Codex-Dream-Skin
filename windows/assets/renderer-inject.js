@@ -23,7 +23,7 @@
     "--ds-bg-rgb", "--ds-panel-rgb", "--ds-panel-2-rgb", "--ds-accent-rgb",
     "--ds-accent-alt-rgb", "--ds-secondary-rgb", "--ds-highlight-rgb",
     "--ds-text-rgb", "--ds-muted-rgb", "--ds-line-rgb",
-    "--dream-art-focus-x", "--dream-art-focus-y", "--dream-art-position",
+    "--dream-accent", "--dream-art", "--dream-art-focus-x", "--dream-art-focus-y", "--dream-art-position",
     "--dream-skin-focus-x", "--dream-skin-focus-y", "--dream-skin-art-position",
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
     "--dream-skin-project-label",
@@ -254,6 +254,7 @@
     }
     return "light";
   };
+  const detectShellAppearance = detectShellMode;
 
   const makeAdaptivePalette = (sample, shell) => {
     const source = sample || { r: 108, g: 126, b: 136 };
@@ -299,8 +300,12 @@
   };
 
   const applyTheme = (root, shell) => {
-    const colors = THEME.colors || {};
-    const explicit = new Set(Array.isArray(THEME.explicitColorKeys) ? THEME.explicitColorKeys : []);
+    root.classList.toggle("dream-theme-light", shell === "light");
+    root.classList.toggle("dream-theme-dark", shell === "dark");
+    const colors = THEME.colors || THEME.palette || {};
+    const explicit = new Set(Array.isArray(THEME.explicitColorKeys)
+      ? THEME.explicitColorKeys
+      : Object.keys(colors));
     const adaptive = makeAdaptivePalette(artAnalysis?.accentRgb, shell);
     const legacyLight = !THEME.appearance && shell === "light";
     const structural = new Set(["background", "panel", "panelAlt", "text", "muted"]);
@@ -342,6 +347,7 @@
       const rgb = rgbString(value);
       if (rgb) setStyleProperty(root, name, rgb);
     }
+    setStyleProperty(root, "--dream-accent", variables["--ds-green"]);
     setStyleProperty(root, "--dream-skin-name", cssString(THEME.name || "Codex Dream Skin"));
     setStyleProperty(root, "--dream-skin-tagline", cssString(THEME.tagline || "Make something wonderful."));
     setStyleProperty(root, "--dream-skin-project-prefix", cssString(THEME.projectPrefix || "选择项目 · "));
@@ -357,12 +363,19 @@
     const focusX = typeof ART.focusX === "number" ? ART.focusX
       : profile?.focusX ?? (safeArea === "left" ? 0.72 : safeArea === "right" ? 0.28 : 0.5);
     const focusY = typeof ART.focusY === "number" ? ART.focusY : profile?.focusY ?? 0.5;
+    const ratio = typeof profile?.ratio === "number" ? profile.ratio : null;
+    const aspect = profile?.aspect || (ratio === null ? "unknown"
+      : ratio >= 2.25 ? "ultrawide"
+      : ratio >= 1.45 ? "wide"
+      : ratio >= 1.08 ? "landscape"
+      : ratio >= 0.9 ? "square"
+      : "portrait");
     const taskMode = ART.taskMode && ART.taskMode !== "auto"
-      ? ART.taskMode : profile?.taskMode || "ambient";
-    const wide = profile?.wide || false;
-    const aspect = profile?.aspect || "unknown";
-    const focusXValue = `${(clamp(focusX, 0, 1) * 100).toFixed(2)}%`;
-    const focusYValue = `${(clamp(focusY, 0, 1) * 100).toFixed(2)}%`;
+      ? ART.taskMode : profile?.taskMode || (aspect === "ultrawide" ? "banner" : "ambient");
+    const wide = profile?.wide ?? (aspect === "wide" || aspect === "ultrawide");
+    const percent = (value) => `${Number((clamp(value, 0, 1) * 100).toFixed(2))}%`;
+    const focusXValue = percent(focusX);
+    const focusYValue = percent(focusY);
 
     setAttribute(root, "data-dream-art-wide", wide ? "true" : "false");
     setAttribute(root, "data-dream-art-safe", canonicalSafe);
@@ -371,6 +384,18 @@
     setAttribute(root, "data-dream-art-task-mode", taskMode);
     setAttribute(root, "data-dream-art-aspect", aspect);
     setAttribute(root, "data-dream-art-ready", artAnalysis ? "true" : "false");
+    root.classList.toggle("dream-art-wide", wide);
+    root.classList.toggle("dream-art-standard", !wide);
+    for (const value of ["left", "center", "right"]) {
+      const focus = clamp(focusX, 0, 1) < 0.4 ? "left" : clamp(focusX, 0, 1) > 0.6 ? "right" : "center";
+      root.classList.toggle(`dream-focus-${value}`, focus === value);
+    }
+    for (const value of ["left", "center", "right", "none"]) {
+      root.classList.toggle(`dream-safe-${value}`, canonicalSafe === value);
+    }
+    for (const value of ["ambient", "banner", "off"]) {
+      root.classList.toggle(`dream-task-${value}`, taskMode === value);
+    }
     setStyleProperty(root, "--dream-art-focus-x", focusXValue);
     setStyleProperty(root, "--dream-art-focus-y", focusYValue);
     setStyleProperty(root, "--dream-art-position", `${focusXValue} ${focusYValue}`);
@@ -549,6 +574,7 @@
     ensureStyle(root);
     const shell = resolvedShell();
     setAttribute(root, SHELL_ATTR, shell);
+    setStyleProperty(root, "--dream-art", `url("${artUrl}")`);
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
@@ -556,12 +582,51 @@
     return shell;
   };
 
+  const clearSkinDom = () => {
+    document.documentElement?.classList.remove(
+      "codex-dream-skin",
+      "dream-theme-light",
+      "dream-theme-dark",
+      "dream-art-wide",
+      "dream-art-standard",
+      "dream-focus-left",
+      "dream-focus-center",
+      "dream-focus-right",
+      "dream-safe-left",
+      "dream-safe-center",
+      "dream-safe-right",
+      "dream-safe-none",
+      "dream-task-ambient",
+      "dream-task-banner",
+      "dream-task-off",
+    );
+    document.documentElement?.removeAttribute(SHELL_ATTR);
+    for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
+    document.documentElement?.style.removeProperty("--dream-skin-art");
+    for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);
+    document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
+    document.querySelectorAll(".dream-home").forEach((node) => node.classList.remove("dream-home"));
+    document.querySelectorAll(".dream-task").forEach((node) => node.classList.remove("dream-task"));
+    document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
+    document.querySelectorAll(".dream-home-shell").forEach((node) => node.classList.remove("dream-home-shell"));
+    document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
+    document.querySelectorAll(".dream-home-utility").forEach((node) => node.classList.remove("dream-home-utility"));
+    document.getElementById(STYLE_ID)?.remove();
+    document.getElementById(CHROME_ID)?.remove();
+  };
+
   const syncRouteState = (shell, { layout = false } = {}) => {
     metrics.routePasses += 1;
     const root = document.documentElement;
     if (!root) return;
     shell ||= root.getAttribute(SHELL_ATTR) || resolvedShell();
-    const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
+    const shellMain = document.querySelector("main.main-surface") ||
+      document.querySelector("main") ||
+      document.querySelector('[role="main"]');
+    if (!shellMain || !document.body) {
+      clearSkinDom();
+      return;
+    }
     const homeIndicator = document.querySelector('[data-testid="home-icon"]');
     const home = homeIndicator?.closest('[role="main"]') ||
       [...document.querySelectorAll('[role="main"]')].find((candidate) =>
@@ -570,16 +635,29 @@
     for (const candidate of document.querySelectorAll('[role="main"].dream-skin-home')) {
       if (candidate !== home) candidate.classList.remove("dream-skin-home");
     }
+    for (const candidate of document.querySelectorAll('[role="main"].dream-home')) {
+      if (candidate !== home) candidate.classList.remove("dream-home");
+    }
+    for (const candidate of document.querySelectorAll('[role="main"].dream-task')) {
+      candidate.classList.remove("dream-task");
+    }
     if (home) home.classList.add("dream-skin-home");
+    if (home) home.classList.add("dream-home");
+    for (const candidate of document.querySelectorAll('[role="main"]')) {
+      if (candidate !== home) candidate.classList.add("dream-task");
+    }
     const homeUtilityBars = new Set(home
       ? home.querySelectorAll('[class*="_homeUtilityBar_"]')
       : []);
     for (const candidate of document.querySelectorAll(".dream-skin-home-utility")) {
       if (!homeUtilityBars.has(candidate)) candidate.classList.remove("dream-skin-home-utility");
     }
+    for (const candidate of document.querySelectorAll(".dream-home-utility")) {
+      if (!homeUtilityBars.has(candidate)) candidate.classList.remove("dream-home-utility");
+    }
     for (const candidate of homeUtilityBars) candidate.classList.add("dream-skin-home-utility");
+    for (const candidate of homeUtilityBars) candidate.classList.add("dream-home-utility");
 
-    if (!shellMain || !document.body) return;
     if (observedShellMain !== shellMain) {
       resizeObserver?.disconnect();
       resizeObserver?.observe(shellMain);
@@ -587,6 +665,7 @@
       layout = true;
     }
     shellMain.classList.toggle("dream-skin-home-shell", Boolean(home));
+    shellMain.classList.toggle("dream-home-shell", Boolean(home));
     let chrome = document.getElementById(CHROME_ID);
     let created = false;
     if (!chrome || chrome.parentElement !== document.body) {
@@ -629,6 +708,7 @@
       setStyleProperty(chrome, "height", `${Math.round(shellBox.height)}px`);
     }
     chrome.classList.toggle("dream-skin-home-shell", Boolean(home));
+    chrome.classList.toggle("dream-home-shell", Boolean(home));
     if (chrome.dataset.dreamShell !== shell) {
       chrome.dataset.dreamShell = shell;
       metrics.attributeWrites += 1;
@@ -648,16 +728,7 @@
     const state = window[STATE_KEY];
     if (state?.installToken !== installToken) return false;
     window[DISABLED_KEY] = true;
-    document.documentElement?.classList.remove("codex-dream-skin");
-    document.documentElement?.removeAttribute(SHELL_ATTR);
-    for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
-    document.documentElement?.style.removeProperty("--dream-skin-art");
-    for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);
-    document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
-    document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
-    document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
-    document.getElementById(STYLE_ID)?.remove();
-    document.getElementById(CHROME_ID)?.remove();
+    clearSkinDom();
     state?.observer?.disconnect();
     state?.rootObserver?.disconnect();
     state?.resizeObserver?.disconnect();
@@ -780,6 +851,7 @@
   }).catch(() => {});
   return {
     installed: true,
+    adaptive: true,
     version: VERSION,
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,

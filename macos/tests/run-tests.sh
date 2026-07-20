@@ -201,34 +201,42 @@ fi
   [ "$seeded" -eq 2 ] || exit 1
 ' _ "$ROOT"
 
-# Theme switches stage files and publish theme.json last, preserving a complete
-# active pack while the watcher is running.
-SWITCH_HOME="$TMP/switch-home"
-SWITCH_STATE="$SWITCH_HOME/Library/Application Support/CodexDreamSkinStudio"
-/bin/mkdir -p "$SWITCH_STATE/themes/preset-switch-fixture" "$SWITCH_STATE/theme"
-/bin/cp "$ROOT/assets/portal-hero.png" "$SWITCH_STATE/themes/preset-switch-fixture/background.png"
-/usr/bin/printf '%s\n' \
-  '{"schemaVersion":1,"id":"preset-switch-fixture","name":"切换测试","image":"background.png"}' \
-  > "$SWITCH_STATE/themes/preset-switch-fixture/theme.json"
-/usr/bin/printf '%s\n' '{"schemaVersion":1,"id":"old","name":"旧主题","image":"old.png"}' \
-  > "$SWITCH_STATE/theme/theme.json"
-: > "$SWITCH_STATE/theme/old.png"
-if /usr/bin/env HOME="$SWITCH_HOME" NODE="$NODE" \
-  "$ROOT/scripts/switch-theme-macos.sh" --id '../escape' --no-apply >/dev/null 2>&1; then
-  printf 'switch-theme unexpectedly accepted a path traversal theme id.\n' >&2
-  exit 1
+run_signed_runtime_switch_test() {
+  local switch_home="$TMP/switch-home"
+  local switch_state="$switch_home/Library/Application Support/CodexDreamSkinStudio"
+  /bin/mkdir -p "$switch_state/themes/preset-switch-fixture" "$switch_state/theme"
+  /bin/cp "$ROOT/assets/portal-hero.png" "$switch_state/themes/preset-switch-fixture/background.png"
+  /usr/bin/printf '%s\n' \
+    '{"schemaVersion":1,"id":"preset-switch-fixture","name":"切换测试","image":"background.png"}' \
+    > "$switch_state/themes/preset-switch-fixture/theme.json"
+  /usr/bin/printf '%s\n' '{"schemaVersion":1,"id":"old","name":"旧主题","image":"old.png"}' \
+    > "$switch_state/theme/theme.json"
+  : > "$switch_state/theme/old.png"
+  if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" --id '../escape' --no-apply >/dev/null 2>&1; then
+    printf 'switch-theme unexpectedly accepted a path traversal theme id.\n' >&2
+    exit 1
+  fi
+  /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null
+  /usr/bin/cmp -s "$switch_state/theme/background.png" \
+    "$switch_state/themes/preset-switch-fixture/background.png"
+  [ ! -e "$switch_state/theme/old.png" ]
+  "$NODE" -e '
+    const fs = require("fs");
+    const theme = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    if (theme.id !== "preset-switch-fixture" || theme.name !== "切换测试") process.exit(1);
+  ' "$switch_state/theme/theme.json"
+  [ -z "$(/usr/bin/find "$switch_state" -maxdepth 1 -name '.theme-switch.*' -print -quit)" ]
+}
+
+if [ "${CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS:-0}" = "1" ]; then
+  printf 'SKIP: switch-theme integration requires an installed, signed Codex app.\n'
+  SWITCH_RUNTIME_RESULT="skipped"
+else
+  run_signed_runtime_switch_test
+  SWITCH_RUNTIME_RESULT="passed"
 fi
-/usr/bin/env HOME="$SWITCH_HOME" NODE="$NODE" \
-  "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null
-/usr/bin/cmp -s "$SWITCH_STATE/theme/background.png" \
-  "$SWITCH_STATE/themes/preset-switch-fixture/background.png"
-[ ! -e "$SWITCH_STATE/theme/old.png" ]
-"$NODE" -e '
-  const fs = require("fs");
-  const theme = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  if (theme.id !== "preset-switch-fixture" || theme.name !== "切换测试") process.exit(1);
-' "$SWITCH_STATE/theme/theme.json"
-[ -z "$(/usr/bin/find "$SWITCH_STATE" -maxdepth 1 -name '.theme-switch.*' -print -quit)" ]
 
 RUNTIME_HOME="$TMP/runtime-home"
 RUNTIME_STATE_ROOT="$RUNTIME_HOME/Library/Application Support/CodexDreamSkinStudio"
@@ -297,6 +305,7 @@ UNTRUSTED_TEAM_ID="TEAM'ID"
   if pid_is_codex_executable "$$" || pid_is_codex_descendant "$$"; then exit 1; fi
 ' _ "$ROOT"
 
+run_signed_runtime_state_tests() {
 # A reused live PID must never be killed or treated as a successfully stopped
 # injector when its command identity does not match the recorded watcher.
 STOP_HOME="$TMP/stop-home"
@@ -489,6 +498,15 @@ for state_payload in '{' '{}'; do
   ' _ "$ROOT" "$TEST_INJECTOR_JOB_LABEL"
   /usr/bin/cmp -s "$STOP_STATE_ROOT/state.json" "$STOP_STATE_ROOT/state.original"
 done
+}
+
+if [ "${CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS:-0}" = "1" ]; then
+  printf 'SKIP: runtime-state integration requires an installed, signed Codex app.\n'
+  RUNTIME_STATE_RESULT="skipped"
+else
+  run_signed_runtime_state_tests
+  RUNTIME_STATE_RESULT="passed"
+fi
 
 /bin/mkdir -p "$TMP/theme"
 /bin/cp "$ROOT/assets/portal-hero.png" "$TMP/theme/background.png"
@@ -823,6 +841,13 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
 /usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
-"$ROOT/scripts/doctor-macos.sh" >/dev/null
+if [ "${CODEX_DREAM_SKIN_SKIP_DOCTOR:-0}" = "1" ]; then
+  printf 'SKIP: Doctor requires an installed, signed Codex app.\n'
+  DOCTOR_RESULT="skipped"
+else
+  "$ROOT/scripts/doctor-macos.sh" >/dev/null
+  DOCTOR_RESULT="passed"
+fi
 
-printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
+printf 'PASS: syntax, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, switch-theme signed runtime %s, runtime-state integration %s, and Doctor %s.\n' \
+  "$SWITCH_RUNTIME_RESULT" "$RUNTIME_STATE_RESULT" "$DOCTOR_RESULT"

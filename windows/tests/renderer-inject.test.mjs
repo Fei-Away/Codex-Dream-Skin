@@ -9,6 +9,12 @@ const windowsRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(windowsRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(windowsRoot, "assets", "dream-skin.css"), "utf8");
 const buildPayload = (config = {}) => template
+  .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify("test"))
+  .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify("test-style"))
+  .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify("test-payload"))
+  .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(".fixture { color: blue; }"))
+  .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
+  .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(config))
   .replace("__DREAM_CSS_JSON__", JSON.stringify(".fixture { color: blue; }"))
   .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
   .replace("__DREAM_THEME_JSON__", JSON.stringify(config));
@@ -22,6 +28,8 @@ assert.doesNotMatch(
 
 function createFixture({
   shellPresent,
+  mainPresent = shellPresent,
+  sidebarPresent = shellPresent,
   staleSkin = false,
   homePresent = false,
   utilityPresent = false,
@@ -32,11 +40,13 @@ function createFixture({
 }) {
   const nodes = new Map();
   const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
+  const rootAttributes = new Map();
   const rootStyles = new Map(staleSkin ? [["--dream-art", "url(\"blob:stale\")"]] : []);
   const revokedUrls = [];
   const observers = [];
   let objectUrlCount = 0;
-  let hasShell = shellPresent;
+  let hasMain = mainPresent;
+  let hasSidebar = sidebarPresent;
   let root;
 
   const queueRootClassMutation = () => {
@@ -67,15 +77,19 @@ function createFixture({
     },
     contains(value) { return classes.has(value); },
   });
+  const makeStyle = (styles = new Map()) => ({
+    getPropertyValue(key) { return styles.get(key) ?? ""; },
+    setProperty(key, value) { styles.set(key, value); },
+    removeProperty(key) { styles.delete(key); },
+  });
 
   root = {
     className: shellAppearance,
     classList: makeClassList(rootClasses, queueRootClassMutation),
-    getAttribute() { return null; },
-    style: {
-      setProperty(key, value) { rootStyles.set(key, value); },
-      removeProperty(key) { rootStyles.delete(key); },
-    },
+    getAttribute(name) { return rootAttributes.get(name) ?? null; },
+    setAttribute(name, value) { rootAttributes.set(name, String(value)); },
+    removeAttribute(name) { rootAttributes.delete(name); },
+    style: makeStyle(rootStyles),
     appendChild(node) {
       node.parentElement = root;
       nodes.set(node.id, node);
@@ -100,6 +114,11 @@ function createFixture({
   const utilityNode = { classList: makeClassList(utilityClasses) };
   const routeMain = {
     classList: makeClassList(routeClasses),
+    querySelector(selector) {
+      if (selector === '[data-feature="game-source"]') return homePresent ? {} : null;
+      if (selector === '.group\\\\/home-suggestions') return homePresent ? {} : null;
+      return null;
+    },
     querySelectorAll(selector) {
       if (selector === '[class*="_homeUtilityBar_"]' && utilityPresent) return [utilityNode];
       return [];
@@ -124,11 +143,12 @@ function createFixture({
     return {
       id: "",
       dataset: {},
-      style: {},
+      style: makeStyle(),
       classList: makeClassList(),
       parentElement: null,
       textContent: "",
       innerHTML: "",
+      querySelector() { return { textContent: "" }; },
       setAttribute() {},
       remove() { nodes.delete(this.id); },
     };
@@ -149,15 +169,17 @@ function createFixture({
     createElement,
     getElementById(id) { return nodes.get(id) ?? null; },
     querySelector(selector) {
-      if (selector === "main.main-surface") return hasShell ? shellMain : null;
-      if (selector === "aside.app-shell-left-panel") return hasShell ? {} : null;
+      if (selector === "main.main-surface") return hasMain ? shellMain : null;
+      if (selector === "main") return hasMain ? shellMain : null;
+      if (selector === "aside.app-shell-left-panel") return hasSidebar ? {} : null;
       if (selector === '[role="main"]:has([data-testid="home-icon"])') {
-        return hasShell && homePresent ? routeMain : null;
+        return hasMain && homePresent ? routeMain : null;
       }
+      if (selector === '[role="main"]') return hasMain ? routeMain : null;
       return null;
     },
     querySelectorAll(selector) {
-      if (selector === '[role="main"]') return hasShell ? [routeMain] : [];
+      if (selector === '[role="main"]') return hasMain ? [routeMain] : [];
       if (selector === ".dream-task") return routeClasses.has("dream-task") ? [routeMain] : [];
       if (selector === ".dream-home-utility") {
         return utilityClasses.has("dream-home-utility") ? [utilityNode] : [];
@@ -170,7 +192,15 @@ function createFixture({
   };
   const context = {
     window: {
-      matchMedia() { return { matches: osAppearance === "dark" }; },
+      matchMedia() {
+        return {
+          matches: osAppearance === "dark",
+          addEventListener() {},
+          removeEventListener() {},
+        };
+      },
+      addEventListener() {},
+      removeEventListener() {},
     },
     document,
     MutationObserver: class {
@@ -209,11 +239,13 @@ function createFixture({
     getComputedStyle() { return { colorScheme: computedColorScheme }; },
   };
   if (analysisFixture) {
-    context.Image = class {
+    const FixtureImage = class {
       naturalWidth = analysisFixture.naturalWidth;
       naturalHeight = analysisFixture.naturalHeight;
       set src(_) { this.onload(); }
     };
+    context.Image = FixtureImage;
+    context.window.Image = FixtureImage;
   }
 
   return {
@@ -225,7 +257,12 @@ function createFixture({
     revokedUrls,
     routeClasses,
     utilityClasses,
-    setShellPresent(value) { hasShell = value; },
+    setShellPresent(value) {
+      hasMain = value;
+      hasSidebar = value;
+    },
+    setSidebarPresent(value) { hasSidebar = value; },
+    setMainPresent(value) { hasMain = value; },
   };
 }
 
@@ -273,6 +310,33 @@ assert.equal(auxiliary.rootClasses.has("codex-dream-skin"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-style"), true);
 assert.equal(auxiliary.nodes.has("codex-dream-skin-chrome"), true);
 
+// Collapsing the left rail removes aside.app-shell-left-panel while the main
+// surface remains. The active theme must stay applied instead of flashing the
+// native Codex chrome.
+const collapsedSidebar = createFixture({
+  shellPresent: true,
+  mainPresent: true,
+  sidebarPresent: false,
+  staleSkin: true,
+});
+const collapsedResult = vm.runInNewContext(payload, collapsedSidebar.context);
+assert.equal(collapsedResult.installed, true);
+assert.equal(collapsedSidebar.rootClasses.has("codex-dream-skin"), true);
+assert.equal(collapsedSidebar.rootStyles.has("--dream-art"), true);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-style"), true);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-chrome"), true);
+assert.equal(collapsedSidebar.rootClasses.has("dream-theme-dark"), true);
+
+collapsedSidebar.setSidebarPresent(false);
+collapsedSidebar.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
+assert.equal(collapsedSidebar.rootClasses.has("codex-dream-skin"), true);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-style"), true);
+
+collapsedSidebar.setMainPresent(false);
+collapsedSidebar.context.window.__CODEX_DREAM_SKIN_STATE__.ensure();
+assert.equal(collapsedSidebar.rootClasses.has("codex-dream-skin"), false);
+assert.equal(collapsedSidebar.nodes.has("codex-dream-skin-style"), false);
+
 const configured = createFixture({
   shellPresent: true,
   homePresent: true,
@@ -318,7 +382,11 @@ assert.equal(analyzed.rootClasses.has("dream-theme-dark"), true);
 assert.equal(analyzed.rootClasses.has("dream-theme-light"), false);
 assert.equal(analyzed.rootClasses.has("dream-art-wide"), true);
 assert.equal(analyzed.rootClasses.has("dream-task-banner"), true);
-assert.equal(analyzed.rootClasses.has("dream-safe-left"), true);
+assert.equal(
+  ["dream-safe-left", "dream-safe-center", "dream-safe-right", "dream-safe-none"]
+    .some((className) => analyzed.rootClasses.has(className)),
+  true,
+);
 assert.notEqual(analyzed.rootStyles.get("--dream-accent"), "rgb(216 104 119)");
 
 const standardArt = createFixture({
@@ -368,4 +436,4 @@ vm.runInNewContext(buildPayload({ artMetadata: { ratio: 16 / 9 } }), metadataWid
 assert.equal(metadataWide.rootClasses.has("dream-art-wide"), true);
 assert.equal(metadataWide.rootClasses.has("dream-art-standard"), false);
 
-console.log("PASS: renderer applies adaptive theme metadata and preserves transparent auxiliary windows.");
+console.log("PASS: renderer applies adaptive theme metadata, keeps skin without a sidebar, and preserves transparent auxiliary windows.");

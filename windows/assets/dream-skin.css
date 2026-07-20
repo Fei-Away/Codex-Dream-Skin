@@ -48,6 +48,7 @@
   --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / .70);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-composer: rgb(var(--ds-panel-rgb) / .44);
+  --dream-immersive-composer: var(--ds-immersive-composer);
   --ds-immersive-composer-solid: color-mix(in srgb,
     rgb(var(--ds-panel-2-rgb)) 88%,
     rgb(var(--ds-muted-rgb)) 12%);
@@ -1354,4 +1355,22 @@ html.codex-dream-skin [data-message-author-role] { border-radius: 16px; }
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Compatibility aliases for the shared Windows/macOS immersive shell contract. */
+html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell)) body {
+  background-image: var(--dream-art) !important;
+  background-position: var(--dream-art-position) !important;
+}
+
+html.codex-dream-skin .dream-home-utility {
+  border: 1px solid var(--ds-line) !important;
+  border-bottom: 0 !important;
+  border-radius: 18px 18px 0 0 !important;
+  background: var(--ds-panel-2) !important;
+}
+
+html.codex-dream-skin .dream-home:has(.dream-home-utility) .composer-surface-chrome {
+  border-radius: 0 0 18px 18px !important;
+  background: var(--ds-panel-2) !important;
 }
