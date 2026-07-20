@@ -1,4 +1,4 @@
-# Codex Dream Skin for Windows - Fix
+# Codex Dream Skin for Windows
 
 <p align="center">
   <strong>中文</strong> · <a href="./README.en.md">English</a>
@@ -6,7 +6,7 @@
 
 Codex Dream Skin 通过本机回环 CDP 给官方 Codex Windows 桌面应用加载外部主题。它保留原生侧栏、项目选择、任务内容和输入框，不修改 WindowsApps、`app.asar` 或应用签名。
 
-此修正版补充了 Windows PowerShell 5.1 托盘菜单兼容性，并为宽屏背景上的浅色应用菜单栏增加可读性底层。
+此分支补充了 Windows PowerShell 5.1 托盘菜单兼容性，并为宽屏背景上的浅色应用菜单栏增加可读性底层。
 
 ## 运行要求
 

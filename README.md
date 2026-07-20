@@ -1,6 +1,6 @@
-# Codex Dream Skin - Windows Fix
+# Codex Dream Skin
 
-这是 `Codex Dream Skin` 的 Windows 修正版，主要修复：
+此分支包含以下 Windows 修复：
 
 - Windows PowerShell 5.1 打开托盘菜单时，空的 `ToolStripItemCollection` 无法绑定到 `Items` 参数。
 - 宽屏背景延伸到原生应用菜单栏时，浅色模式缺少稳定底色，导致菜单文字对比度不足。
