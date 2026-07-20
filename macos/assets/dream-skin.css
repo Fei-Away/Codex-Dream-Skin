@@ -45,7 +45,6 @@
   --ds-immersive-mid: rgb(var(--ds-bg-rgb) / .26);
   --ds-immersive-far: rgb(var(--ds-bg-rgb) / .16);
   --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / .46);
-  --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / .70);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-composer: rgb(var(--ds-panel-rgb) / .44);
   --ds-immersive-composer-solid: color-mix(in srgb,
@@ -92,7 +91,6 @@ html.codex-dream-skin[data-dream-shell="light"] {
   --ds-immersive-mid: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-far: rgb(var(--ds-panel-rgb) / .14);
   --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / .48);
-  --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / .72);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / .34);
   --ds-immersive-composer: rgb(var(--ds-panel-rgb) / .46);
   --ds-immersive-composer-solid: rgb(var(--ds-panel-rgb) / .74);
@@ -180,6 +178,8 @@ html.codex-dream-skin[data-dream-shell="light"]:is([data-dream-art-safe="none"],
 }
 
 html.codex-dream-skin body {
+  position: relative;
+  isolation: isolate;
   background: var(--ds-bg) !important;
   color: var(--ds-text) !important;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif !important;
@@ -187,6 +187,20 @@ html.codex-dream-skin body {
 
 html.codex-dream-skin body::before {
   content: none;
+}
+
+/* Paint wide artwork on its own viewport layer. The right inset is updated by
+   the renderer when Codex opens its opaque side panel, so the image reflows
+   inside the still-visible workspace instead of continuing underneath it. */
+html.codex-dream-skin[data-dream-art-wide="true"] body::before {
+  position: fixed;
+  inset: 0 var(--dream-skin-art-right-inset, 0px) 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background-position: var(--ds-art-position);
+  background-size: cover;
+  background-repeat: no-repeat;
+  transition: right .22s cubic-bezier(.22, 1, .36, 1);
 }
 
 html.codex-dream-skin aside.app-shell-left-panel {
@@ -305,18 +319,21 @@ html.codex-dream-skin:is([data-dream-task-mode="ambient"], [data-dream-art-task-
 }
 
 html.codex-dream-skin:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface:not(.dream-skin-home-shell)) body {
+  background-image: none !important;
+}
+
+html.codex-dream-skin:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface:not(.dream-skin-home-shell)) body::before {
+  content: "";
   background-image: var(--dream-skin-art) !important;
-  background-position: var(--ds-art-position) !important;
-  background-size: cover !important;
-  background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
 }
 
 html.codex-dream-skin:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface:not(.dream-skin-home-shell))
   aside.app-shell-left-panel {
+  /* Keep task/edit routes as transparent as the home route so artwork color
+     and saturation remain visually consistent when navigating into a chat. */
   background: linear-gradient(90deg,
-    var(--ds-task-immersive-sidebar),
-    var(--ds-task-immersive-edge) 100%) !important;
+    var(--ds-immersive-sidebar),
+    var(--ds-immersive-edge) 100%) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -769,11 +786,12 @@ html.codex-dream-skin .composer-surface-chrome::before { content: none !importan
 /* A wide image can carry the home screen too. The native hero remains live,
    but the artwork is painted once on the window instead of repeated in a card. */
 html.codex-dream-skin[data-dream-art-wide="true"]:has(main.main-surface.dream-skin-home-shell) body {
+  background-image: none !important;
+}
+
+html.codex-dream-skin[data-dream-art-wide="true"]:has(main.main-surface.dream-skin-home-shell) body::before {
+  content: "";
   background-image: var(--dream-skin-art) !important;
-  background-position: var(--ds-art-position) !important;
-  background-size: cover !important;
-  background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
 }
 
 html.codex-dream-skin[data-dream-art-wide="true"]:has(main.main-surface.dream-skin-home-shell)

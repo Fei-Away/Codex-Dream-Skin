@@ -42,28 +42,28 @@ assert.doesNotMatch(
 );
 assert.match(
   css,
-  /data-dream-art-task-mode="ambient"[\s\S]{0,500}body\s*\{[\s\S]{0,500}background-image:\s*var\(--dream-skin-art\) !important;[\s\S]{0,200}background-size:\s*cover !important;/,
+  /data-dream-art-task-mode="ambient"[\s\S]{0,700}body::before\s*\{[\s\S]{0,160}background-image:\s*var\(--dream-skin-art\) !important;/,
   "Wide ambient task artwork should cover the full application window.",
 );
 assert.match(
   css,
-  /data-dream-task-mode="banner"[\s\S]{0,900}body\s*\{[\s\S]{0,500}background-image:\s*var\(--dream-skin-art\) !important;[\s\S]{0,200}background-size:\s*cover !important;/,
+  /data-dream-task-mode="banner"[\s\S]{0,900}body::before\s*\{[\s\S]{0,160}background-image:\s*var\(--dream-skin-art\) !important;/,
   "Wide banner task artwork should use the same full-window wallpaper contract as ambient routes.",
 );
 assert.match(
   css,
-  /data-dream-art-wide="true"\]:has\(main\.main-surface\.dream-skin-home-shell\)[\s\S]{0,100}body\s*\{[\s\S]{0,300}background-image:\s*var\(--dream-skin-art\) !important;/,
+  /data-dream-art-wide="true"\]:has\(main\.main-surface\.dream-skin-home-shell\)[\s\S]{0,160}body::before\s*\{[\s\S]{0,160}background-image:\s*var\(--dream-skin-art\) !important;/,
   "Wide home artwork should use the same full-window image as utility routes.",
 );
 assert.match(
   css,
-  /data-dream-art-wide="true"\]:has\(main\.main-surface\.dream-skin-home-shell\)[\s\S]{0,120}body\s*\{[\s\S]{0,260}background-position:\s*var\(--ds-art-position\) !important;/,
-  "Wide home artwork must honor the configured focal point instead of forcing a centered crop.",
+  /data-dream-art-wide="true"\]\s+body::before\s*\{[\s\S]{0,180}inset:\s*0 var\(--dream-skin-art-right-inset, 0px\) 0 0;[\s\S]{0,220}background-position:\s*var\(--ds-art-position\);[\s\S]{0,100}background-size:\s*cover;/,
+  "Wide artwork must honor the focal point inside the visible area left of an open side panel.",
 );
 assert.match(
   css,
-  /data-dream-art-task-mode="ambient"[\s\S]{0,260}data-dream-art-wide="true"\]:has\(main\.main-surface:not\(\.dream-skin-home-shell\)\)[\s\S]{0,120}body\s*\{[\s\S]{0,260}background-position:\s*var\(--ds-art-position\) !important;/,
-  "Wide task artwork must retain the same focal point as the home route.",
+  /data-dream-art-task-mode="ambient"[\s\S]{0,600}aside\.app-shell-left-panel\s*\{[\s\S]{0,260}var\(--ds-immersive-sidebar\)[\s\S]{0,100}var\(--ds-immersive-edge\)/,
+  "Task routes should preserve the same sidebar artwork saturation as the home route.",
 );
 assert.match(
   css,
@@ -159,6 +159,7 @@ function createFixture(theme, {
   nativeShell = "light",
   analysisFixture = null,
   analysisCache = null,
+  sidePanelBox = null,
 } = {}) {
   let fixtureShell = nativeShell;
   const nodes = new Map();
@@ -192,11 +193,22 @@ function createFixture(theme, {
     setAttribute(name, value) { bodyAttributes.set(name, String(value)); },
   };
   const shellBox = { left: 280, top: 36, width: 1000, height: 764 };
+  const rectFor = (box) => ({
+    ...box,
+    x: box.left,
+    y: box.top,
+    right: box.left + box.width,
+    bottom: box.top + box.height,
+  });
+  const sidePanel = sidePanelBox ? {
+    getBoundingClientRect() { return rectFor(sidePanelBox); },
+  } : null;
   const shellMain = {
     classList: createClassList(),
     getBoundingClientRect() {
-      return { ...shellBox };
+      return rectFor(shellBox);
     },
+    querySelectorAll(selector) { return selector === "aside" && sidePanel ? [sidePanel] : []; },
   };
 
   const createElement = (tagName) => {
@@ -250,6 +262,8 @@ function createFixture(theme, {
   };
   const revokedUrls = [];
   const window = {
+    innerWidth: 1280,
+    innerHeight: 800,
     addEventListener() {},
     removeEventListener() {},
     matchMedia() {
@@ -292,7 +306,10 @@ function createFixture(theme, {
     Blob,
     Uint8Array,
     atob,
-    getComputedStyle() {
+    getComputedStyle(target) {
+      if (target === sidePanel) {
+        return { display: "block", visibility: "visible", opacity: "1" };
+      }
       const skinShell = root.classList.contains("codex-dream-skin")
         ? (attributes.get("data-dream-shell") || "dark") : fixtureShell;
       return {
@@ -361,6 +378,8 @@ assert.equal(defaults.attributes.get("data-dream-art-safe-area"), "center");
 assert.equal(defaults.attributes.get("data-dream-art-task-mode"), "ambient");
 assert.equal(defaults.attributes.get("data-dream-art-ready"), "false");
 assert.equal(defaults.rootStyle.values.get("--dream-art-position"), "50.00% 50.00%");
+assert.equal(defaults.rootStyle.values.get("--dream-skin-art-right-inset"), "0px");
+assert.equal(defaults.attributes.get("data-dream-side-panel"), "closed");
 const defaultMetrics = defaults.window.__CODEX_DREAM_SKIN_STATE__.metrics;
 assert.equal(defaultMetrics.rootPasses, 1);
 assert.equal(defaultMetrics.routePasses, 1);
@@ -381,6 +400,39 @@ assert.equal(defaultMetrics.layoutReads, 2, "Shell ResizeObserver changes must r
 const defaultChrome = defaults.nodes.get("codex-dream-skin-chrome");
 assert.equal(defaultChrome.style.values.get("left"), "196px");
 assert.equal(defaultChrome.style.values.get("width"), "1084px");
+
+const withSidePanel = createFixture({
+  id: "side-panel-contract",
+  appearance: "auto",
+  art: { safeArea: "left", taskMode: "ambient" },
+}, {
+  sidePanelBox: { left: 900, top: 36, width: 380, height: 764 },
+});
+vm.runInNewContext(withSidePanel.payload, withSidePanel.context);
+assert.equal(withSidePanel.attributes.get("data-dream-side-panel"), "open");
+assert.equal(withSidePanel.rootStyle.values.get("--dream-skin-art-right-inset"), "380px");
+
+const withBottomPanel = createFixture({
+  id: "bottom-panel-contract",
+  appearance: "auto",
+  art: { safeArea: "left", taskMode: "ambient" },
+}, {
+  sidePanelBox: { left: 900, top: 36, width: 380, height: 96 },
+});
+vm.runInNewContext(withBottomPanel.payload, withBottomPanel.context);
+assert.equal(withBottomPanel.attributes.get("data-dream-side-panel"), "open");
+assert.equal(withBottomPanel.rootStyle.values.get("--dream-skin-art-right-inset"), "380px");
+
+const withBottomDockOnly = createFixture({
+  id: "bottom-dock-contract",
+  appearance: "auto",
+  art: { safeArea: "left", taskMode: "ambient" },
+}, {
+  sidePanelBox: { left: 900, top: 600, width: 380, height: 164 },
+});
+vm.runInNewContext(withBottomDockOnly.payload, withBottomDockOnly.context);
+assert.equal(withBottomDockOnly.attributes.get("data-dream-side-panel"), "closed");
+assert.equal(withBottomDockOnly.rootStyle.values.get("--dream-skin-art-right-inset"), "0px");
 
 // Auto appearance must continue following the native shell after the skin is
 // already installed. The fixture makes the injected root color-scheme win

@@ -7,7 +7,7 @@
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
-    "data-dream-art-ready",
+    "data-dream-art-ready", "data-dream-side-panel",
   ];
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
@@ -25,6 +25,7 @@
     "--ds-text-rgb", "--ds-muted-rgb", "--ds-line-rgb",
     "--dream-art-focus-x", "--dream-art-focus-y", "--dream-art-position",
     "--dream-skin-focus-x", "--dream-skin-focus-y", "--dream-skin-art-position",
+    "--dream-skin-art-right-inset",
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
     "--dream-skin-project-label",
   ];
@@ -526,7 +527,36 @@
 
   let chromeParts = null;
   let observedShellMain = null;
+  let observedSidePanel = null;
   let resizeObserver = null;
+
+  const findVisibleSidePanel = (shellMain, shellBox) => {
+    if (!shellMain || typeof shellMain.querySelectorAll !== "function") return null;
+    const shellRight = Number.isFinite(shellBox.right)
+      ? shellBox.right : shellBox.left + shellBox.width;
+    const minimumWidth = Math.min(280, Math.max(220, shellBox.width * 0.22));
+    const minimumVisibleHeight = Math.min(48, shellBox.height);
+    const minimumLeft = shellBox.left + shellBox.width * 0.38;
+    const panels = [];
+    for (const candidate of shellMain.querySelectorAll("aside")) {
+      try {
+        const box = candidate.getBoundingClientRect();
+        const right = Number.isFinite(box.right) ? box.right : box.left + box.width;
+        const style = getComputedStyle(candidate);
+        if (
+          box.width < minimumWidth || box.height < minimumVisibleHeight
+          || box.top > shellBox.top + 32
+          || box.left < minimumLeft || box.left >= shellRight - 80
+          || right < shellRight - 32 || box.left >= window.innerWidth
+          || style.display === "none" || style.visibility === "hidden"
+          || Number.parseFloat(style.opacity || "1") <= 0.05
+        ) continue;
+        panels.push({ node: candidate, box });
+      } catch {}
+    }
+    panels.sort((left, right) => left.box.left - right.box.left);
+    return panels[0] || null;
+  };
 
   const ensureStyle = (root) => {
     let style = document.getElementById(STYLE_ID);
@@ -581,8 +611,6 @@
 
     if (!shellMain || !document.body) return;
     if (observedShellMain !== shellMain) {
-      resizeObserver?.disconnect();
-      resizeObserver?.observe(shellMain);
       observedShellMain = shellMain;
       layout = true;
     }
@@ -623,6 +651,20 @@
     if (layout || created) {
       metrics.layoutReads += 1;
       const shellBox = shellMain.getBoundingClientRect();
+      const sidePanel = findVisibleSidePanel(shellMain, shellBox);
+      if (observedSidePanel !== sidePanel?.node || created) {
+        resizeObserver?.disconnect();
+        resizeObserver?.observe(shellMain);
+        if (sidePanel?.node) resizeObserver?.observe(sidePanel.node);
+        observedSidePanel = sidePanel?.node || null;
+      }
+      const shellRight = Number.isFinite(shellBox.right)
+        ? shellBox.right : shellBox.left + shellBox.width;
+      const viewportWidth = Number.isFinite(window.innerWidth) ? window.innerWidth : shellRight;
+      const artRightEdge = sidePanel ? sidePanel.box.left : shellRight;
+      const artRightInset = Math.max(0, Math.round(viewportWidth - artRightEdge));
+      setStyleProperty(root, "--dream-skin-art-right-inset", `${artRightInset}px`);
+      setAttribute(root, "data-dream-side-panel", sidePanel ? "open" : "closed");
       setStyleProperty(chrome, "left", `${Math.round(shellBox.left)}px`);
       setStyleProperty(chrome, "top", `${Math.round(shellBox.top)}px`);
       setStyleProperty(chrome, "width", `${Math.round(shellBox.width)}px`);
@@ -702,7 +744,15 @@
       scheduler.timeout = setTimeout(flushScheduledEnsure, 64);
     }
   };
-  const observer = new MutationObserver(() => scheduleEnsure({ route: true }));
+  const nodeContainsAside = (node) => {
+    if (!node || node.nodeType !== 1) return false;
+    return Boolean(node.matches?.("aside") || node.querySelector?.("aside"));
+  };
+  const observer = new MutationObserver((records = []) => {
+    const layout = records.some((record) => record.type === "childList"
+      && [...(record.addedNodes || []), ...(record.removedNodes || [])].some(nodeContainsAside));
+    scheduleEnsure({ route: true, layout });
+  });
   rootObserver = new MutationObserver(() => {
     if (samplingNativeShell) return;
     scheduleEnsure({ root: true, route: true });
