@@ -560,12 +560,12 @@ html.codex-dream-skin [class*="context-menu-content"] button {
 
 html.codex-dream-skin [role="dialog"]:not(#codex-dream-skin-chrome):not(.dream-skin-home)
   button:not([class~="bg-token-foreground"]):not([aria-label]) {
-  color: rgb(var(--ds-text-rgb) / .92) !important;
-  background: rgb(var(--ds-accent-rgb) / .12) !important;
-  border: 1px solid rgb(var(--ds-accent-rgb) / .20) !important;
+  color: rgb(var(--ds-text-rgb) / .86) !important;
+  background: rgb(var(--ds-accent-rgb) / .07) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .14) !important;
   box-shadow:
-    inset 0 1px rgb(var(--ds-text-rgb) / .07),
-    0 8px 18px rgb(var(--ds-bg-rgb) / .20) !important;
+    inset 0 1px rgb(var(--ds-text-rgb) / .04),
+    0 6px 14px rgb(var(--ds-bg-rgb) / .16) !important;
 }
 
 html.codex-dream-skin [role="dialog"]:not(#codex-dream-skin-chrome):not(.dream-skin-home)
@@ -579,6 +579,16 @@ html.codex-dream-skin [class*="popover-content"] button:hover,
 html.codex-dream-skin [class*="dropdown-content"] button:hover,
 html.codex-dream-skin [class*="context-menu-content"] button:hover {
   background: rgb(var(--ds-accent-rgb) / .10) !important;
+}
+
+html.codex-dream-skin [role="dialog"]:not(#codex-dream-skin-chrome):not(.dream-skin-home)
+  button:not([class~="bg-token-foreground"]):not([aria-label]):hover {
+  color: rgb(var(--ds-text-rgb) / .96) !important;
+  background: rgb(var(--ds-accent-rgb) / .14) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .26) !important;
+  box-shadow:
+    inset 0 1px rgb(var(--ds-text-rgb) / .08),
+    0 8px 18px rgb(var(--ds-bg-rgb) / .22) !important;
 }
 
 html.codex-dream-skin [data-radix-popper-content-wrapper] > * svg,
