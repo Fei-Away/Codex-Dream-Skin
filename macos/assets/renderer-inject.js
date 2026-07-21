@@ -4,6 +4,8 @@
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
   const SHELL_ATTR = "data-dream-shell";
+  const MAIN_FALLBACK_CLASS = "dream-skin-main-shell";
+  const SIDE_PANEL_FALLBACK_CLASS = "dream-skin-side-panel";
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
@@ -615,7 +617,13 @@
     const root = document.documentElement;
     if (!root) return;
     shell ||= root.getAttribute(SHELL_ATTR) || resolvedShell();
-    const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
+    const shellMain = document.querySelector("main.main-surface") ||
+      document.querySelector("main") ||
+      document.querySelector('[role="main"]');
+    const sidePanel = document.querySelector("aside.app-shell-left-panel") ||
+      document.querySelector("aside[role='navigation']") ||
+      document.querySelector("aside[class*='left-panel']") ||
+      document.querySelector("aside[class*='sidebar']");
     const homeIndicator = document.querySelector('[data-testid="home-icon"]');
     const home = homeIndicator?.closest('[role="main"]') ||
       [...document.querySelectorAll('[role="main"]')].find((candidate) =>
@@ -634,6 +642,7 @@
     for (const candidate of homeUtilityBars) candidate.classList.add("dream-skin-home-utility");
 
     if (!shellMain || !document.body) return;
+    shellMain.classList.add(MAIN_FALLBACK_CLASS);
     if (observedShellMain !== shellMain) {
       resizeObserver?.disconnect();
       resizeObserver?.observe(shellMain);
@@ -641,6 +650,10 @@
       layout = true;
     }
     shellMain.classList.toggle("dream-skin-home-shell", Boolean(home));
+    for (const node of document.querySelectorAll(`.${SIDE_PANEL_FALLBACK_CLASS}`)) {
+      node.classList.remove(SIDE_PANEL_FALLBACK_CLASS);
+    }
+    sidePanel?.classList.add(SIDE_PANEL_FALLBACK_CLASS);
     let chrome = document.getElementById(CHROME_ID);
     let created = false;
     if (!chrome || chrome.parentElement !== document.body) {
@@ -710,6 +723,8 @@
     for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);
     document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
     document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
+    document.querySelectorAll(`.${MAIN_FALLBACK_CLASS}`).forEach((node) => node.classList.remove(MAIN_FALLBACK_CLASS));
+    document.querySelectorAll(`.${SIDE_PANEL_FALLBACK_CLASS}`).forEach((node) => node.classList.remove(SIDE_PANEL_FALLBACK_CLASS));
     document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();

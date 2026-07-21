@@ -29,6 +29,7 @@
 - Narrower window: wallpaper cropping preserves the declared focus and safe area before essential controls are compressed.
 - Task route: background remains atmospheric, messages and output panels keep high contrast, and the composer remains reachable.
 - Task side panel: open and close the native thread panel twice, resize the window, and repeat; the toggle remains visible and clickable.
+- Pet overlay: open a desktop Pet and confirm its auxiliary host and composition surfaces remain transparent, contain no `codex-dream-skin` marker, and never inherit the main-window wallpaper or readability veil.
 - Selected image contains no fake interface controls or raster text intended to impersonate Codex.
 - Inspect sidebar selection, header, wallpaper edges, cards, project utility row, composer buttons, scrollbars, focus outlines, dialogs, and menus.
 

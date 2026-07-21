@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-violet-rose",
+  "name": "Violet Rose",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "Bring violet roses and soft light to today's workbench.",
+  "projectPrefix": "Select project · ",
+  "projectLabel": "◉  Select project",
+  "statusText": "VIOLET ROSE ONLINE",
+  "quote": "MAKE SOMETHING WONDERFUL",
+  "image": "background.jpg",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.76,
+    "focusY": 0.45,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#17131d",
+    "panel": "#211a29",
+    "panelAlt": "#2d2138",
+    "accent": "#b48bd1",
+    "accentAlt": "#e0a8bd",
+    "secondary": "#d49aad",
+    "highlight": "#7e5ca3",
+    "text": "#f5edf7",
+    "muted": "#c1afc9",
+    "line": "rgba(180, 139, 209, .28)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "Violet Rose",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}

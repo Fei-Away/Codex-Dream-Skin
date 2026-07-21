@@ -835,6 +835,15 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         visible: r.width > 0 && r.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
       };
     };
+    const surface = (node) => {
+      if (!node) return null;
+      return {
+        ...box(node),
+        backgroundColor: getComputedStyle(node).backgroundColor,
+      };
+    };
+    const isNativeOpaqueLight = (value) =>
+      value === 'rgb(255, 255, 255)' || value === 'rgba(255, 255, 255, 1)';
     const homeIndicator = document.querySelector('[data-testid="home-icon"]');
     const homeSignal = homeIndicator ?? document.querySelector('[data-feature="game-source"]') ??
       document.querySelector('.group\\\\/home-suggestions');
@@ -864,6 +873,9 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const shell = box(document.querySelector('main.main-surface'));
     const composer = box(document.querySelector('.composer-surface-chrome'));
     const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
+    const rightPanel = surface(document.querySelector('[data-app-shell-focus-area="right-panel"]'));
+    const bottomPanel = surface(document.querySelector('[data-app-shell-focus-area="bottom-panel"]'));
+    const terminal = surface(document.querySelector('[data-codex-terminal="true"]'));
     const chrome = document.getElementById('codex-dream-skin-chrome');
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
@@ -884,6 +896,9 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       shell,
       composer,
       sidebar,
+      rightPanel,
+      bottomPanel,
+      terminal,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -893,6 +908,8 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const basePass = result.installed && result.version === ${JSON.stringify(SKIN_VERSION)} &&
       result.stylePresent && result.chromePresent && result.chromePointerEvents === 'none' &&
       Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible) && !result.documentOverflow.x;
+    const auxiliaryPanelsPass = [result.rightPanel, result.bottomPanel, result.terminal]
+      .every((item) => !item?.visible || !isNativeOpaqueLight(item.backgroundColor));
     const expectedThemeId = ${JSON.stringify(expectedThemeId)};
     const expectedRevision = ${JSON.stringify(expectedRevision)};
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
@@ -905,13 +922,16 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         result.suggestionLabelColorsMatch
       ))
     );
-    result.pass = Boolean(basePass && homePass && payloadPass);
+    result.pass = Boolean(basePass && homePass && payloadPass && auxiliaryPanelsPass);
     result.expectedThemeId = expectedThemeId;
     result.expectedRevision = expectedRevision;
     result.softNotes = {
       projectButtonOptional: !result.projectButton?.visible,
       composerOptionalOnNonTaskRoutes: !result.composer?.visible,
       suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
+      rightPanelOptionalWhenClosed: !result.rightPanel?.visible,
+      bottomPanelOptionalWhenClosed: !result.bottomPanel?.visible,
+      terminalOptionalWhenClosed: !result.terminal?.visible,
     };
     return result;
   })()`);
@@ -1660,11 +1680,21 @@ async function runWatch(options) {
           }
           const probe = await waitForCodexProbe(session);
           if (!probe?.codex) {
-            await removeEarly(record);
+            // Auxiliary Codex windows (for example the desktop Pet host) can
+            // outlive an older injector generation. Unregistering the early
+            // script alone does not remove an already-installed skin, leaving
+            // the otherwise transparent helper window with an opaque panel.
+            // Invalidate the in-document early observer and scrub only our
+            // own markers/styles before rejecting the target.
+            await invalidateEarly(record);
+            await removeFromSession(session);
+            if (!await verifyRemovedSession(session)) {
+              throw new Error("Could not clear residual skin from auxiliary target");
+            }
             session.close();
             sessions.delete(target.id);
             if (!rejected.has(target.id)) {
-              console.error(`[dream-skin] rejected non-ChatGPT app target ${target.id}`);
+              console.error(`[dream-skin] rejected and cleaned auxiliary app target ${target.id}`);
               rejected.add(target.id);
             }
             continue;

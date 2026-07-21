@@ -78,7 +78,12 @@ assert.match(
 );
 assert.match(
   source,
-  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\([\s\S]{0,2500}visibleSuggestionLabels\.length >= result\.visibleCardCount[\s\S]{0,160}result\.suggestionLabelColorsMatch/,
+  /if \(!probe\?\.codex\) \{[\s\S]{0,900}invalidateEarly\(record\)[\s\S]{0,500}removeFromSession\(session\)[\s\S]{0,500}verifyRemovedSession\(session\)/,
+  "Auxiliary targets must have stale early scripts and residual skin removed before rejection.",
+);
+assert.match(
+  source,
+  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\([\s\S]{0,5000}visibleSuggestionLabels\.length >= result\.visibleCardCount[\s\S]{0,160}result\.suggestionLabelColorsMatch/,
   "Live verification must reject visible home suggestion labels that diverge from the themed card color.",
 );
 

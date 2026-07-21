@@ -256,6 +256,27 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $gothicTheme
     Copy-Item -LiteralPath $gothicSourceTheme -Destination $gothicTheme -Force
   }
+  # Bundled Violet Rose (original lavender-and-rose artwork).
+  $violetSource = Join-Path $SkillRoot 'presets\preset-violet-rose'
+  $violetDirectory = Join-Path $paths.Saved 'preset-violet-rose'
+  $violetTheme = Join-Path $violetDirectory 'theme.json'
+  $violetSourceTheme = Join-Path $violetSource 'theme.json'
+  $violetSourceImage = Join-Path $violetSource 'background.jpg'
+  Assert-DreamSkinNoReparseComponents -Path $violetDirectory
+  Assert-DreamSkinNoReparseComponents -Path $violetTheme
+  if ((Test-Path -LiteralPath $violetSourceTheme -PathType Leaf) -and
+    (Test-Path -LiteralPath $violetSourceImage -PathType Leaf) -and
+    -not (Test-Path -LiteralPath $violetTheme -PathType Leaf)) {
+    Ensure-DreamSkinManagedDirectory -Path $violetDirectory -Root $paths.Root
+    $violetImage = Join-Path $violetDirectory 'background.jpg'
+    Assert-DreamSkinNoReparseComponents -Path $violetImage
+    Assert-DreamSkinImageFile -Path $violetSourceImage
+    Copy-Item -LiteralPath $violetSourceImage -Destination $violetImage -Force
+    Assert-DreamSkinNoReparseComponents -Path $violetImage
+    Assert-DreamSkinImageFile -Path $violetImage
+    Assert-DreamSkinNoReparseComponents -Path $violetTheme
+    Copy-Item -LiteralPath $violetSourceTheme -Destination $violetTheme -Force
+  }
   $null = Read-DreamSkinTheme -ThemeDirectory $paths.Active
   return $paths
 }

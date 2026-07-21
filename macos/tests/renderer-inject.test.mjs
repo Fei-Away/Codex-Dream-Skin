@@ -8,15 +8,16 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const macosRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(macosRoot, "assets", "renderer-inject.js"), "utf8");
 const css = await fs.readFile(path.join(macosRoot, "assets", "dream-skin.css"), "utf8");
+const injector = await fs.readFile(path.join(macosRoot, "scripts", "injector.mjs"), "utf8");
 
 assert.doesNotMatch(
   css,
-  /main\.main-surface\s*>\s*header\.app-header-tint\s*\{[^}]*\b(?:position|z-index)\s*:/,
+  /:(?:is\(main\.main-surface, \.dream-skin-main-shell\)|main\.main-surface)\s*>\s*header\.app-header-tint\s*\{[^}]*\b(?:position|z-index)\s*:/,
   "The skin must preserve Codex's native fixed header so the side-panel toggle remains reachable.",
 );
 assert.doesNotMatch(
   css,
-  /main\.main-surface:not\(\.dream-skin-home-shell\)\s*>\s*\*\s*\{[^}]*\bposition\s*:/,
+  /:(?:is\(main\.main-surface, \.dream-skin-main-shell\)|main\.main-surface):not\(\.dream-skin-home-shell\)\s*>\s*\*\s*\{[^}]*\bposition\s*:/,
   "Task-route child layering must not overwrite the native header position.",
 );
 
@@ -52,17 +53,17 @@ assert.match(
 );
 assert.match(
   css,
-  /data-dream-art-wide="true"\]:has\(main\.main-surface\.dream-skin-home-shell\)[\s\S]{0,100}body\s*\{[\s\S]{0,300}background-image:\s*var\(--dream-skin-art\) !important;/,
+  /data-dream-art-wide="true"\]:has\(:is\(main\.main-surface, \.dream-skin-main-shell\)\.dream-skin-home-shell\)[\s\S]{0,100}body\s*\{[\s\S]{0,300}background-image:\s*var\(--dream-skin-art\) !important;/,
   "Wide home artwork should use the same full-window image as utility routes.",
 );
 assert.match(
   css,
-  /data-dream-art-wide="true"\]:has\(main\.main-surface\.dream-skin-home-shell\)[\s\S]{0,120}body\s*\{[\s\S]{0,260}background-position:\s*var\(--ds-art-position\) !important;/,
+  /data-dream-art-wide="true"\]:has\(:is\(main\.main-surface, \.dream-skin-main-shell\)\.dream-skin-home-shell\)[\s\S]{0,120}body\s*\{[\s\S]{0,260}background-position:\s*var\(--ds-art-position\) !important;/,
   "Wide home artwork must honor the configured focal point instead of forcing a centered crop.",
 );
 assert.match(
   css,
-  /data-dream-art-task-mode="ambient"[\s\S]{0,260}data-dream-art-wide="true"\]:has\(main\.main-surface:not\(\.dream-skin-home-shell\)\)[\s\S]{0,120}body\s*\{[\s\S]{0,260}background-position:\s*var\(--ds-art-position\) !important;/,
+  /data-dream-art-task-mode="ambient"[\s\S]{0,260}data-dream-art-wide="true"\]:has\(:is\(main\.main-surface, \.dream-skin-main-shell\):not\(\.dream-skin-home-shell\)\)[\s\S]{0,120}body\s*\{[\s\S]{0,260}background-position:\s*var\(--ds-art-position\) !important;/,
   "Wide task artwork must retain the same focal point as the home route.",
 );
 assert.match(
@@ -129,6 +130,36 @@ assert.match(
   css,
   /\[class~="bg-token-main-surface-primary"\]\[class~="h-full"\]\[class~="w-full"\][\s\S]{0,100}background:\s*transparent !important;/,
   "Full-size utility route wrappers should not hide the selected artwork.",
+);
+assert.match(
+  css,
+  /data-app-shell-focus-area="right-panel"[\s\S]{0,260}background:\s*linear-gradient/,
+  "The native right tool panel must inherit the selected skin instead of remaining opaque white.",
+);
+assert.match(
+  css,
+  /data-app-shell-focus-area="bottom-panel"[\s\S]{0,260}background:\s*linear-gradient/,
+  "The native bottom panel must inherit the selected skin instead of remaining opaque white.",
+);
+assert.match(
+  css,
+  /data-codex-terminal="true"[\s\S]{0,220}--vscode-terminal-background:\s*transparent !important;/,
+  "The xterm host must override Codex's inline light terminal background.",
+);
+assert.match(
+  injector,
+  /data-app-shell-focus-area="right-panel"/,
+  "Runtime verification must inspect the native right tool panel.",
+);
+assert.match(
+  injector,
+  /data-app-shell-focus-area="bottom-panel"/,
+  "Runtime verification must inspect the native bottom panel.",
+);
+assert.match(
+  injector,
+  /data-codex-terminal="true"/,
+  "Runtime verification must inspect the terminal host.",
 );
 
 function createStyleDeclaration() {

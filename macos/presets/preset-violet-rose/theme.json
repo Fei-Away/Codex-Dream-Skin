@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-violet-rose",
+  "name": "Violet Rose",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "把紫罗兰与玫瑰带进今天的工作台。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "VIOLET ROSE ONLINE",
+  "quote": "MAKE SOMETHING WONDERFUL",
+  "image": "background.jpg",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.72,
+    "focusY": 0.45,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  }
+}
