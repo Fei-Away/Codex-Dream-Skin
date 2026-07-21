@@ -59,6 +59,24 @@ macOS 安装后可从「已保存主题」直接切换，也可以运行：
   --id preset-gothic-void-crusade
 ```
 
+### 枫瀑幽屏 · Maple Falls at Night
+
+[@IndifferentSmirk](https://github.com/IndifferentSmirk) 从博物馆公版藏品《Maple Trees, Waterfall and Birds》中取景，重新裁切并压暗为一套适合长时间工作的夜色主题。左侧留给 Codex 内容，枫叶、古木与瀑布落在右侧；暖铜色强调色只点在按钮和边线上，不会盖过原画。
+
+<p align="center">
+  <img src="docs/images/presets/maple-falls-night-preview.jpg" alt="枫瀑幽屏主题 Windows 实机效果" width="900"><br>
+  <sub>Windows Codex 首页实机效果（仅预览）</sub>
+</p>
+
+主题包同时提供 macOS 与 Windows 版本。macOS 可直接运行：
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-maple-falls-night
+```
+
+Windows 安装后可从托盘的「已保存主题」中选择「枫瀑幽屏 · Maple Falls at Night」。原作来自 Honolulu Museum of Art，经 Wikimedia Commons 以 CC0 发布；完整来源记录见 [`macos/references/asset-provenance.md`](./macos/references/asset-provenance.md)。
+
 ### 桥本有菜 / Arina Hashimoto
 
 下面这套「桥本有菜 / Arina Hashimoto」已经在真实 Codex 首页分别验证浅色和暗色外观。用户提供的源 PNG 为 `1672 × 941`，主题包在保持源图近 16:9 构图的前提下派生导出 `2560 × 1440` JPEG，并不代表增加了源图细节。截图中的侧栏、卡片、项目选择和输入框都是 Codex 原生控件。

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-maple-falls-night",
+  "name": "枫瀑幽屏 · Maple Falls at Night",
+  "brandSubtitle": "MAPLE FALLS · CODEX",
+  "tagline": "在枫影与水声之间展开思路。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "MAPLE FALLS ONLINE",
+  "quote": "静水深流",
+  "image": "background.jpg",
+  "appearance": "dark",
+  "art": {
+    "focusX": 0.74,
+    "focusY": 0.46,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "palette": {
+    "accent": "#c98262"
+  },
+  "colors": {
+    "background": "#0f1513",
+    "panel": "#171e1b",
+    "panelAlt": "#232a26",
+    "accent": "#c98262",
+    "accentAlt": "#dda876",
+    "secondary": "#6f9686",
+    "highlight": "#b65f55",
+    "text": "#f2eee7",
+    "muted": "#a8b1aa",
+    "line": "rgba(201, 130, 98, .34)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "枫瀑幽屏",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}

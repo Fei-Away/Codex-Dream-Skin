@@ -195,10 +195,12 @@ fi
   [ -f "$themes/preset-gothic-void-crusade/background.jpg" ] || exit 1
   [ -f "$themes/preset-arina-hashimoto/theme.json" ] || exit 1
   [ -f "$themes/preset-arina-hashimoto/background.jpg" ] || exit 1
+  [ -f "$themes/preset-maple-falls-night/theme.json" ] || exit 1
+  [ -f "$themes/preset-maple-falls-night/background.jpg" ] || exit 1
   [ -f "$themes/custom-keepme/theme.json" ] || exit 1
   for id in $retired; do [ ! -e "$themes/$id" ] || exit 1; done
   seeded="$(/usr/bin/find "$themes" -maxdepth 1 -type d -name "preset-*" | /usr/bin/wc -l | /usr/bin/tr -d " ")"
-  [ "$seeded" -eq 2 ] || exit 1
+  [ "$seeded" -eq 3 ] || exit 1
 ' _ "$ROOT"
 
 run_signed_runtime_switch_test() {

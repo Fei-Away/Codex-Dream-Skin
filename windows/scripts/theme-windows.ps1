@@ -256,6 +256,27 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $gothicTheme
     Copy-Item -LiteralPath $gothicSourceTheme -Destination $gothicTheme -Force
   }
+  # Bundled Maple Falls at Night (same pack as macOS presets/).
+  $mapleSource = Join-Path $SkillRoot 'presets\preset-maple-falls-night'
+  $mapleDirectory = Join-Path $paths.Saved 'preset-maple-falls-night'
+  $mapleTheme = Join-Path $mapleDirectory 'theme.json'
+  $mapleSourceTheme = Join-Path $mapleSource 'theme.json'
+  $mapleSourceImage = Join-Path $mapleSource 'background.jpg'
+  Assert-DreamSkinNoReparseComponents -Path $mapleDirectory
+  Assert-DreamSkinNoReparseComponents -Path $mapleTheme
+  if ((Test-Path -LiteralPath $mapleSourceTheme -PathType Leaf) -and
+    (Test-Path -LiteralPath $mapleSourceImage -PathType Leaf) -and
+    -not (Test-Path -LiteralPath $mapleTheme -PathType Leaf)) {
+    Ensure-DreamSkinManagedDirectory -Path $mapleDirectory -Root $paths.Root
+    $mapleImage = Join-Path $mapleDirectory 'background.jpg'
+    Assert-DreamSkinNoReparseComponents -Path $mapleImage
+    Assert-DreamSkinImageFile -Path $mapleSourceImage
+    Copy-Item -LiteralPath $mapleSourceImage -Destination $mapleImage -Force
+    Assert-DreamSkinNoReparseComponents -Path $mapleImage
+    Assert-DreamSkinImageFile -Path $mapleImage
+    Assert-DreamSkinNoReparseComponents -Path $mapleTheme
+    Copy-Item -LiteralPath $mapleSourceTheme -Destination $mapleTheme -Force
+  }
   $null = Read-DreamSkinTheme -ThemeDirectory $paths.Active
   return $paths
 }

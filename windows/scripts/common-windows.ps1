@@ -132,6 +132,8 @@ function Install-DreamSkinRuntimeEngine {
     'assets\theme.json',
     'presets\preset-gothic-void-crusade\background.jpg',
     'presets\preset-gothic-void-crusade\theme.json',
+    'presets\preset-maple-falls-night\background.jpg',
+    'presets\preset-maple-falls-night\theme.json',
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',
     'scripts\image-metadata.mjs',
