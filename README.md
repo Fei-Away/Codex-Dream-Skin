@@ -63,6 +63,16 @@ macOS 安装后可从「已保存主题」直接切换，也可以运行：
 
 这是一套完整角色 UI 主题，不只是更换背景图：它会增加侧栏主题卡片、导航小人物、右下前景双角色、顶部趴卧双角色、眨眼与摆腿、流动光影及花瓣。所有装饰都不接收鼠标事件；切换到其他主题或暂停后会热清理，不需要重启 Codex。
 
+<p align="center">
+  <img src="docs/images/presets/sky-garden-duo-home.jpg" alt="天空花园双姝新建任务页实机效果" width="900"><br>
+  <sub>新建任务页 · 真实 Codex 注入截图（账户名称已遮挡，仅预览）</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/presets/sky-garden-duo-task.jpg" alt="天空花园双姝普通任务页实机效果" width="900"><br>
+  <sub>普通任务页 · 真实 Codex 注入截图（账户名称已遮挡，仅预览）</sub>
+</p>
+
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
   --id preset-sky-garden-duo

@@ -68,6 +68,16 @@ pair, a reclining top companion, blink and leg motion, flowing light, and
 falling petals. Decorations never receive pointer events and are removed on a
 hot theme switch or pause without restarting Codex.
 
+<p align="center">
+  <img src="docs/images/presets/sky-garden-duo-home.jpg" alt="Sky Garden Duo running on the real Codex new-task page" width="900"><br>
+  <sub>New-task page · real injected Codex screenshot; account name redacted (preview only)</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/presets/sky-garden-duo-task.jpg" alt="Sky Garden Duo running on a regular Codex task page" width="900"><br>
+  <sub>Regular task page · real injected Codex screenshot; account name redacted (preview only)</sub>
+</p>
+
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
   --id preset-sky-garden-duo
