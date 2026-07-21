@@ -15,6 +15,8 @@ const SKIN_VERSION = "1.2.0";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
+const DUO_THEME_ID = "preset-sky-garden-duo";
+const DUO_ASSET_ROOT = path.join(root, "assets", "preset-extras", DUO_THEME_ID);
 const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
@@ -126,7 +128,25 @@ const OPERATION_UI_CSS = `
     }
   }
 `;
+const DUO_WIDGET_IMAGE_FILE = "duo-sidebar-widget-v3.png";
+const DUO_FOREGROUND_IMAGE_FILE = "duo-foreground-characters-jk-v1.png";
+const DUO_LOUNGE_IMAGE_FILE = "duo-lounge-jk-v1.png";
+const DUO_LOUNGE_BODY_IMAGE_FILE = "duo-lounge-body-v2.webp";
+const DUO_LOUNGE_LEFT_LEGS_IMAGE_FILE = "duo-lounge-left-legs-v2.webp";
+const DUO_LOUNGE_RIGHT_LEGS_IMAGE_FILE = "duo-lounge-right-legs-v2.webp";
+const DUO_LOUNGE_BLINK_IMAGE_FILE = "duo-lounge-blink-v1.webp";
+const DUO_CHARACTER_ICON_FILES = Object.freeze({
+  newTask: "nav-new-task.webp",
+  pullRequests: "nav-pull-requests.webp",
+  sites: "nav-sites.webp",
+  scheduled: "nav-scheduled.webp",
+  plugins: "nav-plugins.webp",
+  search: "nav-search.webp",
+  permissions: "control-permissions.webp",
+  send: "control-send.webp",
+});
 let staticPayloadAssets = null;
+let duoPayloadAssets = null;
 let operationSequence = 0;
 
 function parseArgs(argv) {
@@ -585,8 +605,84 @@ async function loadStaticPayloadAssets() {
   return { css, template, cacheHit };
 }
 
+async function loadDuoPayloadAssets(themeId) {
+  if (themeId !== DUO_THEME_ID) {
+    return {
+      cacheHit: true,
+      revision: "",
+      duoIcons: {},
+      duoWidgetArt: "",
+      duoForegroundArt: "",
+      duoLoungeArt: "",
+      duoLoungeBodyArt: "",
+      duoLoungeLeftLegsArt: "",
+      duoLoungeRightLegsArt: "",
+      duoLoungeBlinkArt: "",
+      widgetBytes: 0,
+      foregroundBytes: 0,
+      loungeBytes: 0,
+      loungeBodyBytes: 0,
+      loungeLegBytes: 0,
+      loungeBlinkBytes: 0,
+      characterIconBytes: 0,
+    };
+  }
+  const cacheHit = Boolean(duoPayloadAssets);
+  if (!duoPayloadAssets) {
+    const iconRoot = path.join(DUO_ASSET_ROOT, "duo-character-icons");
+    const iconEntries = Object.entries(DUO_CHARACTER_ICON_FILES);
+    duoPayloadAssets = Promise.all([
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_WIDGET_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_FOREGROUND_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_BODY_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_LEFT_LEGS_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_RIGHT_LEGS_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_BLINK_IMAGE_FILE)),
+      ...iconEntries.map(([, filename]) => fs.readFile(path.join(iconRoot, filename))),
+    ]).then(([widgetBuffer, foregroundBuffer, loungeBuffer, loungeBodyBuffer, loungeLeftLegsBuffer, loungeRightLegsBuffer, loungeBlinkBuffer, ...iconBuffers]) => {
+      const duoIcons = Object.fromEntries(iconEntries.map(([role], index) => [
+        role,
+        `data:image/webp;base64,${iconBuffers[index].toString("base64")}`,
+      ]));
+      const staticRevision = createHash("sha256")
+        .update(widgetBuffer)
+        .update(foregroundBuffer)
+        .update(loungeBuffer)
+        .update(loungeBodyBuffer)
+        .update(loungeLeftLegsBuffer)
+        .update(loungeRightLegsBuffer)
+        .update(loungeBlinkBuffer);
+      for (const icon of iconBuffers) staticRevision.update(icon);
+      return {
+        duoIcons,
+        duoWidgetArt: `data:image/png;base64,${widgetBuffer.toString("base64")}`,
+        duoForegroundArt: `data:image/png;base64,${foregroundBuffer.toString("base64")}`,
+        duoLoungeArt: `data:image/png;base64,${loungeBuffer.toString("base64")}`,
+        duoLoungeBodyArt: `data:image/webp;base64,${loungeBodyBuffer.toString("base64")}`,
+        duoLoungeLeftLegsArt: `data:image/webp;base64,${loungeLeftLegsBuffer.toString("base64")}`,
+        duoLoungeRightLegsArt: `data:image/webp;base64,${loungeRightLegsBuffer.toString("base64")}`,
+        duoLoungeBlinkArt: `data:image/webp;base64,${loungeBlinkBuffer.toString("base64")}`,
+        widgetBytes: widgetBuffer.length,
+        foregroundBytes: foregroundBuffer.length,
+        loungeBytes: loungeBuffer.length,
+        loungeBodyBytes: loungeBodyBuffer.length,
+        loungeLegBytes: loungeLeftLegsBuffer.length + loungeRightLegsBuffer.length,
+        loungeBlinkBytes: loungeBlinkBuffer.length,
+        characterIconBytes: iconBuffers.reduce((total, icon) => total + icon.length, 0),
+        revision: staticRevision.digest("hex").slice(0, 20),
+      };
+    }).catch((error) => {
+      duoPayloadAssets = null;
+      throw error;
+    });
+  }
+  return { ...await duoPayloadAssets, cacheHit };
+}
+
 function invalidateStaticPayloadAssets() {
   staticPayloadAssets = null;
+  duoPayloadAssets = null;
 }
 
 async function loadPayload(themeDir) {
@@ -595,9 +691,18 @@ async function loadPayload(themeDir) {
     loadStaticPayloadAssets(),
     loadTheme(themeDir),
   ]);
+  const duoAssets = await loadDuoPayloadAssets(loaded.theme.id);
   const { css, template } = staticAssets;
+  const {
+    duoIcons, duoWidgetArt, duoForegroundArt, duoLoungeArt,
+    duoLoungeBodyArt, duoLoungeLeftLegsArt, duoLoungeRightLegsArt, duoLoungeBlinkArt,
+  } = duoAssets;
   const { art, extension, theme } = loaded;
-  const styleRevision = createHash("sha256").update(css).digest("hex").slice(0, 20);
+  const styleRevision = createHash("sha256")
+    .update(css)
+    .update(duoAssets.revision)
+    .digest("hex")
+    .slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
   if (!artMetadata) {
     throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
@@ -612,6 +717,7 @@ async function loadPayload(themeDir) {
     .update(SKIN_VERSION)
     .update(css)
     .update(template)
+    .update(duoAssets.revision)
     .update(JSON.stringify(theme))
     .digest("hex")
     .slice(0, 20);
@@ -619,17 +725,33 @@ async function loadPayload(themeDir) {
     .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
+    .replace("__DREAM_DUO_ICONS_JSON__", JSON.stringify(duoIcons))
+    .replace("__DREAM_DUO_WIDGET_ART_JSON__", JSON.stringify(duoWidgetArt))
+    .replace("__DREAM_DUO_FOREGROUND_ART_JSON__", JSON.stringify(duoForegroundArt))
+    .replace("__DREAM_DUO_LOUNGE_ART_JSON__", JSON.stringify(duoLoungeArt))
+    .replace("__DREAM_DUO_LOUNGE_BODY_ART_JSON__", JSON.stringify(duoLoungeBodyArt))
+    .replace("__DREAM_DUO_LOUNGE_LEFT_LEGS_ART_JSON__", JSON.stringify(duoLoungeLeftLegsArt))
+    .replace("__DREAM_DUO_LOUNGE_RIGHT_LEGS_ART_JSON__", JSON.stringify(duoLoungeRightLegsArt))
+    .replace("__DREAM_DUO_LOUNGE_BLINK_ART_JSON__", JSON.stringify(duoLoungeBlinkArt))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
     .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
     .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision));
   return {
     imageBytes: art.length,
+    widgetBytes: duoAssets.widgetBytes,
+    foregroundBytes: duoAssets.foregroundBytes,
+    loungeBytes: duoAssets.loungeBytes,
+    loungeBodyBytes: duoAssets.loungeBodyBytes,
+    loungeLegBytes: duoAssets.loungeLegBytes,
+    loungeBlinkBytes: duoAssets.loungeBlinkBytes,
+    characterIconBytes: duoAssets.characterIconBytes,
     payload,
     revision,
     theme,
     timings: {
       buildMs: Number((performance.now() - startedAt).toFixed(3)),
       staticCacheHit: staticAssets.cacheHit,
+      extrasCacheHit: duoAssets.cacheHit,
     },
   };
 }
@@ -806,9 +928,25 @@ async function removeFromSession(session) {
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
     document.documentElement?.classList.remove('codex-dream-skin');
+    document.documentElement?.removeAttribute('data-dream-theme-id');
+    document.documentElement?.removeAttribute('data-dream-motion-state');
+    document.documentElement?.removeAttribute('data-dream-duo-foreground-mode');
     document.documentElement?.style.removeProperty('--dream-skin-art');
+    document.documentElement?.style.removeProperty('--dream-motion-x');
+    document.documentElement?.style.removeProperty('--dream-motion-y');
+    document.documentElement?.style.removeProperty('--dream-duo-foreground-height');
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
+    document.getElementById('codex-dream-skin-motion-stage')?.remove();
+    document.getElementById('codex-dream-skin-sidebar-widget')?.remove();
+    document.querySelectorAll('[data-dream-character-icon]').forEach((node) => node.remove());
+    document.querySelectorAll('[data-dream-character-role]').forEach((node) => {
+      node.removeAttribute('data-dream-character-role');
+      node.removeAttribute('data-dream-character-kind');
+    });
+    document.querySelectorAll('[data-dream-native-icon]').forEach((node) => {
+      node.removeAttribute('data-dream-native-icon');
+    });
     delete window.__CODEX_DREAM_SKIN_STATE__;
     return true;
   })()`);
@@ -819,6 +957,13 @@ async function verifyRemovedSession(session) {
     !document.documentElement.classList.contains('codex-dream-skin') &&
     !document.getElementById('codex-dream-skin-style') &&
     !document.getElementById('codex-dream-skin-chrome') &&
+    !document.getElementById('codex-dream-skin-motion-stage') &&
+    !document.getElementById('codex-dream-skin-sidebar-widget') &&
+    !document.querySelector('[data-dream-character-icon]') &&
+    !document.querySelector('[data-dream-character-role]') &&
+    !document.querySelector('[data-dream-native-icon]') &&
+    !document.documentElement.hasAttribute('data-dream-motion-state') &&
+    !document.documentElement.hasAttribute('data-dream-duo-foreground-mode') &&
     !window.__CODEX_DREAM_SKIN_STATE__
   )()`);
 }
@@ -865,11 +1010,22 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const composer = box(document.querySelector('.composer-surface-chrome'));
     const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
     const chrome = document.getElementById('codex-dream-skin-chrome');
+    const root = document.documentElement;
+    const skinState = window.__CODEX_DREAM_SKIN_STATE__;
+    const motionStage = document.getElementById('codex-dream-skin-motion-stage');
+    const foreground = motionStage?.querySelector('.dream-duo-characters') ?? null;
+    const lounge = motionStage?.querySelector('.dream-duo-lounge') ?? null;
+    const loungeRig = lounge?.querySelector('.dream-duo-lounge-rig') ?? null;
+    const loungeLegLayers = lounge?.querySelectorAll('.dream-duo-lounge-left-legs, .dream-duo-lounge-right-legs').length ?? 0;
+    const loungeBlink = lounge?.querySelector('.dream-duo-lounge-blink') ?? null;
+    const sidebarWidget = document.getElementById('codex-dream-skin-sidebar-widget');
+    const themeId = root.getAttribute('data-dream-theme-id');
+    const motionState = root.getAttribute('data-dream-motion-state');
     const result = {
-      installed: document.documentElement.classList.contains('codex-dream-skin'),
-      version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
-      themeId: window.__CODEX_DREAM_SKIN_STATE__?.themeId ?? null,
-      revision: window.__CODEX_DREAM_SKIN_STATE__?.revision ?? null,
+      installed: root.classList.contains('codex-dream-skin'),
+      version: skinState?.version ?? null,
+      themeId: skinState?.themeId ?? null,
+      revision: skinState?.revision ?? null,
       stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
       chromePresent: Boolean(chrome),
       chromePointerEvents: getComputedStyle(chrome || document.body).pointerEvents,
@@ -886,13 +1042,48 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       sidebar,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
-        x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-        y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+        x: root.scrollWidth > root.clientWidth,
+        y: root.scrollHeight > root.clientHeight,
+      },
+      motion: {
+        themeId, state: motionState, stagePresent: Boolean(motionStage),
+        petalCount: motionStage?.querySelectorAll('.dream-duo-petals i').length ?? 0,
+        foregroundPresent: Boolean(foreground),
+        loungePresent: Boolean(lounge),
+        loungeRigPresent: Boolean(loungeRig),
+        loungeLegLayers,
+        loungeBlinkPresent: Boolean(loungeBlink),
+        avoidanceMode: root.getAttribute('data-dream-duo-foreground-mode') || 'normal',
+        pointerEvents: getComputedStyle(motionStage || document.body).pointerEvents,
+        active: Boolean(skinState?.metrics?.motionActive),
+        sidebarWidgetPresent: Boolean(sidebarWidget),
+        frames: skinState?.metrics?.motionFrames ?? 0,
+        pointerMoves: skinState?.metrics?.motionPointerEvents ?? 0,
+      },
+      characters: {
+        iconCount: document.querySelectorAll('[data-dream-character-icon]').length,
+        targetCount: document.querySelectorAll('[data-dream-character-role]').length,
+        nativeMarkerCount: document.querySelectorAll('[data-dream-native-icon]').length,
+        creates: skinState?.metrics?.characterIconCreates ?? 0,
       },
     };
+    const motionPass = themeId !== 'preset-sky-garden-duo' || (
+      result.motion.stagePresent && result.motion.petalCount === 14 &&
+      result.motion.foregroundPresent && result.motion.loungePresent &&
+      result.motion.loungeRigPresent && result.motion.loungeLegLayers === 2 && result.motion.loungeBlinkPresent &&
+      ['normal', 'scaled', 'hidden'].includes(result.motion.avoidanceMode) &&
+      result.motion.pointerEvents === 'none' && result.motion.active &&
+      result.motion.sidebarWidgetPresent &&
+      (motionState === 'running' || motionState === 'paused')
+    );
+    const characterPass = themeId !== 'preset-sky-garden-duo' || (
+      result.characters.iconCount >= 5 &&
+      result.characters.targetCount === result.characters.iconCount
+    );
     const basePass = result.installed && result.version === ${JSON.stringify(SKIN_VERSION)} &&
       result.stylePresent && result.chromePresent && result.chromePointerEvents === 'none' &&
-      Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible) && !result.documentOverflow.x;
+      Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible) && !result.documentOverflow.x &&
+      motionPass && characterPass;
     const expectedThemeId = ${JSON.stringify(expectedThemeId)};
     const expectedRevision = ${JSON.stringify(expectedRevision)};
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
@@ -1134,6 +1325,8 @@ export function earlyPayloadFor(payload, revision) {
   })()`;
 }
 
+const characterIconRoot = path.join(DUO_ASSET_ROOT, "duo-character-icons");
+
 function watchPayloadSources(themeDir, onDirty) {
   const assetsRoot = path.join(root, "assets");
   const themeRoot = themeDir ?? assetsRoot;
@@ -1143,8 +1336,11 @@ function watchPayloadSources(themeDir, onDirty) {
     try {
       watcher = watchFs(directory, { persistent: false }, (_event, filename) => {
         const name = filename ? String(filename) : "";
-        const staticChanged = directory === assetsRoot &&
-          (!name || name === "dream-skin.css" || name === "renderer-inject.js");
+        const staticChanged = kind === "static" && (
+          directory === characterIconRoot || directory === DUO_ASSET_ROOT
+          || (directory === assetsRoot &&
+            (!name || name === "dream-skin.css" || name === "renderer-inject.js"))
+        );
         if (kind === "static" && !staticChanged) return;
         onDirty({ staticChanged });
       });
@@ -1158,6 +1354,8 @@ function watchPayloadSources(themeDir, onDirty) {
   };
   add(themeRoot, "theme");
   if (themeRoot !== assetsRoot) add(assetsRoot, "static");
+  if (themeRoot !== DUO_ASSET_ROOT) add(DUO_ASSET_ROOT, "static");
+  if (themeRoot !== characterIconRoot) add(characterIconRoot, "static");
   return () => watchers.forEach((watcher) => watcher.close());
 }
 
@@ -1801,6 +1999,13 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         themeId: loaded.theme.id,
         themeName: loaded.theme.name,
         imageBytes: loaded.imageBytes,
+        widgetBytes: loaded.widgetBytes,
+        foregroundBytes: loaded.foregroundBytes,
+        loungeBytes: loaded.loungeBytes,
+        loungeBodyBytes: loaded.loungeBodyBytes,
+        loungeLegBytes: loaded.loungeLegBytes,
+        loungeBlinkBytes: loaded.loungeBlinkBytes,
+        characterIconBytes: loaded.characterIconBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
         artMetadata: loaded.theme.artMetadata ?? null,
         timings: loaded.timings,

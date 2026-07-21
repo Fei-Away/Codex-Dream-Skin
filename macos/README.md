@@ -74,13 +74,23 @@ CDP is powerful and unauthenticated on loopback. Prefer Restore when you are don
 
 ## Bundled presets
 
-A fresh install seeds two tested presets into your theme library:
-**Gothic Void Crusade** and **桥本有菜 / Arina Hashimoto**. Gothic Void Crusade
-is the default when no active theme exists. Switch to Arina Hashimoto with:
+A fresh install seeds three tested presets into your theme library:
+**Gothic Void Crusade**, **桥本有菜 / Arina Hashimoto**, and
+**天空花园双姝 / Sky Garden Duo**. Gothic Void Crusade is the default when no
+active theme exists. Switch themes with:
 
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-arina-hashimoto
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-sky-garden-duo
 ```
+
+Sky Garden Duo is a complete UI preset rather than a wallpaper-only pack. In
+addition to the standard background and color metadata, it enables a themed
+sidebar card, character navigation icons, a foreground companion pair, a
+reclining top companion, flowing light, and falling petals. These files live in
+the engine-owned `assets/preset-extras/preset-sky-garden-duo/` directory and are
+loaded only when the exact built-in preset id is active. User theme JSON cannot
+load arbitrary CSS, JavaScript, or extra files.
 
 The user-provided source PNG is `1672 × 941`. Its pack contains a standardized
 derived `2560 × 1440` JPEG plus theme metadata; the derived export does not add

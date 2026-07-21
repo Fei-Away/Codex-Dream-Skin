@@ -1,9 +1,27 @@
-((cssText, artDataUrl, themeConfig) => {
+((cssText, artDataUrl, themeConfig, duoIcons, duoWidgetArt, duoForegroundArt, duoLoungeArt, duoLoungeBodyArt, duoLoungeLeftLegsArt, duoLoungeRightLegsArt, duoLoungeBlinkArt) => {
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
+  const MOTION_STAGE_ID = "codex-dream-skin-motion-stage";
+  const DUO_WIDGET_ID = "codex-dream-skin-sidebar-widget";
+  const DUO_ICON_ATTR = "data-dream-character-icon";
+  const DUO_ROLE_ATTR = "data-dream-character-role";
+  const DUO_KIND_ATTR = "data-dream-character-kind";
+  const DUO_NATIVE_ICON_ATTR = "data-dream-native-icon";
   const SHELL_ATTR = "data-dream-shell";
+  const THEME_ATTR = "data-dream-theme-id";
+  const MOTION_ATTR = "data-dream-motion-state";
+  const DUO_FOREGROUND_MODE_ATTR = "data-dream-duo-foreground-mode";
+  const DUO_THEME_ID = "preset-sky-garden-duo";
+  const DUO_OVERLAY_SELECTOR = [
+    '[role="dialog"]',
+    '[role="menu"]',
+    '[role="listbox"]',
+    '[data-radix-popper-content-wrapper]',
+    '[class*="z-[60]"]',
+    '[class*="thread-floating-content"]',
+  ].join(",");
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
@@ -16,6 +34,42 @@
   const ART = THEME.art && typeof THEME.art === "object" ? THEME.art : {};
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
     ? THEME.artMetadata : null;
+  const IS_DUO_THEME = THEME.id === DUO_THEME_ID;
+  const DUO_ICONS = duoIcons && typeof duoIcons === "object" ? duoIcons : {};
+  const DUO_WIDGET_ART = typeof duoWidgetArt === "string" ? duoWidgetArt : "";
+  const DUO_FOREGROUND_ART = typeof duoForegroundArt === "string" ? duoForegroundArt : "";
+  const DUO_LOUNGE_ART = typeof duoLoungeArt === "string" ? duoLoungeArt : "";
+  const DUO_LOUNGE_BODY_ART = typeof duoLoungeBodyArt === "string" ? duoLoungeBodyArt : "";
+  const DUO_LOUNGE_LEFT_LEGS_ART = typeof duoLoungeLeftLegsArt === "string" ? duoLoungeLeftLegsArt : "";
+  const DUO_LOUNGE_RIGHT_LEGS_ART = typeof duoLoungeRightLegsArt === "string" ? duoLoungeRightLegsArt : "";
+  const DUO_LOUNGE_BLINK_ART = typeof duoLoungeBlinkArt === "string" ? duoLoungeBlinkArt : "";
+  const HAS_DUO_ICONS = Object.keys(DUO_ICONS).length > 0;
+  const DUO_PALETTES = {
+    light: {
+      background: "#edf3ff",
+      panel: "#f8faff",
+      panelAlt: "#e7edfb",
+      accent: "#7899d4",
+      accentAlt: "#a8c1ef",
+      secondary: "#8b78c9",
+      highlight: "#6653aa",
+      text: "#25293a",
+      muted: "#6c7693",
+      line: "rgba(120, 153, 212, .30)",
+    },
+    dark: {
+      background: "#10131f",
+      panel: "#171b2a",
+      panelAlt: "#20263a",
+      accent: "#9dbbff",
+      accentAlt: "#c3d5ff",
+      secondary: "#a08be5",
+      highlight: "#8067cf",
+      text: "#f1f4ff",
+      muted: "#a8b0cb",
+      line: "rgba(157, 187, 255, .32)",
+    },
+  };
   const ANALYSIS_CACHE_KEY = "__CODEX_DREAM_SKIN_ANALYSIS_CACHE__";
   const THEME_VARIABLES = [
     "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime",
@@ -27,6 +81,9 @@
     "--dream-skin-focus-x", "--dream-skin-focus-y", "--dream-skin-art-position",
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
     "--dream-skin-project-label",
+    "--dream-motion-x", "--dream-motion-y", "--dream-duo-foreground-height",
+    "--dream-duo-lounge-left", "--dream-duo-lounge-top", "--dream-duo-lounge-right",
+    "--dream-duo-lounge-translate-x", "--dream-duo-lounge-height",
   ];
   const installToken = {};
   const existingAnalysisCache = window[ANALYSIS_CACHE_KEY];
@@ -49,6 +106,14 @@
     textWrites: 0,
     analysisRuns: 0,
     analysisCacheHits: artAnalysis ? 1 : 0,
+    motionFrames: 0,
+    motionPointerEvents: 0,
+    motionStageCreates: 0,
+    motionAvoidanceChecks: 0,
+    motionAvoidanceMode: "normal",
+    sidebarWidgetCreates: 0,
+    characterIconCreates: 0,
+    motionActive: false,
     firstEnsureMs: null,
     analysisMs: null,
   };
@@ -64,6 +129,9 @@
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
   })();
 
+  previous?.motion?.dispose?.();
+  previous?.removeDuoCharacterIcons?.();
+  document.getElementById(DUO_WIDGET_ID)?.remove();
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.rootObserver) previous.rootObserver.disconnect();
   if (previous?.resizeObserver) previous.resizeObserver.disconnect();
@@ -302,9 +370,11 @@
     const colors = THEME.colors || {};
     const explicit = new Set(Array.isArray(THEME.explicitColorKeys) ? THEME.explicitColorKeys : []);
     const adaptive = makeAdaptivePalette(artAnalysis?.accentRgb, shell);
+    const dedicated = IS_DUO_THEME ? DUO_PALETTES[shell] : null;
     const legacyLight = !THEME.appearance && shell === "light";
     const structural = new Set(["background", "panel", "panelAlt", "text", "muted"]);
     const pick = (name) => {
+      if (dedicated && typeof dedicated[name] === "string") return dedicated[name];
       const allowExplicit = explicit.has(name) && !(legacyLight && structural.has(name));
       return allowExplicit && typeof colors[name] === "string" ? colors[name] : adaptive[name];
     };
@@ -320,7 +390,9 @@
       "--ds-purple": pick("highlight"),
       "--ds-text": pick("text"),
       "--ds-muted": pick("muted"),
-      "--ds-line": explicit.has("line") && typeof colors.line === "string" ? colors.line : adaptive.line,
+      "--ds-line": dedicated?.line || (
+        explicit.has("line") && typeof colors.line === "string" ? colors.line : adaptive.line
+      ),
     };
 
     for (const [name, value] of Object.entries(variables)) {
@@ -527,6 +599,7 @@
   let chromeParts = null;
   let observedShellMain = null;
   let resizeObserver = null;
+  let duoMotion = null;
 
   const ensureStyle = (root) => {
     let style = document.getElementById(STYLE_ID);
@@ -549,11 +622,381 @@
     ensureStyle(root);
     const shell = resolvedShell();
     setAttribute(root, SHELL_ATTR, shell);
+    setAttribute(root, THEME_ATTR, THEME.id || "custom");
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
-    root.classList.add("codex-dream-skin");
+    if (!root.classList.contains("codex-dream-skin")) root.classList.add("codex-dream-skin");
     return shell;
+  };
+
+  const createDuoMotion = (root, shellMain) => {
+    document.getElementById(MOTION_STAGE_ID)?.remove();
+    const stage = document.createElement("div");
+    stage.id = MOTION_STAGE_ID;
+    stage.setAttribute("aria-hidden", "true");
+    const animatedLounge = Boolean(
+      DUO_LOUNGE_ART && DUO_LOUNGE_BODY_ART &&
+      DUO_LOUNGE_LEFT_LEGS_ART && DUO_LOUNGE_RIGHT_LEGS_ART,
+    );
+    const loungeMarkup = DUO_LOUNGE_ART ? `
+      <div class="dream-duo-lounge${animatedLounge ? " dream-duo-lounge-animated" : ""}">
+        <img class="dream-duo-lounge-static" src="${DUO_LOUNGE_ART}" alt="">
+        ${animatedLounge ? `<div class="dream-duo-lounge-rig">
+          <img class="dream-duo-lounge-left-legs" src="${DUO_LOUNGE_LEFT_LEGS_ART}" alt="">
+          <img class="dream-duo-lounge-right-legs" src="${DUO_LOUNGE_RIGHT_LEGS_ART}" alt="">
+          <img class="dream-duo-lounge-body" src="${DUO_LOUNGE_BODY_ART}" alt="">
+          ${DUO_LOUNGE_BLINK_ART ? `<img class="dream-duo-lounge-blink" src="${DUO_LOUNGE_BLINK_ART}" alt="">` : ""}
+        </div>` : ""}
+      </div>` : "";
+    stage.innerHTML = `
+      <div class="dream-duo-art"></div>
+      <div class="dream-duo-light dream-duo-light-flow"></div>
+      ${loungeMarkup}
+      ${DUO_FOREGROUND_ART ? `<img class="dream-duo-characters" src="${DUO_FOREGROUND_ART}" alt="">` : ""}
+      <div class="dream-duo-petals">${"<i></i>".repeat(14)}</div>`;
+    shellMain.appendChild(stage);
+    metrics.motionStageCreates += 1;
+    metrics.motionActive = true;
+
+    let disposed = false;
+    let blockerResizeObserver = null;
+    const observedBlockers = new Set();
+    const blockerSizes = new WeakMap();
+    const loungePositionVariables = [
+      "--dream-duo-lounge-left",
+      "--dream-duo-lounge-top",
+      "--dream-duo-lounge-right",
+      "--dream-duo-lounge-translate-x",
+      "--dream-duo-lounge-height",
+    ];
+
+    const visibleRect = (node) => {
+      if (!node) return null;
+      const rect = node.getBoundingClientRect?.();
+      const style = getComputedStyle(node);
+      if (
+        !rect || rect.width < 160 || rect.height < 80
+        || style.display === "none" || style.visibility === "hidden"
+        || Number(style.opacity) === 0
+      ) return null;
+      return {
+        left: Number(rect.left), top: Number(rect.top),
+        right: Number(rect.right), bottom: Number(rect.bottom),
+        width: Number(rect.width), height: Number(rect.height),
+      };
+    };
+    const blockingRects = () => {
+      const candidates = new Set();
+      for (const node of document.querySelectorAll(DUO_OVERLAY_SELECTOR)) {
+        const rect = visibleRect(node);
+        if (!rect) continue;
+        const style = getComputedStyle(node);
+        if (style.pointerEvents !== "none") {
+          candidates.add(node);
+          continue;
+        }
+        const descendants = [...(node.querySelectorAll?.("*") ?? [])]
+          .map((child) => ({ child, rect: visibleRect(child), style: getComputedStyle(child) }))
+          .filter((entry) => entry.rect && entry.style.pointerEvents !== "none")
+          .sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height);
+        if (descendants[0]) candidates.add(descendants[0].child);
+      }
+      return [...candidates]
+        .map((node) => ({ node, rect: visibleRect(node) }))
+        .filter((entry) => entry.rect);
+    };
+    const blockerSize = (node) => {
+      const rect = node?.getBoundingClientRect?.();
+      if (!rect) return "";
+      return `${Math.round(Number(rect.width) || 0)}:${Math.round(Number(rect.height) || 0)}`;
+    };
+    const clearLoungePosition = () => {
+      for (const name of loungePositionVariables) {
+        if (!root.style.getPropertyValue(name)) continue;
+        root.style.removeProperty(name);
+        metrics.styleWrites += 1;
+      }
+    };
+    const positionLoungeAbove = (blockers, main, viewportHeight) => {
+      if (!blockers.length) {
+        clearLoungePosition();
+        return;
+      }
+      const primary = blockers.reduce((largest, entry) => {
+        if (!largest) return entry;
+        const area = entry.rect.width * entry.rect.height;
+        const largestArea = largest.rect.width * largest.rect.height;
+        return area > largestArea ? entry : largest;
+      }, null);
+      const mainLeft = Number(main.left) || 0;
+      const mainTop = Number(main.top) || 0;
+      const mainWidth = Number(main.width) || 0;
+      const mainHeight = Number(main.height) || 0;
+      const defaultLoungeHeight = clamp(viewportHeight * 0.13, 96, 132);
+      const minimumTop = Math.max(8, 12 - mainTop);
+      const loungeSizingOverlap = 4;
+      const loungeEdgeOverlap = 12;
+      const availableAbove = primary.rect.top - mainTop - minimumTop + loungeSizingOverlap;
+      const loungeHeight = clamp(Math.min(defaultLoungeHeight, availableAbove), 48, defaultLoungeHeight);
+      const loungeWidth = Math.min(mainWidth * 0.42, 360, loungeHeight * (1942 / 809));
+      const rawCenter = primary.rect.left - mainLeft + primary.rect.width / 2;
+      const center = clamp(rawCenter, loungeWidth / 2 + 12, mainWidth - loungeWidth / 2 - 12);
+      const maximumTop = Math.max(minimumTop, mainHeight - loungeHeight - 8);
+      const top = clamp(primary.rect.top - mainTop - loungeHeight + loungeEdgeOverlap, minimumTop, maximumTop);
+      setStyleProperty(root, "--dream-duo-lounge-left", `${Math.round(center)}px`);
+      setStyleProperty(root, "--dream-duo-lounge-top", `${Math.round(top)}px`);
+      setStyleProperty(root, "--dream-duo-lounge-right", "auto");
+      setStyleProperty(root, "--dream-duo-lounge-translate-x", "-50%");
+      setStyleProperty(root, "--dream-duo-lounge-height", `${Math.round(loungeHeight)}px`);
+    };
+    const updateAvoidance = () => {
+      if (disposed) return "normal";
+      metrics.motionAvoidanceChecks += 1;
+      const main = shellMain.getBoundingClientRect?.();
+      if (!main || main.width <= 0 || main.height <= 0) return "normal";
+      const viewportWidth = Math.max(1, Number(window.innerWidth) || main.width);
+      const viewportHeight = Math.max(1, Number(window.innerHeight) || main.height);
+      const mainLeft = Number(main.left) || 0;
+      const mainTop = Number(main.top) || 0;
+      const mainRight = Number.isFinite(Number(main.right)) ? Number(main.right) : mainLeft + main.width;
+      const mainBottom = Number.isFinite(Number(main.bottom)) ? Number(main.bottom) : mainTop + main.height;
+      const desiredHeight = clamp(main.height * 0.44, 300, 460);
+      const desiredWidth = Math.min(main.width * 0.42, desiredHeight * 0.75);
+      const rightOffset = clamp(viewportWidth * 0.018, 10, 28);
+      const bottomOffset = clamp(viewportHeight * 0.018, 8, 22);
+      const zone = {
+        left: mainRight - rightOffset - desiredWidth,
+        right: mainRight - rightOffset,
+        top: mainBottom - bottomOffset - desiredHeight,
+        bottom: mainBottom - bottomOffset,
+      };
+      const blockers = blockingRects();
+      positionLoungeAbove(blockers, main, viewportHeight);
+      const nextBlockers = new Set(blockers.map((entry) => entry.node));
+      for (const blocker of observedBlockers) {
+        if (nextBlockers.has(blocker)) continue;
+        blockerResizeObserver?.unobserve?.(blocker);
+        observedBlockers.delete(blocker);
+        blockerSizes.delete(blocker);
+      }
+      for (const blocker of nextBlockers) {
+        if (observedBlockers.has(blocker)) continue;
+        blockerSizes.set(blocker, blockerSize(blocker));
+        blockerResizeObserver?.observe(blocker);
+        observedBlockers.add(blocker);
+      }
+      const overlaps = blockers.map((entry) => entry.rect).filter((rect) =>
+        rect.left < zone.right && rect.right > zone.left
+        && rect.top < zone.bottom && rect.bottom > zone.top
+      );
+      let mode = "normal";
+      let safeHeight = null;
+      if (overlaps.length) {
+        const blockingBottom = Math.max(...overlaps.map((rect) => Math.min(mainBottom, rect.bottom)));
+        const availableHeight = Math.floor(zone.bottom - blockingBottom - 12);
+        if (availableHeight < desiredHeight - 4) {
+          if (availableHeight >= 240) {
+            mode = "scaled";
+            safeHeight = clamp(availableHeight, 240, desiredHeight);
+          } else {
+            mode = "hidden";
+          }
+        }
+      }
+      metrics.motionAvoidanceMode = mode;
+      if (mode === "normal") root.removeAttribute(DUO_FOREGROUND_MODE_ATTR);
+      else setAttribute(root, DUO_FOREGROUND_MODE_ATTR, mode);
+      if (safeHeight === null) {
+        if (root.style.getPropertyValue("--dream-duo-foreground-height")) {
+          root.style.removeProperty("--dream-duo-foreground-height");
+          metrics.styleWrites += 1;
+        }
+      }
+      else setStyleProperty(root, "--dream-duo-foreground-height", `${Math.round(safeHeight)}px`);
+      return mode;
+    };
+    if (typeof ResizeObserver === "function") {
+      blockerResizeObserver = new ResizeObserver((entries) => {
+        let changed = false;
+        for (const entry of entries || []) {
+          const blocker = entry?.target;
+          if (!observedBlockers.has(blocker)) continue;
+          const nextSize = blockerSize(blocker);
+          if (nextSize === blockerSizes.get(blocker)) continue;
+          blockerSizes.set(blocker, nextSize);
+          changed = true;
+        }
+        if (changed) updateAvoidance();
+      });
+    }
+    const visibilityHandler = () => {
+      setAttribute(root, MOTION_ATTR, document.hidden ? "paused" : "running");
+    };
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      blockerResizeObserver?.disconnect();
+      observedBlockers.clear();
+      clearLoungePosition();
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      stage.remove();
+      root.removeAttribute(MOTION_ATTR);
+      root.removeAttribute(DUO_FOREGROUND_MODE_ATTR);
+      root.style.removeProperty("--dream-duo-foreground-height");
+      metrics.motionActive = false;
+    };
+
+    document.addEventListener("visibilitychange", visibilityHandler);
+    visibilityHandler();
+    updateAvoidance();
+    return { stage, main: shellMain, dispose, updateAvoidance };
+  };
+
+  const DUO_NAV_TARGETS = [
+    { role: "newTask", kind: "nav", aliases: ["新建任务", "new task", "new chat"] },
+    { role: "pullRequests", kind: "nav", aliases: ["拉取请求", "pull requests", "pull request"] },
+    { role: "sites", kind: "nav", aliases: ["站点", "sites", "site"] },
+    { role: "scheduled", kind: "nav", aliases: ["已安排", "计划任务", "scheduled"] },
+    { role: "plugins", kind: "nav", aliases: ["插件", "plugins", "plugin"] },
+    { role: "search", kind: "search", aliases: ["搜索", "search"] },
+  ];
+  const DUO_CONTROL_TARGETS = [
+    {
+      role: "newTask",
+      kind: "control",
+      aliases: ["添加附件", "添加文件", "附加", "attach", "add files", "add context"],
+    },
+    {
+      role: "permissions",
+      kind: "control",
+      aliases: ["完全访问", "权限", "full access", "permissions", "permission"],
+    },
+    { role: "send", kind: "control", aliases: ["发送", "发送消息", "send", "send message"] },
+  ];
+
+  const normalizedControlText = (value) => String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase();
+
+  const targetMatches = (target, aliases) => {
+    const metadata = ["aria-label", "title", "data-testid"]
+      .map((name) => normalizedControlText(target.getAttribute?.(name)))
+      .filter(Boolean);
+    const text = normalizedControlText(target.textContent);
+    return aliases.some((rawAlias) => {
+      const alias = normalizedControlText(rawAlias);
+      if (!alias) return false;
+      if (metadata.some((value) => value === alias || value.includes(alias))) return true;
+      return text === alias || text.startsWith(`${alias} `);
+    });
+  };
+
+  const clearDuoCharacterTarget = (target) => {
+    target.querySelectorAll?.(`[${DUO_ICON_ATTR}]`).forEach((node) => node.remove());
+    target.querySelectorAll?.(`[${DUO_NATIVE_ICON_ATTR}]`).forEach((node) => {
+      node.removeAttribute(DUO_NATIVE_ICON_ATTR);
+    });
+    target.removeAttribute?.(DUO_ROLE_ATTR);
+    target.removeAttribute?.(DUO_KIND_ATTR);
+  };
+
+  const removeDuoCharacterIcons = () => {
+    document.querySelectorAll(`[${DUO_ICON_ATTR}]`).forEach((node) => node.remove());
+    document.querySelectorAll(`[${DUO_ROLE_ATTR}]`).forEach((node) => {
+      node.removeAttribute(DUO_ROLE_ATTR);
+      node.removeAttribute(DUO_KIND_ATTR);
+    });
+    document.querySelectorAll(`[${DUO_NATIVE_ICON_ATTR}]`).forEach((node) => {
+      node.removeAttribute(DUO_NATIVE_ICON_ATTR);
+    });
+  };
+
+  const decorateDuoCharacterTarget = (target, definition) => {
+    const src = DUO_ICONS[definition.role];
+    if (!target || typeof src !== "string" || !src.startsWith("data:image/webp;base64,")) return false;
+    const existing = target.querySelector?.(`[${DUO_ICON_ATTR}]`);
+    if (existing?.getAttribute?.(DUO_ICON_ATTR) !== definition.role) existing?.remove();
+    if (!target.querySelector?.(`[${DUO_ICON_ATTR}]`)) {
+      const icon = document.createElement("span");
+      icon.className = "dream-duo-character-icon";
+      icon.setAttribute(DUO_ICON_ATTR, definition.role);
+      icon.setAttribute("aria-hidden", "true");
+      const image = document.createElement("img");
+      image.src = src;
+      image.alt = "";
+      image.decoding = "async";
+      image.draggable = false;
+      icon.appendChild(image);
+      if (typeof target.insertBefore === "function") target.insertBefore(icon, target.firstChild || null);
+      else target.prepend?.(icon);
+      metrics.characterIconCreates += 1;
+    }
+    target.setAttribute(DUO_ROLE_ATTR, definition.role);
+    target.setAttribute(DUO_KIND_ATTR, definition.kind);
+    const nativeIcon = target.querySelector?.("svg");
+    nativeIcon?.setAttribute(DUO_NATIVE_ICON_ATTR, "true");
+    return true;
+  };
+
+  const syncDuoCharacterTargets = (selector, definitions, matched) => {
+    const usedRoles = new Set();
+    for (const target of document.querySelectorAll(selector)) {
+      const definition = definitions.find((candidate) =>
+        !usedRoles.has(candidate.role) && targetMatches(target, candidate.aliases));
+      if (!definition) continue;
+      if (decorateDuoCharacterTarget(target, definition)) {
+        matched.add(target);
+        usedRoles.add(definition.role);
+      }
+    }
+  };
+
+  const ensureDuoCharacterIcons = () => {
+    if (!IS_DUO_THEME || !HAS_DUO_ICONS) {
+      removeDuoCharacterIcons();
+      return;
+    }
+    const matched = new Set();
+    syncDuoCharacterTargets(
+      "aside.app-shell-left-panel button, aside.app-shell-left-panel a",
+      DUO_NAV_TARGETS,
+      matched,
+    );
+    syncDuoCharacterTargets(".composer-surface-chrome button", DUO_CONTROL_TARGETS, matched);
+    for (const target of document.querySelectorAll(`[${DUO_ROLE_ATTR}]`)) {
+      if (!matched.has(target)) clearDuoCharacterTarget(target);
+    }
+  };
+
+  const ensureDuoWidget = () => {
+    const existing = document.getElementById(DUO_WIDGET_ID);
+    if (!IS_DUO_THEME || !DUO_WIDGET_ART) {
+      existing?.remove();
+      return null;
+    }
+    const sidebar = document.querySelector("aside.app-shell-left-panel");
+    const scroller = sidebar?.querySelector?.(".vertical-scroll-fade-mask");
+    if (!scroller) {
+      existing?.remove();
+      return null;
+    }
+    if (existing?.parentElement === scroller) return existing;
+    existing?.remove();
+    const widget = document.createElement("div");
+    widget.id = DUO_WIDGET_ID;
+    widget.setAttribute("aria-hidden", "true");
+    widget.innerHTML = `
+      <span class="dream-duo-widget-copy">
+        <strong>天空花园</strong>
+        <small>白昼 · 暗夜</small>
+      </span>
+      <span class="dream-duo-widget-stars"><i></i><i></i><i></i></span>
+      <img src="${DUO_WIDGET_ART}" alt="">`;
+    scroller.insertBefore(widget, scroller.children[1] || null);
+    metrics.sidebarWidgetCreates += 1;
+    return widget;
   };
 
   const syncRouteState = (shell, { layout = false } = {}) => {
@@ -579,7 +1022,29 @@
     }
     for (const candidate of homeUtilityBars) candidate.classList.add("dream-skin-home-utility");
 
+    ensureDuoCharacterIcons();
+
     if (!shellMain || !document.body) return;
+    if (IS_DUO_THEME) {
+      ensureDuoWidget();
+      if (
+        !duoMotion
+        || duoMotion.main !== shellMain
+        || document.getElementById(MOTION_STAGE_ID) !== duoMotion.stage
+      ) {
+        duoMotion?.dispose();
+        duoMotion = createDuoMotion(root, shellMain);
+        const state = window[STATE_KEY];
+        if (state?.installToken === installToken) state.motion = duoMotion;
+      }
+      duoMotion?.updateAvoidance?.();
+    } else {
+      document.getElementById(DUO_WIDGET_ID)?.remove();
+      duoMotion?.dispose();
+      duoMotion = null;
+      root.removeAttribute(MOTION_ATTR);
+      document.getElementById(MOTION_STAGE_ID)?.remove();
+    }
     if (observedShellMain !== shellMain) {
       resizeObserver?.disconnect();
       resizeObserver?.observe(shellMain);
@@ -650,14 +1115,22 @@
     window[DISABLED_KEY] = true;
     document.documentElement?.classList.remove("codex-dream-skin");
     document.documentElement?.removeAttribute(SHELL_ATTR);
+    document.documentElement?.removeAttribute(THEME_ATTR);
+    document.documentElement?.removeAttribute(MOTION_ATTR);
+    document.documentElement?.removeAttribute(DUO_FOREGROUND_MODE_ATTR);
     for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
     document.documentElement?.style.removeProperty("--dream-skin-art");
     for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);
     document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
     document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
     document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
+    removeDuoCharacterIcons();
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
+    document.getElementById(DUO_WIDGET_ID)?.remove();
+    duoMotion?.dispose();
+    duoMotion = null;
+    document.getElementById(MOTION_STAGE_ID)?.remove();
     state?.observer?.disconnect();
     state?.rootObserver?.disconnect();
     state?.resizeObserver?.disconnect();
@@ -738,10 +1211,13 @@
     version: VERSION,
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,
+    motion: duoMotion,
+    removeDuoCharacterIcons,
     detectShellMode,
   };
   const firstEnsureStartedAt = now();
   ensure({ layout: !previous || !document.getElementById(CHROME_ID) });
+  window[STATE_KEY].motion = duoMotion;
   metrics.firstEnsureMs = Number((now() - firstEnsureStartedAt).toFixed(3));
   if (previous?.artUrl && previous.artUrl !== artUrl) URL.revokeObjectURL(previous.artUrl);
 
@@ -786,4 +1262,16 @@
     shell: resolvedShell(),
     analysis: artAnalysis,
   };
-})(__DREAM_SKIN_CSS_JSON__, __DREAM_SKIN_ART_JSON__, __DREAM_SKIN_THEME_JSON__)
+})(
+  __DREAM_SKIN_CSS_JSON__,
+  __DREAM_SKIN_ART_JSON__,
+  __DREAM_SKIN_THEME_JSON__,
+  __DREAM_DUO_ICONS_JSON__,
+  __DREAM_DUO_WIDGET_ART_JSON__,
+  __DREAM_DUO_FOREGROUND_ART_JSON__,
+  __DREAM_DUO_LOUNGE_ART_JSON__,
+  __DREAM_DUO_LOUNGE_BODY_ART_JSON__,
+  __DREAM_DUO_LOUNGE_LEFT_LEGS_ART_JSON__,
+  __DREAM_DUO_LOUNGE_RIGHT_LEGS_ART_JSON__,
+  __DREAM_DUO_LOUNGE_BLINK_ART_JSON__
+)

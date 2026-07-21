@@ -59,6 +59,17 @@ macOS 安装后可从「已保存主题」直接切换，也可以运行：
   --id preset-gothic-void-crusade
 ```
 
+### 天空花园双姝 / Sky Garden Duo（macOS）
+
+这是一套完整角色 UI 主题，不只是更换背景图：它会增加侧栏主题卡片、导航小人物、右下前景双角色、顶部趴卧双角色、眨眼与摆腿、流动光影及花瓣。所有装饰都不接收鼠标事件；切换到其他主题或暂停后会热清理，不需要重启 Codex。
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-sky-garden-duo
+```
+
+角色素材只对仓库内置的固定 preset id 开启。普通用户主题仍使用原有 `theme.json + background.*` 格式，不能加载任意 CSS 或 JavaScript。
+
 ### 桥本有菜 / Arina Hashimoto
 
 下面这套「桥本有菜 / Arina Hashimoto」已经在真实 Codex 首页分别验证浅色和暗色外观。用户提供的源 PNG 为 `1672 × 941`，主题包在保持源图近 16:9 构图的前提下派生导出 `2560 × 1440` JPEG，并不代表增加了源图细节。截图中的侧栏、卡片、项目选择和输入框都是 Codex 原生控件。

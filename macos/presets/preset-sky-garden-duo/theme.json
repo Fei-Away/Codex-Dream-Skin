@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-sky-garden-duo",
+  "name": "天空花园双姝 / Sky Garden Duo",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "一明一暗，把灵感留在云端。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉ 选择项目",
+  "statusText": "SKY GARDEN ONLINE",
+  "quote": "TWO MOODS, ONE WORKSPACE",
+  "image": "background.jpg",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.78,
+    "focusY": 0.53,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#edf3ff",
+    "panel": "#f7f9ff",
+    "panelAlt": "#e8eefb",
+    "accent": "#7188d4",
+    "accentAlt": "#a9bce9",
+    "secondary": "#7962b4",
+    "highlight": "#5f478f",
+    "text": "#252b3c",
+    "muted": "#68748e",
+    "line": "rgba(113, 136, 212, .28)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "Sky Garden Duo",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}

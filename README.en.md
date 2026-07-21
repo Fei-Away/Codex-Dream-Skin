@@ -60,6 +60,23 @@ After installing on macOS, switch from **已保存主题** or run:
   --id preset-gothic-void-crusade
 ```
 
+### Sky Garden Duo / 天空花园双姝 (macOS)
+
+This is a complete character UI theme rather than a wallpaper-only preset. It
+adds a sidebar theme card, character navigation mascots, a foreground companion
+pair, a reclining top companion, blink and leg motion, flowing light, and
+falling petals. Decorations never receive pointer events and are removed on a
+hot theme switch or pause without restarting Codex.
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-sky-garden-duo
+```
+
+The character pack is enabled only for the fixed bundled preset id. Imported
+user themes keep the existing `theme.json + background.*` format and cannot
+load arbitrary CSS or JavaScript.
+
 ### Arina Hashimoto / 桥本有菜
 
 “Arina Hashimoto / 桥本有菜” has been verified on the real Codex home screen in

@@ -17,6 +17,16 @@ It does **not** grant rights to:
 
 `assets/portal-hero.png` is original abstract geometric art generated for this open-source repository (no characters). Replace it with your own image before shipping a branded theme to customers.
 
+## Sky Garden Duo artwork
+
+The files under `presets/preset-sky-garden-duo/` and
+`assets/preset-extras/preset-sky-garden-duo/` are AI-generated original artwork
+contributed specifically for this project. They depict fictional adult
+characters and do not intentionally reference a real person or an existing
+franchise. The contributor confirmed on 2026-07-21 that these generated assets
+may be redistributed with the project. They are not official OpenAI/Codex
+artwork or an endorsement.
+
 ## Arina Hashimoto reference material
 
 The following user/maintainer-supplied files are excluded from the MIT software license:
