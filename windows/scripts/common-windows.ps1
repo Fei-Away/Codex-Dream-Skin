@@ -137,6 +137,8 @@ function Install-DreamSkinRuntimeEngine {
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
     'assets\theme.json',
+    'presets\preset-gothic-void-crusade\background.jpg',
+    'presets\preset-gothic-void-crusade\theme.json',
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',
     'scripts\image-metadata.mjs',
@@ -166,6 +168,7 @@ function Install-DreamSkinRuntimeEngine {
   $sourceSets = @(
     [pscustomobject]@{ Name = 'assets'; Path = (Join-Path $sourceRoot 'assets') },
     [pscustomobject]@{ Name = 'scripts'; Path = (Join-Path $sourceRoot 'scripts') },
+    [pscustomobject]@{ Name = 'presets'; Path = (Join-Path $sourceRoot 'presets') },
     [pscustomobject]@{ Name = 'platform'; Path = (Join-Path $sourceRoot 'platform') },
     [pscustomobject]@{ Name = 'studio'; Path = (Join-Path $sourceRoot 'studio') },
     [pscustomobject]@{ Name = 'shared'; Path = ([System.IO.Path]::GetFullPath($sharedSource)) }

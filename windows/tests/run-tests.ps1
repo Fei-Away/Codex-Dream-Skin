@@ -14,7 +14,7 @@ try {
   $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
   $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
   New-Item -ItemType Directory -Path $runtimeSourceRoot | Out-Null
-  foreach ($directoryName in @('assets', 'scripts', 'platform', 'studio')) {
+  foreach ($directoryName in @('assets', 'scripts', 'presets', 'platform', 'studio')) {
     Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
       -Recurse -Force -ErrorAction Stop
   }
@@ -32,15 +32,15 @@ try {
   $runtimeSourceFiles = @(
     Get-ChildItem -LiteralPath `
       (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts'), `
-      (Join-Path $runtimeSourceRoot 'platform'), (Join-Path $runtimeSourceRoot 'studio'), `
-      (Join-Path $runtimeSourceRoot 'shared') `
+      (Join-Path $runtimeSourceRoot 'presets'), (Join-Path $runtimeSourceRoot 'platform'), `
+      (Join-Path $runtimeSourceRoot 'studio'), (Join-Path $runtimeSourceRoot 'shared') `
       -Recurse -File -Force
   )
   $runtimeEngineFiles = @(
     Get-ChildItem -LiteralPath `
       (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts'), `
-      (Join-Path $engine.Root 'platform'), (Join-Path $engine.Root 'studio'), `
-      (Join-Path $engine.Root 'shared') `
+      (Join-Path $engine.Root 'presets'), (Join-Path $engine.Root 'platform'), `
+      (Join-Path $engine.Root 'studio'), (Join-Path $engine.Root 'shared') `
       -Recurse -File -Force
   )
   if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
@@ -666,10 +666,15 @@ try {
     throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
-  if ($preseededThemes.Count -ne 1 -or
-    $preseededThemes[0].Id -cne 'preset-arina-hashimoto' -or
-    $preseededThemes[0].Name -cne '桥本有菜') {
-    throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
+  $preseededIds = @($preseededThemes | ForEach-Object { $_.Id })
+  if ($preseededThemes.Count -lt 2 -or
+    $preseededIds -notcontains 'preset-arina-hashimoto' -or
+    $preseededIds -notcontains 'preset-gothic-void-crusade') {
+    throw 'Windows did not preseed both Arina Hashimoto and Gothic Void Crusade.'
+  }
+  $gothicSeed = $preseededThemes | Where-Object { $_.Id -ceq 'preset-gothic-void-crusade' } | Select-Object -First 1
+  if ($null -eq $gothicSeed -or $gothicSeed.Name -cne 'Gothic Void Crusade') {
+    throw 'Gothic Void Crusade was not preseeded with the expected display name.'
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
@@ -682,12 +687,12 @@ try {
   }
   $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   $idempotentTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($idempotentTheme.Theme.id -cne 'custom' -or
-    @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 1) {
-    throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled preset.'
+  $afterReinitCount = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count
+  if ($idempotentTheme.Theme.id -cne 'custom' -or $afterReinitCount -ne 2) {
+    throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled presets.'
   }
   $savedTheme = Save-DreamSkinCurrentTheme -Name '已保存主题' -StateRoot $themeStateRoot
-  if ($savedTheme.Theme.name -cne '已保存主题' -or @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 2) {
+  if ($savedTheme.Theme.name -cne '已保存主题' -or @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 3) {
     throw 'Saved theme creation or discovery failed.'
   }
   $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot
@@ -768,11 +773,40 @@ try {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '继续显示皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
-  if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
-    throw 'Tray pause/restore closures do not terminate cleanly.'
+  if (-not $traySource.Contains('Invoke-DreamSkinLiveRemove') -or
+    -not $traySource.Contains("Set-DreamSkinPaused -Paused `$true") -or
+    -not $traySource.Contains("Set-DreamSkinPaused -Paused `$false") -or
+    -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
+    throw 'Tray pause/resume no longer mirrors macOS live-remove and re-apply semantics.'
+  }
+  $themeWindowsSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-windows.ps1')
+  foreach ($requiredLiveRemoveToken in @(
+    'function Invoke-DreamSkinLiveRemove',
+    'function Show-DreamSkinOperationUi',
+    "'--remove'",
+    "'--browser-id'",
+    "'--begin-operation'",
+    'Invoke-DreamSkinNative'
+  )) {
+    if (-not $themeWindowsSource.Contains($requiredLiveRemoveToken)) {
+      throw "Live remove helper is missing required token: $requiredLiveRemoveToken"
+    }
+  }
+  $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
+  foreach ($requiredOperationUi in @(
+    'chatgpt-dream-skin-operation',
+    'begin-operation',
+    'finish-operation',
+    '正在暂停皮肤…',
+    'presentOperationUi',
+    'operationUiExpression'
+  )) {
+    if (-not $injectorSource.Contains($requiredOperationUi)) {
+      throw "Windows injector operation UI is missing: $requiredOperationUi"
+    }
   }
   if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 1 -or
     $traySource.Contains('-ExecutionPolicy Bypass')) {
@@ -781,6 +815,31 @@ try {
   if (-not $traySource.Contains('Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata') -or
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
+  }
+  $trayTokens = $null
+  $trayParseErrors = $null
+  $trayAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $traySource,
+    [ref]$trayTokens,
+    [ref]$trayParseErrors
+  )
+  if ($trayParseErrors.Count -gt 0) { throw "Tray script failed to parse: $($trayParseErrors[0].Message)" }
+  $addTrayItemAst = $trayAst.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Add-DreamSkinTrayItem'
+  }, $true)
+  if ($null -eq $addTrayItemAst) { throw 'Tray item helper could not be loaded for an empty-menu behavior check.' }
+  Invoke-Expression $addTrayItemAst.Extent.Text
+  Add-Type -AssemblyName System.Windows.Forms
+  $emptyMenu = [System.Windows.Forms.ContextMenuStrip]::new()
+  try {
+    $probeItem = Add-DreamSkinTrayItem -Items $emptyMenu.Items -Text 'first-item-probe' -Action $null -Enabled $false
+    if ($emptyMenu.Items.Count -ne 1 -or $probeItem.Text -ne 'first-item-probe' -or $probeItem.Enabled) {
+      throw 'Tray item helper cannot add the first disabled entry to an empty menu.'
+    }
+  } finally {
+    $emptyMenu.Dispose()
   }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {

@@ -1,6 +1,6 @@
 # Windows Changelog
 
-## 1.5.2 — 2026-07-17
+## Unreleased
 
 ### 新增
 
@@ -17,6 +17,13 @@
 
 - Studio 主题切换复用既有受管主题仓库与 reparse point 检查；暂停使用 watcher pause marker；启动和恢复继续要求重启确认，不绕过 Store 包身份校验。
 - Studio 快捷方式与启动、恢复、托盘入口一致使用 `RemoteSigned`，不再通过 `ExecutionPolicy Bypass` 绕过 PowerShell 执行策略。
+
+### 修复
+
+- 收起或重建左侧栏时不再因找不到 `aside.app-shell-left-panel` 而整页卸掉皮肤；只要主内容壳层仍在就继续应用当前主题，避免闪回 Codex 原生配色。透明辅助窗口仍会清理残留样式。
+- 托盘「暂停皮肤」现在与 macOS 一致：写入暂停标记后立刻通过 CDP 执行 `injector --remove` 卸下当前窗口皮肤，不再只等 watcher 轮询；「继续显示皮肤」会清除暂停并重新应用。
+- Windows 注入器补齐与 macOS 相同的窗口内操作浮层（loading / 成功 / 失败）；暂停、继续与重新应用时在 Codex 主区显示「正在暂停皮肤…」「正在应用皮肤…」等进度，不再只有托盘气泡。
+- 安装/主题库初始化会把 macOS 同款「Gothic Void Crusade / 哥特虚空远征」播种到已保存主题（`presets/preset-gothic-void-crusade`），可与「桥本有菜」一并在托盘切换；默认活动主题仍为桥本有菜。
 
 ### 说明
 

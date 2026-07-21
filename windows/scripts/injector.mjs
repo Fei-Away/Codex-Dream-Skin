@@ -12,6 +12,97 @@ const MAX_ART_BYTES = 16 * 1024 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
+const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
+const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
+const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
+const OPERATION_UI_STATES = new Set(["success", "error", "cancelled"]);
+// Shared with macOS: in-renderer progress for pause/apply so both platforms feel the same.
+const OPERATION_UI_CSS = `
+  :host {
+    all: initial;
+    position: fixed;
+    top: var(--dream-skin-operation-top, 0px);
+    left: var(--dream-skin-operation-left, 0px);
+    width: var(--dream-skin-operation-width, 100vw);
+    height: var(--dream-skin-operation-height, 100vh);
+    z-index: 2147483647;
+    pointer-events: none;
+    opacity: 0;
+    display: grid;
+    place-items: center;
+    transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  }
+  :host([data-visible="true"]) { opacity: 1; }
+  .status {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: min(220px, calc(100% - 32px));
+    min-height: 112px;
+    padding: 18px 20px;
+    border: 1px solid rgba(238, 239, 244, 0.16);
+    border-radius: 8px;
+    background: rgba(32, 33, 38, 0.94);
+    color: #f3f3f6;
+    box-shadow: 0 8px 24px rgba(12, 14, 19, 0.22);
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1.35;
+    text-align: center;
+    transform: translateY(-4px) scale(0.98);
+    transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  :host([data-visible="true"]) .status { transform: translateY(0) scale(1); }
+  :host([data-tone="light"]) .status {
+    border-color: #d9dbe3;
+    background: rgba(248, 248, 251, 0.96);
+    color: #25262c;
+    box-shadow: 0 8px 24px rgba(31, 35, 48, 0.14);
+  }
+  .indicator {
+    box-sizing: border-box;
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    color: #78a8f5;
+  }
+  :host([data-state="loading"]) .indicator {
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: dream-skin-operation-spin 720ms linear infinite;
+  }
+  :host([data-state="success"]) .indicator,
+  :host([data-state="error"]) .indicator,
+  :host([data-state="cancelled"]) .indicator {
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: 750;
+  }
+  :host([data-state="success"]) .indicator { color: #53b77b; }
+  :host([data-state="success"]) .indicator::before { content: "✓"; }
+  :host([data-state="error"]) .indicator { color: #e26d7e; }
+  :host([data-state="error"]) .indicator::before { content: "!"; }
+  :host([data-state="cancelled"]) .indicator { color: #a5a7b0; }
+  :host([data-state="cancelled"]) .indicator::before { content: "×"; }
+  .message { min-width: 0; overflow-wrap: anywhere; }
+  @keyframes dream-skin-operation-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    :host, .status { transition: none; }
+    :host([data-state="loading"]) .indicator {
+      animation: none;
+      border-top-color: currentColor;
+      opacity: 0.65;
+    }
+  }
+`;
+let operationSequence = 0;
 
 class CdpIdentityMismatchError extends Error {}
 
@@ -36,6 +127,10 @@ function parseArgs(argv) {
     browserId: null,
     themeDir: path.join(root, "assets"),
     pauseFile: null,
+    operationKind: null,
+    operationUiState: null,
+    operationMessage: null,
+    operationToken: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -44,11 +139,17 @@ function parseArgs(argv) {
     else if (arg === "--watch") options.mode = "watch";
     else if (arg === "--verify") options.mode = "verify";
     else if (arg === "--remove") options.mode = "remove";
+    else if (arg === "--begin-operation") options.mode = "begin-operation";
+    else if (arg === "--finish-operation") options.mode = "finish-operation";
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--browser-id") options.browserId = argv[++i];
     else if (arg === "--theme-dir") options.themeDir = path.resolve(argv[++i]);
     else if (arg === "--pause-file") options.pauseFile = path.resolve(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
+    else if (arg === "--operation-kind") options.operationKind = argv[++i];
+    else if (arg === "--operation-ui-state") options.operationUiState = argv[++i];
+    else if (arg === "--operation-message") options.operationMessage = argv[++i];
+    else if (arg === "--operation-token") options.operationToken = argv[++i];
     else if (arg === "--reload") options.reload = true;
     else if (arg === "--self-test") options.mode = "self-test";
     else if (arg === "--check-payload") options.mode = "check-payload";
@@ -62,6 +163,26 @@ function parseArgs(argv) {
   }
   if (options.browserId !== null && !BROWSER_ID_PATTERN.test(options.browserId)) {
     throw new Error(`Invalid browser ID: ${options.browserId}`);
+  }
+  if (options.operationToken !== null && !/^\d{1,12}:\d{13}:\d{1,8}$/.test(options.operationToken)) {
+    throw new Error("Invalid operation token");
+  }
+  if (options.mode === "begin-operation") {
+    if (!OPERATION_KINDS.has(options.operationKind)) {
+      throw new Error("Begin operation requires --operation-kind apply, pause, or switch");
+    }
+    if (!options.browserId) throw new Error("--browser-id is required in begin-operation mode");
+  }
+  if (options.mode === "finish-operation") {
+    if (!OPERATION_UI_STATES.has(options.operationUiState)) {
+      throw new Error("Finish operation requires --operation-ui-state success, error, or cancelled");
+    }
+    if (!options.operationToken) throw new Error("Finish operation requires --operation-token");
+    if (typeof options.operationMessage !== "string" || options.operationMessage.length > 240
+      || /[\r\n]/.test(options.operationMessage)) {
+      throw new Error("Finish operation requires a single-line --operation-message up to 240 characters");
+    }
+    if (!options.browserId) throw new Error("--browser-id is required in finish-operation mode");
   }
   if (["watch", "once", "verify", "remove"].includes(options.mode) && !options.browserId) {
     throw new Error(`--browser-id is required in ${options.mode} mode`);
@@ -570,6 +691,176 @@ async function removeEarlyPayload(session, identifier) {
   await session.send("Page.removeScriptToEvaluateOnNewDocument", { identifier }).catch(() => {});
 }
 
+
+function nextOperationToken() {
+  operationSequence += 1;
+  return `${process.pid}:${Date.now()}:${operationSequence}`;
+}
+
+function operationKindMessage(kind) {
+  if (kind === "pause") return "正在暂停皮肤…";
+  if (kind === "switch") return "正在切换主题…";
+  return "正在应用皮肤…";
+}
+
+function operationUiExpression(action, token, state = "loading", message = "") {
+  const config = { action, token, state, message };
+  return `(() => {
+    const config = ${JSON.stringify(config)};
+    const hostId = ${JSON.stringify(OPERATION_UI_HOST_ID)};
+    const registryKey = ${JSON.stringify(OPERATION_UI_REGISTRY_KEY)};
+    const css = ${JSON.stringify(OPERATION_UI_CSS)};
+    const revealDelayMs = 16;
+    const minimumLoadingMs = 700;
+    const stateTtl = (value) => value === "loading" ? 180000
+      : value === "success" ? 1800 : value === "cancelled" ? 2400 : 6000;
+    const issuedAt = (value) => Number(String(value).split(":")[1]) || 0;
+    const positionInMainArea = (host) => {
+      const main = document.querySelector("main.main-surface") ||
+        document.querySelector("main") ||
+        document.querySelector('[role="main"]') || document.documentElement;
+      const rect = main.getBoundingClientRect();
+      const top = Math.max(0, rect.top);
+      const left = Math.max(0, rect.left);
+      const width = Math.max(1, Math.min(innerWidth - left, rect.width || innerWidth));
+      const height = Math.max(1, Math.min(innerHeight - top, rect.height || innerHeight));
+      host.style.setProperty("--dream-skin-operation-top", String(top) + "px");
+      host.style.setProperty("--dream-skin-operation-left", String(left) + "px");
+      host.style.setProperty("--dream-skin-operation-width", String(width) + "px");
+      host.style.setProperty("--dream-skin-operation-height", String(height) + "px");
+    };
+    const clearTimer = (timer) => { if (timer) clearTimeout(timer); };
+    const removeHost = (expectedToken, force = false) => {
+      const host = document.getElementById(hostId);
+      const registry = window[registryKey];
+      if (!force && host?.dataset.operationToken !== expectedToken) return false;
+      if (!force && registry?.token && registry.token !== expectedToken) return false;
+      clearTimer(registry?.showTimer);
+      clearTimer(registry?.expiryTimer);
+      clearTimer(registry?.terminalTimer);
+      host?.remove();
+      if (force || registry?.token === expectedToken) delete window[registryKey];
+      return true;
+    };
+    if (config.action === "clear") {
+      removeHost("", true);
+      return { visible: false, cleared: true };
+    }
+    if (config.action === "hide") {
+      return { visible: false, removed: removeHost(config.token) };
+    }
+    let host = document.getElementById(hostId);
+    if (config.action === "show") {
+      const currentIssuedAt = Number(host?.dataset.operationIssuedAt || 0);
+      if (host?.dataset.operationToken !== config.token && currentIssuedAt > issuedAt(config.token)) {
+        return { visible: false, stale: true };
+      }
+      removeHost("", true);
+      host = document.createElement("div");
+      host.id = hostId;
+      host.dataset.operationToken = config.token;
+      host.dataset.operationIssuedAt = String(issuedAt(config.token));
+      host.dataset.state = config.state;
+      host.setAttribute("role", "status");
+      host.setAttribute("aria-live", "polite");
+      host.setAttribute("aria-atomic", "true");
+      const rgb = getComputedStyle(document.body || document.documentElement).backgroundColor.match(/\\d+(?:\\.\\d+)?/g)?.map(Number);
+      const light = rgb?.length >= 3
+        ? (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) > 150
+        : matchMedia("(prefers-color-scheme: light)").matches;
+      host.dataset.tone = light ? "light" : "dark";
+      positionInMainArea(host);
+      const shadow = host.attachShadow({ mode: "open" });
+      const styleNode = document.createElement("style");
+      styleNode.textContent = css;
+      const statusNode = document.createElement("div");
+      statusNode.className = "status";
+      const indicator = document.createElement("span");
+      indicator.className = "indicator";
+      indicator.setAttribute("aria-hidden", "true");
+      const messageNode = document.createElement("span");
+      messageNode.className = "message";
+      messageNode.textContent = config.message;
+      statusNode.append(indicator, messageNode);
+      shadow.append(styleNode, statusNode);
+      document.documentElement.append(host);
+      const registry = {
+        token: config.token,
+        startedAt: Date.now(),
+        showTimer: null,
+        expiryTimer: null,
+        terminalTimer: null,
+      };
+      registry.showTimer = setTimeout(() => {
+        const current = document.getElementById(hostId);
+        if (current?.dataset.operationToken === config.token) current.dataset.visible = "true";
+      }, revealDelayMs);
+      registry.expiryTimer = setTimeout(() => removeHost(config.token), stateTtl(config.state));
+      window[registryKey] = registry;
+      return { visible: true, state: config.state };
+    }
+    if (!host || host.dataset.operationToken !== config.token) {
+      return { visible: false, stale: true };
+    }
+    const registry = window[registryKey];
+    clearTimer(registry?.terminalTimer);
+    clearTimer(registry?.expiryTimer);
+    positionInMainArea(host);
+    const terminal = config.state === "success" || config.state === "error" || config.state === "cancelled";
+    const remainingLoadingMs = terminal && host.dataset.state === "loading" && registry?.startedAt
+      ? Math.max(0, registry.startedAt + minimumLoadingMs - Date.now())
+      : 0;
+    if (remainingLoadingMs > 0 && registry?.token === config.token) {
+      registry.terminalTimer = setTimeout(() => {
+        const current = document.getElementById(hostId);
+        const currentRegistry = window[registryKey];
+        if (current?.dataset.operationToken !== config.token || currentRegistry?.token !== config.token) return;
+        current.dataset.state = config.state;
+        current.dataset.visible = "true";
+        const currentMessage = current.shadowRoot?.querySelector(".message");
+        if (currentMessage) currentMessage.textContent = config.message;
+        clearTimer(currentRegistry.expiryTimer);
+        currentRegistry.expiryTimer = setTimeout(() => removeHost(config.token), stateTtl(config.state));
+      }, remainingLoadingMs);
+      return { visible: true, state: "loading", deferred: true };
+    }
+    host.dataset.state = config.state;
+    host.dataset.visible = "true";
+    const messageNode = host.shadowRoot?.querySelector(".message");
+    if (messageNode) messageNode.textContent = config.message;
+    if (registry?.token === config.token) {
+      registry.expiryTimer = setTimeout(() => removeHost(config.token), stateTtl(config.state));
+    }
+    return { visible: true, state: config.state };
+  })()`;
+}
+
+async function updateOperationUi(session, action, token, state, message, timeoutMs = 10000) {
+  if (session.closed) return false;
+  const result = await session.evaluate(
+    operationUiExpression(action, token, state, message),
+    timeoutMs,
+  );
+  return Boolean(result?.visible || result?.cleared || result?.removed);
+}
+
+async function bestEffortOperationUi(session, action, token, state, message, timeoutMs = 10000) {
+  try {
+    return await updateOperationUi(session, action, token, state, message, timeoutMs);
+  } catch (error) {
+    console.error(`[dream-skin] client status unavailable: ${error.message}`);
+    return false;
+  }
+}
+
+async function presentOperationUi(session, token, state, message, timeoutMs = 10000) {
+  const updated = await bestEffortOperationUi(
+    session, "update", token, state, message, timeoutMs,
+  );
+  if (updated) return true;
+  return bestEffortOperationUi(session, "show", token, state, message, timeoutMs);
+}
+
 async function removeFromSession(session) {
   return session.evaluate(`(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
@@ -677,10 +968,70 @@ async function capture(session, outputPath) {
   await fs.writeFile(outputPath, Buffer.from(result.data, "base64"));
 }
 
+async function runBeginOperation(options) {
+  const connected = await connectCodexTargets(options.port, options.timeoutMs, options.browserId);
+  const operationToken = options.operationToken ?? nextOperationToken();
+  let shown = false;
+  try {
+    const results = await Promise.all(connected.map(({ session }) => presentOperationUi(
+      session,
+      operationToken,
+      "loading",
+      operationKindMessage(options.operationKind),
+      Math.max(250, Math.floor(options.timeoutMs / 2)),
+    )));
+    shown = results.some(Boolean);
+  } finally {
+    for (const { session } of connected) session.close();
+  }
+  if (!shown) throw new Error("Could not show operation progress in the verified Codex renderer");
+  process.stdout.write(`${operationToken}\n`);
+}
+
+async function runFinishOperation(options) {
+  const connected = await connectCodexTargets(options.port, options.timeoutMs, options.browserId);
+  let shown = false;
+  try {
+    const results = await Promise.all(connected.map(({ session }) => presentOperationUi(
+      session,
+      options.operationToken,
+      options.operationUiState,
+      options.operationMessage,
+      Math.max(250, Math.floor(options.timeoutMs / 2)),
+    )));
+    shown = results.some(Boolean);
+  } finally {
+    for (const { session } of connected) session.close();
+  }
+  if (!shown) throw new Error("Could not show the completed operation state in the verified Codex renderer");
+}
+
 async function runOneShot(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs, options.browserId);
-  const loadedPayload = (options.mode === "once" || options.reload)
-    ? await loadPayload(options.themeDir) : null;
+  const operationToken = options.mode === "once" || options.mode === "remove"
+    ? options.operationToken ?? nextOperationToken()
+    : null;
+  if (operationToken) {
+    const message = options.mode === "remove" ? "正在暂停皮肤…" : "正在准备皮肤…";
+    const action = options.operationToken ? presentOperationUi : (session, token, state, text) =>
+      bestEffortOperationUi(session, "show", token, state, text);
+    await Promise.all(connected.map(({ session }) => action(
+      session, operationToken, "loading", message,
+    )));
+  }
+  let loadedPayload = null;
+  try {
+    loadedPayload = (options.mode === "once" || options.reload)
+      ? await loadPayload(options.themeDir) : null;
+  } catch (error) {
+    if (operationToken) {
+      await Promise.all(connected.map(({ session }) => presentOperationUi(
+        session, operationToken, "error", "皮肤准备失败",
+      )));
+    }
+    for (const { session } of connected) session.close();
+    throw error;
+  }
   const payload = loadedPayload?.payload ?? null;
   const results = [];
   let screenshotCaptured = false;
@@ -688,14 +1039,36 @@ async function runOneShot(options) {
     for (const { target, session, probe } of connected) {
       try {
         if (options.mode === "remove") await removeFromSession(session);
-        else if (options.mode === "once") await applyToSession(session, payload);
-        if (options.mode === "once") {
+        else if (options.mode === "once") {
+          if (operationToken) {
+            await bestEffortOperationUi(
+              session, "update", operationToken, "loading",
+              `正在应用「${loadedPayload.theme.name}」…`,
+            );
+          }
+          await applyToSession(session, payload);
           await new Promise((resolve) => setTimeout(resolve, 850));
         }
         if (options.reload) {
           await session.send("Page.reload", { ignoreCache: true });
           await new Promise((resolve) => setTimeout(resolve, 1600));
-          if (options.mode !== "remove") await applyToSession(session, payload);
+          if (options.mode !== "remove") {
+            if (operationToken) {
+              await presentOperationUi(
+                session, operationToken, "loading",
+                `正在应用「${loadedPayload.theme.name}」…`,
+              );
+            }
+            await applyToSession(session, payload);
+          }
+        }
+        if (operationToken) {
+          await presentOperationUi(
+            session,
+            operationToken,
+            "loading",
+            options.mode === "remove" ? "正在确认皮肤已暂停…" : "正在检查显示效果…",
+          );
         }
         const verified = options.mode === "remove"
           ? await verifyRemovedSession(session)
@@ -703,10 +1076,34 @@ async function runOneShot(options) {
             ? await waitForVerifiedSession(session, options.timeoutMs)
             : await verifySession(session);
         results.push({ targetId: target.id, markers: probe.markers, result: verified });
+        if (operationToken) {
+          const passed = options.mode === "remove" ? verified === true : verified?.pass;
+          await presentOperationUi(
+            session,
+            operationToken,
+            passed ? "success" : "error",
+            passed
+              ? options.mode === "remove" ? "皮肤已暂停" : `已应用「${loadedPayload.theme.name}」`
+              : options.mode === "remove" ? "暂停校验失败" : "显示校验失败",
+          );
+        }
         if (options.screenshot && !screenshotCaptured) {
+          if (operationToken) {
+            await bestEffortOperationUi(session, "hide", operationToken, "loading", "");
+          }
           await capture(session, options.screenshot);
           screenshotCaptured = true;
         }
+      } catch (error) {
+        if (operationToken) {
+          await presentOperationUi(
+            session,
+            operationToken,
+            "error",
+            options.mode === "remove" ? "暂停失败，请重试" : "应用失败，请重试",
+          );
+        }
+        results.push({ targetId: target.id, markers: probe?.markers, error: error.message });
       } finally {
         session.close();
       }
@@ -716,7 +1113,7 @@ async function runOneShot(options) {
   }
   console.log(JSON.stringify({ mode: options.mode, port: options.port, targets: results }, null, 2));
   const failed = results.length === 0 || results.some((item) =>
-    options.mode === "remove" ? item.result !== true : !item.result?.pass);
+    item.error || (options.mode === "remove" ? item.result !== true : !item.result?.pass));
   if (failed) process.exitCode = 2;
 }
 
@@ -1027,6 +1424,8 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
     }));
-  } else if (options.mode === "watch") await runWatch(options);
+  } else if (options.mode === "begin-operation") await runBeginOperation(options);
+  else if (options.mode === "finish-operation") await runFinishOperation(options);
+  else if (options.mode === "watch") await runWatch(options);
   else await runOneShot(options);
 }
