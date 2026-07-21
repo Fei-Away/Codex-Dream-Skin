@@ -324,6 +324,11 @@ assert.match(
   /data-dream-duo-foreground-mode="hidden"[\s\S]{0,180}\.dream-duo-characters\s*\{[\s\S]{0,100}opacity:\s*0 !important/,
   "The main duo must fade out when a native floating panel leaves no safe area.",
 );
+assert.match(
+  css,
+  /data-dream-theme-id="preset-sky-garden-duo"\][\s\S]{0,180}main\.main-surface\.dream-skin-home-shell[\s\S]{0,180}#codex-dream-skin-motion-stage \.dream-duo-characters\s*\{[\s\S]{0,120}opacity:\s*0 !important/,
+  "The new-task page must hide the standing pair and keep the reclining pair as its sole foreground focus.",
+);
 assert.doesNotMatch(
   css,
   /#codex-dream-skin-motion-stage\s*\{[^}]*background-image:\s*var\(--dream-skin-art\)/,

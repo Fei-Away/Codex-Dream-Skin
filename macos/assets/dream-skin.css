@@ -1329,6 +1329,13 @@ html.codex-dream-skin[data-dream-theme-id="preset-sky-garden-duo"][data-dream-du
 }
 
 html.codex-dream-skin[data-dream-theme-id="preset-sky-garden-duo"]
+  main.main-surface.dream-skin-home-shell
+  #codex-dream-skin-motion-stage .dream-duo-characters {
+  opacity: 0 !important;
+  visibility: hidden;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-sky-garden-duo"]
   #codex-dream-skin-motion-stage .dream-duo-light {
   position: absolute;
   inset: -18%;
