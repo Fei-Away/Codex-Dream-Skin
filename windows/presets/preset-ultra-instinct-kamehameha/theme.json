@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-ultra-instinct-kamehameha",
+  "name": "自在极意·龟派气功",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "静若无我，动若星河。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "ULTRA INSTINCT ONLINE",
+  "quote": "MOVE BEFORE THOUGHT",
+  "image": "background.jpg",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.78,
+    "focusY": 0.45,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#050B1B",
+    "panel": "#0B1631",
+    "panelAlt": "#12264C",
+    "accent": "#49D9FF",
+    "accentAlt": "#DCEAFF",
+    "secondary": "#8E78FF",
+    "highlight": "#217CFF",
+    "text": "#F2F7FF",
+    "muted": "#A7B6D4",
+    "line": "rgba(73, 217, 255, .30)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "Ultra Instinct Kamehameha",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}
