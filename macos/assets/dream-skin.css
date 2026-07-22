@@ -1292,6 +1292,54 @@ html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
   color: currentColor !important;
 }
 
+/* The composer's context picker is its own floating surface and keeps the
+   native light dropdown tokens whether opened from plus or by typing @. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [data-codex-composer-root]
+  [data-composer-overlay-floating-ui="true"] > div:has([data-list-navigation-item="true"]) {
+  --color-token-dropdown-background: rgb(var(--ds-panel-rgb) / .94);
+  --color-token-foreground: var(--ds-text);
+  --color-token-description-foreground: rgb(var(--ds-muted-rgb) / .88);
+  --color-token-list-hover-background: rgb(var(--ds-accent-rgb) / .14);
+  background: rgb(var(--ds-panel-rgb) / .94) !important;
+  color: var(--ds-text) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .38) !important;
+  box-shadow:
+    0 18px 48px rgb(var(--ds-bg-rgb) / .42),
+    inset 0 1px rgb(var(--ds-text-rgb) / .10) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [data-codex-composer-root]
+  [data-composer-overlay-floating-ui="true"] [class*="bg-token-dropdown-background/"] {
+  background: rgb(var(--ds-panel-rgb) / .96) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [data-codex-composer-root]
+  [data-composer-overlay-floating-ui="true"] [class*="bg-token-dropdown-background/"][class~="sticky"] {
+  color: var(--ds-accent) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [data-codex-composer-root]
+  [data-composer-overlay-floating-ui="true"] [data-list-navigation-item="true"] {
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [data-codex-composer-root]
+  [data-composer-overlay-floating-ui="true"] [data-list-navigation-item="true"][aria-selected="true"] {
+  background: rgb(var(--ds-accent-rgb) / .18) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [data-codex-composer-root]
+  [data-composer-overlay-floating-ui="true"] [class~="text-token-description-foreground"] {
+  color: rgb(var(--ds-muted-rgb) / .88) !important;
+}
+
 html.codex-dream-skin .ProseMirror {
   color: var(--ds-text) !important;
   caret-color: var(--ds-accent) !important;

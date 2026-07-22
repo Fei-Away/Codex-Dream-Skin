@@ -166,6 +166,16 @@ assert.match(
 );
 assert.match(
   css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,180}data-codex-composer-root[\s\S]{0,180}data-composer-overlay-floating-ui="true"[\s\S]{0,180}data-list-navigation-item="true"[\s\S]{0,340}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\) !important;[\s\S]{0,160}border-color:\s*rgb\(var\(--ds-accent-rgb\) \/ \.38\) !important;/,
+  "Gothic's plus and @ context picker must replace the native white dropdown surface.",
+);
+assert.match(
+  css,
+  /data-composer-overlay-floating-ui="true"[\s\S]{0,180}data-list-navigation-item="true"\]\[aria-selected="true"\][\s\S]{0,140}background:\s*rgb\(var\(--ds-accent-rgb\) \/ \.18\) !important;/,
+  "Gothic's selected add-context row must remain distinct on the dark menu surface.",
+);
+assert.match(
+  css,
   /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,280}\[class\*="_markdown"\][\s\S]{0,260}div:has\(> pre\)[\s\S]{0,180}border:\s*1px solid rgb\(var\(--ds-accent-rgb\) \/ \.42\) !important;[\s\S]{0,160}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.76\) !important;/,
   "Gothic fenced code blocks must retain a complete contrast-safe border and surface over the wallpaper.",
 );
