@@ -25,7 +25,6 @@
 - 卸载确认后先调用受管恢复引擎；只有 Codex 外观、CDP 与运行状态安全恢复成功才删除安装文件，失败会中止卸载并保留修复入口。
 - 安装、启动、托盘与恢复均使用 `RemoteSigned`，不再要求普通用户执行 `.ps1`、修改 Execution Policy 或安装全局 Node.js。
 - Release 构建会用固定 SHA-256 核验的 Gothic Void Crusade 替换源码中的人物参考素材；Setup.exe 同时携带项目 LICENSE/NOTICE 与 Node.js 自带许可证。
->>>>>>> origin/main
 
 ## 1.2.0 — 2026-07-17
 
