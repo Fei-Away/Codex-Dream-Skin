@@ -378,6 +378,7 @@ try {
     'assets\dream-reference.jpg',
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
+    'assets\selectors.json',
     'assets\theme.json',
     'assets\codex-dream-skin.ico',
     'presets\preset-gothic-void-crusade\background.jpg',
