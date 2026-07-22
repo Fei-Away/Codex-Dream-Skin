@@ -31,13 +31,33 @@ deploy_project() {
     --exclude 'runtime/' \
     "$PROJECT_ROOT/" "$temporary/"
   /bin/chmod 700 "$temporary"/*.command "$temporary"/scripts/*.sh 2>/dev/null || true
+  /bin/rm -rf "$previous"
   if [ -e "$INSTALL_ROOT" ]; then /bin/mv "$INSTALL_ROOT" "$previous"; fi
   if ! /bin/mv "$temporary" "$INSTALL_ROOT"; then
     [ -e "$previous" ] && /bin/mv "$previous" "$INSTALL_ROOT"
     fail "Could not install the project at $INSTALL_ROOT"
   fi
-  /bin/rm -rf "$previous"
+  DEPLOY_PREVIOUS="$previous"
 }
+
+commit_deployed_project() {
+  [ -n "${DEPLOY_PREVIOUS:-}" ] || return 0
+  /bin/rm -rf "$DEPLOY_PREVIOUS" || true
+  DEPLOY_PREVIOUS=""
+}
+
+rollback_deployed_project() {
+  local status="$1"
+  /bin/rm -rf "$INSTALL_ROOT"
+  if [ -n "${DEPLOY_PREVIOUS:-}" ] && [ -e "$DEPLOY_PREVIOUS" ]; then
+    /bin/mv "$DEPLOY_PREVIOUS" "$INSTALL_ROOT" \
+      || fail "Installation failed and the previous engine could not be restored."
+  fi
+  DEPLOY_PREVIOUS=""
+  return "$status"
+}
+
+DEPLOY_PREVIOUS=""
 
 if [ "$IN_PLACE" = "false" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
   /bin/mkdir -p "$(dirname "$INSTALL_ROOT")"
@@ -45,7 +65,14 @@ if [ "$IN_PLACE" = "false" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
   install_args=(--in-place --port "$PORT")
   [ "$CREATE_LAUNCHERS" = "true" ] || install_args+=(--no-launchers)
   [ "$LAUNCH_AFTER_INSTALL" = "true" ] || install_args+=(--no-launch)
-  exec "$INSTALL_ROOT/scripts/install-dream-skin-macos.sh" "${install_args[@]}"
+  if "$INSTALL_ROOT/scripts/install-dream-skin-macos.sh" "${install_args[@]}"; then
+    commit_deployed_project
+    exit 0
+  else
+    status=$?
+    rollback_deployed_project "$status"
+    exit "$status"
+  fi
 fi
 
 discover_codex_app

@@ -18,6 +18,25 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# A native AppKit install deploys the engine before it validates Codex and the
+# config. If that validation fails, the outer installer rolls the engine back;
+# this branch also makes a stale partial engine safe to remove without asking
+# for an official app or bundled Node that was never used to change config.
+if [ "$UNINSTALL" = "true" ] && [ ! -e "$STATE_PATH" ] &&
+    [ ! -e "$OPERATION_STATE_PATH" ] && [ ! -e "$OPERATION_ACK_PATH" ]; then
+  if [ ! -e "$THEME_BACKUP_PATH" ]; then
+    printf 'No active Dream Skin session or config backup was found; safe engine-only cleanup.\n'
+    exit 0
+  fi
+  backup_appearance="$(/usr/bin/plutil -extract values.appearanceTheme raw -o - "$THEME_BACKUP_PATH" 2>/dev/null || true)"
+  backup_dark_code="$(/usr/bin/plutil -extract values.appearanceDarkCodeThemeId raw -o - "$THEME_BACKUP_PATH" 2>/dev/null || true)"
+  if [ "$backup_appearance" = "null" ] && [ "$backup_dark_code" = "null" ]; then
+    /bin/rm -f "$THEME_BACKUP_PATH"
+    printf 'The install created no config overrides; safe engine-only cleanup.\n'
+    exit 0
+  fi
+fi
+
 discover_codex_app
 require_macos_runtime
 ensure_state_root
@@ -62,10 +81,16 @@ fi
 clear_operation_state
 /bin/rm -f "$OPERATION_ACK_PATH"
 if [ "$UNINSTALL" = "true" ]; then
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin.command"
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Customize.command"
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Verify.command"
-  /bin/rm -f "$HOME/Desktop/Codex Dream Skin - Restore.command"
+  for launcher in \
+    "$HOME/Desktop/Codex Dream Skin.command" \
+    "$HOME/Desktop/Codex Dream Skin - Customize.command" \
+    "$HOME/Desktop/Codex Dream Skin - Verify.command" \
+    "$HOME/Desktop/Codex Dream Skin - Restore.command"; do
+    if [ -f "$launcher" ] && [ ! -L "$launcher" ] &&
+       /usr/bin/grep -F -q '# CodexDreamSkinStudio launcher' "$launcher"; then
+      /bin/rm -f "$launcher"
+    fi
+  done
 fi
 
 printf 'ChatGPT Dream Skin was removed and the requested macOS restore actions completed successfully.\n'
