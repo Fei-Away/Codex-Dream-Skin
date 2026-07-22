@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-17",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#10272a",
+      "panel": "#17383a",
+      "panelAlt": "#214a4a",
+      "accent": "#69b99a",
+      "accentAlt": "#9bd8ba",
+      "secondary": "#73b8c2",
+      "highlight": "#d9b86c",
+      "text": "#f5fffb",
+      "muted": "#a6c9bd",
+      "line": "#69b99a",
+      "lineOpacity": 0.3
+    },
+    "light": {
+      "background": "#f1f7f3",
+      "panel": "#ffffff",
+      "panelAlt": "#e2eee7",
+      "accent": "#69b99a",
+      "accentAlt": "#9bd8ba",
+      "secondary": "#73b8c2",
+      "highlight": "#d9b86c",
+      "text": "#24332e",
+      "muted": "#657b73",
+      "line": "#69b99a",
+      "lineOpacity": 0.3
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 12
+    },
+    "surface": {
+      "opacity": 78,
+      "blur": 24,
+      "radius": 22,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "orbit",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "云上仙途",
+  "brandSubtitle": "CLOUD ASCENT",
+  "tagline": "云海灵脉中的东方修行之旅。",
+  "projectPrefix": "云上项目 ·",
+  "projectLabel": "选择云上项目",
+  "statusText": "JADE CURRENT ONLINE",
+  "quote": "RISE ABOVE THE CLOUDS",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "cloud",
+      "shortName": "云上仙途"
+    },
+    "hero": {
+      "eyebrow": "CLOUD ASCENT",
+      "title": "沿云海探索下一重境界",
+      "description": "云海灵脉中的东方修行之旅。",
+      "tags": [
+        "云海",
+        "修行",
+        "探索"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "cloud",
+        "title": "观测灵脉",
+        "detail": "先理解上下文与边界。",
+        "badge": "云海",
+        "tone": "accent"
+      },
+      {
+        "icon": "research",
+        "title": "推演功法",
+        "detail": "把方案转化为具体行动。",
+        "badge": "修行",
+        "tone": "secondary"
+      },
+      {
+        "icon": "mountain",
+        "title": "突破关隘",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "探索",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "pen",
+        "title": "记录心得",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "云海",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "灵脉平稳",
+        "心境澄明"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "云海",
+      "hint": "在「云上仙途」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#69b99a",
+    "surface": "#17383a",
+    "ink": "#f5fffb",
+    "contrast": 62,
+    "diffAdded": "#9bd8ba",
+    "diffRemoved": "#d9b86c",
+    "skill": "#73b8c2"
+  }
+}

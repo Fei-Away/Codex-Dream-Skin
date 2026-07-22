@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-07",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#082733",
+      "panel": "#0d3947",
+      "panelAlt": "#124c5c",
+      "accent": "#2dd4d0",
+      "accentAlt": "#73e8df",
+      "secondary": "#f2a4dc",
+      "highlight": "#d668c0",
+      "text": "#efffff",
+      "muted": "#a5d5d5",
+      "line": "#2dd4d0",
+      "lineOpacity": 0.36
+    },
+    "light": {
+      "background": "#effcfb",
+      "panel": "#ffffff",
+      "panelAlt": "#ddf4f2",
+      "accent": "#2dd4d0",
+      "accentAlt": "#73e8df",
+      "secondary": "#f2a4dc",
+      "highlight": "#d668c0",
+      "text": "#16343a",
+      "muted": "#5b7f80",
+      "line": "#2dd4d0",
+      "lineOpacity": 0.36
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 62,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 18
+    },
+    "surface": {
+      "opacity": 80,
+      "blur": 22,
+      "radius": 24,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "sparkles",
+      "intensity": 64
+    },
+    "typography": "rounded"
+  },
+  "name": "初音未来",
+  "brandSubtitle": "CYAN RHYTHM",
+  "tagline": "青粉电子音浪与全息舞台，保持轻快而明亮的节奏。",
+  "projectPrefix": "音浪项目 ·",
+  "projectLabel": "选择音浪项目",
+  "statusText": "CYAN RHYTHM ONLINE",
+  "quote": "CODE IN RHYTHM",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "signal",
+      "shortName": "初音未来"
+    },
+    "hero": {
+      "eyebrow": "CYAN RHYTHM",
+      "title": "让工作跟上今天的节拍",
+      "description": "青粉电子音浪与全息舞台，保持轻快而明亮的节奏。",
+      "tags": [
+        "节奏",
+        "协作",
+        "舞台"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "signal",
+        "title": "校准节拍",
+        "detail": "先理解上下文与边界。",
+        "badge": "节奏",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "编排任务",
+        "detail": "把方案转化为具体行动。",
+        "badge": "协作",
+        "tone": "secondary"
+      },
+      {
+        "icon": "wand",
+        "title": "同步协作",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "舞台",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "ship",
+        "title": "完成演出",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "节奏",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "节拍在线",
+        "保持轻快"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "节奏",
+      "hint": "在「初音未来」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#2dd4d0",
+    "surface": "#0d3947",
+    "ink": "#efffff",
+    "contrast": 62,
+    "diffAdded": "#73e8df",
+    "diffRemoved": "#d668c0",
+    "skill": "#f2a4dc"
+  }
+}

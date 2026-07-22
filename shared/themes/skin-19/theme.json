@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-19",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#151719",
+      "panel": "#222528",
+      "panelAlt": "#32363a",
+      "accent": "#d1483f",
+      "accentAlt": "#ef766b",
+      "secondary": "#8f9ea3",
+      "highlight": "#be3b34",
+      "text": "#f7f5ef",
+      "muted": "#aeb1ad",
+      "line": "#d1483f",
+      "lineOpacity": 0.28
+    },
+    "light": {
+      "background": "#f2f1ec",
+      "panel": "#ffffff",
+      "panelAlt": "#e7e6e0",
+      "accent": "#d1483f",
+      "accentAlt": "#ef766b",
+      "secondary": "#8f9ea3",
+      "highlight": "#be3b34",
+      "text": "#282a2b",
+      "muted": "#707373",
+      "line": "#d1483f",
+      "lineOpacity": 0.28
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 14
+    },
+    "surface": {
+      "opacity": 78,
+      "blur": 20,
+      "radius": 6,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grain",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "墨影江湖",
+  "brandSubtitle": "INK HORIZON",
+  "tagline": "水墨留白与凌厉刀光。",
+  "projectPrefix": "江湖项目 ·",
+  "projectLabel": "选择江湖项目",
+  "statusText": "INK CURRENT ONLINE",
+  "quote": "MOVE BEFORE THE INK DRIES",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "sword",
+      "shortName": "墨影江湖"
+    },
+    "hero": {
+      "eyebrow": "INK HORIZON",
+      "title": "这一式该如何落笔？",
+      "description": "水墨留白与凌厉刀光。",
+      "tags": [
+        "江湖",
+        "策略",
+        "决断"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "听风辨势",
+        "detail": "先理解上下文与边界。",
+        "badge": "江湖",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "拆解招式",
+        "detail": "把方案转化为具体行动。",
+        "badge": "策略",
+        "tone": "secondary"
+      },
+      {
+        "icon": "sword",
+        "title": "快速出手",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "决断",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "review",
+        "title": "复盘心法",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "江湖",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "气息平稳",
+        "出手果断"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "江湖",
+      "hint": "在「墨影江湖」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#d1483f",
+    "surface": "#222528",
+    "ink": "#f7f5ef",
+    "contrast": 62,
+    "diffAdded": "#ef766b",
+    "diffRemoved": "#be3b34",
+    "skill": "#8f9ea3"
+  }
+}

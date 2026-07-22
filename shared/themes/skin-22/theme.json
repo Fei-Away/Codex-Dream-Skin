@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-22",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#1b2a21",
+      "panel": "#293c2e",
+      "panelAlt": "#3a503d",
+      "accent": "#67b878",
+      "accentAlt": "#9ad99a",
+      "secondary": "#63a8c1",
+      "highlight": "#e88968",
+      "text": "#f7fff2",
+      "muted": "#adc5ae",
+      "line": "#67b878",
+      "lineOpacity": 0.3
+    },
+    "light": {
+      "background": "#f2f8ec",
+      "panel": "#ffffff",
+      "panelAlt": "#e5f0df",
+      "accent": "#67b878",
+      "accentAlt": "#9ad99a",
+      "secondary": "#63a8c1",
+      "highlight": "#e88968",
+      "text": "#29342b",
+      "muted": "#6b7c6c",
+      "line": "#67b878",
+      "lineOpacity": 0.3
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 10
+    },
+    "surface": {
+      "opacity": 76,
+      "blur": 24,
+      "radius": 24,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "sparkles",
+      "intensity": 62
+    },
+    "typography": "rounded"
+  },
+  "name": "灵宠奇旅",
+  "brandSubtitle": "SPIRIT TRAIL",
+  "tagline": "自然灵性与温暖轻冒险。",
+  "projectPrefix": "奇旅项目 ·",
+  "projectLabel": "选择奇旅项目",
+  "statusText": "TRAIL LIGHTS ONLINE",
+  "quote": "FOLLOW THE SMALL LIGHTS",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "pet",
+      "shortName": "灵宠奇旅"
+    },
+    "hero": {
+      "eyebrow": "SPIRIT TRAIL",
+      "title": "循着微光开始今天的旅程",
+      "description": "自然灵性与温暖轻冒险。",
+      "tags": [
+        "伙伴",
+        "自然",
+        "冒险"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "plan",
+        "title": "整理行囊",
+        "detail": "先理解上下文与边界。",
+        "badge": "伙伴",
+        "tone": "accent"
+      },
+      {
+        "icon": "compass",
+        "title": "寻找线索",
+        "detail": "把方案转化为具体行动。",
+        "badge": "自然",
+        "tone": "secondary"
+      },
+      {
+        "icon": "pet",
+        "title": "照顾伙伴",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "冒险",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "pen",
+        "title": "记录旅程",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "伙伴",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "伙伴安心",
+        "小径明亮"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "伙伴",
+      "hint": "在「灵宠奇旅」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#67b878",
+    "surface": "#293c2e",
+    "ink": "#f7fff2",
+    "contrast": 62,
+    "diffAdded": "#9ad99a",
+    "diffRemoved": "#e88968",
+    "skill": "#63a8c1"
+  }
+}

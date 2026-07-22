@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-21",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#0b1118",
+      "panel": "#111c26",
+      "panelAlt": "#1b2b36",
+      "accent": "#d84b45",
+      "accentAlt": "#f07a70",
+      "secondary": "#3ea5bd",
+      "highlight": "#b92f38",
+      "text": "#edf6fa",
+      "muted": "#91a9b5",
+      "line": "#3ea5bd",
+      "lineOpacity": 0.34
+    },
+    "light": {
+      "background": "#ebeced",
+      "panel": "#f5f6f6",
+      "panelAlt": "#e8eaeb",
+      "accent": "#d84b45",
+      "accentAlt": "#f07a70",
+      "secondary": "#3ea5bd",
+      "highlight": "#b92f38",
+      "text": "#040508",
+      "muted": "#546269",
+      "line": "#3ea5bd",
+      "lineOpacity": 0.34
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 50,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 38
+    },
+    "surface": {
+      "opacity": 92,
+      "blur": 10,
+      "radius": 8,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grid",
+      "intensity": 42
+    },
+    "typography": "technical"
+  },
+  "name": "星穹机甲",
+  "brandSubtitle": "ORBITAL FORGE",
+  "tagline": "东方科幻与重型机械结构。",
+  "projectPrefix": "星穹项目 ·",
+  "projectLabel": "选择星穹项目",
+  "statusText": "HANGAR SYSTEMS ONLINE",
+  "quote": "BUILD FOR THE DISTANCE",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "mecha",
+      "shortName": "星穹机甲"
+    },
+    "hero": {
+      "eyebrow": "ORBITAL FORGE",
+      "title": "机库今天要锻造什么？",
+      "description": "东方科幻与重型机械结构。",
+      "tags": [
+        "机甲",
+        "工程",
+        "远征"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "monitor",
+        "title": "读取遥测",
+        "detail": "先理解上下文与边界。",
+        "badge": "机甲",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "设计模块",
+        "detail": "把方案转化为具体行动。",
+        "badge": "工程",
+        "tone": "secondary"
+      },
+      {
+        "icon": "mecha",
+        "title": "装配机体",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "远征",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "ship",
+        "title": "远征测试",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "机甲",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "机库在线",
+        "动力充足"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "机甲",
+      "hint": "在「星穹机甲」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#d84b45",
+    "surface": "#111c26",
+    "ink": "#edf6fa",
+    "contrast": 62,
+    "diffAdded": "#f07a70",
+    "diffRemoved": "#b92f38",
+    "skill": "#3ea5bd"
+  }
+}

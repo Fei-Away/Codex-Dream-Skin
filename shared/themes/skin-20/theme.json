@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-20",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#261510",
+      "panel": "#382018",
+      "panelAlt": "#4b2d20",
+      "accent": "#c83e2e",
+      "accentAlt": "#d9a94f",
+      "secondary": "#59798b",
+      "highlight": "#9d2f28",
+      "text": "#fff6df",
+      "muted": "#cfb996",
+      "line": "#d9a94f",
+      "lineOpacity": 0.34
+    },
+    "light": {
+      "background": "#fbf2df",
+      "panel": "#fffdf5",
+      "panelAlt": "#f2e3ca",
+      "accent": "#c83e2e",
+      "accentAlt": "#d9a94f",
+      "secondary": "#59798b",
+      "highlight": "#9d2f28",
+      "text": "#38231a",
+      "muted": "#7d664f",
+      "line": "#d9a94f",
+      "lineOpacity": 0.34
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 46,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 24
+    },
+    "surface": {
+      "opacity": 88,
+      "blur": 14,
+      "radius": 12,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "orbit",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "长安机关",
+  "brandSubtitle": "CHANG'AN MECHANICA",
+  "tagline": "盛唐幻想与精密机关。",
+  "projectPrefix": "机关项目 ·",
+  "projectLabel": "选择机关项目",
+  "statusText": "MECHANISM ONLINE",
+  "quote": "MAKE EVERY PART MATTER",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "gear",
+      "shortName": "长安机关"
+    },
+    "hero": {
+      "eyebrow": "CHANG'AN MECHANICA",
+      "title": "让每个机关严丝合缝",
+      "description": "盛唐幻想与精密机关。",
+      "tags": [
+        "机关",
+        "结构",
+        "精密"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "拆解结构",
+        "detail": "先理解上下文与边界。",
+        "badge": "机关",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "绘制机括",
+        "detail": "把方案转化为具体行动。",
+        "badge": "结构",
+        "tone": "secondary"
+      },
+      {
+        "icon": "gear",
+        "title": "装配部件",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "精密",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "review",
+        "title": "校验运转",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "机关",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "机括就绪",
+        "精度稳定"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "机关",
+      "hint": "在「长安机关」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#c83e2e",
+    "surface": "#382018",
+    "ink": "#fff6df",
+    "contrast": 62,
+    "diffAdded": "#d9a94f",
+    "diffRemoved": "#9d2f28",
+    "skill": "#59798b"
+  }
+}

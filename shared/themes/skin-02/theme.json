@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-02",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#24130f",
+      "panel": "#351b14",
+      "panelAlt": "#47251a",
+      "accent": "#d43d2f",
+      "accentAlt": "#e5b64f",
+      "secondary": "#d7a838",
+      "highlight": "#9f251f",
+      "text": "#fff7e8",
+      "muted": "#d5b994",
+      "line": "#e5b64f",
+      "lineOpacity": 0.34
+    },
+    "light": {
+      "background": "#fff7e8",
+      "panel": "#fffdf7",
+      "panelAlt": "#fbe9d3",
+      "accent": "#d43d2f",
+      "accentAlt": "#e5b64f",
+      "secondary": "#d7a838",
+      "highlight": "#9f251f",
+      "text": "#39170f",
+      "muted": "#7c5b43",
+      "line": "#e5b64f",
+      "lineOpacity": 0.34
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 60,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 26
+    },
+    "surface": {
+      "opacity": 90,
+      "blur": 14,
+      "radius": 14,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grain",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "财神打工版",
+  "brandSubtitle": "PROSPERITY MODE",
+  "tagline": "朱砂红与鎏金意象，为今天的项目添一点好彩头。",
+  "projectPrefix": "开运项目 ·",
+  "projectLabel": "选择开运项目",
+  "statusText": "PROSPERITY ONLINE",
+  "quote": "BUILD VALUE TODAY",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "coin",
+      "shortName": "财神打工版"
+    },
+    "hero": {
+      "eyebrow": "PROSPERITY MODE",
+      "title": "今天要创造什么价值？",
+      "description": "朱砂红与鎏金意象，为今天的项目添一点好彩头。",
+      "tags": [
+        "目标",
+        "价值",
+        "交付"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "盘点机会",
+        "detail": "先理解上下文与边界。",
+        "badge": "目标",
+        "tone": "accent"
+      },
+      {
+        "icon": "chart",
+        "title": "核算价值",
+        "detail": "把方案转化为具体行动。",
+        "badge": "价值",
+        "tone": "secondary"
+      },
+      {
+        "icon": "ship",
+        "title": "推进成交",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "交付",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "review",
+        "title": "复盘收益",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "目标",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "目标清晰",
+        "稳步进账"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "目标",
+      "hint": "在「财神打工版」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#d43d2f",
+    "surface": "#351b14",
+    "ink": "#fff7e8",
+    "contrast": 62,
+    "diffAdded": "#e5b64f",
+    "diffRemoved": "#9f251f",
+    "skill": "#d7a838"
+  }
+}

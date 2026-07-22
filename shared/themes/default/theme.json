@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 3,
+  "id": "default",
+  "name": "Dream Skin",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "把喜欢的画面变成可交互的 Codex 工作台。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "THEME ONLINE",
+  "quote": "MAKE SOMETHING WONDERFUL",
+  "image": "portal-hero.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#2b2224", "panel": "#392d30", "panelAlt": "#493a3e",
+      "accent": "#e25563", "accentAlt": "#f07a86", "secondary": "#f3a8af",
+      "highlight": "#c93d4c", "text": "#fff7f8", "muted": "#c9b5b9",
+      "line": "#c47880", "lineOpacity": 0.3
+    },
+    "light": {
+      "background": "#f7f4f5", "panel": "#ffffff", "panelAlt": "#fff7f8",
+      "accent": "#c93d4c", "accentAlt": "#e25563", "secondary": "#a14f5a",
+      "highlight": "#a72f3c", "text": "#2b2224", "muted": "#79686c",
+      "line": "#c47880", "lineOpacity": 0.22
+    }
+  },
+  "appearance": {
+    "background": { "focusX": 58, "focusY": 50, "zoom": 100, "overlay": 18 },
+    "surface": { "opacity": 88, "blur": 18, "radius": 18, "shadow": 30 },
+    "decoration": { "style": "orbit", "intensity": 42 },
+    "typography": "system"
+  },
+  "scene": {
+    "kind": "custom-scene",
+    "identity": { "icon": "spark", "shortName": "Dream Skin" },
+    "hero": {
+      "eyebrow": "CODEX DREAM SKIN", "title": "我们该构建什么？",
+      "description": "把喜欢的画面变成可交互的 Codex 工作台。",
+      "tags": ["构建", "审查", "解释"]
+    },
+    "actions": [
+      { "icon": "code", "title": "探索并理解代码", "detail": "梳理结构、依赖与调用路径。", "badge": "分析", "tone": "accent" },
+      { "icon": "build", "title": "构建新功能", "detail": "把想法实现为可验证的改动。", "badge": "构建", "tone": "secondary" },
+      { "icon": "review", "title": "审查与改进", "detail": "检查风险并提出清晰建议。", "badge": "审查", "tone": "accentAlt" },
+      { "icon": "repair", "title": "修复问题", "detail": "定位根因并验证恢复路径。", "badge": "修复", "tone": "highlight" }
+    ],
+    "widget": { "icon": "signal", "title": "今日状态", "lines": ["保持专注", "小步验证"], "visible": true },
+    "composer": { "icon": "wand", "label": "场景输入", "hint": "让 Codex 构建、审查或解释…" },
+    "chrome": { "iconColor": "background", "iconSurface": "accent", "badgeColor": "highlight", "cardText": "text" }
+  },
+  "nativeAppearance": {
+    "variant": "light", "accent": "#c93d4c", "surface": "#ffffff", "ink": "#2b2224",
+    "contrast": 62, "diffAdded": "#4f9f70", "diffRemoved": "#c95757", "skill": "#5c77c8"
+  }
+}

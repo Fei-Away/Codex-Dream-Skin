@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-10",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#202329",
+      "panel": "#2d3138",
+      "panelAlt": "#3c424c",
+      "accent": "#4f73d8",
+      "accentAlt": "#ef6b55",
+      "secondary": "#5ca2b7",
+      "highlight": "#d99b37",
+      "text": "#f8f9fb",
+      "muted": "#aeb5c0",
+      "line": "#6f88ca",
+      "lineOpacity": 0.28
+    },
+    "light": {
+      "background": "#f4f5f7",
+      "panel": "#ffffff",
+      "panelAlt": "#e8ebef",
+      "accent": "#4f73d8",
+      "accentAlt": "#ef6b55",
+      "secondary": "#5ca2b7",
+      "highlight": "#d99b37",
+      "text": "#252931",
+      "muted": "#69717e",
+      "line": "#6f88ca",
+      "lineOpacity": 0.28
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 52,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 8
+    },
+    "surface": {
+      "opacity": 94,
+      "blur": 8,
+      "radius": 10,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "none",
+      "intensity": 42
+    },
+    "typography": "system"
+  },
+  "name": "产品策划",
+  "brandSubtitle": "PRODUCT CLARITY",
+  "tagline": "从问题、路径到决策的结构化工作台。",
+  "projectPrefix": "产品项目 ·",
+  "projectLabel": "选择产品项目",
+  "statusText": "DECISION MODE ONLINE",
+  "quote": "MAKE THE NEXT DECISION CLEAR",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "plan",
+      "shortName": "产品策划"
+    },
+    "hero": {
+      "eyebrow": "PRODUCT CLARITY",
+      "title": "下一项产品决策是什么？",
+      "description": "从问题、路径到决策的结构化工作台。",
+      "tags": [
+        "问题",
+        "路径",
+        "决策"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "澄清问题",
+        "detail": "先理解上下文与边界。",
+        "badge": "问题",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "梳理用户",
+        "detail": "把方案转化为具体行动。",
+        "badge": "路径",
+        "tone": "secondary"
+      },
+      {
+        "icon": "chart",
+        "title": "比较方案",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "决策",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "review",
+        "title": "形成决策",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "问题",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "决策模式",
+        "用户优先"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "问题",
+      "hint": "在「产品策划」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#4f73d8",
+    "surface": "#2d3138",
+    "ink": "#f8f9fb",
+    "contrast": 62,
+    "diffAdded": "#ef6b55",
+    "diffRemoved": "#d99b37",
+    "skill": "#5ca2b7"
+  }
+}

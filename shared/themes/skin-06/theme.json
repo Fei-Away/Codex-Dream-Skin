@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-06",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#090d38",
+      "panel": "#12164b",
+      "panelAlt": "#1b225f",
+      "accent": "#7b78ff",
+      "accentAlt": "#c16ef4",
+      "secondary": "#37c9ef",
+      "highlight": "#da55dc",
+      "text": "#f4f2ff",
+      "muted": "#aaa9dc",
+      "line": "#7b78ff",
+      "lineOpacity": 0.38
+    },
+    "light": {
+      "background": "#f4f3ff",
+      "panel": "#ffffff",
+      "panelAlt": "#e9e7fb",
+      "accent": "#7b78ff",
+      "accentAlt": "#c16ef4",
+      "secondary": "#37c9ef",
+      "highlight": "#da55dc",
+      "text": "#25234d",
+      "muted": "#66658c",
+      "line": "#7b78ff",
+      "lineOpacity": 0.38
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 62,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 34
+    },
+    "surface": {
+      "opacity": 78,
+      "blur": 24,
+      "radius": 22,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "orbit",
+      "intensity": 68
+    },
+    "typography": "rounded"
+  },
+  "name": "紫夜限定",
+  "brandSubtitle": "PRISM NIGHT",
+  "tagline": "蓝紫星夜、晶体蝴蝶与微光轨道，适合沉浸工作。",
+  "projectPrefix": "星夜项目 ·",
+  "projectLabel": "选择星夜项目",
+  "statusText": "PRISM NIGHT ONLINE",
+  "quote": "FOLLOW THE LIGHT",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "moon",
+      "shortName": "紫夜限定"
+    },
+    "hero": {
+      "eyebrow": "PRISM NIGHT",
+      "title": "今夜要深入哪一个问题？",
+      "description": "蓝紫星夜、晶体蝴蝶与微光轨道，适合沉浸工作。",
+      "tags": [
+        "沉浸",
+        "深潜",
+        "微光"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "moon",
+        "title": "进入深潜",
+        "detail": "先理解上下文与边界。",
+        "badge": "沉浸",
+        "tone": "accent"
+      },
+      {
+        "icon": "research",
+        "title": "追踪线索",
+        "detail": "把方案转化为具体行动。",
+        "badge": "深潜",
+        "tone": "secondary"
+      },
+      {
+        "icon": "build",
+        "title": "打磨方案",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "微光",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "pen",
+        "title": "记录发现",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "沉浸",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "专注稳定",
+        "勿扰模式"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "沉浸",
+      "hint": "在「紫夜限定」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#7b78ff",
+    "surface": "#12164b",
+    "ink": "#f4f2ff",
+    "contrast": 62,
+    "diffAdded": "#c16ef4",
+    "diffRemoved": "#da55dc",
+    "skill": "#37c9ef"
+  }
+}

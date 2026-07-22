@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-04",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#182018",
+      "panel": "#222c21",
+      "panelAlt": "#2d392a",
+      "accent": "#91a176",
+      "accentAlt": "#b1bd91",
+      "secondary": "#c7ceb0",
+      "highlight": "#6f8057",
+      "text": "#f7f8ef",
+      "muted": "#bdc5ac",
+      "line": "#91a176",
+      "lineOpacity": 0.34
+    },
+    "light": {
+      "background": "#f5f6ee",
+      "panel": "#fffefa",
+      "panelAlt": "#e9ede1",
+      "accent": "#91a176",
+      "accentAlt": "#b1bd91",
+      "secondary": "#c7ceb0",
+      "highlight": "#6f8057",
+      "text": "#252a20",
+      "muted": "#68705d",
+      "line": "#91a176",
+      "lineOpacity": 0.34
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 68,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 10
+    },
+    "surface": {
+      "opacity": 82,
+      "blur": 22,
+      "radius": 20,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "none",
+      "intensity": 42
+    },
+    "typography": "editorial"
+  },
+  "name": "清透定制",
+  "brandSubtitle": "QUIET PAPER",
+  "tagline": "象牙白、鼠尾草绿与纸鹤，留出安静的思考空间。",
+  "projectPrefix": "清透项目 ·",
+  "projectLabel": "选择清透项目",
+  "statusText": "QUIET PAPER ONLINE",
+  "quote": "MAKE SPACE TO THINK",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "pen",
+      "shortName": "清透定制"
+    },
+    "hero": {
+      "eyebrow": "QUIET PAPER",
+      "title": "留白之后，答案是什么？",
+      "description": "象牙白、鼠尾草绿与纸鹤，留出安静的思考空间。",
+      "tags": [
+        "阅读",
+        "梳理",
+        "沉静"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "research",
+        "title": "阅读材料",
+        "detail": "先理解上下文与边界。",
+        "badge": "阅读",
+        "tone": "accent"
+      },
+      {
+        "icon": "plan",
+        "title": "提炼要点",
+        "detail": "把方案转化为具体行动。",
+        "badge": "梳理",
+        "tone": "secondary"
+      },
+      {
+        "icon": "pen",
+        "title": "组织思路",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "沉静",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "review",
+        "title": "写下结论",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "阅读",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "思路清透",
+        "保持留白"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "阅读",
+      "hint": "在「清透定制」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#91a176",
+    "surface": "#222c21",
+    "ink": "#f7f8ef",
+    "contrast": 62,
+    "diffAdded": "#b1bd91",
+    "diffRemoved": "#6f8057",
+    "skill": "#c7ceb0"
+  }
+}

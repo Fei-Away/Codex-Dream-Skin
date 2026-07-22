@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 3,
+  "id": "skin-03",
+  "image": "background.png",
+  "shellMode": "recommended",
+  "palettes": {
+    "dark": {
+      "background": "#211214",
+      "panel": "#33191d",
+      "panelAlt": "#452126",
+      "accent": "#ef4b50",
+      "accentAlt": "#ff8080",
+      "secondary": "#f2a2a4",
+      "highlight": "#be222c",
+      "text": "#fff7f7",
+      "muted": "#d5b7b9",
+      "line": "#ef4b50",
+      "lineOpacity": 0.34
+    },
+    "light": {
+      "background": "#fff8f8",
+      "panel": "#ffffff",
+      "panelAlt": "#fcebed",
+      "accent": "#ef4b50",
+      "accentAlt": "#ff8080",
+      "secondary": "#f2a2a4",
+      "highlight": "#be222c",
+      "text": "#2d1719",
+      "muted": "#72575a",
+      "line": "#ef4b50",
+      "lineOpacity": 0.34
+    }
+  },
+  "appearance": {
+    "background": {
+      "focusX": 55,
+      "focusY": 50,
+      "zoom": 100,
+      "overlay": 16
+    },
+    "surface": {
+      "opacity": 94,
+      "blur": 8,
+      "radius": 10,
+      "shadow": 34
+    },
+    "decoration": {
+      "style": "grid",
+      "intensity": 42
+    },
+    "typography": "technical"
+  },
+  "name": "红白科幻",
+  "brandSubtitle": "RED HORIZON",
+  "tagline": "克制的红白未来地平线，适合清晰、专注的工作节奏。",
+  "projectPrefix": "未来项目 ·",
+  "projectLabel": "选择未来项目",
+  "statusText": "HORIZON ONLINE",
+  "quote": "BUILD THE NEXT HORIZON",
+  "scene": {
+    "kind": "official-scene",
+    "identity": {
+      "icon": "monitor",
+      "shortName": "红白科幻"
+    },
+    "hero": {
+      "eyebrow": "RED HORIZON",
+      "title": "下一条清晰路径是什么？",
+      "description": "克制的红白未来地平线，适合清晰、专注的工作节奏。",
+      "tags": [
+        "系统",
+        "边界",
+        "未来"
+      ]
+    },
+    "actions": [
+      {
+        "icon": "monitor",
+        "title": "扫描系统",
+        "detail": "先理解上下文与边界。",
+        "badge": "系统",
+        "tone": "accent"
+      },
+      {
+        "icon": "code",
+        "title": "设计接口",
+        "detail": "把方案转化为具体行动。",
+        "badge": "边界",
+        "tone": "secondary"
+      },
+      {
+        "icon": "review",
+        "title": "验证路径",
+        "detail": "检查风险、反馈与质量。",
+        "badge": "未来",
+        "tone": "accentAlt"
+      },
+      {
+        "icon": "ship",
+        "title": "发布版本",
+        "detail": "形成清晰可复用的结果。",
+        "badge": "系统",
+        "tone": "highlight"
+      }
+    ],
+    "widget": {
+      "icon": "signal",
+      "title": "场景状态",
+      "lines": [
+        "系统在线",
+        "边界清晰"
+      ],
+      "visible": true
+    },
+    "composer": {
+      "icon": "wand",
+      "label": "系统",
+      "hint": "在「红白科幻」场景中描述下一项工作…"
+    },
+    "chrome": {
+      "iconColor": "background",
+      "iconSurface": "accent",
+      "badgeColor": "highlight",
+      "cardText": "text"
+    }
+  },
+  "nativeAppearance": {
+    "variant": "dark",
+    "accent": "#ef4b50",
+    "surface": "#33191d",
+    "ink": "#fff7f7",
+    "contrast": 62,
+    "diffAdded": "#ff8080",
+    "diffRemoved": "#be222c",
+    "skill": "#f2a2a4"
+  }
+}
