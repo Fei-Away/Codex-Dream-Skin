@@ -450,6 +450,38 @@ html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
   --wb-text-primary: var(--ds-text) !important;
   --wb-text-secondary: rgb(var(--ds-muted-rgb) / .92) !important;
   --wb-text-tertiary: rgb(var(--ds-muted-rgb) / .74) !important;
+  --color-token-main-surface-primary: rgb(var(--ds-panel-rgb) / .90);
+  --color-token-border-default: rgb(var(--ds-accent-rgb) / .34);
+  background: rgb(var(--ds-panel-rgb) / .90) !important;
+  color: var(--ds-text) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .38) !important;
+  box-shadow:
+    0 12px 32px rgb(var(--ds-bg-rgb) / .30),
+    inset 0 1px rgb(var(--ds-text-rgb) / .10) !important;
+  text-shadow: none !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [data-oai-writing-block-surface] * {
+  text-shadow: none !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [data-oai-writing-block-surface] button {
+  color: rgb(var(--ds-muted-rgb) / .96) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .30) !important;
+  background: rgb(var(--ds-accent-rgb) / .08) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [data-oai-writing-block-surface] button:hover {
+  color: var(--ds-text) !important;
+  background: rgb(var(--ds-accent-rgb) / .14) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [data-oai-writing-block-surface] button * {
+  color: currentColor !important;
 }
 
 html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]

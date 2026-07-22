@@ -131,6 +131,16 @@ assert.match(
 );
 assert.match(
   css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,180}\[data-oai-writing-block-surface\][\s\S]{0,340}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.90\) !important;[\s\S]{0,140}border:\s*1px solid rgb\(var\(--ds-accent-rgb\) \/ \.38\) !important;/,
+  "Gothic reusable content blocks must replace the native high-brightness surface.",
+);
+assert.match(
+  css,
+  /\[data-oai-writing-block-surface\] button\s*\{[\s\S]{0,160}color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.96\) !important;[\s\S]{0,160}background:\s*rgb\(var\(--ds-accent-rgb\) \/ \.08\) !important;/,
+  "Gothic reusable content block controls must remain readable without bright native button fills.",
+);
+assert.match(
+  css,
   /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,220}:has\(#plugins-page-search\)[\s\S]{0,260}button\[class~="bg-token-bg-fog"\][\s\S]{0,260}background:\s*var\(--ds-accent\) !important;[\s\S]{0,180}color:\s*var\(--ds-on-accent\) !important;/,
   "Gothic plugin install buttons must use the preset accent and a contrast-safe foreground.",
 );
