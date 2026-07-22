@@ -107,6 +107,16 @@ assert.match(
 );
 assert.match(
   css,
+  /home-suggestions button > span:first-child > span:first-child\s*\{[\s\S]{0,280}display:\s*flex !important;[\s\S]{0,120}justify-content:\s*center !important;/,
+  "Home suggestion icons must override native justify-start so glyphs stay centered in the circle.",
+);
+assert.match(
+  css,
+  /home-suggestions button\.group\\\/home-suggestion-list-item\s*\{[\s\S]{0,120}min-height:\s*40px !important;/,
+  "Composer suggestion dropdown rows must keep the native compact list height.",
+);
+assert.match(
+  css,
   /\.composer-surface-chrome p\.placeholder::after\s*\{[\s\S]{0,120}color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.82\) !important;[\s\S]{0,80}opacity:\s*1 !important;/,
   "Composer placeholder text must not inherit a stale native color with double opacity.",
 );

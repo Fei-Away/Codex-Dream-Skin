@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### 修复
+
+- Gothic Void Crusade 预设的 `appearance` 从 `auto` 固定为 `dark`（#134 引入时误用了 auto）：这张暗色专属背景在浅色外壳下会与 Codex 原生浅色组件（差异卡片、任务条等）互相打架。已在用该预设的用户需重新切换一次该主题才会拿到修复。
+- Pull Requests 等新版工具路由的右侧详情面板不再保留原生整块底色：新版 Codex 用 `bg-token-main-surface-primary` 的 `section/div` 面板取代了 `[role="main"]`，旧透明化规则匹配不到，导致整窗背景图被右侧面板盖死。聊天与首页可通过「Toggle side panel」让 Review·Terminal·Browser·Files 侧面板与可见首页同屏共存，因此该透明化不再以 `dream-skin-home-shell` 做路由门控。
+- 首页建议卡圆形图标居中（接手 #181 核心修复，感谢 @wayne-kk 分析与实现；fixes #176）：原生 span 的 `justify-start` 使 grid + `place-items` 无法居中图标；改为 flex 强制居中并增补回归测试。原 PR 另外两条 `width:100%` 外层规则会打碎输入框聚焦后的建议列表（图标撑满整行、文字被挤成 0 宽），未采纳。
+- 输入框聚焦后的建议下拉列表恢复原生紧凑行：不再被建议卡样式撑成 118px 的空框加居中文字，回到原生 40px 左对齐布局，仅叠加半透明底、描边与主题强调色图标，保证压在背景画上仍可读。
+- 恢复 0437e18（adaptive full-window skins）误删的首页口号与主题名：右下角 `.dream-skin-quote`（读取主题 `quote` 字段，可自定义）重新在首页显示，标题上方恢复 `--dream-skin-name` 主题名眉标；配色从旧版写死的荧光绿改为跟随当前主题强调色，窄屏（≤1120px）自动隐藏口号，浅色外壳下去除辉光。
+- 修复注入器 home 检测兜底选择器 `.group\/home-suggestions` 被双重转义、永远匹配不到的问题（此前仅靠 `home-icon` 检测兜底才未出错）。
+
 ### 改进
 
 - 菜单栏在 `paused` 状态显示「继续显示皮肤」（调用现有应用入口），与 Windows 托盘暂停/继续文案和语义对齐；运行中仍为「重新应用皮肤」+「暂停皮肤」。
