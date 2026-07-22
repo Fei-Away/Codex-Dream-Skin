@@ -257,6 +257,27 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $gothicTheme
     Copy-Item -LiteralPath $gothicSourceTheme -Destination $gothicTheme -Force
   }
+  # Bundled Caishen Readable (same pack as macOS presets/).
+  $caishenSource = Join-Path $SkillRoot 'presets\preset-caishen-readable'
+  $caishenDirectory = Join-Path $paths.Saved 'preset-caishen-readable'
+  $caishenTheme = Join-Path $caishenDirectory 'theme.json'
+  $caishenSourceTheme = Join-Path $caishenSource 'theme.json'
+  $caishenSourceImage = Join-Path $caishenSource 'background.jpg'
+  Assert-DreamSkinNoReparseComponents -Path $caishenDirectory
+  Assert-DreamSkinNoReparseComponents -Path $caishenTheme
+  if ((Test-Path -LiteralPath $caishenSourceTheme -PathType Leaf) -and
+    (Test-Path -LiteralPath $caishenSourceImage -PathType Leaf) -and
+    -not (Test-Path -LiteralPath $caishenTheme -PathType Leaf)) {
+    Ensure-DreamSkinManagedDirectory -Path $caishenDirectory -Root $paths.Root
+    $caishenImage = Join-Path $caishenDirectory 'background.jpg'
+    Assert-DreamSkinNoReparseComponents -Path $caishenImage
+    Assert-DreamSkinImageFile -Path $caishenSourceImage
+    Copy-Item -LiteralPath $caishenSourceImage -Destination $caishenImage -Force
+    Assert-DreamSkinNoReparseComponents -Path $caishenImage
+    Assert-DreamSkinImageFile -Path $caishenImage
+    Assert-DreamSkinNoReparseComponents -Path $caishenTheme
+    Copy-Item -LiteralPath $caishenSourceTheme -Destination $caishenTheme -Force
+  }
   $null = Read-DreamSkinTheme -ThemeDirectory $paths.Active
   return $paths
 }

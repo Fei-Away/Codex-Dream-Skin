@@ -6,14 +6,16 @@
 
 ## 内置实测预设
 
-当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）与
-`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）两套实机验证主题。
-前者是社区作者提供的原创哥特科幻背景；后者使用一张
-`2560 × 1440`（16:9）纯背景：左侧低信息留白承载 Codex 原生标题，人物和花卉主视觉集中在右侧。浅色与暗色截图均来自真实 Codex 注入，不是 AI 绘制的整窗 UI。
+当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）、
+`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）与
+`preset-caishen-readable/`（Caishen Readable）三套主题。
+Gothic Void Crusade 是社区作者提供的原创哥特科幻背景；桥本有菜使用一张
+`2560 × 1440`（16:9）纯背景：左侧低信息留白承载 Codex 原生标题，人物和花卉主视觉集中在右侧。Caishen Readable 使用公开安全的原创生成财神工作台背景：整体偏浅、低噪、左侧留白，右侧保留主视觉和财气元素。浅色与暗色截图均来自真实 Codex 注入，不是 AI 绘制的整窗 UI。
 
 来源尺寸必须如实区分：归档的用户源图（不随 preset 播种）是 `1672 × 941` PNG；preset 内的 `background.jpg` 保持其近 16:9 构图，标准化导出为 `2560 × 1440` JPEG，并不代表补回或新增了源图细节。派生文件使用 `sips -z 1440 2560 -s format jpeg -s formatOptions 90` 生成。
 
 - 可导入/可播种的主题素材只有 [`background.jpg`](./preset-arina-hashimoto/background.jpg) 与 [`theme.json`](./preset-arina-hashimoto/theme.json)。
+- Caishen Readable 的可导入/可播种素材位于 [`preset-caishen-readable/background.jpg`](./preset-caishen-readable/background.jpg) 与 [`preset-caishen-readable/theme.json`](./preset-caishen-readable/theme.json)，背景不含私人 Codex 截图、任务名、聊天内容或文件路径。
 - 用户提供的 byte-identical 源 PNG 单独归档在 [`docs/images/presets/arina-hashimoto-source.png`](../../docs/images/presets/arina-hashimoto-source.png)，不放进 preset pack，因此不会被安装脚本播种为多余文件。
 - 当前浅色、暗色实测文档截图均为 `2308 × 1572` Retina JPEG（CSS viewport `1154 × 786`），来自同一真实 Codex 首页；为保护未发送草稿，截图时仅用临时本地样式隐藏输入文字并收起编辑区，没有修改草稿内容或伪造皮肤效果。它们包含真实侧栏、项目工具栏和输入框，**只作预览，绝不能当背景导入**。
 - 背景是用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；公开分发前仍需确认人物、模型输出与素材使用权。
@@ -23,7 +25,7 @@
 
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
-  --id preset-arina-hashimoto
+  --id preset-caishen-readable
 ```
 
 ## 一套预设的结构

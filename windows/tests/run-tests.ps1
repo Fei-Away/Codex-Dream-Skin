@@ -793,14 +793,19 @@ try {
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
   $preseededIds = @($preseededThemes | ForEach-Object { $_.Id })
-  if ($preseededThemes.Count -lt 2 -or
+  if ($preseededThemes.Count -lt 3 -or
     $preseededIds -notcontains 'preset-arina-hashimoto' -or
-    $preseededIds -notcontains 'preset-gothic-void-crusade') {
-    throw 'Windows did not preseed both Arina Hashimoto and Gothic Void Crusade.'
+    $preseededIds -notcontains 'preset-gothic-void-crusade' -or
+    $preseededIds -notcontains 'preset-caishen-readable') {
+    throw 'Windows did not preseed Arina Hashimoto, Gothic Void Crusade, and Caishen Readable.'
   }
   $gothicSeed = $preseededThemes | Where-Object { $_.Id -ceq 'preset-gothic-void-crusade' } | Select-Object -First 1
   if ($null -eq $gothicSeed -or $gothicSeed.Name -cne 'Gothic Void Crusade') {
     throw 'Gothic Void Crusade was not preseeded with the expected display name.'
+  }
+  $caishenSeed = $preseededThemes | Where-Object { $_.Id -ceq 'preset-caishen-readable' } | Select-Object -First 1
+  if ($null -eq $caishenSeed -or $caishenSeed.Name -cne 'Caishen Readable') {
+    throw 'Caishen Readable was not preseeded with the expected display name.'
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot

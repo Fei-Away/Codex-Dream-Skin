@@ -85,6 +85,22 @@
 
 > 可下载的用户源图是 [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png)（`1672 × 941`）；源码参考预设使用 [`macos/presets/preset-arina-hashimoto/background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；未确认人物与素材权利前不得把它打进公开安装包。
 
+### Caishen Readable / 财神清爽可读
+
+`Caishen Readable` 是一套偏浅色、低噪、左侧留白的财神工作台预设：主视觉在右侧，左侧给 Codex 原生标题、侧栏和输入区保留可读区域。背景图为公开安全的原创生成素材，不包含私人 Codex 截图、任务名、聊天内容或文件路径。
+
+<p align="center">
+  <img src="macos/presets/preset-caishen-readable/background.jpg" alt="Caishen Readable 纯背景素材预览" width="900"><br>
+  <sub>纯背景素材预览，可作为 macOS / Windows 预设导入；不是整窗 UI 截图</sub>
+</p>
+
+macOS 可直接切换：
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-caishen-readable
+```
+
 ## 概念效果图（不可直接导入）
 
 下面八张图用于表达可实现的视觉方向，但它们是带界面的概念效果图，不是可直接使用的主题背景。需要同类效果时，先按[参考生图提示词](./docs/reference-background-prompt-guide.md)生成无 UI 的 `2560 × 1440` 素材；八种风格的详细拆解见[概念图提示词](./docs/background-generation-prompts.md)。

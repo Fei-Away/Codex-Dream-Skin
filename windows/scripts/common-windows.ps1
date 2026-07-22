@@ -182,6 +182,8 @@ function Install-DreamSkinRuntimeEngine {
     'assets\theme.json',
     'presets\preset-gothic-void-crusade\background.jpg',
     'presets\preset-gothic-void-crusade\theme.json',
+    'presets\preset-caishen-readable\background.jpg',
+    'presets\preset-caishen-readable\theme.json',
     'scripts\common-windows.ps1',
     'scripts\check-update.ps1',
     'scripts\config-utf8.ps1',

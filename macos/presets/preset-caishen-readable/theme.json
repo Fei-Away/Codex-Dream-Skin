@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-caishen-readable",
+  "name": "Caishen Readable",
+  "brandSubtitle": "CODEX DREAM SKIN",
+  "tagline": "A warm fortune workspace with readable light surfaces.",
+  "projectPrefix": "Select project · ",
+  "projectLabel": "◉  Select project",
+  "statusText": "CAISHEN READABLE READY",
+  "quote": "CLEAR WORK, GOOD FORTUNE",
+  "image": "background.jpg",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.76,
+    "focusY": 0.48,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#fff6ea",
+    "panel": "#fffcf7",
+    "panelAlt": "#f8ecdc",
+    "accent": "#d96b42",
+    "accentAlt": "#f2a15f",
+    "secondary": "#d9a84a",
+    "highlight": "#b94e27",
+    "text": "#24170f",
+    "muted": "#735f4d",
+    "line": "rgba(166, 112, 55, .23)"
+  },
+  "promoTitle": "Codex Dream Skin",
+  "promoSub": "Caishen Readable",
+  "promoUrl": "https://github.com/Fei-Away/Codex-Dream-Skin"
+}

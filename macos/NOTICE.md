@@ -26,6 +26,15 @@ this MIT-licensed project. It is the redistributable default artwork included in
 the public macOS and Windows installers. Its name and artwork do not imply
 OpenAI/Codex affiliation or endorsement.
 
+## Caishen Readable generated artwork
+
+The following generated files are included as public-safe theme preset artwork:
+
+- `presets/preset-caishen-readable/background.jpg`
+- `../windows/presets/preset-caishen-readable/background.jpg`
+
+They contain original generated Caishen-themed workspace art for a readable Codex skin preset. They are not official OpenAI/Codex artwork and contain no private Codex screenshots, task names, chats, file paths, or recognizable real person. Downstream branded or commercial redistribution should still perform its own rights review.
+
 ## Arina Hashimoto reference material
 
 The following user/maintainer-supplied files are excluded from the MIT software license:
