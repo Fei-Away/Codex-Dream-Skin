@@ -255,7 +255,7 @@ try {
     $startupError = $_
     # We own the daemon Process object, so stop it directly: the object is
     # immune to PID reuse, and identity re-validation cannot spuriously
-    # refuse.  Slow machines also need more than a moment for teardown — a
+    # refuse.  Slow machines also need more than a moment for teardown; a
     # premature "did not stop" here is what used to leave duelling watchers.
     $injectorStopped = $true
     if ($null -ne $daemon) {
