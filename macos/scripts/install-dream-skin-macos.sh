@@ -22,6 +22,7 @@ case "$PORT" in ''|*[!0-9]*) fail "Invalid port: $PORT" ;; esac
 deploy_project() {
   local temporary="$INSTALL_ROOT.installing.$$"
   local previous="$INSTALL_ROOT.previous.$$"
+  local shared_source=""
   /bin/rm -rf "$temporary"
   /bin/mkdir -p "$temporary"
   /usr/bin/rsync -a \
@@ -30,6 +31,12 @@ deploy_project() {
     --exclude 'release/' \
     --exclude 'runtime/' \
     "$PROJECT_ROOT/" "$temporary/"
+  for candidate in "$PROJECT_ROOT/shared" "$PROJECT_ROOT/../shared"; do
+    if [ -d "$candidate/runtime" ] && [ -d "$candidate/studio" ]; then shared_source="$candidate"; break; fi
+  done
+  [ -n "$shared_source" ] || fail "Shared Dream Skin runtime is missing."
+  /bin/mkdir -p "$temporary/shared"
+  /usr/bin/rsync -a --exclude '.DS_Store' "$shared_source/" "$temporary/shared/"
   /bin/chmod 700 "$temporary"/*.command "$temporary"/scripts/*.sh 2>/dev/null || true
   if [ -e "$INSTALL_ROOT" ]; then /bin/mv "$INSTALL_ROOT" "$previous"; fi
   if ! /bin/mv "$temporary" "$INSTALL_ROOT"; then
@@ -84,11 +91,13 @@ if [ "$CREATE_LAUNCHERS" = "true" ]; then
   customize_script="$(shell_quote "$SCRIPT_DIR/customize-theme-macos.sh")"
   verify_script="$(shell_quote "$SCRIPT_DIR/verify-dream-skin-macos.sh")"
   restore_script="$(shell_quote "$SCRIPT_DIR/restore-dream-skin-macos.sh")"
+  studio_script="$(shell_quote "$PROJECT_ROOT/Start Dream Skin Studio.command")"
   screenshot="$(shell_quote "$HOME/Desktop/Codex Dream Skin Verification.png")"
   write_launcher "$HOME/Desktop/Codex Dream Skin.command" "exec $start_script --port $PORT --prompt-restart"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Customize.command" "exec $customize_script"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Verify.command" "$verify_script --screenshot $screenshot && /usr/bin/open $screenshot"
   write_launcher "$HOME/Desktop/Codex Dream Skin - Restore.command" "exec $restore_script --restore-base-theme --restart-codex"
+  write_launcher "$HOME/Desktop/Codex Dream Skin Studio.command" "exec $studio_script"
 fi
 
 printf 'Codex Dream Skin Studio %s installed at %s for Codex %s using its signed Node.js %s.\n' \

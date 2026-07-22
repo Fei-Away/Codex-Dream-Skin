@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.2.0";
+const SKIN_VERSION = "1.5.2";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
@@ -128,6 +128,17 @@ const OPERATION_UI_CSS = `
 `;
 let staticPayloadAssets = null;
 let operationSequence = 0;
+
+async function resolveSharedRoot() {
+  const candidates = [path.join(root, "shared"), path.resolve(root, "..", "shared")];
+  for (const candidate of candidates) {
+    try {
+      await fs.access(path.join(candidate, "runtime", "scene-inject.js"));
+      return candidate;
+    } catch {}
+  }
+  throw new Error("Shared Theme v3 scene runtime is missing");
+}
 
 function parseArgs(argv) {
   const options = {
@@ -445,7 +456,8 @@ async function loadTheme(themeDir) {
     throw error;
   }
   const raw = JSON.parse(config);
-  if (raw.schemaVersion !== 1 || typeof raw.image !== "string" || !raw.image) {
+  const schemaVersion = Number(raw.schemaVersion ?? 1);
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1 || schemaVersion > 3 || typeof raw.image !== "string" || !raw.image) {
     throw new Error(`${configPath} has an unsupported schema or image field`);
   }
   if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(raw.image)) {
@@ -486,19 +498,25 @@ async function loadTheme(themeDir) {
     "background", "panel", "panelAlt", "accent", "accentAlt", "secondary",
     "highlight", "text", "muted", "line",
   ];
-  const appearance = choice(raw.appearance, "appearance", ["auto", "light", "dark"]);
+  const sceneAppearance = raw.appearance && typeof raw.appearance === "object" && !Array.isArray(raw.appearance)
+    ? raw.appearance : null;
+  const appearance = typeof raw.appearance === "string"
+    ? choice(raw.appearance, "appearance", ["auto", "light", "dark"])
+    : choice(raw.shellMode, "shellMode", ["auto", "recommended", "light", "dark"]);
   if (raw.art !== undefined && (!raw.art || typeof raw.art !== "object" || Array.isArray(raw.art))) {
     throw new Error(`${configPath} has an invalid art field`);
   }
+  const rawBackground = sceneAppearance?.background && typeof sceneAppearance.background === "object"
+    ? sceneAppearance.background : {};
   const rawArt = raw.art || {};
   const art = {
-    focusX: unit(rawArt.focusX, "art.focusX"),
-    focusY: unit(rawArt.focusY, "art.focusY"),
+    focusX: unit(rawArt.focusX ?? (Number.isFinite(rawBackground.focusX) ? rawBackground.focusX / 100 : undefined), "art.focusX"),
+    focusY: unit(rawArt.focusY ?? (Number.isFinite(rawBackground.focusY) ? rawBackground.focusY / 100 : undefined), "art.focusY"),
     safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"]),
     taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "off"]),
   };
   const theme = {
-    schemaVersion: 1,
+    schemaVersion,
     id: text(raw.id, "custom", 80, "id"),
     name: text(raw.name, "ChatGPT Dream Skin", 80, "name"),
     brandSubtitle: text(raw.brandSubtitle, "CODEX DREAM SKIN", 80, "brandSubtitle"),
@@ -524,6 +542,14 @@ async function loadTheme(themeDir) {
     },
   };
   if (appearance !== undefined) theme.appearance = appearance;
+  if (sceneAppearance) theme.sceneAppearance = sceneAppearance;
+  if (raw.palettes && typeof raw.palettes === "object" && !Array.isArray(raw.palettes)) {
+    theme.palettes = Object.fromEntries(["dark", "light"].map((mode) => {
+      const source = raw.palettes[mode] && typeof raw.palettes[mode] === "object" ? raw.palettes[mode] : {};
+      return [mode, Object.fromEntries(colorKeys.map((key) => [key, color(source[key], theme.colors[key])]))];
+    }));
+  }
+  if (raw.scene && typeof raw.scene === "object" && !Array.isArray(raw.scene)) theme.scene = raw.scene;
   if (Object.values(art).some((value) => value !== undefined)) {
     theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
   }
@@ -573,16 +599,22 @@ async function loadTheme(themeDir) {
 async function loadStaticPayloadAssets() {
   const cacheHit = Boolean(staticPayloadAssets);
   if (!staticPayloadAssets) {
-    staticPayloadAssets = Promise.all([
-      fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
-      fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
-    ]).catch((error) => {
+    staticPayloadAssets = (async () => {
+      const sharedRoot = await resolveSharedRoot();
+      return Promise.all([
+        fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
+        fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
+        fs.readFile(path.join(sharedRoot, "runtime", "css", "home.css"), "utf8"),
+        fs.readFile(path.join(sharedRoot, "runtime", "css", "scene-v3.css"), "utf8"),
+        fs.readFile(path.join(sharedRoot, "runtime", "scene-inject.js"), "utf8"),
+      ]);
+    })().catch((error) => {
       staticPayloadAssets = null;
       throw error;
     });
   }
-  const [css, template] = await staticPayloadAssets;
-  return { css, template, cacheHit };
+  const [baseCss, template, homeCss, sceneCss, sceneTemplate] = await staticPayloadAssets;
+  return { css: [baseCss, homeCss, sceneCss].join("\n"), template, sceneTemplate, cacheHit };
 }
 
 function invalidateStaticPayloadAssets() {
@@ -595,7 +627,7 @@ async function loadPayload(themeDir) {
     loadStaticPayloadAssets(),
     loadTheme(themeDir),
   ]);
-  const { css, template } = staticAssets;
+  const { css, template, sceneTemplate } = staticAssets;
   const { art, extension, theme } = loaded;
   const styleRevision = createHash("sha256").update(css).digest("hex").slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
@@ -612,16 +644,18 @@ async function loadPayload(themeDir) {
     .update(SKIN_VERSION)
     .update(css)
     .update(template)
+    .update(sceneTemplate)
     .update(JSON.stringify(theme))
     .digest("hex")
     .slice(0, 20);
-  const payload = template
+  const payload = `${template
     .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
     .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
-    .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision));
+    .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision))}\n;${sceneTemplate
+      .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))}`;
   return {
     imageBytes: art.length,
     payload,
@@ -803,6 +837,7 @@ async function presentOperationUi(session, token, state, message, timeoutMs = 10
 async function removeFromSession(session) {
   return session.evaluate(`(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
+    window.__CODEX_DREAM_SKIN_SCENE_STATE__?.cleanup?.();
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
     document.documentElement?.classList.remove('codex-dream-skin');
@@ -810,6 +845,7 @@ async function removeFromSession(session) {
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
+    delete window.__CODEX_DREAM_SKIN_SCENE_STATE__;
     return true;
   })()`);
 }

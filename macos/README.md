@@ -32,11 +32,14 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 #    Codex Dream Skin - Customize.command
 #    Codex Dream Skin - Verify.command
 #    Codex Dream Skin - Restore.command
+#    Codex Dream Skin Studio.command
 
 # 5) Optional: menu bar (SwiftBar) — apply, pause, import, and switch
 ./Install\ Menu\ Bar.command
 # Look for 🎨 Skin in the top-right menu bar
 ```
+
+`Codex Dream Skin Studio.command` 会打开只监听 `127.0.0.1` 的本地 Web 控制台，可直接应用 24 套 Theme v3 场景、编辑自定义主题、切换浅色/深色预览并运行诊断。Studio 复用现有签名校验、主题原子暂存和 CDP 安全链路。
 
 Install location after step 2:
 
