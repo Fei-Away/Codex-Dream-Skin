@@ -107,6 +107,51 @@ assert.match(
 );
 assert.match(
   css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,180}main\.main-surface\s*\{[\s\S]{0,260}--vscode-foreground:\s*var\(--ds-text\);[\s\S]{0,300}--color-token-text-primary:\s*var\(--ds-text\);/,
+  "Gothic conversation timelines must bridge native light-shell text variables to the preset palette.",
+);
+assert.match(
+  css,
+  /--color-token-conversation-body:\s*rgb\(var\(--ds-muted-rgb\) \/ \.90\);/,
+  "Gothic collapsed activity headers must not inherit the native light-shell conversation-body token.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,260}\[class\*="!text-token-conversation-body"\] \*:not\(button\)[\s\S]{0,120}color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.90\) !important;/,
+  "Generated important conversation-body descendants must remain readable in Gothic activity rows.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,180}\[data-oai-writing-block-surface\][\s\S]{0,160}--wb-text-primary:\s*var\(--ds-text\) !important;/,
+  "Gothic writing and command surfaces must not retain an inline light-theme text color.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,220}:has\(#plugins-page-search\)[\s\S]{0,260}button\[class~="bg-token-bg-fog"\][\s\S]{0,260}background:\s*var\(--ds-accent\) !important;[\s\S]{0,180}color:\s*var\(--ds-on-accent\) !important;/,
+  "Gothic plugin install buttons must use the preset accent and a contrast-safe foreground.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,220}data-app-action-sidebar-thread-active="true"[\s\S]{0,180}--vscode-foreground:\s*var\(--ds-text\) !important;/,
+  "Gothic selected thread titles must override the stale native VS Code foreground token.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,180}> div > div > \.composer-surface-chrome\):has\(> div > div > \.dream-skin-home-utility\)[\s\S]{0,100}margin-bottom:\s*72px !important;/,
+  "Gothic's taller labeled project bar must reserve enough layout space to avoid overlapping home suggestions.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,180}\.dream-skin-home \.dream-skin-home-utility[\s\S]{0,180}border:\s*1px solid rgb\(var\(--ds-accent-rgb\) \/ \.34\) !important;[\s\S]{0,100}border-radius:\s*18px !important;/,
+  "Gothic's home project picker must retain a complete, visible border on all four sides.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,280}\[class\*="_markdown"\][\s\S]{0,260}div:has\(> pre\)[\s\S]{0,180}border:\s*1px solid rgb\(var\(--ds-accent-rgb\) \/ \.42\) !important;[\s\S]{0,160}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.76\) !important;/,
+  "Gothic fenced code blocks must retain a complete contrast-safe border and surface over the wallpaper.",
+);
+assert.match(
+  css,
   /\.composer-surface-chrome p\.placeholder::after\s*\{[\s\S]{0,120}color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.82\) !important;[\s\S]{0,80}opacity:\s*1 !important;/,
   "Composer placeholder text must not inherit a stale native color with double opacity.",
 );
@@ -357,6 +402,7 @@ const defaults = createFixture({
 const defaultResult = vm.runInNewContext(defaults.payload, defaults.context);
 assert.equal(defaultResult.installed, true);
 assert.equal(defaults.attributes.get("data-dream-shell"), "light");
+assert.equal(defaults.attributes.get("data-dream-theme-id"), "default-contract");
 assert.equal(defaults.attributes.get("data-dream-art-safe-area"), "center");
 assert.equal(defaults.attributes.get("data-dream-art-task-mode"), "ambient");
 assert.equal(defaults.attributes.get("data-dream-art-ready"), "false");
@@ -537,6 +583,7 @@ assert.equal(banner.attributes.get("data-dream-task-mode"), "banner");
 assert.equal(explicit.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
 assert.equal(explicit.root.classList.contains("codex-dream-skin"), false);
 assert.equal(explicit.attributes.has("data-dream-shell"), false);
+assert.equal(explicit.attributes.has("data-dream-theme-id"), false);
 assert.equal(explicit.attributes.has("data-dream-art-safe-area"), false);
 assert.equal(explicit.attributes.has("data-dream-art-task-mode"), false);
 assert.equal(explicit.rootStyle.values.has("--dream-art-position"), false);

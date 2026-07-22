@@ -4,6 +4,7 @@
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
   const SHELL_ATTR = "data-dream-shell";
+  const THEME_ATTR = "data-dream-theme-id";
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
@@ -549,6 +550,7 @@
     ensureStyle(root);
     const shell = resolvedShell();
     setAttribute(root, SHELL_ATTR, shell);
+    setAttribute(root, THEME_ATTR, THEME.id || "unknown");
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
@@ -650,6 +652,7 @@
     window[DISABLED_KEY] = true;
     document.documentElement?.classList.remove("codex-dream-skin");
     document.documentElement?.removeAttribute(SHELL_ATTR);
+    document.documentElement?.removeAttribute(THEME_ATTR);
     for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
     document.documentElement?.style.removeProperty("--dream-skin-art");
     for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);

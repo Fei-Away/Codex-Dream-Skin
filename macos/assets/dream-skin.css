@@ -263,6 +263,20 @@ html.codex-dream-skin aside.app-shell-left-panel [aria-current="page"] svg {
   color: var(--ds-accent) !important;
 }
 
+/* The selected thread title uses VS Code's native foreground variable rather
+   than a Codex text token. Override it only for this dark preset so other
+   skins retain their own selected-row treatment. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  aside.app-shell-left-panel
+  [data-app-action-sidebar-thread-active="true"][aria-current="page"] {
+  --vscode-foreground: var(--ds-text) !important;
+  background: rgb(var(--ds-accent-rgb) / .16) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .38) !important;
+  box-shadow:
+    0 5px 16px rgb(var(--ds-bg-rgb) / .22),
+    inset 0 0 0 1px rgb(var(--ds-text-rgb) / .04) !important;
+}
+
 html.codex-dream-skin main.main-surface {
   position: relative !important;
   isolation: isolate;
@@ -412,6 +426,146 @@ html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) [role="main"
   text-shadow:
     0 1px 2px rgb(var(--ds-bg-rgb) / .72),
     0 0 10px rgb(var(--ds-bg-rgb) / .46);
+}
+
+/* Utility routes such as the Plugins directory keep explicit native text
+   token classes. When this dark preset is used over a native light shell,
+   align those tokens with the selected skin instead. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface {
+  --vscode-foreground: var(--ds-text);
+  --vscode-descriptionForeground: rgb(var(--ds-muted-rgb) / .92);
+  --color-token-foreground: var(--ds-text);
+  --color-token-text-primary: var(--ds-text);
+  --color-token-text-secondary: rgb(var(--ds-muted-rgb) / .92);
+  --color-token-text-tertiary: rgb(var(--ds-muted-rgb) / .74);
+  --color-token-conversation-body: rgb(var(--ds-muted-rgb) / .90);
+  --color-token-description-foreground: rgb(var(--ds-muted-rgb) / .86);
+  --color-token-input-placeholder-foreground: rgb(var(--ds-muted-rgb) / .78);
+  --color-token-button-tertiary-foreground: var(--ds-text);
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [data-oai-writing-block-surface] {
+  --wb-text-primary: var(--ds-text) !important;
+  --wb-text-secondary: rgb(var(--ds-muted-rgb) / .92) !important;
+  --wb-text-tertiary: rgb(var(--ds-muted-rgb) / .74) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface
+  :is([class~="text-token-foreground"], [class~="text-token-text-primary"]) {
+  color: var(--ds-text) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface
+  :is(
+    [class~="text-token-text-secondary"],
+    [class~="text-token-text-tertiary"],
+    [class~="text-token-muted-foreground"],
+    [class~="text-token-description-foreground"],
+    [class~="text-token-input-placeholder-foreground"]
+  ) {
+  color: var(--ds-muted) !important;
+}
+
+/* Activity headers use a separate conversation-body token, including a
+   generated descendant variant that carries !important. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface
+  :is(
+    [class~="text-token-conversation-body"],
+    [class*="!text-token-conversation-body"] *:not(button)
+  ) {
+  color: rgb(var(--ds-muted-rgb) / .90) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface
+  :is(
+    [class~="text-token-conversation-body"],
+    [class*="!text-token-conversation-body"] *:not(button)
+  ) svg {
+  color: currentColor !important;
+}
+
+/* Native fenced-code surfaces are transparent on this preset, so their edges
+   disappear into the artwork. Keep a semantic wrapper plus a pre fallback. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [class*="_markdown"]
+  :is(
+    [data-code-block],
+    [class*="_codeBlock_"],
+    [class*="code-block"],
+    figure:has(> pre),
+    div:has(> pre)
+  ) {
+  overflow: hidden;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .42) !important;
+  border-radius: 14px !important;
+  background: rgb(var(--ds-panel-rgb) / .76) !important;
+  box-shadow:
+    0 10px 28px rgb(var(--ds-bg-rgb) / .24),
+    inset 0 1px rgb(var(--ds-text-rgb) / .08) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [class*="_markdown"] pre {
+  border: 1px solid rgb(var(--ds-accent-rgb) / .42) !important;
+  border-radius: 14px !important;
+  background: rgb(var(--ds-panel-rgb) / .76) !important;
+  box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [class*="_markdown"]
+  :is(
+    [data-code-block],
+    [class*="_codeBlock_"],
+    [class*="code-block"],
+    figure:has(> pre),
+    div:has(> pre)
+  ) > pre {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface [class*="_markdown"]
+  :is(
+    [data-code-block],
+    [class*="_codeBlock_"],
+    [class*="code-block"],
+    figure:has(> pre),
+    div:has(> pre)
+  ) button {
+  color: rgb(var(--ds-muted-rgb) / .96) !important;
+}
+
+/* Keep plugin install actions on the preset's gold accent instead of the
+   native white fog surface. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface:has(#plugins-page-search)
+  button[class~="bg-token-bg-fog"][class~="text-token-button-tertiary-foreground"][class~="h-token-button-composer"] {
+  background: var(--ds-accent) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .72) !important;
+  color: var(--ds-on-accent) !important;
+  box-shadow: 0 5px 14px rgb(var(--ds-bg-rgb) / .24) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface:has(#plugins-page-search)
+  button[class~="bg-token-bg-fog"][class~="text-token-button-tertiary-foreground"][class~="h-token-button-composer"]:enabled:hover {
+  background: var(--ds-accent-soft) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  main.main-surface:has(#plugins-page-search)
+  button[class~="bg-token-bg-fog"][class~="text-token-button-tertiary-foreground"][class~="h-token-button-composer"]:disabled {
+  opacity: .62 !important;
 }
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) [role="main"] {
@@ -1027,6 +1181,41 @@ html.codex-dream-skin[data-dream-art-wide="true"] main.main-surface
   background: rgb(var(--ds-accent-rgb) / .08) !important;
   color: var(--ds-text) !important;
   box-shadow: 0 3px 12px rgb(var(--ds-bg-rgb) / .12) !important;
+}
+
+/* The labeled project bar is absolutely positioned and taller than Codex's
+   reserved gap. Give Gothic's detailed artwork complete card edges and keep
+   the first suggestion from covering the bottom border. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  .dream-skin-home div:has(> div > div > .composer-surface-chrome):has(> div > div > .dream-skin-home-utility) {
+  margin-bottom: 72px !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  .dream-skin-home:has(.dream-skin-home-utility) .composer-surface-chrome {
+  border-radius: 22px !important;
+  box-shadow:
+    0 10px 30px rgb(var(--ds-bg-rgb) / .22),
+    inset 0 0 0 1px rgb(var(--ds-accent-rgb) / .34),
+    inset 0 1px rgb(var(--ds-text-rgb) / .14) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  .dream-skin-home .dream-skin-home-utility {
+  margin-top: 8px !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .34) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 8px 22px rgb(var(--ds-bg-rgb) / .20),
+    inset 0 1px rgb(var(--ds-text-rgb) / .10) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  .dream-skin-home .group\/home-suggestions button.group\/home-suggestion-list-item {
+  border: 1px solid rgb(var(--ds-accent-rgb) / .26) !important;
+  box-shadow:
+    0 8px 22px rgb(var(--ds-bg-rgb) / .18),
+    inset 0 0 0 1px rgb(var(--ds-accent-rgb) / .08) !important;
 }
 
 html.codex-dream-skin .ProseMirror {
