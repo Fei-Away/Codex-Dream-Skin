@@ -94,6 +94,19 @@ if ! /usr/bin/grep -F -q 'DEPLOY_PREVIOUS' "$ROOT/scripts/install-dream-skin-mac
   printf 'The macOS outer installer must roll back a failed engine deployment.\n' >&2
   exit 1
 fi
+if ! /usr/bin/grep -F -q 'INSTALL_ROOT.broken' "$ROOT/scripts/install-dream-skin-macos.sh"; then
+  printf 'Installer rollback must detach the broken engine with a rename instead of rm -rf on the live root.\n' >&2
+  exit 1
+fi
+INSTALL_GUARD_LINE="$(/usr/bin/grep -n 'codex_is_running && fail "Close Codex before installation' \
+  "$ROOT/scripts/install-dream-skin-macos.sh" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+INSTALL_DEPLOY_LINE="$(/usr/bin/grep -n '^  deploy_project$' \
+  "$ROOT/scripts/install-dream-skin-macos.sh" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+if [ -z "$INSTALL_GUARD_LINE" ] || [ -z "$INSTALL_DEPLOY_LINE" ] ||
+   [ "$INSTALL_GUARD_LINE" -ge "$INSTALL_DEPLOY_LINE" ]; then
+  printf 'The Codex-running guard must run before deploy_project copies any engine bytes.\n' >&2
+  exit 1
+fi
 if ! /usr/bin/grep -F -q '# CodexDreamSkinStudio launcher' \
    "$ROOT/scripts/restore-dream-skin-macos.sh"; then
   printf 'macOS uninstall must remove only launchers owned by Dream Skin.\n' >&2
