@@ -241,28 +241,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func savedThemes() -> [ThemeOption] {
-    guard let entries = try? fileManager.contentsOfDirectory(
-      at: themesURL,
-      includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-      options: [.skipsHiddenFiles]
-    ) else {
+    let entries: [URL]
+    do {
+      entries = try fileManager.contentsOfDirectory(
+        at: themesURL,
+        includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+        options: [.skipsHiddenFiles]
+      )
+    } catch {
+      NSLog(
+        "[DreamSkin] savedThemes: list %@ failed: %@",
+        themesURL.path, String(describing: error)
+      )
       return []
     }
-    let safeRoot = themesURL.standardizedFileURL.path + "/"
-    return entries.compactMap { directory in
+    // 包含性判断必须用 canonicalPath：用户记录的 home 大小写可能与磁盘目录
+    // 不一致（如 NFSHomeDirectory=/Users/Fei、磁盘实际为 /Users/fei），
+    // 字符串前缀比较会把全部主题误拒成 rejected["root"]。
+    let canonicalRoot =
+      (((try? themesURL.resourceValues(forKeys: [.canonicalPathKey]))?.canonicalPath)
+        ?? themesURL.standardizedFileURL.path) + "/"
+    var rejected: [String: Int] = [:]
+    let options: [ThemeOption] = entries.compactMap { directory in
       let id = directory.lastPathComponent
-      guard id.range(of: #"^[A-Za-z0-9_-]{1,80}$"#, options: .regularExpression) != nil,
-            let values = try? directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+      guard id.range(of: #"^[A-Za-z0-9_-]{1,80}$"#, options: .regularExpression) != nil else {
+        rejected["name", default: 0] += 1
+        return nil
+      }
+      guard let values = try? directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
             values.isDirectory == true,
-            values.isSymbolicLink != true,
-            directory.standardizedFileURL.path.hasPrefix(safeRoot) else {
+            values.isSymbolicLink != true else {
+        rejected["kind", default: 0] += 1
+        return nil
+      }
+      let entryPath =
+        ((try? directory.resourceValues(forKeys: [.canonicalPathKey]))?.canonicalPath)
+          ?? directory.standardizedFileURL.path
+      guard entryPath.hasPrefix(canonicalRoot) else {
+        rejected["root", default: 0] += 1
         return nil
       }
       let configURL = directory.appendingPathComponent("theme.json")
       guard let data = try? Data(contentsOf: configURL, options: [.mappedIfSafe]),
-            data.count <= 1_048_576,
-            let object = try? JSONSerialization.jsonObject(with: data),
+            data.count <= 1_048_576 else {
+        rejected["read", default: 0] += 1
+        return nil
+      }
+      guard let object = try? JSONSerialization.jsonObject(with: data),
             let value = object as? [String: Any] else {
+        rejected["json", default: 0] += 1
         return nil
       }
       let rawName = value["name"] as? String ?? id
@@ -270,6 +297,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }.sorted {
       $0.name.localizedStandardCompare($1.name) == .orderedAscending
     }
+    // 空列表或有拒收时落一条统一日志：`log show --predicate 'process ==
+    // "CodexDreamSkinMenuBar"'` 可直接定位是哪一层过滤把主题吃掉了。
+    if options.isEmpty || !rejected.isEmpty {
+      NSLog(
+        "[DreamSkin] savedThemes: %d entries -> %d themes at %@ rejected=%@",
+        entries.count, options.count, themesURL.path, String(describing: rejected)
+      )
+    }
+    return options
   }
 
   private func cleanMenuText(_ source: String) -> String {
