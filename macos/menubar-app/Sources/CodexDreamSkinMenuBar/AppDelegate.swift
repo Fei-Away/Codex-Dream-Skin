@@ -255,7 +255,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       )
       return []
     }
-    let safeRoot = themesURL.standardizedFileURL.path + "/"
+    // 包含性判断必须用 canonicalPath：用户记录的 home 大小写可能与磁盘目录
+    // 不一致（如 NFSHomeDirectory=/Users/Fei、磁盘实际为 /Users/fei），
+    // 字符串前缀比较会把全部主题误拒成 rejected["root"]。
+    let canonicalRoot =
+      (((try? themesURL.resourceValues(forKeys: [.canonicalPathKey]))?.canonicalPath)
+        ?? themesURL.standardizedFileURL.path) + "/"
     var rejected: [String: Int] = [:]
     let options: [ThemeOption] = entries.compactMap { directory in
       let id = directory.lastPathComponent
@@ -269,7 +274,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         rejected["kind", default: 0] += 1
         return nil
       }
-      guard directory.standardizedFileURL.path.hasPrefix(safeRoot) else {
+      let entryPath =
+        ((try? directory.resourceValues(forKeys: [.canonicalPathKey]))?.canonicalPath)
+          ?? directory.standardizedFileURL.path
+      guard entryPath.hasPrefix(canonicalRoot) else {
         rejected["root", default: 0] += 1
         return nil
       }
