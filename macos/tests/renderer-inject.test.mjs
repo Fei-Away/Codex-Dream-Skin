@@ -159,6 +159,7 @@ function createFixture(theme, {
   nativeShell = "light",
   analysisFixture = null,
   analysisCache = null,
+  animationFrame = false,
 } = {}) {
   let fixtureShell = nativeShell;
   const nodes = new Map();
@@ -167,7 +168,9 @@ function createFixture(theme, {
   const observers = [];
   const resizeObservers = [];
   const timers = new Map();
+  const animationFrames = new Map();
   let nextTimer = 1;
+  let nextFrame = 1;
   let nextBlob = 1;
   const rootStyle = createStyleDeclaration();
   const root = {
@@ -176,6 +179,7 @@ function createFixture(theme, {
     style: rootStyle,
     appendChild(node) {
       node.parentElement = root;
+      node.isConnected = true;
       if (node.id) nodes.set(node.id, node);
     },
     getAttribute(name) { return attributes.get(name) ?? null; },
@@ -186,6 +190,7 @@ function createFixture(theme, {
     className: "",
     appendChild(node) {
       node.parentElement = body;
+      node.isConnected = true;
       if (node.id) nodes.set(node.id, node);
     },
     getAttribute(name) { return bodyAttributes.get(name) ?? null; },
@@ -194,40 +199,54 @@ function createFixture(theme, {
   const shellBox = { left: 280, top: 36, width: 1000, height: 764 };
   const shellMain = {
     classList: createClassList(),
+    prepend(node) {
+      node.parentElement = shellMain;
+      node.isConnected = true;
+      if (node.id) nodes.set(node.id, node);
+    },
     getBoundingClientRect() {
       return { ...shellBox };
     },
   };
 
   const createElement = (tagName) => {
-    if (tagName === "canvas" && analysisFixture) {
-      return {
-        width: 0,
-        height: 0,
-        getContext() {
-          return {
-            drawImage() {},
-            getImageData() { return { data: analysisFixture.pixels }; },
-          };
-        },
-      };
-    }
     const childNodes = new Map();
+    const elementAttributes = new Map();
     const element = {
       id: "",
       dataset: {},
       style: createStyleDeclaration(),
       classList: createClassList(),
       parentElement: null,
+      isConnected: false,
+      tabIndex: 0,
       textContent: "",
       innerHTML: "",
-      setAttribute() {},
+      setAttribute(name, value) { elementAttributes.set(name, String(value)); },
+      getAttribute(name) { return elementAttributes.get(name) ?? null; },
       querySelector(selector) {
         if (!childNodes.has(selector)) childNodes.set(selector, { textContent: "" });
         return childNodes.get(selector);
       },
-      remove() { if (element.id) nodes.delete(element.id); },
+      remove() {
+        element.isConnected = false;
+        if (element.id) nodes.delete(element.id);
+      },
     };
+    if (tagName === "canvas") {
+      element.width = 0;
+      element.height = 0;
+      element.drawCalls = 0;
+      element.getContext = () => ({
+        clearRect() {},
+        drawImage() {},
+        fillRect() { element.drawCalls += 1; },
+        getImageData() {
+          return { data: analysisFixture?.pixels ?? new Uint8ClampedArray(0) };
+        },
+        fillStyle: "",
+      });
+    }
     return element;
   };
 
@@ -241,7 +260,13 @@ function createFixture(theme, {
       if (selector === "main.main-surface" || selector === "main") return shellMain;
       return null;
     },
-    querySelectorAll() { return []; },
+    querySelectorAll(selector) {
+      if (selector.startsWith("#")) {
+        const node = nodes.get(selector.slice(1));
+        return node ? [node] : [];
+      }
+      return [];
+    },
   };
   const mediaQuery = {
     matches: false,
@@ -292,12 +317,13 @@ function createFixture(theme, {
     Blob,
     Uint8Array,
     atob,
-    getComputedStyle() {
+    getComputedStyle(node) {
       const skinShell = root.classList.contains("codex-dream-skin")
         ? (attributes.get("data-dream-shell") || "dark") : fixtureShell;
       return {
         colorScheme: skinShell,
         backgroundColor: fixtureShell === "dark" ? "rgb(24, 24, 27)" : "rgb(250, 250, 250)",
+        pointerEvents: node?.style?.getPropertyValue?.("pointer-events") || "auto",
       };
     },
     setInterval: () => 1,
@@ -309,7 +335,18 @@ function createFixture(theme, {
     },
     clearTimeout(id) { timers.delete(id); },
     cancelAnimationFrame() {},
+    innerWidth: 1280,
+    innerHeight: 800,
+    devicePixelRatio: 1,
   };
+  if (animationFrame) {
+    context.requestAnimationFrame = (callback) => {
+      const id = nextFrame++;
+      animationFrames.set(id, callback);
+      return id;
+    };
+    context.cancelAnimationFrame = (id) => { animationFrames.delete(id); };
+  }
   const payloadFor = (nextTheme, cssText = ".fixture { color: blue; }") => template
     .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(cssText))
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
@@ -327,13 +364,20 @@ function createFixture(theme, {
       timer.callback();
     }
   };
+  const flushAnimationFrames = () => {
+    const pending = [...animationFrames.entries()];
+    animationFrames.clear();
+    for (const [, callback] of pending) callback(16.667);
+  };
 
   return {
+    animationFrames,
     attributes,
     body,
     bodyAttributes,
     context,
     flushTimers,
+    flushAnimationFrames,
     nodes,
     observers,
     payload: payloadFor(theme),
@@ -533,6 +577,100 @@ vm.runInNewContext(banner.payload, banner.context);
 assert.equal(banner.attributes.get("data-dream-art-wide"), "true");
 assert.equal(banner.attributes.get("data-dream-art-task-mode"), "banner");
 assert.equal(banner.attributes.get("data-dream-task-mode"), "banner");
+
+const audioFrame = (sequence, overrides = {}) => ({
+  type: "features",
+  protocolVersion: 1,
+  sequence,
+  monotonicMs: (sequence - 1) * (1000 / 30),
+  rms: 0.4,
+  peak: 0.6,
+  bass: 0.5,
+  mid: 0.4,
+  treble: 0.3,
+  beat: false,
+  bands: Array.from({ length: 64 }, (_, index) => ((sequence + index) % 20) / 20),
+  ...overrides,
+});
+
+const audioFixture = createFixture({
+  id: "audio-push-contract",
+  appearance: "dark",
+  art: { safeArea: "none", taskMode: "ambient" },
+}, { animationFrame: true });
+vm.runInNewContext(audioFixture.payload, audioFixture.context);
+const firstAudioState = audioFixture.window.__CODEX_DREAM_SKIN_STATE__;
+assert.equal(firstAudioState.audio.snapshot().active, false);
+assert.equal(audioFixture.nodes.has("codex-dream-skin-audio"), false);
+
+const firstPush = firstAudioState.audio.push(audioFrame(1), { fps: 30 });
+assert.equal(firstPush.accepted, true);
+assert.equal(firstPush.sequence, 1);
+assert.equal(firstPush.replaced, false);
+const secondPush = firstAudioState.audio.push(audioFrame(2), { fps: 30 });
+assert.equal(secondPush.accepted, true);
+assert.equal(secondPush.sequence, 2);
+assert.equal(secondPush.replaced, true);
+const thirdPush = firstAudioState.audio.push(audioFrame(3), { fps: 30 });
+assert.equal(thirdPush.accepted, true);
+assert.equal(thirdPush.sequence, 3);
+assert.equal(thirdPush.replaced, true);
+assert.equal(audioFixture.animationFrames.size, 1, "Audio pushes must share one scheduled animation frame.");
+const audioCanvas = audioFixture.nodes.get("codex-dream-skin-audio");
+assert.ok(audioCanvas, `Audio canvas missing; fixture nodes: ${[...audioFixture.nodes.keys()].join(", ")}`);
+assert.equal(audioCanvas.getAttribute("aria-hidden"), "true");
+assert.equal(audioCanvas.tabIndex, -1);
+assert.equal(audioCanvas.style.getPropertyValue("pointer-events"), "none");
+assert.equal(audioCanvas.style.getPropertyValue("contain"), "strict");
+assert.equal(audioFixture.context.document.querySelectorAll("#codex-dream-skin-audio").length, 1);
+audioFixture.flushAnimationFrames();
+const coalesced = firstAudioState.audio.snapshot();
+assert.equal(coalesced.metrics.accepted, 3);
+assert.equal(coalesced.metrics.drawn, 1);
+assert.equal(coalesced.metrics.renderDropped, 2);
+assert.equal(coalesced.metrics.lastDrawnSequence, 3);
+assert.equal(coalesced.canvas.count, 1);
+assert.equal(coalesced.canvas.pointerEvents, "none");
+assert.equal(coalesced.canvas.contain, "strict");
+
+for (const invalid of [
+  audioFrame(4, { bands: [0.2] }),
+  audioFrame(4, { rms: Number.NaN }),
+  audioFrame(4, { peak: Number.POSITIVE_INFINITY }),
+  audioFrame(4, { bass: 1.1 }),
+  audioFrame(4, { beat: "yes" }),
+  audioFrame(2),
+]) {
+  assert.equal(firstAudioState.audio.push(invalid, { fps: 30 }).accepted, false);
+}
+const rejected = firstAudioState.audio.snapshot();
+assert.equal(rejected.metrics.rejected, 6);
+assert.equal(rejected.metrics.accepted, 3);
+assert.equal(audioFixture.animationFrames.size, 0);
+
+firstAudioState.audio.push(audioFrame(4), { fps: 30 });
+assert.equal(audioFixture.animationFrames.size, 1);
+vm.runInNewContext(audioFixture.payloadFor({
+  id: "audio-push-reinstalled",
+  appearance: "dark",
+  art: { safeArea: "none", taskMode: "ambient" },
+}), audioFixture.context);
+const secondAudioState = audioFixture.window.__CODEX_DREAM_SKIN_STATE__;
+assert.equal(firstAudioState.audio.snapshot().active, false);
+assert.equal(audioFixture.animationFrames.size, 0, "Reinjection must cancel the old audio frame.");
+assert.equal(audioFixture.nodes.has("codex-dream-skin-audio"), false);
+assert.equal(firstAudioState.cleanup(), false, "Old cleanup must not remove a newer renderer generation.");
+
+secondAudioState.audio.push(audioFrame(1), { fps: 10 });
+assert.equal(audioFixture.nodes.has("codex-dream-skin-audio"), true);
+assert.equal(audioFixture.animationFrames.size, 1);
+assert.equal(secondAudioState.audio.stop(), true);
+assert.equal(secondAudioState.audio.snapshot().active, false);
+assert.equal(audioFixture.animationFrames.size, 0);
+assert.equal(audioFixture.nodes.has("codex-dream-skin-audio"), false);
+assert.equal(secondAudioState.cleanup(), true);
+assert.equal(audioFixture.window.__CODEX_DREAM_SKIN_STATE__, undefined);
+assert.equal(audioFixture.nodes.has("codex-dream-skin-audio"), false);
 
 assert.equal(explicit.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
 assert.equal(explicit.root.classList.contains("codex-dream-skin"), false);

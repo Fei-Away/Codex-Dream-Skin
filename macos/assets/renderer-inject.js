@@ -3,6 +3,7 @@
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
   const STYLE_ID = "codex-dream-skin-style";
   const CHROME_ID = "codex-dream-skin-chrome";
+  const AUDIO_CANVAS_ID = "codex-dream-skin-audio";
   const SHELL_ATTR = "data-dream-shell";
   const ART_ATTRS = [
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
@@ -64,6 +65,7 @@
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
   })();
 
+  try { previous?.audio?.stop?.(); } catch {}
   if (previous?.observer) previous.observer.disconnect();
   if (previous?.rootObserver) previous.rootObserver.disconnect();
   if (previous?.resizeObserver) previous.resizeObserver.disconnect();
@@ -644,10 +646,199 @@
     if (route) syncRouteState(shell, { layout });
   };
 
+  const createAudioController = () => {
+    const allowedFrameKeys = new Set([
+      "type", "protocolVersion", "sequence", "monotonicMs", "rms", "peak",
+      "bass", "mid", "treble", "beat", "bands",
+    ]);
+    let canvas = null;
+    let context = null;
+    let latest = null;
+    let scheduledFrame = null;
+    let scheduledTimer = null;
+    let fps = 30;
+    let lastAcceptedSequence = 0;
+    const audioMetrics = {
+      received: 0,
+      accepted: 0,
+      rejected: 0,
+      drawn: 0,
+      renderDropped: 0,
+      lastAcceptedSequence: null,
+      lastDrawnSequence: null,
+      queueLatencyTotalMs: 0,
+      queueLatencyMaxMs: 0,
+    };
+
+    const canvasCount = () => {
+      if (typeof document.querySelectorAll === "function") {
+        return document.querySelectorAll(`#${AUDIO_CANVAS_ID}`).length;
+      }
+      return document.getElementById(AUDIO_CANVAS_ID) ? 1 : 0;
+    };
+
+    const ensureCanvas = () => {
+      if (canvas && canvas.isConnected !== false && document.getElementById(AUDIO_CANVAS_ID) === canvas) {
+        return true;
+      }
+      document.getElementById(AUDIO_CANVAS_ID)?.remove();
+      const next = document.createElement("canvas");
+      next.id = AUDIO_CANVAS_ID;
+      next.setAttribute("aria-hidden", "true");
+      next.tabIndex = -1;
+      next.style.setProperty("position", "fixed");
+      next.style.setProperty("inset", "0");
+      next.style.setProperty("width", "100%");
+      next.style.setProperty("height", "100%");
+      next.style.setProperty("z-index", "0");
+      next.style.setProperty("pointer-events", "none");
+      next.style.setProperty("user-select", "none");
+      next.style.setProperty("contain", "strict");
+      next.style.setProperty("opacity", "0.22");
+      const host = document.querySelector("main.main-surface") || document.body;
+      if (typeof host?.prepend === "function") host.prepend(next);
+      else host?.appendChild?.(next);
+      const nextContext = next.getContext?.("2d", { alpha: true });
+      if (!nextContext) {
+        next.remove();
+        return false;
+      }
+      canvas = next;
+      context = nextContext;
+      return true;
+    };
+
+    const validUnit = (value) => Number.isFinite(value) && value >= 0 && value <= 1;
+    const isValidFrame = (frame) => frame && typeof frame === "object" && !Array.isArray(frame)
+      && Object.keys(frame).every((key) => allowedFrameKeys.has(key))
+      && frame.type === "features" && frame.protocolVersion === 1
+      && Number.isSafeInteger(frame.sequence) && frame.sequence > lastAcceptedSequence
+      && Number.isFinite(frame.monotonicMs) && frame.monotonicMs >= 0
+      && validUnit(frame.rms) && validUnit(frame.peak) && validUnit(frame.bass)
+      && validUnit(frame.mid) && validUnit(frame.treble) && typeof frame.beat === "boolean"
+      && Array.isArray(frame.bands) && frame.bands.length === 64
+      && frame.bands.every(validUnit);
+
+    const resizeCanvas = () => {
+      const width = typeof innerWidth === "number" && innerWidth > 0 ? innerWidth : 320;
+      const height = typeof innerHeight === "number" && innerHeight > 0 ? innerHeight : 180;
+      const scale = Math.min(
+        1.5,
+        typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1,
+      );
+      const nextWidth = Math.min(1600, Math.max(1, Math.round(width * scale)));
+      const nextHeight = Math.min(1000, Math.max(1, Math.round(height * scale)));
+      if (canvas.width !== nextWidth) canvas.width = nextWidth;
+      if (canvas.height !== nextHeight) canvas.height = nextHeight;
+    };
+
+    const drawLatest = () => {
+      scheduledFrame = null;
+      scheduledTimer = null;
+      const record = latest;
+      latest = null;
+      if (!record || !canvas || !context) return;
+      resizeCanvas();
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      const width = canvas.width / record.frame.bands.length;
+      const baseHeight = canvas.height * (0.08 + record.frame.rms * 0.18);
+      for (let index = 0; index < record.frame.bands.length; index += 1) {
+        const value = record.frame.bands[index];
+        const shaped = Math.min(1, value * 0.72 + record.frame.bass * 0.18 + record.frame.peak * 0.1);
+        const height = Math.max(1, baseHeight + shaped * canvas.height * 0.72);
+        context.fillStyle = index % 2 === 0 ? "#f5c84c" : "#7b5cff";
+        context.fillRect(
+          index * width,
+          canvas.height - height,
+          Math.max(1, width - 1),
+          height,
+        );
+      }
+      const queueLatencyMs = Math.max(0, now() - record.receivedAt);
+      audioMetrics.drawn += 1;
+      audioMetrics.lastDrawnSequence = record.frame.sequence;
+      audioMetrics.queueLatencyTotalMs += queueLatencyMs;
+      audioMetrics.queueLatencyMaxMs = Math.max(audioMetrics.queueLatencyMaxMs, queueLatencyMs);
+    };
+
+    const scheduleDraw = () => {
+      if (scheduledFrame !== null || scheduledTimer !== null) return;
+      if (typeof requestAnimationFrame === "function") {
+        scheduledFrame = requestAnimationFrame(drawLatest);
+      } else {
+        scheduledTimer = setTimeout(drawLatest, Math.round(1000 / fps));
+      }
+    };
+
+    const push = (frame, config = {}) => {
+      audioMetrics.received += 1;
+      if (config?.fps !== undefined && ![10, 20, 30].includes(config.fps)) {
+        audioMetrics.rejected += 1;
+        return { accepted: false, sequence: frame?.sequence ?? null, reason: "fps" };
+      }
+      if (!isValidFrame(frame)) {
+        audioMetrics.rejected += 1;
+        return { accepted: false, sequence: frame?.sequence ?? null, reason: "frame" };
+      }
+      fps = config?.fps ?? fps;
+      if (!ensureCanvas()) {
+        audioMetrics.rejected += 1;
+        return { accepted: false, sequence: frame.sequence, reason: "canvas" };
+      }
+      const replaced = Boolean(latest);
+      if (replaced) audioMetrics.renderDropped += 1;
+      latest = { frame, receivedAt: now() };
+      lastAcceptedSequence = frame.sequence;
+      audioMetrics.accepted += 1;
+      audioMetrics.lastAcceptedSequence = frame.sequence;
+      scheduleDraw();
+      return { accepted: true, sequence: frame.sequence, replaced };
+    };
+
+    const snapshot = () => ({
+      active: Boolean(canvas),
+      fps,
+      metrics: {
+        ...audioMetrics,
+        queueLatencyMeanMs: audioMetrics.drawn
+          ? audioMetrics.queueLatencyTotalMs / audioMetrics.drawn : null,
+      },
+      canvas: canvas ? {
+        count: canvasCount(),
+        ariaHidden: canvas.getAttribute?.("aria-hidden") ?? null,
+        tabIndex: canvas.tabIndex,
+        pointerEvents: typeof getComputedStyle === "function"
+          ? getComputedStyle(canvas).pointerEvents : canvas.style.getPropertyValue("pointer-events"),
+        contain: canvas.style.getPropertyValue("contain"),
+      } : null,
+    });
+
+    const stop = () => {
+      if (scheduledFrame !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(scheduledFrame);
+      }
+      if (scheduledTimer !== null) clearTimeout(scheduledTimer);
+      scheduledFrame = null;
+      scheduledTimer = null;
+      latest = null;
+      lastAcceptedSequence = 0;
+      canvas?.remove();
+      document.getElementById(AUDIO_CANVAS_ID)?.remove();
+      canvas = null;
+      context = null;
+      return true;
+    };
+
+    return { push, snapshot, stop };
+  };
+
+  const audio = createAudioController();
+
   const cleanup = () => {
     const state = window[STATE_KEY];
     if (state?.installToken !== installToken) return false;
     window[DISABLED_KEY] = true;
+    state.audio?.stop?.();
     document.documentElement?.classList.remove("codex-dream-skin");
     document.documentElement?.removeAttribute(SHELL_ATTR);
     for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
@@ -735,6 +926,7 @@
     analysis: artAnalysis,
     artMetadata: ART_METADATA,
     metrics,
+    audio,
     version: VERSION,
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,

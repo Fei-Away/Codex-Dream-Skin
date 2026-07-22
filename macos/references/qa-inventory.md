@@ -21,6 +21,7 @@
 - Port collision selection and saved-port reuse.
 - PID reuse protection through PID, start time, executable, script path, and command-line matching.
 - Live verification after `Page.reload` returns version `1.2.0` and `pass: true`.
+- Synthetic audio diagnostics validate strict 64-band feature frames at 10/20/30 FPS, latest-frame backpressure, one inaccessible pointer-transparent canvas, CDP target reattachment, and zero canvas/process/profile residue without requesting audio permission.
 - Strict home verification requires a visible wallpaper composition region of at least 320×160, composer, sidebar, non-interactive decoration, and no horizontal overflow. Suggestion cards and the standalone project button are optional only when the current Codex host does not render them.
 
 ## Visual checks

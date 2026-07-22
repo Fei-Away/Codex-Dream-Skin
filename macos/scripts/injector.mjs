@@ -19,6 +19,12 @@ const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
 const OPERATION_UI_STATES = new Set(["success", "error", "cancelled"]);
+const AUDIO_FPS_VALUES = new Set([10, 20, 30]);
+const MAX_AUDIO_PUSH_RECEIPTS = 32;
+const AUDIO_FRAME_KEYS = new Set([
+  "type", "protocolVersion", "sequence", "monotonicMs", "rms", "peak",
+  "bass", "mid", "treble", "beat", "bands",
+]);
 const OPERATION_UI_CSS = `
   :host {
     all: initial;
@@ -143,6 +149,9 @@ function parseArgs(argv) {
     operationUiState: null,
     operationMessage: null,
     operationToken: null,
+    syntheticAudio: false,
+    audioFps: 30,
+    audioFpsExplicit: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -163,6 +172,11 @@ function parseArgs(argv) {
     else if (arg === "--operation-ui-state") options.operationUiState = argv[++i];
     else if (arg === "--operation-message") options.operationMessage = argv[++i];
     else if (arg === "--operation-token") options.operationToken = argv[++i];
+    else if (arg === "--synthetic-audio") options.syntheticAudio = true;
+    else if (arg === "--audio-fps") {
+      options.audioFps = Number(argv[++i]);
+      options.audioFpsExplicit = true;
+    }
     else if (arg === "--reload") options.reload = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -188,7 +202,22 @@ function parseArgs(argv) {
       throw new Error("Finish operation requires a single-line --operation-message up to 240 characters");
     }
   }
+  options.audioFps = normalizeAudioFps(options.audioFps);
+  if (options.audioFpsExplicit && !options.syntheticAudio) {
+    throw new Error("--audio-fps requires --synthetic-audio");
+  }
+  if (options.syntheticAudio && options.mode !== "watch") {
+    throw new Error("--synthetic-audio is available only in watch mode");
+  }
   return options;
+}
+
+export function normalizeAudioFps(value) {
+  const fps = Number(value);
+  if (!Number.isInteger(fps) || !AUDIO_FPS_VALUES.has(fps)) {
+    throw new Error("Audio FPS must be 10, 20, or 30");
+  }
+  return fps;
 }
 
 function validatedDebuggerUrl(target, port) {
@@ -638,6 +667,217 @@ async function applyToSession(session, payload) {
   return session.evaluate(payload);
 }
 
+export function normalizeAudioFeatureFrame(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Audio feature frame must be an object");
+  }
+  if (Object.keys(input).some((key) => !AUDIO_FRAME_KEYS.has(key))) {
+    throw new Error("Audio feature frame contains an unsupported field");
+  }
+  const unit = (value, name) => {
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      throw new Error(`Audio feature ${name} must be finite and normalized`);
+    }
+    return value;
+  };
+  if (input.type !== "features" || input.protocolVersion !== 1) {
+    throw new Error("Audio feature frame must use protocol version 1");
+  }
+  if (!Number.isSafeInteger(input.sequence) || input.sequence < 1) {
+    throw new Error("Audio feature sequence must be a positive safe integer");
+  }
+  if (!Number.isFinite(input.monotonicMs) || input.monotonicMs < 0) {
+    throw new Error("Audio feature monotonicMs must be finite and non-negative");
+  }
+  if (typeof input.beat !== "boolean") {
+    throw new Error("Audio feature beat must be boolean");
+  }
+  if (!Array.isArray(input.bands) || input.bands.length !== 64) {
+    throw new Error("Audio feature frame must contain exactly 64 bands");
+  }
+  return {
+    type: "features",
+    protocolVersion: 1,
+    sequence: input.sequence,
+    monotonicMs: input.monotonicMs,
+    rms: unit(input.rms, "rms"),
+    peak: unit(input.peak, "peak"),
+    bass: unit(input.bass, "bass"),
+    mid: unit(input.mid, "mid"),
+    treble: unit(input.treble, "treble"),
+    beat: input.beat,
+    bands: input.bands.map((value, index) => unit(value, `bands[${index}]`)),
+  };
+}
+
+export function createDeterministicAudioFrame(sequence, fps = 30) {
+  const normalizedFps = normalizeAudioFps(fps);
+  if (!Number.isSafeInteger(sequence) || sequence < 1) {
+    throw new Error("Synthetic audio sequence must be a positive safe integer");
+  }
+  const wave = (index) => Number((
+    (Math.sin((sequence + index) * 0.31) + 1) * 0.32
+    + (Math.cos((sequence * 0.17) + (index * 0.11)) + 1) * 0.18
+  ).toFixed(6));
+  const rms = Number((0.2 + ((sequence % 12) / 24)).toFixed(6));
+  return normalizeAudioFeatureFrame({
+    type: "features",
+    protocolVersion: 1,
+    sequence,
+    monotonicMs: Number((((sequence - 1) * 1000) / normalizedFps).toFixed(3)),
+    rms,
+    peak: Number(Math.min(1, rms + 0.16).toFixed(6)),
+    bass: Number((0.25 + (sequence % 5) * 0.1).toFixed(6)),
+    mid: Number((0.3 + (sequence % 4) * 0.08).toFixed(6)),
+    treble: Number((0.2 + (sequence % 3) * 0.09).toFixed(6)),
+    beat: sequence % 10 === 0,
+    bands: Array.from({ length: 64 }, (_, index) => wave(index)),
+  });
+}
+
+export class LatestFrameDispatcher {
+  constructor(send, clock = () => performance.now()) {
+    if (typeof send !== "function" || typeof clock !== "function") {
+      throw new Error("LatestFrameDispatcher requires send and clock functions");
+    }
+    this.send = send;
+    this.clock = clock;
+    this.closed = false;
+    this.inFlight = null;
+    this.pending = null;
+    this.lastOfferedSequence = 0;
+    this.waiters = new Set();
+    this.metrics = {
+      sent: 0,
+      dispatched: 0,
+      accepted: 0,
+      transportDropped: 0,
+      failed: 0,
+      maxBuffered: 0,
+      lastSentSequence: null,
+      lastAcceptedSequence: null,
+      roundTripTotalMs: 0,
+      roundTripMinMs: null,
+      roundTripMaxMs: 0,
+    };
+  }
+
+  offer(input) {
+    if (this.closed) throw new Error("Audio frame dispatcher is closed");
+    const frame = normalizeAudioFeatureFrame(input);
+    if (frame.sequence <= this.lastOfferedSequence) {
+      throw new Error("Audio feature sequence must increase strictly");
+    }
+    this.lastOfferedSequence = frame.sequence;
+    this.metrics.sent += 1;
+    this.metrics.lastSentSequence = frame.sequence;
+    const record = { frame };
+    if (this.inFlight) {
+      if (this.pending) this.metrics.transportDropped += 1;
+      this.pending = record;
+      this.metrics.maxBuffered = Math.max(this.metrics.maxBuffered, 1);
+      return { queued: true, sequence: frame.sequence };
+    }
+    this.dispatch(record);
+    return { queued: false, sequence: frame.sequence };
+  }
+
+  dispatch(record) {
+    record.dispatchedAt = this.clock();
+    this.inFlight = record;
+    this.metrics.dispatched += 1;
+    Promise.resolve()
+      .then(() => this.send(record.frame))
+      .then((ack) => {
+        if (ack?.accepted !== true || ack.sequence !== record.frame.sequence) {
+          throw new Error("Renderer rejected the audio feature frame");
+        }
+        const roundTripMs = Math.max(0, this.clock() - record.dispatchedAt);
+        this.metrics.accepted += 1;
+        this.metrics.lastAcceptedSequence = record.frame.sequence;
+        this.metrics.roundTripTotalMs += roundTripMs;
+        this.metrics.roundTripMinMs = this.metrics.roundTripMinMs === null
+          ? roundTripMs : Math.min(this.metrics.roundTripMinMs, roundTripMs);
+        this.metrics.roundTripMaxMs = Math.max(this.metrics.roundTripMaxMs, roundTripMs);
+      })
+      .catch(() => {
+        this.metrics.failed += 1;
+      })
+      .finally(() => {
+        this.inFlight = null;
+        const next = this.pending;
+        this.pending = null;
+        if (!this.closed && next) this.dispatch(next);
+        else this.resolveWaitersIfDrained();
+      });
+  }
+
+  resolveWaitersIfDrained() {
+    if (this.inFlight || this.pending) return;
+    for (const resolve of this.waiters) resolve();
+    this.waiters.clear();
+  }
+
+  async drain() {
+    if (!this.inFlight && !this.pending) return this.snapshot();
+    await new Promise((resolve) => this.waiters.add(resolve));
+    return this.snapshot();
+  }
+
+  async close() {
+    if (!this.closed) {
+      this.closed = true;
+      if (this.pending) {
+        this.metrics.transportDropped += 1;
+        this.pending = null;
+      }
+      this.resolveWaitersIfDrained();
+    }
+    return this.drain();
+  }
+
+  snapshot() {
+    const roundTripMeanMs = this.metrics.accepted
+      ? this.metrics.roundTripTotalMs / this.metrics.accepted : null;
+    return {
+      sent: this.metrics.sent,
+      dispatched: this.metrics.dispatched,
+      accepted: this.metrics.accepted,
+      transportDropped: this.metrics.transportDropped,
+      failed: this.metrics.failed,
+      maxBuffered: this.metrics.maxBuffered,
+      lastSentSequence: this.metrics.lastSentSequence,
+      lastAcceptedSequence: this.metrics.lastAcceptedSequence,
+      roundTripMs: {
+        min: this.metrics.roundTripMinMs,
+        mean: roundTripMeanMs,
+        max: this.metrics.roundTripMaxMs,
+      },
+      closed: this.closed,
+    };
+  }
+}
+
+export function audioPushExpression(input, fps = 30) {
+  const frame = normalizeAudioFeatureFrame(input);
+  const normalizedFps = normalizeAudioFps(fps);
+  return `(() => {
+    const audio = window.__CODEX_DREAM_SKIN_STATE__?.audio;
+    if (!audio?.push) return { accepted: false, sequence: ${frame.sequence}, reason: "unavailable" };
+    return audio.push(${JSON.stringify(frame)}, { fps: ${normalizedFps} });
+  })()`;
+}
+
+function audioStopExpression() {
+  return `(() => {
+    const audio = window.__CODEX_DREAM_SKIN_STATE__?.audio;
+    if (!audio?.stop) return { available: false, before: null, after: null };
+    const before = audio.snapshot();
+    audio.stop();
+    return { available: true, before, after: audio.snapshot() };
+  })()`;
+}
+
 function nextOperationToken() {
   operationSequence += 1;
   return `${process.pid}:${Date.now()}:${operationSequence}`;
@@ -809,6 +1049,7 @@ async function removeFromSession(session) {
     document.documentElement?.style.removeProperty('--dream-skin-art');
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
+    document.getElementById('codex-dream-skin-audio')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
     return true;
   })()`);
@@ -819,6 +1060,7 @@ async function verifyRemovedSession(session) {
     !document.documentElement.classList.contains('codex-dream-skin') &&
     !document.getElementById('codex-dream-skin-style') &&
     !document.getElementById('codex-dream-skin-chrome') &&
+    !document.getElementById('codex-dream-skin-audio') &&
     !window.__CODEX_DREAM_SKIN_STATE__
   )()`);
 }
@@ -905,6 +1147,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         result.suggestionLabelColorsMatch
       ))
     );
+    result.audio = window.__CODEX_DREAM_SKIN_STATE__?.audio?.snapshot?.() ?? null;
     result.pass = Boolean(basePass && homePass && payloadPass);
     result.expectedThemeId = expectedThemeId;
     result.expectedRevision = expectedRevision;
@@ -1272,6 +1515,10 @@ async function runWatch(options) {
   let controlOnly = false;
   let mutationEpoch = 0;
   let activeTargetSetups = 0;
+  let syntheticAudioTimer = null;
+  let syntheticAudioSequence = 0;
+  let latestSyntheticFrame = null;
+  const audioPushReceipts = [];
   const targetSetupWaiters = new Set();
   let wakeControlWait = null;
   const wakeControlLoop = () => {
@@ -1362,6 +1609,55 @@ async function runWatch(options) {
     return results.every(Boolean);
   };
 
+  const stopAudioForRecord = async (record) => {
+    if (!options.syntheticAudio || record.audioStopped) return null;
+    record.audioStopped = true;
+    const dispatcher = record.audioDispatcher;
+    record.audioDispatcher = null;
+    const transport = dispatcher
+      ? await dispatcher.close()
+      : null;
+    let renderer = null;
+    if (!record.session.closed) {
+      try {
+        renderer = await record.session.evaluate(audioStopExpression(), 2000);
+      } catch (error) {
+        renderer = { available: false, error: error.message };
+      }
+    }
+    const receipt = { targetId: record.targetId, transport, renderer };
+    if (audioPushReceipts.length === MAX_AUDIO_PUSH_RECEIPTS) audioPushReceipts.shift();
+    audioPushReceipts.push(receipt);
+    return receipt;
+  };
+
+  const createAudioDispatcher = (record) => {
+    record.audioStopped = false;
+    record.audioDispatcher = new LatestFrameDispatcher((frame) =>
+      record.session.evaluate(
+        audioPushExpression(frame, options.audioFps),
+        Math.max(250, Math.min(2000, options.timeoutMs)),
+      ));
+    if (latestSyntheticFrame) record.audioDispatcher.offer(latestSyntheticFrame);
+  };
+
+  const emitSyntheticAudioFrame = () => {
+    if (!options.syntheticAudio || stopping || controlOnly) return;
+    syntheticAudioSequence += 1;
+    latestSyntheticFrame = createDeterministicAudioFrame(
+      syntheticAudioSequence,
+      options.audioFps,
+    );
+    for (const record of sessions.values()) {
+      if (!record.audioDispatcher || record.session.closed) continue;
+      try {
+        record.audioDispatcher.offer(latestSyntheticFrame);
+      } catch (error) {
+        console.error(`[dream-skin] audio frame offer failed: ${error.message}`);
+      }
+    }
+  };
+
   const registerEarlyForRecord = async (record, payload, revision) => {
     const identifier = await registerEarly(record.session, payload, revision);
     if (identifier) record.earlyScriptIds.add(identifier);
@@ -1384,7 +1680,8 @@ async function runWatch(options) {
     return removeEarly(record, { strict });
   };
 
-  const releaseControlSessions = () => {
+  const releaseControlSessions = async () => {
+    await Promise.all([...sessions.values()].map((record) => stopAudioForRecord(record)));
     for (const record of sessions.values()) record.session.close();
     sessions.clear();
   };
@@ -1396,7 +1693,7 @@ async function runWatch(options) {
       token: operation.token,
       message: operation.message || "暂停失败，原皮肤已恢复",
     };
-    releaseControlSessions();
+    await releaseControlSessions();
     wakeControlLoop();
   };
 
@@ -1545,13 +1842,22 @@ async function runWatch(options) {
           invalidateEarly(record, { strict: true }))).catch((error) => {
           console.error(`[dream-skin] final pause invalidation failed: ${error.message}`);
         });
-        releaseControlSessions();
+        await releaseControlSessions();
       }
     }).catch((error) => {
       console.error(`[dream-skin] operation progress failed: ${error.message}`);
     });
     return operationSignalChain;
   });
+
+  if (options.syntheticAudio) {
+    emitSyntheticAudioFrame();
+    syntheticAudioTimer = setInterval(
+      emitSyntheticAudioFrame,
+      Math.round(1000 / options.audioFps),
+    );
+    console.log(`[dream-skin] synthetic audio enabled at ${options.audioFps} FPS`);
+  }
 
   try {
     while (!stopping) {
@@ -1570,11 +1876,11 @@ async function runWatch(options) {
         }));
         if (expiredOperation.status === "pausing") {
           controlOnly = true;
-          releaseControlSessions();
+          await releaseControlSessions();
         }
       }
       if (controlOnly && !activeOperation) {
-        releaseControlSessions();
+        await releaseControlSessions();
         await waitForControlOperation();
         continue;
       }
@@ -1593,7 +1899,7 @@ async function runWatch(options) {
       }
 
       if (controlOnly && !activeOperation) {
-        releaseControlSessions();
+        await releaseControlSessions();
         continue;
       }
 
@@ -1605,6 +1911,7 @@ async function runWatch(options) {
               record.session, "hide", record.operationToken, "loading", "",
             );
           }
+          await stopAudioForRecord(record);
           record.session.close();
           sessions.delete(id);
         }
@@ -1623,12 +1930,15 @@ async function runWatch(options) {
         try {
           session = await connectTarget(target, options.port);
           record = {
+            targetId: target.id,
             session,
             earlyScriptId: null,
             earlyScriptIds: new Set(),
             needsLoadFallback: false,
             operationToken: null,
             operationExternal: false,
+            audioDispatcher: null,
+            audioStopped: true,
           };
           connectionEpoch = mutationEpoch;
           sessions.set(target.id, record);
@@ -1718,6 +2028,7 @@ async function runWatch(options) {
             current.revision,
           );
           if (!verification?.pass) throw new Error("Initial theme verification failed");
+          if (options.syntheticAudio) createAudioDispatcher(record);
           if (recoveryOperation && !activeOperation
             && pauseRecovery?.token === recoveryOperation.token) {
             await presentOperationUi(
@@ -1753,7 +2064,10 @@ async function runWatch(options) {
               );
             }
           }
-          if (record) await removeEarly(record);
+          if (record) {
+            await stopAudioForRecord(record);
+            await removeEarly(record);
+          }
           session?.close();
           sessions.delete(target.id);
           console.error(`[dream-skin] inject failed for ${target.id}: ${error.message}`);
@@ -1770,6 +2084,7 @@ async function runWatch(options) {
       await new Promise((resolve) => setTimeout(resolve, pollDelay));
     }
   } finally {
+    if (syntheticAudioTimer) clearInterval(syntheticAudioTimer);
     if (reloadTimer) clearTimeout(reloadTimer);
     closePayloadWatchers();
     closeOperationWatcher();
@@ -1779,8 +2094,16 @@ async function runWatch(options) {
       record.operationToken && !record.operationExternal
         ? bestEffortOperationUi(record.session, "hide", record.operationToken, "loading", "")
         : Promise.resolve(false)));
+    await Promise.all([...sessions.values()].map((record) => stopAudioForRecord(record)));
     await Promise.all([...sessions.values()].map((record) => removeEarly(record)));
     for (const record of sessions.values()) record.session.close();
+    if (options.syntheticAudio) {
+      console.log(`[dream-skin] audio-push-receipt ${JSON.stringify({
+        fps: options.audioFps,
+        lastSyntheticSequence: syntheticAudioSequence,
+        targets: audioPushReceipts,
+      })}`);
+    }
   }
 }
 
@@ -1813,7 +2136,14 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       await runFinishOperation(options);
       await new Promise((resolve) => process.stdout.write("", resolve));
       process.exit(0);
-    } else if (options.mode === "watch") await runWatch(options);
+    } else if (options.mode === "watch") {
+      await runWatch(options);
+      await Promise.all([
+        new Promise((resolve) => process.stdout.write("", resolve)),
+        new Promise((resolve) => process.stderr.write("", resolve)),
+      ]);
+      process.exit(process.exitCode ?? 0);
+    }
     else await runOneShotAndExit(options);
   } catch (error) {
     console.error(`[dream-skin] ${error.stack || error.message}`);
