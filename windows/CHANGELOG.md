@@ -1,6 +1,6 @@
 # Windows Changelog
 
-## Unreleased
+## 1.3.3 — 2026-07-23
 
 ### 修复
 
