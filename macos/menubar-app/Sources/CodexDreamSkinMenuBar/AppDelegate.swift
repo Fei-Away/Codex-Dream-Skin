@@ -106,12 +106,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     menu.autoenablesItems = false
     statusItem.menu = menu
     guard let button = statusItem.button else { return }
-    let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
-    button.image = NSImage(
-      systemSymbolName: "paintpalette.fill",
-      accessibilityDescription: "Codex Dream Skin"
-    )?.withSymbolConfiguration(configuration)
-    button.image?.isTemplate = true
+    // 菜单栏模板剪影：与 dreamskin.cc favicon 同源的品牌 mark
+    // （圆角方描边 + 墨色对角半区）。模板图仅黑 + 透明，青点在
+    // 此尺寸下省略，避免糊成噪点。
+    let mark = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
+      let inset = rect.insetBy(dx: 1, dy: 1)
+      let rounded = NSBezierPath(roundedRect: inset, xRadius: 5.2, yRadius: 5.2)
+      NSColor.black.setStroke()
+      rounded.lineWidth = 1.4
+      rounded.stroke()
+      NSGraphicsContext.current?.saveGraphicsState()
+      rounded.addClip()
+      let diagonal = NSBezierPath()
+      diagonal.move(to: NSPoint(x: inset.minX, y: inset.maxY))
+      diagonal.line(to: NSPoint(x: inset.maxX, y: inset.minY))
+      diagonal.line(to: NSPoint(x: inset.maxX, y: inset.maxY))
+      diagonal.close()
+      NSColor.black.setFill()
+      diagonal.fill()
+      NSGraphicsContext.current?.restoreGraphicsState()
+      return true
+    }
+    mark.isTemplate = true
+    mark.accessibilityDescription = "Codex Dream Skin"
+    button.image = mark
     button.toolTip = "Codex Dream Skin"
     rebuildMenu()
   }
