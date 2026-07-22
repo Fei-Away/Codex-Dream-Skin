@@ -1,6 +1,6 @@
 # Windows Changelog
 
-## Unreleased
+## 1.3.1 — 2026-07-23
 
 ### 修复
 
@@ -11,6 +11,11 @@
 - Windows 注入器补齐与 macOS 相同的窗口内操作浮层（loading / 成功 / 失败）；暂停、继续与重新应用时在 Codex 主区显示「正在暂停皮肤…」「正在应用皮肤…」等进度，不再只有托盘气泡。
 - 源码安装/主题库初始化会把 macOS 同款「Gothic Void Crusade / 哥特虚空远征」播种到已保存主题（`presets/preset-gothic-void-crusade`），可与源码中的「桥本有菜」参考主题一并在托盘切换；公开 Setup.exe 只携带并默认播种 Gothic Void Crusade。
 - 同步 macOS 的首页建议卡图标居中修复（#176 / #181 核心部分）：原生 span 的 `justify-start` 使 grid + `place-items` 无法居中图标徽章内的字形，改为 flex 强制居中。
+
+### 改进
+
+- 托盘、安装器与开始菜单/自启快捷方式的 ICO 改绘为 DreamSkin 品牌 mark，与 dreamskin.cc 网站 favicon 同源：纸白圆角方、发丝描边、墨色对角半区与青色圆点（#217）。
+- 皮肤 runtime 双端统一（#216）：与 macOS 共用 `tools/selectors.json` 选择器契约与单源渲染器，双端注入产物由工具链编译并强制字节一致；运行时只写 `data-dream-*` 属性与 CSS 变量，锚点缺失场景降级 L0。
 
 ## 1.3.0 — 2026-07-19
 
