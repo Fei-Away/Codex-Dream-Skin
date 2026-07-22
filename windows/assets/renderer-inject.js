@@ -29,6 +29,11 @@
     "--dream-image-luma",
   ];
   const HOME_UTILITY_CLASS = "dream-home-utility";
+  const SIDEBAR_TOGGLE_CLASS = "dream-sidebar-toggle";
+  const HOME_PLUS_CLASS = "dream-home-plus-promo";
+  const HOME_LAYOUT_CLASS = "dream-home-layout";
+  const PLAN_PROGRESS_CLASS = "dream-plan-progress";
+  const PLAN_PROGRESS_SHELL_CLASS = "dream-plan-progress-shell";
   const installToken = {};
   let samplingNativeShell = false;
   let observer = null;
@@ -283,6 +288,11 @@
     document.querySelectorAll(".dream-task").forEach((node) => node.classList.remove("dream-task"));
     document.querySelectorAll(".dream-home-shell").forEach((node) => node.classList.remove("dream-home-shell"));
     document.querySelectorAll(`.${HOME_UTILITY_CLASS}`).forEach((node) => node.classList.remove(HOME_UTILITY_CLASS));
+    document.querySelectorAll(`.${SIDEBAR_TOGGLE_CLASS}`).forEach((node) => node.classList.remove(SIDEBAR_TOGGLE_CLASS));
+    document.querySelectorAll(`.${HOME_PLUS_CLASS}`).forEach((node) => node.classList.remove(HOME_PLUS_CLASS));
+    document.querySelectorAll(`.${HOME_LAYOUT_CLASS}`).forEach((node) => node.classList.remove(HOME_LAYOUT_CLASS));
+    document.querySelectorAll(`.${PLAN_PROGRESS_CLASS}`).forEach((node) => node.classList.remove(PLAN_PROGRESS_CLASS));
+    document.querySelectorAll(`.${PLAN_PROGRESS_SHELL_CLASS}`).forEach((node) => node.classList.remove(PLAN_PROGRESS_SHELL_CLASS));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
   };
@@ -366,6 +376,64 @@
     }
     for (const candidate of utilityBars) candidate.classList.add(HOME_UTILITY_CLASS);
     shellMain.classList.toggle("dream-home-shell", Boolean(home));
+    shellMain.classList.toggle(HOME_LAYOUT_CLASS, Boolean(home));
+
+    // Codex's sidebar control is native and may be rebuilt with hashed classes.
+    // Mark it by stable accessibility metadata so the skin can keep it visible.
+    const sidebarCandidates = document.querySelectorAll(
+      'aside.app-shell-left-panel button, main.main-surface > header.app-header-tint button, [class~="group/application-menu-top-bar"] button',
+    );
+    for (const candidate of document.querySelectorAll(`.${SIDEBAR_TOGGLE_CLASS}`)) {
+      candidate.classList.remove(SIDEBAR_TOGGLE_CLASS);
+    }
+    for (const candidate of sidebarCandidates) {
+      const signal = [
+        candidate.getAttribute("aria-label"),
+        candidate.getAttribute("title"),
+        candidate.getAttribute("data-testid"),
+        candidate.getAttribute("aria-controls"),
+        candidate.textContent,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (/sidebar|side[ -]?panel|left[ -]?panel|collapse|expand|toggle|panel|侧栏|侧边栏|展开|收起/.test(signal)) {
+        candidate.classList.add(SIDEBAR_TOGGLE_CLASS);
+      }
+    }
+
+    for (const candidate of document.querySelectorAll(`.${PLAN_PROGRESS_CLASS}`)) {
+      candidate.classList.remove(PLAN_PROGRESS_CLASS);
+    }
+    for (const candidate of document.querySelectorAll(`.${PLAN_PROGRESS_SHELL_CLASS}`)) {
+      candidate.classList.remove(PLAN_PROGRESS_SHELL_CLASS);
+    }
+    for (const label of document.querySelectorAll("span.whitespace-nowrap.tabular-nums")) {
+      const signal = label.textContent?.replace(/\s+/g, " ").trim() || "";
+      const isPlanProgress = /^(?:第\s*)?\d+\s*\/\s*\d+(?:\s*步)?$/.test(signal) ||
+        /^step\s+\d+\s+(?:of|\/)\s+\d+$/i.test(signal);
+      if (!isPlanProgress || !label.closest("div.sticky.bottom-0")) continue;
+      const container = label.parentElement?.parentElement?.parentElement;
+      if (container?.matches("div.max-w-full.min-w-0")) {
+        container.classList.add(PLAN_PROGRESS_CLASS);
+        container.parentElement?.parentElement?.classList.add(PLAN_PROGRESS_SHELL_CLASS);
+      }
+    }
+
+    for (const candidate of document.querySelectorAll(`.${HOME_PLUS_CLASS}`)) {
+      candidate.classList.remove(HOME_PLUS_CLASS);
+    }
+    if (home) {
+      const homeControls = home.querySelectorAll('button, [role="button"]');
+      for (const candidate of homeControls) {
+        const signal = [
+          candidate.getAttribute("aria-label"),
+          candidate.getAttribute("title"),
+          candidate.textContent,
+        ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+        // Hide home promos labelled "Get Plus" or "获取 Plus" without touching real controls.
+        if (/(?:get\s+plus|upgrade(?:\s+to)?\s+plus|获取\s*plus|获取\s*升级)/i.test(signal)) {
+          candidate.classList.add(HOME_PLUS_CLASS);
+        }
+      }
+    }
 
     let chrome = document.getElementById(CHROME_ID);
     if (!chrome || chrome.parentElement !== document.body) {

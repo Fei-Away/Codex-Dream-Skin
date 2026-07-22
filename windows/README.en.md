@@ -8,9 +8,10 @@ Codex Dream Skin loads an external theme into the official Codex Windows desktop
 
 ## Requirements
 
-- The official `OpenAI.Codex` app installed from Microsoft Store and registered for the current user.
+- The official `OpenAI.Codex` or `OpenAI.CodexBeta` app installed from Microsoft Store and registered for the current user.
 - Node.js 22 or newer, with `node.exe` available on `PATH`.
-- Windows PowerShell 5.1 or newer.
+- PowerShell 7, with `pwsh.exe` available from its standard installation directory or `PATH`. The graphical console is not compatible with Windows PowerShell 5.1.
+- Windows .NET Framework 4.x, used to build the native GUI launcher from source during installation.
 
 Run the installer after Codex has fully exited. Normal use does not require administrator access or ownership changes under WindowsApps.
 
@@ -22,11 +23,11 @@ Open PowerShell in the repository's `windows` directory and run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
 ```
 
-The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
+The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, initializes the local theme store, and builds the GUI launcher from the checked-in C# source. By default it creates one desktop and Start Menu shortcut:
 
-- `Codex Dream Skin`: launch or reapply the skin.
-- `Codex Dream Skin - Tray`: open the system tray theme controls.
-- `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
+- `Codex Dream Skin Console`: compact control panel for launch, themes, images, pause/resume, restore, and verification.
+
+The console starts the existing tray service when needed. The tray remains a background control surface, but is no longer a separate desktop shortcut.
 
 `Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
 
@@ -42,7 +43,7 @@ Exit the Dream Skin tray and close Codex, update the checkout (`git pull`, or do
 
 ## Launch and verify
 
-The `Codex Dream Skin` shortcut is the recommended launcher. It asks for confirmation before restarting an open Codex window.
+The `Codex Dream Skin Console` shortcut is the recommended launcher. Its Apply action asks for confirmation before restarting an open Codex window.
 
 Command-line launch:
 
@@ -69,7 +70,7 @@ Next, use the generated screenshot to check horizontal overflow and text contras
 
 ## Change and save themes
 
-Open `Codex Dream Skin - Tray` to:
+Open `Codex Dream Skin Console` to:
 
 - Import a PNG, JPEG, or WebP background.
 - Save the active theme and switch through saved themes.
@@ -118,12 +119,17 @@ See [`../docs/platforms.md`](../docs/platforms.md) for the complete platform pat
 
 Run `node --version`, confirm that it reports version 22 or newer, and reopen PowerShell so an updated `PATH` takes effect.
 
+### PowerShell 7 is missing
+
+The graphical console requires PowerShell 7 and cannot fall back to Windows PowerShell 5.1. Install PowerShell 7, run `pwsh --version` to confirm it is available, and reopen the console.
+
 ### The official Codex package is missing
 
 Run:
 
 ```powershell
 Get-AppxPackage -Name OpenAI.Codex
+Get-AppxPackage -Name OpenAI.CodexBeta
 ```
 
 The scripts accept only a registered official Store package. They do not launch Codex from an arbitrary executable path.
@@ -142,7 +148,7 @@ When `-Port` is omitted, the launcher searches for a free port beginning at `933
 
 ### Verification cannot find a CDP endpoint
 
-Launch Codex through the `Codex Dream Skin` shortcut, then run verification. A normal Codex launch does not open the debug session used by Dream Skin.
+Apply the skin through `Codex Dream Skin Console`, then run verification. A normal Codex launch does not open the debug session used by Dream Skin.
 
 ### The skin stops working after a Codex update
 

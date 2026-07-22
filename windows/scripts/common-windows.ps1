@@ -58,6 +58,9 @@ function Get-DreamSkinRuntimeEnginePaths {
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
+    Console = Join-Path $scripts 'console-dream-skin.ps1'
+    ConsoleLauncher = Join-Path $scripts 'launch-console.vbs'
+    ConsoleExecutable = Join-Path $root 'assets\Codex Dream Skin.exe'
   }
 }
 
@@ -130,6 +133,9 @@ function Install-DreamSkinRuntimeEngine {
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
     'assets\theme.json',
+    'assets\codex-icon.ico',
+    'launcher\CodexDreamSkinLauncher.cs',
+    'launcher\build-launcher.ps1',
     'presets\preset-gothic-void-crusade\background.jpg',
     'presets\preset-gothic-void-crusade\theme.json',
     'scripts\common-windows.ps1',
@@ -141,6 +147,8 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
     'scripts\tray-dream-skin.ps1',
+    'scripts\console-dream-skin.ps1',
+    'scripts\launch-console.vbs',
     'scripts\verify-dream-skin.ps1'
   )
   foreach ($relative in $required) {
@@ -148,7 +156,7 @@ function Install-DreamSkinRuntimeEngine {
       throw "Dream Skin runtime source is incomplete: $relative"
     }
   }
-  $runtimeDirectories = @('assets', 'scripts', 'presets')
+  $runtimeDirectories = @('assets', 'scripts', 'presets', 'launcher')
   foreach ($directoryName in $runtimeDirectories) {
     $sourceDirectory = Join-Path $sourceRoot $directoryName
     if ((Test-DreamSkinPathEqual -Left $fullStateRoot -Right $sourceDirectory) -or
@@ -203,10 +211,26 @@ function Install-DreamSkinRuntimeEngine {
     }
 
     # Unblock only verified managed copies so shortcuts can honor RemoteSigned instead of bypassing policy.
-    foreach ($runtimeScript in Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'scripts') `
+    foreach ($runtimeScript in Get-ChildItem -LiteralPath $stagingRoot `
       -Filter '*.ps1' -Recurse -File -Force -ErrorAction Stop) {
       Unblock-File -LiteralPath $runtimeScript.FullName -ErrorAction Stop
     }
+
+    $launcherOutput = Join-Path $stagingRoot 'assets\Codex Dream Skin.exe'
+    & (Join-Path $stagingRoot 'launcher\build-launcher.ps1') -OutputPath $launcherOutput | Out-Null
+    if (-not (Test-Path -LiteralPath $launcherOutput -PathType Leaf)) {
+      throw 'The native Codex Dream Skin launcher was not generated in the staged runtime.'
+    }
+    $launcherBytes = [System.IO.File]::ReadAllBytes($launcherOutput)
+    if ($launcherBytes.Length -lt 512 -or $launcherBytes[0] -ne 0x4d -or $launcherBytes[1] -ne 0x5a) {
+      throw 'The staged native launcher is not a valid PE image.'
+    }
+    $launcherPeOffset = [BitConverter]::ToInt32($launcherBytes, 0x3c)
+    $launcherSubsystem = [BitConverter]::ToUInt16($launcherBytes, $launcherPeOffset + 24 + 68)
+    if ($launcherSubsystem -ne 2) {
+      throw 'The staged native launcher is not a Windows GUI executable.'
+    }
+    Unblock-File -LiteralPath $launcherOutput -ErrorAction Stop
 
     $hasBackup = $false
     if (Test-Path -LiteralPath $engine.Root) {
@@ -336,26 +360,38 @@ function ConvertTo-DreamSkinCodexInstall {
     [Parameter(Mandatory = $true)][object]$Package,
     [AllowNull()][object]$Manifest
   )
-  if ("$($Package.Name)" -ine 'OpenAI.Codex' -or -not $Package.InstallLocation -or
+  $packageName = "$($Package.Name)"
+  $allowedExecutables = switch ($packageName) {
+    # Prefer the standalone Codex executable when the package manifest exposes it.
+    # Older Store manifests still register ChatGPT.exe as the activation target,
+    # so keep those names as compatibility fallbacks for process activation.
+    'OpenAI.Codex' { @('app\Codex.exe', 'app\ChatGPT.exe'); break }
+    'OpenAI.CodexBeta' { @('app\Codex (Beta).exe', 'app\Codex.exe', 'app\ChatGPT (Beta).exe'); break }
+    default { return $null }
+  }
+  if (-not $Package.InstallLocation -or
     -not $Package.PackageFullName -or -not $Package.PackageFamilyName -or
     "$($Package.SignatureKind)" -ine 'Store' -or [bool]$Package.IsDevelopmentMode) {
     return $null
   }
   $packageRoot = "$($Package.InstallLocation)"
-  $executable = Join-Path $packageRoot 'app\ChatGPT.exe'
-  if (-not (Test-Path -LiteralPath $executable)) { return $null }
   try {
     if (-not $PSBoundParameters.ContainsKey('Manifest')) {
       $Manifest = Get-AppxPackageManifest -Package $Package -ErrorAction Stop
     }
     $applications = @($Manifest.Package.Applications.Application | Where-Object {
-      "$($_.Executable)".Replace('/', '\') -ieq 'app\ChatGPT.exe'
+      "$($_.Executable)".Replace('/', '\') -in $allowedExecutables
     })
+    # Reject duplicate matching applications: choosing one from an ambiguous
+    # manifest would weaken the package identity validation.
     if ($applications.Count -ne 1) { return $null }
     $applicationId = "$($applications[0].Id)"
+    $applicationExecutable = "$($applications[0].Executable)".Replace('/', '\')
   } catch {
     return $null
   }
+  $executable = Join-Path $packageRoot $applicationExecutable
+  if (-not (Test-Path -LiteralPath $executable)) { return $null }
   $packageFamilyName = "$($Package.PackageFamilyName)"
   if ($packageFamilyName -cnotmatch '^[A-Za-z0-9._-]{1,128}$' -or
     $applicationId -cnotmatch '^[A-Za-z0-9._-]{1,64}$') {
@@ -374,7 +410,9 @@ function ConvertTo-DreamSkinCodexInstall {
 }
 
 function Get-DreamSkinRegisteredCodexInstalls {
-  $packages = @(Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | Sort-Object Version -Descending)
+  $packages = @(Get-AppxPackage -ErrorAction Stop | Where-Object {
+    "$($_.Name)" -in @('OpenAI.Codex', 'OpenAI.CodexBeta')
+  } | Sort-Object Version -Descending)
   $installs = @()
   foreach ($package in $packages) {
     $install = ConvertTo-DreamSkinCodexInstall -Package $package
@@ -387,6 +425,91 @@ function Get-DreamSkinCodexInstall {
   $installs = @(Get-DreamSkinRegisteredCodexInstalls)
   if ($installs.Count -eq 0) { throw 'The official OpenAI.Codex Store package is not installed or its identity cannot be validated.' }
   return $installs[0]
+}
+
+function Get-DreamSkinCodexIconSourcePath {
+  <# Resolve an icon-bearing executable from the registered Codex package.
+     This path is used only while installing, when the package is readable. #>
+  param([AllowNull()][object]$Codex)
+  $roots = @()
+  if ($null -ne $Codex -and $Codex.PackageRoot) {
+    $roots += "$($Codex.PackageRoot)"
+  } else {
+    try {
+      $roots += @(Get-DreamSkinRegisteredCodexInstalls | ForEach-Object { "$($_.PackageRoot)" })
+    } catch {
+      # Icon lookup is cosmetic; callers retain their own fallback icon.
+    }
+  }
+  $candidateNames = @(
+    'app\Codex (Beta).exe',
+    'app\Codex.exe',
+    'app\resources\codex.exe'
+  )
+  foreach ($root in ($roots | Select-Object -Unique)) {
+    foreach ($relative in $candidateNames) {
+      $candidate = Join-Path $root $relative
+      if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+  }
+  return $null
+}
+
+function Get-DreamSkinCodexIconPath {
+  <#
+    Return the extracted icon stored outside WindowsApps. Shortcuts and the
+    tray must never retain a package executable path as their icon location.
+  #>
+  param([string]$RuntimeRoot)
+  $root = if ($RuntimeRoot) {
+    [System.IO.Path]::GetFullPath($RuntimeRoot)
+  } else {
+    [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) ''))
+  }
+  $iconPath = Join-Path $root 'assets\codex-icon.ico'
+  if (Test-Path -LiteralPath $iconPath -PathType Leaf) { return $iconPath }
+  return $null
+}
+
+function Export-DreamSkinCodexIcon {
+  <# Extract the standalone Codex icon once into the managed state directory. #>
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [Parameter(Mandatory = $true)][string]$DestinationPath
+  )
+  $sourcePath = Get-DreamSkinCodexIconSourcePath -Codex $Codex
+  if (-not $sourcePath) { throw 'The registered Codex package does not expose a readable Codex icon executable.' }
+  $destination = [System.IO.Path]::GetFullPath($DestinationPath)
+  $parent = [System.IO.Path]::GetDirectoryName($destination)
+  if (-not $parent) { throw 'The Codex icon destination directory is invalid.' }
+  if (Get-Command Ensure-DreamSkinManagedDirectory -ErrorAction SilentlyContinue) {
+    Ensure-DreamSkinManagedDirectory -Path $parent -Root $parent
+  } else {
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+  }
+  Add-Type -AssemblyName System.Drawing
+  $icon = $null
+  $stream = $null
+  $temporary = "$destination.$([guid]::NewGuid().ToString('N')).tmp"
+  try {
+    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($sourcePath)
+    if ($null -eq $icon) { throw 'Windows could not extract the Codex icon.' }
+    $stream = [System.IO.File]::Open($temporary, [System.IO.FileMode]::CreateNew,
+      [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    $icon.Save($stream)
+    $stream.Flush($true)
+    $stream.Dispose()
+    $stream = $null
+    Move-Item -LiteralPath $temporary -Destination $destination -Force
+  } finally {
+    if ($null -ne $stream) { $stream.Dispose() }
+    if ($null -ne $icon) { $icon.Dispose() }
+    if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
+  }
+  if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) {
+    throw 'The extracted Codex icon was not written to the managed state directory.'
+  }
+  return $destination
 }
 
 function Initialize-DreamSkinPackageLauncher {
@@ -459,8 +582,15 @@ function Get-DreamSkinCodexStatePathCandidate {
   if ($null -eq $State -or -not $State.codexExe -or -not $State.codexPackageRoot) { return $null }
   $executable = "$($State.codexExe)"
   $packageRoot = "$($State.codexPackageRoot)"
-  $expectedExecutable = Join-Path $packageRoot 'app\ChatGPT.exe'
-  if (-not (Test-DreamSkinPathEqual -Left $executable -Right $expectedExecutable)) { return $null }
+  $expectedExecutables = @(
+    (Join-Path $packageRoot 'app\Codex (Beta).exe'),
+    (Join-Path $packageRoot 'app\Codex.exe'),
+    (Join-Path $packageRoot 'app\ChatGPT.exe'),
+    (Join-Path $packageRoot 'app\ChatGPT (Beta).exe')
+  )
+  if (-not ($expectedExecutables | Where-Object {
+    Test-DreamSkinPathEqual -Left $executable -Right $_
+  })) { return $null }
   return [pscustomobject]@{
     PackageRoot = $packageRoot
     Executable = $executable
@@ -777,10 +907,14 @@ function Stop-DreamSkinRecordedInjector {
 
 function Get-DreamSkinCodexProcesses {
   param([Parameter(Mandatory = $true)][object]$Codex)
-  return @(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" -ErrorAction SilentlyContinue |
+  $processName = [System.IO.Path]::GetFileName("$($Codex.Executable)")
+  if (-not $processName) { return @() }
+  return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object {
-      $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $_
-      Test-DreamSkinPathEqual -Left $processPath -Right $Codex.Executable
+      if ("$($_.Name)" -ieq $processName) {
+        $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $_
+        Test-DreamSkinPathEqual -Left $processPath -Right $Codex.Executable
+      }
     })
 }
 

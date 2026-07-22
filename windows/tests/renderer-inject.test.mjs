@@ -19,6 +19,23 @@ assert.doesNotMatch(
   /main\.main-surface\s*>\s*header\.app-header-tint\s*\{[^}]*\b(?:position|z-index)\s*:/,
   "The skin must preserve Codex's native fixed header so the side-panel toggle remains reachable.",
 );
+assert.doesNotMatch(
+  css,
+  /\.dream-task\s*>\s*\*\s*\{[^}]*\b(?:position|z-index)\s*:/,
+  "Task decoration must not replace positioning or stacking for every native top-level control.",
+);
+assert.match(css, /\.dream-plan-progress\s*\{[^}]*flex:\s*0 0 auto\s*!important/,
+  "Plan progress must not shrink into the changed-file +/- counter.");
+assert.match(css, /\.dream-plan-progress-shell\s*\{[^}]*width:\s*max-content\s*!important/,
+  "The plan status pill must expand to contain both progress and changed-file statistics.");
+assert.match(css, /button:has\(\.diff-stat-rolling-number\)\s*\{[^}]*min-width:\s*max-content\s*!important/,
+  "The changed-file +/- counter must stay inside its button.");
+assert.match(css, /button\[class~="bg-token-foreground"\]\s+:is\(svg, path\)\s*\{[^}]*color:\s*var\(--dream-accent-ink\)\s*!important/,
+  "The primary composer button icon must retain high contrast against its themed background.");
+assert.match(template, /PLAN_PROGRESS_CLASS\s*=\s*"dream-plan-progress"/,
+  "The renderer must mark the live plan progress label container.");
+assert.match(template, /PLAN_PROGRESS_SHELL_CLASS\s*=\s*"dream-plan-progress-shell"/,
+  "The renderer must mark the live plan progress pill shell.");
 
 function createFixture({
   shellPresent,

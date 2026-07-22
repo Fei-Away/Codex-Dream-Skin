@@ -155,8 +155,11 @@ try {
         (Join-Path $desktop 'Codex Dream Skin.lnk'),
         (Join-Path $desktop 'Codex Dream Skin - Restore.lnk'),
         (Join-Path $desktop 'Codex Dream Skin - Tray.lnk'),
+        (Join-Path $desktop 'Codex Dream Skin Console.lnk'),
         (Join-Path $startMenu 'Codex Dream Skin.lnk'),
-        (Join-Path $startMenu 'Codex Dream Skin - Tray.lnk')
+        (Join-Path $startMenu 'Codex Dream Skin - Restore.lnk'),
+        (Join-Path $startMenu 'Codex Dream Skin - Tray.lnk'),
+        (Join-Path $startMenu 'Codex Dream Skin Console.lnk')
       ) | ForEach-Object { Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue }
     }
 

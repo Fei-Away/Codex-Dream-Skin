@@ -12,9 +12,12 @@ Assert-DreamSkinPort -Port $Port
 $SkillRoot = Split-Path -Parent $PSScriptRoot
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $paths = Initialize-DreamSkinThemeStore -SkillRoot $SkillRoot -StateRoot $StateRoot
-$powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
+$powershellCommand = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+if (-not $powershellCommand) { $powershellCommand = Get-Command powershell.exe -ErrorAction Stop }
+$powershell = $powershellCommand.Source
 $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
 $restoreScript = Join-Path $PSScriptRoot 'restore-dream-skin.ps1'
+$codexIconPath = Get-DreamSkinCodexIconPath
 
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
@@ -24,7 +27,19 @@ try {
   if (-not $acquired) { exit 0 }
 
   $notify = [System.Windows.Forms.NotifyIcon]::new()
-  $notify.Icon = [System.Drawing.SystemIcons]::Application
+  $codexIcon = $null
+  if ($codexIconPath) {
+    try {
+      if ([System.IO.Path]::GetExtension($codexIconPath) -ieq '.ico') {
+        $codexIcon = [System.Drawing.Icon]::new($codexIconPath)
+      } else {
+        $codexIcon = [System.Drawing.Icon]::ExtractAssociatedIcon($codexIconPath)
+      }
+    } catch { $codexIcon = $null }
+  }
+  # Use the standalone Codex executable's icon; the generic application icon is
+  # only a last-resort fallback when Windows cannot read the package resources.
+  $notify.Icon = if ($codexIcon) { $codexIcon } else { [System.Drawing.SystemIcons]::Application }
   $notify.Text = 'Codex Dream Skin'
   $notify.Visible = $true
   $menu = [System.Windows.Forms.ContextMenuStrip]::new()
@@ -43,9 +58,16 @@ try {
   function Start-DreamSkinPowerShell {
     param([Parameter(Mandatory = $true)][string]$Script, [string[]]$Arguments = @())
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
-    $argumentLine = '-NoProfile -ExecutionPolicy RemoteSigned -File ' + $scriptToken
+    $argumentLine = '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
-    Start-Process -FilePath $powershell -ArgumentList $argumentLine | Out-Null
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $powershell
+    $startInfo.Arguments = $argumentLine
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    $startInfo.WorkingDirectory = Join-Path $StateRoot 'engine'
+    [System.Diagnostics.Process]::Start($startInfo) | Out-Null
   }
 
   function Add-DreamSkinTrayItem {
@@ -207,6 +229,7 @@ try {
   [System.Windows.Forms.Application]::Run()
 } finally {
   if ($null -ne $notify) { $notify.Dispose() }
+  if ($null -ne $codexIcon) { $codexIcon.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
   $mutex.Dispose()
 }

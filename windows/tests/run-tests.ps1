@@ -14,7 +14,7 @@ try {
   $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
   $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
   New-Item -ItemType Directory -Path $runtimeSourceRoot | Out-Null
-  foreach ($directoryName in @('assets', 'scripts', 'presets')) {
+  foreach ($directoryName in @('assets', 'scripts', 'presets', 'launcher')) {
     Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
       -Recurse -Force -ErrorAction Stop
   }
@@ -28,17 +28,19 @@ try {
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
   $sourcePrefix = $runtimeSourceRoot.TrimEnd('\') + '\'
   $runtimeSourceFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts'), (Join-Path $runtimeSourceRoot 'presets') `
+    Get-ChildItem -LiteralPath (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts'), (Join-Path $runtimeSourceRoot 'presets'), (Join-Path $runtimeSourceRoot 'launcher') `
       -Recurse -File -Force
   )
   $runtimeEngineFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts'), (Join-Path $engine.Root 'presets') `
+    Get-ChildItem -LiteralPath (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts'), (Join-Path $engine.Root 'presets'), (Join-Path $engine.Root 'launcher') `
       -Recurse -File -Force
   )
-  if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
+  if (($runtimeSourceFiles.Count + 1) -ne $runtimeEngineFiles.Count -or
     -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
+    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot) -or
+    -not (Test-DreamSkinPathWithin -Path $engine.Console -Root $runtimeStateRoot) -or
+    -not (Test-DreamSkinPathWithin -Path $engine.ConsoleExecutable -Root $runtimeStateRoot)) {
     throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
   }
   foreach ($sourceFile in $runtimeSourceFiles) {
@@ -53,6 +55,10 @@ try {
   if (@(Get-Item -LiteralPath $engine.Start -Stream 'Zone.Identifier' `
     -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Installed runtime retained an Internet-zone marker and cannot use RemoteSigned safely.'
+  }
+  if (@(Get-Item -LiteralPath $engine.ConsoleExecutable -Stream 'Zone.Identifier' `
+    -ErrorAction SilentlyContinue).Count -ne 0) {
+    throw 'Generated native launcher retained an Internet-zone marker.'
   }
 
   [System.IO.File]::WriteAllText((Join-Path $engine.Root 'stale-runtime.txt'), 'stale')
@@ -138,34 +144,44 @@ try {
   if ($hashVerificationIndex -lt 0 -or $unblockIndex -le $hashVerificationIndex) {
     throw 'Runtime scripts are not unblocked only after staged byte-content verification.'
   }
+  foreach ($requiredRuntimeBuildToken in @(
+    "'launcher\CodexDreamSkinLauncher.cs'",
+    "'launcher\build-launcher.ps1'",
+    "Join-Path `$stagingRoot 'assets\Codex Dream Skin.exe'",
+    "Join-Path `$stagingRoot 'launcher\build-launcher.ps1'"
+  )) {
+    if (-not $commonSource.Contains($requiredRuntimeBuildToken)) {
+      throw "Runtime installer does not build its native launcher from source: $requiredRuntimeBuildToken"
+    }
+  }
   $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
   $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
   if ($trayGuardIndex -lt 0 -or $engineInstallIndex -le $trayGuardIndex) {
     throw 'Installer does not reject an active source-bound tray before replacing the runtime engine.'
   }
   foreach ($requiredShortcutBinding in @(
-    '$startScript = $engine.Start',
-    '$restoreScript = $engine.Restore',
-    '$trayScript = $engine.Tray',
-    '$shortcut.WorkingDirectory = $engine.Root',
-    '$restore.WorkingDirectory = $engine.Root',
-    '$tray.WorkingDirectory = $engine.Root'
+    '$consoleExecutable = $engine.ConsoleExecutable',
+    '$console.TargetPath = $consoleExecutable',
+    '$console.WorkingDirectory = $engine.Root',
+    'Codex Dream Skin Console.lnk',
+    'Codex Dream Skin - Restore.lnk',
+    'Codex Dream Skin - Tray.lnk'
   )) {
     if (-not $installSource.Contains($requiredShortcutBinding)) {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
     }
   }
-  if ([regex]::Matches($installSource, '-ExecutionPolicy RemoteSigned').Count -ne 4 -or
-    $installSource.Contains('-ExecutionPolicy Bypass')) {
-    throw 'Installer shortcuts or tray launch still bypass the PowerShell execution policy.'
+  if ($installSource.Contains('-ExecutionPolicy Bypass') -or $installSource.Contains('System32\wscript.exe')) {
+    throw 'Installer still creates a script-host shortcut instead of using the native executable.'
   }
 
   Remove-Item -LiteralPath $runtimeSourceRoot -Recurse -Force
   foreach ($installedScript in Get-ChildItem -LiteralPath $engine.Scripts -Filter '*.ps1' -File) {
+    $installedSource = Read-DreamSkinUtf8File -Path $installedScript.FullName
     $tokens = $null
     $parseErrors = $null
-    [System.Management.Automation.Language.Parser]::ParseFile(
-      $installedScript.FullName, [ref]$tokens, [ref]$parseErrors
+    [System.Management.Automation.Language.Parser]::ParseInput(
+      $installedSource, [ref]$tokens, [ref]$parseErrors
     ) | Out-Null
     if ($parseErrors.Count -gt 0) {
       throw "Installed runtime script failed to parse after its source checkout was removed: $($installedScript.Name)"
@@ -173,8 +189,11 @@ try {
   }
   if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
-    throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
+    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.Console -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.ConsoleLauncher -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.ConsoleExecutable -PathType Leaf)) {
+    throw 'Installed launch, restore, tray, or console entry point disappeared with the source checkout.'
   }
   Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
 
@@ -551,7 +570,7 @@ try {
   }
 
   $fakePackageRoot = Join-Path $temporaryRoot 'OpenAI.Codex_1.2.3.4_x64__test'
-  $fakeExecutable = Join-Path $fakePackageRoot 'app\ChatGPT.exe'
+  $fakeExecutable = Join-Path $fakePackageRoot 'app\Codex.exe'
   New-Item -ItemType Directory -Path (Split-Path -Parent $fakeExecutable) -Force | Out-Null
   [System.IO.File]::WriteAllBytes($fakeExecutable, [byte[]]@())
   $fakePackage = [pscustomobject]@{
@@ -568,7 +587,7 @@ try {
       Applications = [pscustomobject]@{
         Application = @(
           [pscustomobject]@{ Id = 'Other'; Executable = 'other\Other.exe' },
-          [pscustomobject]@{ Id = 'App'; Executable = 'app/ChatGPT.exe' }
+          [pscustomobject]@{ Id = 'App'; Executable = 'app/Codex.exe' }
         )
       }
     }
@@ -584,7 +603,7 @@ try {
     throw 'An invalid packaged-app application ID was accepted.'
   }
   $fakeManifest.Package.Applications.Application[1].Id = 'App'
-  $fakeManifest.Package.Applications.Application += [pscustomobject]@{ Id = 'Duplicate'; Executable = 'app\ChatGPT.exe' }
+  $fakeManifest.Package.Applications.Application += [pscustomobject]@{ Id = 'Duplicate'; Executable = 'app\Codex.exe' }
   if ($null -ne (ConvertTo-DreamSkinCodexInstall -Package $fakePackage -Manifest $fakeManifest)) {
     throw 'An ambiguous packaged-app manifest was accepted.'
   }
@@ -594,6 +613,49 @@ try {
     throw 'A non-Store Appx package was accepted as official Codex.'
   }
   $fakePackage.SignatureKind = 'Store'
+  $fakeBetaPackageRoot = Join-Path $temporaryRoot 'OpenAI.CodexBeta_1.2.3.4_x64__test'
+  $fakeBetaExecutable = Join-Path $fakeBetaPackageRoot 'app\ChatGPT (Beta).exe'
+  New-Item -ItemType Directory -Path (Split-Path -Parent $fakeBetaExecutable) -Force | Out-Null
+  [System.IO.File]::WriteAllBytes($fakeBetaExecutable, [byte[]]@())
+  $fakeBetaPackage = [pscustomobject]@{
+    Name = 'OpenAI.CodexBeta'
+    InstallLocation = $fakeBetaPackageRoot
+    PackageFullName = 'OpenAI.CodexBeta_1.2.3.4_x64__test'
+    PackageFamilyName = 'OpenAI.CodexBeta_test'
+    SignatureKind = 'Store'
+    IsDevelopmentMode = $false
+    Version = [version]'1.2.3.4'
+  }
+  $fakeBetaManifest = [pscustomobject]@{
+    Package = [pscustomobject]@{
+      Applications = [pscustomobject]@{
+        Application = @([pscustomobject]@{ Id = 'App'; Executable = 'app/ChatGPT (Beta).exe' })
+      }
+    }
+  }
+  $fakeBetaInstall = ConvertTo-DreamSkinCodexInstall -Package $fakeBetaPackage -Manifest $fakeBetaManifest
+  if ($null -eq $fakeBetaInstall -or $fakeBetaInstall.AppUserModelId -cne 'OpenAI.CodexBeta_test!App' -or
+    -not (Test-DreamSkinPathEqual -Left $fakeBetaInstall.Executable -Right $fakeBetaExecutable)) {
+    throw 'Registered Codex Beta Appx package identity conversion failed.'
+  }
+  $fakeBetaProcess = [pscustomobject]@{
+    ProcessId = 4242
+    Name = 'ChatGPT (Beta).exe'
+    ExecutablePath = $fakeBetaExecutable
+  }
+  function Get-CimInstance {
+    [CmdletBinding()]
+    param([Parameter(Position = 0)][string]$ClassName, [string]$Filter)
+    return @($fakeBetaProcess)
+  }
+  try {
+    $detectedBetaProcesses = @(Get-DreamSkinCodexProcesses -Codex $fakeBetaInstall)
+    if ($detectedBetaProcesses.Count -ne 1 -or $detectedBetaProcesses[0].ProcessId -ne 4242) {
+      throw 'A running Codex Beta process was not recognized by its verified executable path.'
+    }
+  } finally {
+    Remove-Item -LiteralPath Function:\Get-CimInstance -ErrorAction SilentlyContinue
+  }
   $pathOnlyState = [pscustomobject]@{
     codexExe = $fakeExecutable
     codexPackageRoot = $fakePackageRoot
@@ -601,6 +663,14 @@ try {
   }
   if ($null -eq (Get-DreamSkinCodexStatePathCandidate -State $pathOnlyState)) {
     throw 'A structurally valid legacy Codex path was not recognized for read-only activity checks.'
+  }
+  $betaPathOnlyState = [pscustomobject]@{
+    codexExe = $fakeBetaExecutable
+    codexPackageRoot = $fakeBetaPackageRoot
+    codexVersion = '1.2.3.4'
+  }
+  if ($null -eq (Get-DreamSkinCodexStatePathCandidate -State $betaPathOnlyState)) {
+    throw 'A structurally valid Codex Beta path was not recognized for read-only activity checks.'
   }
   if ($null -eq (Resolve-DreamSkinCodexInstallFromState -State $pathOnlyState `
     -RegisteredInstalls @($fakeInstall))) {
@@ -756,8 +826,12 @@ try {
     'background-position: var(--dream-art-position)',
     '.dream-home-utility',
     ':has(.dream-home-utility) .composer-surface-chrome',
-    ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))'
-  )) {
+    ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))',
+    'dream-sidebar-toggle',
+    'dream-home-plus-promo',
+    'dream-home-layout',
+    '--dream-caret-color'
+)) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
@@ -829,6 +903,106 @@ try {
   } finally {
     $emptyMenu.Dispose()
   }
+  $consoleSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\console-dream-skin.ps1')
+  foreach ($requiredConsoleToken in @(
+    'System.Windows.Forms.Form',
+    'AutoScaleMode]::Dpi',
+    'System.Windows.Forms.TableLayoutPanel',
+    'Test-DreamSkinTrayActive',
+    'ConvertTo-DreamSkinProcessArgument',
+    'function Start-ConsoleScript',
+    'busyProcess',
+    'start-dream-skin.ps1',
+    'restore-dream-skin.ps1',
+    'verify-dream-skin.ps1'
+  )) {
+    if (-not $consoleSource.Contains($requiredConsoleToken)) {
+      throw "Console launcher is missing required behavior: $requiredConsoleToken"
+    }
+  }
+  $consoleTokens = $null
+  $consoleParseErrors = $null
+  $consoleAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $consoleSource,
+    [ref]$consoleTokens,
+    [ref]$consoleParseErrors
+  )
+  if ($consoleParseErrors.Count -gt 0) {
+    throw "Console launcher failed to parse: $($consoleParseErrors[0].Message)"
+  }
+  foreach ($roundedFunctionName in @('Update-RoundedRegion', 'Set-RoundedCorners')) {
+    $roundedFunctionAst = $consoleAst.Find({
+      param($node)
+      $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq $roundedFunctionName
+    }, $true)
+    if ($null -eq $roundedFunctionAst) {
+      throw "Console rounded-region helper is missing: $roundedFunctionName"
+    }
+    Invoke-Expression $roundedFunctionAst.Extent.Text
+  }
+  Add-Type -AssemblyName System.Drawing
+  $roundedProbe = [System.Windows.Forms.Panel]::new()
+  $roundedGraphics = $null
+  try {
+    $roundedProbe.Size = [System.Drawing.Size]::new(300, 100)
+    Set-RoundedCorners -Control $roundedProbe -Radius 12
+    $roundedProbe.Size = [System.Drawing.Size]::new(600, 100)
+    [System.Windows.Forms.Application]::DoEvents()
+    $roundedGraphics = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero)
+    $roundedBounds = $roundedProbe.Region.GetBounds($roundedGraphics)
+    if ([Math]::Abs($roundedBounds.Width - $roundedProbe.Width) -ge 1) {
+      throw 'Console rounded region retained its initial width after the control resized.'
+    }
+  } finally {
+    if ($null -ne $roundedGraphics) { $roundedGraphics.Dispose() }
+    $roundedProbe.Dispose()
+  }
+  $consoleLauncherSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\launch-console.vbs')
+  foreach ($requiredLauncherToken in @('WScript.Arguments', 'shell.Run command, 0, False')) {
+    if (-not $consoleLauncherSource.Contains($requiredLauncherToken)) {
+      throw "Hidden console launcher is missing required behavior: $requiredLauncherToken"
+    }
+  }
+  $nativeLauncherSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'launcher\CodexDreamSkinLauncher.cs')
+  foreach ($requiredNativeLauncherToken in @(
+    'CreateNoWindow = true',
+    'WindowStyle = ProcessWindowStyle.Hidden',
+    '-ExecutionPolicy RemoteSigned',
+    'CodexDreamSkin", "engine',
+    'console-dream-skin.ps1',
+    'FindPowerShell7(engineRoot)',
+    'IsPathWithin(resolved, engineRoot)',
+    'MinimumPort = 1024',
+    'MaximumPort = 65535'
+  )) {
+    if (-not $nativeLauncherSource.Contains($requiredNativeLauncherToken)) {
+      throw "Native console launcher is missing required behavior: $requiredNativeLauncherToken"
+    }
+  }
+  $nativeLauncherBuildRoot = Join-Path $temporaryRoot 'native-launcher-build'
+  $nativeLauncherPath = Join-Path $nativeLauncherBuildRoot 'Codex Dream Skin.exe'
+  New-Item -ItemType Directory -Path $nativeLauncherBuildRoot | Out-Null
+  & (Join-Path $Root 'launcher\build-launcher.ps1') -OutputPath $nativeLauncherPath | Out-Null
+  $nativeLauncherBytes = [System.IO.File]::ReadAllBytes($nativeLauncherPath)
+  if ($nativeLauncherBytes.Length -lt 512 -or $nativeLauncherBytes[0] -ne 0x4d -or $nativeLauncherBytes[1] -ne 0x5a) {
+    throw 'Native console launcher is not a valid PE image.'
+  }
+  $peOffset = [BitConverter]::ToInt32($nativeLauncherBytes, 0x3c)
+  $subsystem = [BitConverter]::ToUInt16($nativeLauncherBytes, $peOffset + 24 + 68)
+  if ($subsystem -ne 2) { throw 'Native console launcher is not using the Windows GUI subsystem.' }
+  $nativeVersion = (Get-Item -LiteralPath $nativeLauncherPath).VersionInfo
+  if ($nativeVersion.ProductName -cne 'Codex Dream Skin' -or $nativeVersion.FileDescription -notlike '*control panel launcher*') {
+    throw 'Native console launcher product metadata is missing.'
+  }
+  $nativeIcon = [System.Drawing.Icon]::ExtractAssociatedIcon($nativeLauncherPath)
+  try {
+    if ($null -eq $nativeIcon -or $nativeIcon.Width -lt 16 -or $nativeIcon.Height -lt 16) {
+      throw 'Native console launcher icon is missing.'
+    }
+  } finally {
+    if ($null -ne $nativeIcon) { $nativeIcon.Dispose() }
+  }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
     throw 'Complete restore does not stop a separately launched tray process.'
@@ -860,7 +1034,16 @@ try {
   }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
-  foreach ($requiredRendererBehavior in @('dream-home-utility', 'artMetadata', 'detectShellAppearance')) {
+  foreach ($requiredRendererBehavior in @(
+    'dream-home-utility',
+    'dream-sidebar-toggle',
+    'dream-home-plus-promo',
+    'dream-home-layout',
+    'artMetadata',
+    'detectShellAppearance',
+    'Get Plus',
+    '获取 Plus'
+  )) {
     if (-not $rendererSource.Contains($requiredRendererBehavior)) {
       throw "Renderer adaptive behavior is missing: $requiredRendererBehavior"
     }

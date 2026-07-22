@@ -40,6 +40,11 @@ try {
   }
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $SkillRoot -StateRoot $StateRoot
   $null = Initialize-DreamSkinThemeStore -SkillRoot $engine.Root -StateRoot $StateRoot
+  # The Codex icon is a checked-in, user-readable asset copied into the runtime.
+  $codexIconPath = Get-DreamSkinCodexIconPath -RuntimeRoot $engine.Root
+  if (-not $codexIconPath) {
+    throw 'The managed Codex icon asset is missing; refusing to use a package executable as a shortcut icon.'
+  }
   $ConfigPath = Join-Path $HOME '.codex\config.toml'
   $BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
   Install-DreamSkinBaseTheme -ConfigPath $ConfigPath -BackupPath $BackupPath
@@ -48,45 +53,37 @@ try {
     $shell = New-Object -ComObject WScript.Shell
     $desktop = [Environment]::GetFolderPath('Desktop')
     $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-    $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
-    $startScript = $engine.Start
-    $restoreScript = $engine.Restore
-    $trayScript = $engine.Tray
-    $portArgument = if ($PortExplicit) { " -Port $Port" } else { '' }
+    $consoleExecutable = $engine.ConsoleExecutable
+    if (-not (Test-Path -LiteralPath $codexIconPath -PathType Leaf)) {
+      throw 'The extracted Codex icon is unavailable; shortcuts were not created.'
+    }
+    if (-not (Test-Path -LiteralPath $consoleExecutable -PathType Leaf)) {
+      throw 'The native Codex Dream Skin launcher is unavailable; shortcuts were not created.'
+    }
+    $portArgument = if ($PortExplicit) { "-Port $Port" } else { '' }
 
     foreach ($folder in @($desktop, $startMenu)) {
-      $shortcut = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin.lnk'))
-      $shortcut.TargetPath = $powershell
-      $shortcut.Arguments = "-NoProfile -ExecutionPolicy RemoteSigned -File `"$startScript`"$portArgument -PromptRestart"
-      $shortcut.WorkingDirectory = $engine.Root
-      $shortcut.Description = 'Launch the official Codex app with Codex Dream Skin'
-      $shortcut.Save()
+      $console = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin Console.lnk'))
+      $console.TargetPath = $consoleExecutable
+      $console.Arguments = $portArgument
+      $console.WorkingDirectory = $engine.Root
+      $console.Description = 'Open the Codex Dream Skin control panel'
+      $console.IconLocation = "$consoleExecutable,0"
+      $console.Save()
+      foreach ($legacyName in @(
+        'Codex Dream Skin.lnk',
+        'Codex Dream Skin - Restore.lnk',
+        'Codex Dream Skin - Tray.lnk'
+      )) {
+        Remove-Item -LiteralPath (Join-Path $folder $legacyName) -Force -ErrorAction SilentlyContinue
+      }
     }
-
-    $restore = $shell.CreateShortcut((Join-Path $desktop 'Codex Dream Skin - Restore.lnk'))
-    $restore.TargetPath = $powershell
-    $restore.Arguments = "-NoProfile -ExecutionPolicy RemoteSigned -File `"$restoreScript`"$portArgument -RestoreBaseTheme -PromptRestart"
-    $restore.WorkingDirectory = $engine.Root
-    $restore.Description = 'Restore the official Codex appearance and close the CDP session'
-    $restore.Save()
-
-    foreach ($folder in @($desktop, $startMenu)) {
-      $tray = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin - Tray.lnk'))
-      $tray.TargetPath = $powershell
-      $tray.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument"
-      $tray.WorkingDirectory = $engine.Root
-      $tray.Description = 'Open Codex Dream Skin status and theme controls in the system tray'
-      $tray.Save()
-    }
-    Start-Process -FilePath $powershell -ArgumentList `
-      "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument" `
-      -WindowStyle Hidden | Out-Null
   }
 
   if ($NoShortcuts) {
-    Write-Host "Codex Dream Skin base theme installed at $($engine.Root). Run $($engine.Start) to launch it."
+    Write-Host "Codex Dream Skin base theme installed at $($engine.Root). Run $($engine.Console) to open the control panel."
   } else {
-    Write-Host 'Codex Dream Skin installed. The launch shortcut asks before restarting an open Codex window.'
+    Write-Host 'Codex Dream Skin installed. Use the single console shortcut to manage launch, themes, pause, restore, and verification.'
   }
 } finally {
   Exit-DreamSkinOperationLock -Mutex $operationLock

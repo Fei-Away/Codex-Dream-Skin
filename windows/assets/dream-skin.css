@@ -2,6 +2,7 @@
   color-scheme: light;
   --dream-accent: oklch(0.66 0.15 18);
   --dream-accent-ink: oklch(0.98 0.006 20);
+  --dream-caret-color: oklch(0.2 0.018 30);
   --dream-art-position: 72% 45%;
   --dream-canvas: color-mix(in oklab, oklch(0.975 0.006 35) 96%, var(--dream-accent));
   --dream-surface: color-mix(in oklab, oklch(0.988 0.004 35) 97%, var(--dream-accent));
@@ -31,6 +32,7 @@
 :root.codex-dream-skin.dream-theme-dark {
   color-scheme: dark;
   --dream-canvas: color-mix(in oklab, oklch(0.16 0.012 245) 96%, var(--dream-accent));
+  --dream-caret-color: oklch(0.97 0.008 245);
   --dream-surface: color-mix(in oklab, oklch(0.19 0.012 245) 95%, var(--dream-accent));
   --dream-surface-raised: color-mix(in oklab, oklch(0.23 0.012 245) 95%, var(--dream-accent));
   --dream-sidebar: color-mix(in oklab, oklch(0.145 0.014 245) 94%, var(--dream-accent));
@@ -76,6 +78,29 @@ html.codex-dream-skin aside.app-shell-left-panel nav {
 html.codex-dream-skin aside.app-shell-left-panel button {
   color: var(--dream-text) !important;
   transition: background-color 180ms cubic-bezier(.22, 1, .36, 1), color 180ms cubic-bezier(.22, 1, .36, 1) !important;
+}
+
+html.codex-dream-skin .dream-sidebar-toggle {
+  opacity: 1 !important;
+  color: var(--dream-text) !important;
+}
+
+/* The plan label and the changed-file counter share one compact status pill.
+   Keep the label at its intrinsic width so its nowrap text cannot spill over
+   the +/- counter when both are present. */
+html.codex-dream-skin .dream-plan-progress {
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+}
+
+html.codex-dream-skin .dream-plan-progress-shell {
+  width: max-content !important;
+}
+
+html.codex-dream-skin .dream-plan-progress + div,
+html.codex-dream-skin .dream-plan-progress + div button:has(.diff-stat-rolling-number) {
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
 }
 
 html.codex-dream-skin aside.app-shell-left-panel button:hover {
@@ -182,8 +207,7 @@ html.codex-dream-skin.dream-task-off .dream-task::before {
   display: none;
 }
 
-html.codex-dream-skin .dream-task > * {
-  position: relative;
+html.codex-dream-skin .dream-task > :not(header.app-header-tint) {
   z-index: 1;
 }
 
@@ -376,13 +400,23 @@ html.codex-dream-skin .composer-surface-chrome {
 
 html.codex-dream-skin .ProseMirror {
   color: var(--dream-text) !important;
-  caret-color: var(--dream-accent) !important;
+  caret-color: var(--dream-caret-color) !important;
+}
+
+html.codex-dream-skin [contenteditable="true"],
+html.codex-dream-skin textarea,
+html.codex-dream-skin input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
+  caret-color: var(--dream-caret-color) !important;
 }
 
 html.codex-dream-skin button[class~="bg-token-foreground"] {
   color: var(--dream-accent-ink) !important;
   background: var(--dream-accent) !important;
   box-shadow: none !important;
+}
+
+html.codex-dream-skin button[class~="bg-token-foreground"] :is(svg, path) {
+  color: var(--dream-accent-ink) !important;
 }
 
 html.codex-dream-skin [data-message-author-role],
@@ -411,7 +445,7 @@ html.codex-dream-skin.dream-art-wide:is(.dream-task-ambient, .dream-task-banner)
     var(--dream-immersive-sidebar),
     var(--dream-immersive-edge)) !important;
   border: 0 !important;
-  border-radius: 0 !important;
+  border-radius: 18px !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
 }
@@ -525,6 +559,20 @@ html.codex-dream-skin .dream-home:has(.dream-home-utility) .composer-surface-chr
     inset 1px 0 var(--dream-immersive-line),
     inset -1px 0 var(--dream-immersive-line),
     inset 0 -1px var(--dream-immersive-line) !important;
+}
+
+html.codex-dream-skin .dream-home-plus-promo {
+  display: none !important;
+}
+
+/* Keep the project utility and composer aligned as one responsive home layout. */
+html.codex-dream-skin .dream-home-layout .dream-home-utility,
+html.codex-dream-skin .dream-home-layout .composer-surface-chrome {
+  width: min(1120px, calc(100% - 48px)) !important;
+  max-width: 1120px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
 }
 
 /* Plugins, scheduled tasks and search routes ship opaque sticky wrappers.
