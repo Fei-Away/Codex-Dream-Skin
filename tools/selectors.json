@@ -31,6 +31,7 @@
     { "key": "header-tint", "selector": "header.app-header-tint", "tier": "L1", "scope": "all", "required": true, "notes": "顶栏；皮肤不得覆盖其 position/z-index（既有回归约束）" },
     { "key": "home-icon", "selector": "[data-testid=\"home-icon\"]", "tier": "L1", "scope": "home", "required": true, "notes": "首页判定信号，双端一致" },
     { "key": "home-route", "selector": "[role=\"main\"]:has([data-testid=\"home-icon\"])", "tier": "L1", "scope": "home", "required": true, "notes": "首页容器。实测 [role=main] 仅存在于首页——它不是通用路由锚点，thread 页没有" },
+    { "key": "home-route-css", "selector": "[role=\"main\"]", "tier": "L1", "scope": "home", "required": false, "notes": "home-route 的 CSS 可组合别名：不含 :has()。CSS 禁止 :has() 嵌套，home-route 原选择器一旦写进 :has()/:not(:has()) 整条规则会被解析器丢弃（v1.3.1 全窗口首页与任务页氛围背景因此失效）。依据与 home-route 相同的实测：[role=main] 仅存在于首页" },
     { "key": "composer-chrome", "selector": ".composer-surface-chrome", "tier": "L2", "scope": "home+thread", "required": false, "notes": "输入框壳。win 实测存在无 composer 的 detail 路由，不可当全局锚点" },
     { "key": "home-utility", "selector": "[class*=\"_homeUtilityBar_\"]", "tier": "L2", "scope": "home", "required": false, "notes": "CSS Modules 前缀匹配；模块名跨端稳定、hash 随版本变，禁止匹配完整 hash" },
     { "key": "game-source", "selector": "[data-feature=\"game-source\"]", "tier": "L2", "scope": "home", "required": false },

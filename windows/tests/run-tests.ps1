@@ -945,8 +945,8 @@ try {
     '--ds-immersive-composer',
     'background-position: var(--ds-art-position)',
     'html[data-dream-skin="active"]',
-    'main.main-surface:has([role="main"]:has([data-testid="home-icon"]))',
-    'main.main-surface:not(:has([role="main"]:has([data-testid="home-icon"])))'
+    'main.main-surface:has([role="main"])',
+    'main.main-surface:not(:has([role="main"]))'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }

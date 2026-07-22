@@ -193,7 +193,12 @@ export async function runRendererRuntimeTest(assetRoot) {
   // and the measured fossil selector must be absent from the canonical CSS.
   assert.doesNotMatch(css, /(?:^|[.#\s])(?:codex-dream-skin|dream-skin-home|dream-home|dream-task)(?:[\s.#:{>]|$)|home-suggestion-list-item/);
   assert.match(css, /html\[data-dream-skin="active"\]/);
-  assert.match(css, /main\.main-surface:has\(\[role="main"\]:has\(\[data-testid="home-icon"\]\)\)/);
+  // Home gating must stay single-level: CSS forbids :has() inside :has(),
+  // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
+  // canonical CSS therefore gates on the :has()-free home-route-css alias.
+  assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
+  assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
+  assert.doesNotMatch(css, /:has\([^()]*:has\(/);
   assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
   assert.match(css, /content:\s*var\(--dream-skin-status/);
   assert.match(css, /content:\s*var\(--dream-skin-quote/);
