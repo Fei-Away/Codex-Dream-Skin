@@ -29,7 +29,9 @@ if [ "$SKIP_TESTS" != "true" ]; then
 fi
 
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-app.XXXXXX)"
-trap '/bin/rm -rf "$TMP"' EXIT
+# Preserve the real exit status; a plain cleanup trap masks fatal errors as
+# success on the /bin/bash 3.2 this shebang resolves to.
+trap 'status=$?; /bin/rm -rf "$TMP"; exit "$status"' EXIT
 ARCH_TEXT="${DREAMSKIN_ARCHS:-arm64 x86_64}"
 read -r -a ARCHS <<< "$ARCH_TEXT"
 [ "${#ARCHS[@]}" -gt 0 ] || { printf 'No build architectures selected.\n' >&2; exit 1; }
@@ -135,6 +137,8 @@ actual_public_preset_theme_sha256="$(LC_ALL=C /usr/bin/shasum -a 256 \
   || { printf 'Rights-restricted preset entered the public app bundle.\n' >&2; exit 1; }
 
 "$ROOT/scripts/generate-app-icon.sh" "$RESOURCES/DreamSkin.icns"
+[ -s "$RESOURCES/DreamSkin.icns" ] \
+  || { printf 'App icon is missing after generation: %s\n' "$RESOURCES/DreamSkin.icns" >&2; exit 1; }
 /usr/bin/codesign --force --deep --sign - --timestamp=none "$APP"
 /usr/bin/codesign --verify --deep --strict "$APP"
 

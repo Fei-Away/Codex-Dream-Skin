@@ -4,17 +4,23 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 OUTPUT="${1:-$ROOT/menubar-app/Resources/DreamSkin.icns}"
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-icon.XXXXXX)"
-trap '/bin/rm -rf "$TMP"' EXIT
+# Preserve the real exit status: with a plain cleanup trap, bash 3.2 reports
+# the trap command's status instead, so fatal errors leave exit code 0 and
+# the DMG build keeps going without an icon.
+trap 'status=$?; /bin/rm -rf "$TMP"; exit "$status"' EXIT
 
 ICONSET="$TMP/DreamSkin.iconset"
 SOURCE="$TMP/icon-1024.png"
 /bin/mkdir -p "$ICONSET" "$(dirname "$OUTPUT")"
-SWIFT_ARGS=()
+# No array here: expanding an empty array under `set -u` is fatal on the
+# /bin/bash 3.2 this shebang resolves to.
 if [ -n "${DREAMSKIN_SDK:-}" ]; then
-  SWIFT_ARGS+=( -sdk "$DREAMSKIN_SDK" )
+  /usr/bin/xcrun swift -sdk "$DREAMSKIN_SDK" \
+    "$ROOT/menubar-app/Tools/generate-icon.swift" "$SOURCE"
+else
+  /usr/bin/xcrun swift \
+    "$ROOT/menubar-app/Tools/generate-icon.swift" "$SOURCE"
 fi
-/usr/bin/xcrun swift "${SWIFT_ARGS[@]}" \
-  "$ROOT/menubar-app/Tools/generate-icon.swift" "$SOURCE"
 
 make_icon() {
   local pixels="$1"
@@ -33,4 +39,6 @@ make_icon 512 icon_256x256@2x.png
 make_icon 512 icon_512x512.png
 /bin/cp "$SOURCE" "$ICONSET/icon_512x512@2x.png"
 /usr/bin/iconutil --convert icns --output "$OUTPUT" "$ICONSET"
+[ -s "$OUTPUT" ] \
+  || { printf 'Icon generation produced no output: %s\n' "$OUTPUT" >&2; exit 1; }
 /usr/bin/printf 'Created %s\n' "$OUTPUT"
