@@ -100,6 +100,28 @@ if ! /usr/bin/grep -F -q '# CodexDreamSkinStudio launcher' \
   exit 1
 fi
 
+# Shared runtime contract: selectors and renderer/CSS sources are compiled
+# once, then staged byte-for-byte into both platform asset directories.
+PROJECT_ROOT="$(cd "$ROOT/.." && pwd -P)"
+"$NODE" "$PROJECT_ROOT/tools/sync-runtime-assets.mjs" --check
+"$NODE" "$PROJECT_ROOT/tools/doctor-selectors.test.mjs"
+if ! /usr/bin/cmp -s "$ROOT/assets/dream-skin.css" "$PROJECT_ROOT/windows/assets/dream-skin.css" ||
+    ! /usr/bin/cmp -s "$ROOT/assets/renderer-inject.js" "$PROJECT_ROOT/windows/assets/renderer-inject.js" ||
+    ! /usr/bin/cmp -s "$ROOT/assets/selectors.json" "$PROJECT_ROOT/windows/assets/selectors.json"; then
+  printf 'macOS and Windows runtime assets are not byte-identical.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -E -q 'getBoundingClientRect|ResizeObserver|childList|subtree|classList\.(add|remove|toggle)|syncRouteState|samplingNativeShell' \
+    "$ROOT/assets/renderer-inject.js"; then
+  printf 'Unified renderer still contains retired layout/class or broad-observer behavior.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -E -q 'home-suggestion-list-item|\.dream-skin-home|\.dream-home|\.dream-task|codex-dream-skin-chrome' \
+    "$ROOT/assets/dream-skin.css"; then
+  printf 'Canonical CSS still contains retired marker classes or fossil selectors.\n' >&2
+  exit 1
+fi
+
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
@@ -362,7 +384,7 @@ run_signed_runtime_state_tests() {
 STOP_HOME="$TMP/stop-home"
 STOP_STATE_ROOT="$STOP_HOME/Library/Application Support/CodexDreamSkinStudio"
 /bin/mkdir -p "$STOP_STATE_ROOT"
-"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 30000);' &
+"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 600000);' &
 DUMMY_PID="$!"
 "$NODE" -e '
   const fs = require("node:fs");
@@ -426,7 +448,7 @@ DUMMY_PID=""
 STATUS_HOME="$TMP/status-home"
 STATUS_STATE_ROOT="$STATUS_HOME/Library/Application Support/CodexDreamSkinStudio"
 /bin/mkdir -p "$STATUS_STATE_ROOT"
-"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 30000);' &
+"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 600000);' &
 STATUS_PID="$!"
 "$NODE" -e '
   const fs = require("node:fs");
@@ -454,7 +476,7 @@ STATUS_PID=""
 # real bundled Node process so command/path/start checks pass and only the
 # token boundary distinguishes this case.
 STATUS_FAKE_INJECTOR="$TMP/status-fake-injector.mjs"
-/usr/bin/printf 'setTimeout(() => {}, 30000);\n' > "$STATUS_FAKE_INJECTOR"
+/usr/bin/printf 'setTimeout(() => {}, 600000);\n' > "$STATUS_FAKE_INJECTOR"
 "$NODE" "$STATUS_FAKE_INJECTOR" --watch --port 93410 --theme-dir "$TMP" &
 STATUS_PID="$!"
 /bin/sleep 0.08
