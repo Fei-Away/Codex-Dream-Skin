@@ -568,7 +568,8 @@
     const home = homeIndicator?.closest('[role="main"]') ||
       [...document.querySelectorAll('[role="main"]')].find((candidate) =>
         candidate.querySelector('[data-feature="game-source"]') &&
-        candidate.querySelector('.group\\\\/home-suggestions')) || null;
+        (candidate.querySelector('.group\\\\/home-suggestions') ||
+          candidate.querySelector('[data-codex-composer-root]'))) || null;
     for (const candidate of document.querySelectorAll('[role="main"].dream-skin-home')) {
       if (candidate !== home) candidate.classList.remove("dream-skin-home");
     }

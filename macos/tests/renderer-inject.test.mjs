@@ -85,6 +85,10 @@ assert.match(
   /\[class\*="_homeUtilityBar_"\][\s\S]{0,500}dream-skin-home-utility/,
   "The renderer should give the current native home utility bar a stable theme class.",
 );
+assert.ok(
+  template.includes("candidate.querySelector('[data-codex-composer-root]')"),
+  "Typed home routes must retain their stable theme class after native suggestions disappear.",
+);
 assert.match(
   css,
   /\.dream-skin-home:has\(\.dream-skin-home-utility\)[\s\S]{0,120}\.composer-surface-chrome\s*\{[\s\S]{0,180}border-radius:\s*0 0 22px 22px !important;/,
@@ -144,6 +148,21 @@ assert.match(
   css,
   /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,180}\.dream-skin-home \.dream-skin-home-utility[\s\S]{0,180}border:\s*1px solid rgb\(var\(--ds-accent-rgb\) \/ \.34\) !important;[\s\S]{0,100}border-radius:\s*18px !important;/,
   "Gothic's home project picker must retain a complete, visible border on all four sides.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,220}\[role="main"\]:has\(\[data-feature="game-source"\]\) \[class\*="_homeUtilityBar_"\][\s\S]{0,180}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.92\) !important;[\s\S]{0,220}border:\s*1px solid rgb\(var\(--ds-accent-rgb\) \/ \.34\) !important;/,
+  "Gothic's typed-home project bar must not flash the native white utility surface.",
+);
+assert.match(
+  css,
+  /data-dream-theme-id="preset-gothic-void-crusade"[\s\S]{0,220}rounded-3xl[\s\S]{0,120}thread-summary-panel-item-button[\s\S]{0,320}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\) !important;[\s\S]{0,160}border:\s*1px solid rgb\(var\(--ds-accent-rgb\) \/ \.36\) !important;/,
+  "Gothic's thread summary panel must use a readable preset surface and complete border.",
+);
+assert.match(
+  css,
+  /thread-summary-panel-section-actions[\s\S]{0,100}text-token-conversation-summary-trailing[\s\S]{0,140}color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.82\) !important;/,
+  "Gothic's summary actions and trailing labels must remain readable over the dark panel.",
 );
 assert.match(
   css,

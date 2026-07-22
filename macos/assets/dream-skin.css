@@ -1202,6 +1202,22 @@ html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
 
 html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
   .dream-skin-home .dream-skin-home-utility {
+  background: rgb(var(--ds-panel-rgb) / .92) !important;
+  color: var(--ds-text) !important;
+  margin-top: 8px !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .34) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 8px 22px rgb(var(--ds-bg-rgb) / .20),
+    inset 0 1px rgb(var(--ds-text-rgb) / .10) !important;
+}
+
+/* Keep the typed-home project bar readable during the short route-sync window
+   before Codex's generated utility bar receives its stable skin class. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [role="main"]:has([data-feature="game-source"]) [class*="_homeUtilityBar_"] {
+  background: rgb(var(--ds-panel-rgb) / .92) !important;
+  color: var(--ds-text) !important;
   margin-top: 8px !important;
   border: 1px solid rgb(var(--ds-accent-rgb) / .34) !important;
   border-radius: 18px !important;
@@ -1211,11 +1227,69 @@ html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
 }
 
 html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [role="main"]:has([data-feature="game-source"]) [class*="_homeUtilityBar_"] button {
+  color: rgb(var(--ds-muted-rgb) / .96) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  [role="main"]:has([data-feature="game-source"]) [class*="_homeUtilityBar_"] button * {
+  color: currentColor !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
   .dream-skin-home .group\/home-suggestions button.group\/home-suggestion-list-item {
   border: 1px solid rgb(var(--ds-accent-rgb) / .26) !important;
   box-shadow:
     0 8px 22px rgb(var(--ds-bg-rgb) / .18),
     inset 0 0 0 1px rgb(var(--ds-accent-rgb) / .08) !important;
+}
+
+/* The thread summary is rendered as a floating native dropdown, so bridge its
+   light-shell tokens only when Gothic is the active preset. */
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  div[class~="bg-token-dropdown-background"][class~="rounded-3xl"]:has([data-slot="thread-summary-panel-item-button"]) {
+  --color-token-dropdown-background: rgb(var(--ds-panel-rgb) / .94);
+  --color-token-conversation-summary-trailing: rgb(var(--ds-muted-rgb) / .82);
+  --color-token-border-default: rgb(var(--ds-accent-rgb) / .26);
+  --color-token-list-hover-background: rgb(var(--ds-accent-rgb) / .12);
+  background: rgb(var(--ds-panel-rgb) / .94) !important;
+  color: var(--ds-text) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .36) !important;
+  box-shadow:
+    0 18px 48px rgb(var(--ds-bg-rgb) / .42),
+    inset 0 1px rgb(var(--ds-text-rgb) / .10) !important;
+  backdrop-filter: blur(16px) saturate(108%);
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  div[class~="bg-token-dropdown-background"]:has([data-slot="thread-summary-panel-item-button"])
+  header[class~="bg-token-dropdown-background"] {
+  background: rgb(var(--ds-panel-rgb) / .96) !important;
+  color: var(--ds-accent) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  div[class~="bg-token-dropdown-background"]:has([data-slot="thread-summary-panel-item-button"])
+  :is([data-slot="thread-summary-panel-item-button"], [data-slot="thread-summary-panel-item-label"]) {
+  color: rgb(var(--ds-muted-rgb) / .96) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  div[class~="bg-token-dropdown-background"]:has([data-slot="thread-summary-panel-item-button"])
+  :is([data-slot="thread-summary-panel-section-actions"], [class~="text-token-conversation-summary-trailing"]) {
+  color: rgb(var(--ds-muted-rgb) / .82) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  div[class~="bg-token-dropdown-background"]:has([data-slot="thread-summary-panel-item-button"])
+  [data-slot="thread-summary-panel-item-button"]:hover {
+  color: var(--ds-text) !important;
+}
+
+html.codex-dream-skin[data-dream-theme-id="preset-gothic-void-crusade"]
+  div[class~="bg-token-dropdown-background"]:has([data-slot="thread-summary-panel-item-button"])
+  svg {
+  color: currentColor !important;
 }
 
 html.codex-dream-skin .ProseMirror {
