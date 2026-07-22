@@ -1,0 +1,237 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js for manifest checks
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Match tag and platform versions
+        id: version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must look like v1.2.3: $tag" >&2
+            exit 1
+          fi
+          main_sha="$(git rev-parse origin/main)"
+          tag_sha="$(git rev-parse HEAD)"
+          if [[ "$tag_sha" != "$main_sha" ]]; then
+            echo "Release tag must point at the current origin/main commit: tag=$tag_sha main=$main_sha" >&2
+            exit 1
+          fi
+          version="$(tr -d '[:space:]' < macos/VERSION)"
+          windows_version="$(tr -d '[:space:]' < windows/VERSION)"
+          package_version="$(node -p "JSON.parse(require('fs').readFileSync('macos/package.json', 'utf8')).version")"
+          for value in "$version" "$windows_version" "$package_version"; do
+            if [[ ! "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "A platform version is not semantic: $value" >&2
+              exit 1
+            fi
+          done
+          if [[ "$tag" != "v$version" || "$windows_version" != "$version" || "$package_version" != "$version" ]]; then
+            echo "Tag/version mismatch: tag=$tag macOS=$version Windows=$windows_version package=$package_version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build-macos:
+    name: Build macOS DMG
+    needs: guard
+    runs-on: macos-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js for macOS regressions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Build unsigned DMG
+        shell: bash
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          NODE="$(command -v node)" \
+            CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS=1 \
+            CODEX_DREAM_SKIN_SKIP_DOCTOR=1 \
+            ./macos/tests/run-tests.sh
+          swift test --package-path macos/menubar-app
+          test -x macos/scripts/build-dmg.sh || chmod +x macos/scripts/build-dmg.sh
+          # The builder owns app assembly, engine staging, and ad-hoc signing.
+          # Release signing/notarization remains optional and is intentionally
+          # outside this unsigned public workflow.
+          ./macos/scripts/build-dmg.sh --skip-tests
+          artifact="macos/release/CodexDreamSkin-v${VERSION}.dmg"
+          test -s "$artifact"
+          hdiutil imageinfo "$artifact" >/dev/null
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-macos
+          if-no-files-found: error
+          path: macos/release/CodexDreamSkin-v${{ needs.guard.outputs.version }}.dmg
+          retention-days: 14
+
+  build-windows:
+    name: Build Windows Setup
+    needs: guard
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js for Windows regressions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          $requiredVersion = '6.7.1'
+          choco upgrade innosetup --version=$requiredVersion --allow-downgrade --no-progress --yes
+          if ($LASTEXITCODE -ne 0) { throw "Could not install Inno Setup $requiredVersion." }
+          $resolved = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+            (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+          if (-not $resolved) { throw 'Inno Setup 6 (ISCC.exe) is not available on the runner.' }
+          "ISCC_PATH=$resolved" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build Setup.exe with pinned Node runtime
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\tests\run-tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows regressions failed with exit code $LASTEXITCODE." }
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\tests\installer-static.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Installer static checks failed with exit code $LASTEXITCODE." }
+          $output = Join-Path $env:RUNNER_TEMP 'codex-dream-skin-release'
+          New-Item -ItemType Directory -Path $output -Force | Out-Null
+          & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\installer\build-release.ps1 `
+            -OutputDirectory $output -IsccPath $env:ISCC_PATH
+          if ($LASTEXITCODE -ne 0) { throw "Windows release builder failed with exit code $LASTEXITCODE." }
+          $artifact = Join-Path $output "CodexDreamSkin-Setup-v$env:VERSION.exe"
+          if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+            throw "Expected Windows artifact was not created: $artifact"
+          }
+          if ((Get-Item -LiteralPath $artifact).Length -le 0) { throw 'Windows artifact is empty.' }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-windows
+          if-no-files-found: error
+          path: ${{ runner.temp }}/codex-dream-skin-release/CodexDreamSkin-Setup-v${{ needs.guard.outputs.version }}.exe
+          retention-days: 14
+
+  publish-draft:
+    name: Create draft GitHub Release
+    needs: [guard, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums and release notes
+        shell: bash
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -s "dist/CodexDreamSkin-v${VERSION}.dmg"
+          test -s "dist/CodexDreamSkin-Setup-v${VERSION}.exe"
+          (
+            cd dist
+            sha256sum "CodexDreamSkin-v${VERSION}.dmg" \
+              "CodexDreamSkin-Setup-v${VERSION}.exe" > SHA256SUMS.txt
+          )
+          cat > release-notes.md <<EOF
+          ## Codex Dream Skin v${VERSION}
+
+          ### Downloads
+
+          - **macOS:** [CodexDreamSkin-v${VERSION}.dmg](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg)
+          - **Windows:** [CodexDreamSkin-Setup-v${VERSION}.exe](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe)
+          - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
+
+          The packages are currently unsigned. Follow the graphical first-run steps in
+          [macOS installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-macos.md)
+          or [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md).
+          No terminal trust command is required for ordinary users.
+
+          This release is created as a draft for a maintainer to review before publishing.
+          EOF
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            is_draft="$(gh release view "v${VERSION}" --json isDraft --jq .isDraft)"
+            test "$is_draft" = true || {
+              echo "Refusing to replace an already published v${VERSION} release." >&2
+              exit 1
+            }
+            gh release upload "v${VERSION}" --clobber \
+              dist/CodexDreamSkin-v${VERSION}.dmg \
+              dist/CodexDreamSkin-Setup-v${VERSION}.exe \
+              dist/SHA256SUMS.txt
+            gh release edit "v${VERSION}" --draft \
+              --title "Codex Dream Skin v${VERSION}" \
+              --notes-file release-notes.md
+          else
+            gh release create "v${VERSION}" \
+              --draft \
+              --title "Codex Dream Skin v${VERSION}" \
+              --notes-file release-notes.md \
+              dist/CodexDreamSkin-v${VERSION}.dmg \
+              dist/CodexDreamSkin-Setup-v${VERSION}.exe \
+              dist/SHA256SUMS.txt
+          fi

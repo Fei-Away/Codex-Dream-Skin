@@ -59,7 +59,14 @@ done
   "$DOCS_SOURCE/background-generation-prompts.md" \
   "$DOCS_TARGET/"
 /bin/cp -R "$DOCS_SOURCE/images/gallery" "$DOCS_TARGET/images/"
-/bin/cp -R "$DOCS_SOURCE/images/presets" "$DOCS_TARGET/images/"
+/bin/mkdir -p "$DOCS_TARGET/images/presets"
+for image in "$DOCS_SOURCE/images/presets"/*; do
+  [ -f "$image" ] || continue
+  case "$(/usr/bin/basename "$image")" in
+    arina-hashimoto-*) continue ;;
+  esac
+  /bin/cp "$image" "$DOCS_TARGET/images/presets/"
+done
 /bin/cp "$DOCS_SOURCE/images/hero-banner-red-white.png" "$DOCS_TARGET/images/"
 if [ -f "$DOCS_SOURCE/images/sponsor-passion8.png" ]; then
   /bin/cp "$DOCS_SOURCE/images/sponsor-passion8.png" "$DOCS_TARGET/images/"

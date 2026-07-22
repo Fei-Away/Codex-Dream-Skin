@@ -351,8 +351,11 @@ html.codex-dream-skin.dream-safe-center .dream-home > div:first-child > div:firs
 .dream-home .group\/home-suggestions button > span:first-child > span:first-child {
   width: 38px;
   height: 38px;
-  display: grid !important;
-  place-items: center;
+  /* Native spans carry justify-start; grid + place-items cannot override
+     justify-content, so the glyph parks at the badge's left edge. (#176) */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   border-radius: 12px;
   color: var(--dream-accent-ink) !important;
   background: var(--dream-accent) !important;

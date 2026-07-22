@@ -435,6 +435,23 @@ html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-ski
   text-shadow: none;
 }
 
+/* Newer Codex builds paint the list/detail panes (pull requests, the chat
+   review/terminal/browser/files side panel) with token surfaces instead of
+   [role="main"]. The side panel can coexist with a visible home shell, so this
+   transparency is deliberately not gated on dream-skin-home-shell. The nested
+   surfaces all carry the same token, so they are cleared everywhere and the
+   translucent pane tint is painted once, on the bordered outer wrapper. */
+html.codex-dream-skin main.main-surface
+  :is(div, section, aside)[class~="bg-token-main-surface-primary"] {
+  background: transparent !important;
+}
+
+html.codex-dream-skin main.main-surface
+  div[class~="bg-token-main-surface-primary"][class~="border-l"] {
+  background: rgb(var(--ds-panel-rgb) / .62) !important;
+  backdrop-filter: blur(10px) saturate(106%) !important;
+}
+
 html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) article {
   border: 1px solid rgb(var(--ds-muted-rgb) / .12);
   background: rgb(var(--ds-panel-rgb) / .44);
@@ -444,6 +461,11 @@ html.codex-dream-skin main.main-surface:not(.dream-skin-home-shell) article {
 
 html.codex-dream-skin[data-dream-shell="light"] main.main-surface:not(.dream-skin-home-shell) article {
   background: rgb(var(--ds-panel-rgb) / .72);
+}
+
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-quote,
+html.codex-dream-skin[data-dream-shell="light"] .dream-skin-home [data-feature="game-source"]::before {
+  text-shadow: none;
 }
 
 html.codex-dream-skin main.main-surface > header.app-header-tint {
@@ -526,8 +548,21 @@ html.codex-dream-skin main.main-surface > header.app-header-tint {
   box-shadow: 0 0 8px rgb(var(--ds-accent-rgb) / .42);
 }
 
-.dream-skin-quote,
 .dream-skin-orbit { display: none !important; }
+
+.dream-skin-quote {
+  position: absolute;
+  right: 28px;
+  bottom: 72px;
+  display: none;
+  color: rgb(var(--ds-accent-rgb) / .74);
+  font: italic 14px/1.2 "Segoe Print", "Comic Sans MS", cursive;
+  letter-spacing: .03em;
+  text-shadow: 0 0 13px rgb(var(--ds-accent-rgb) / .30);
+  transform: rotate(-3deg);
+}
+
+#codex-dream-skin-chrome.dream-skin-home-shell .dream-skin-quote { display: block; }
 
 .dream-skin-particles {
   display: none;
@@ -677,7 +712,13 @@ html.codex-dream-skin:is([data-dream-art-safe="center"], [data-dream-art-safe-ar
 }
 
 .dream-skin-home [data-feature="game-source"]::before {
-  content: none;
+  content: var(--dream-skin-name, "Codex Dream Skin");
+  display: block;
+  margin-bottom: 9px;
+  color: var(--ds-accent);
+  font: 800 12px/1.3 "Microsoft YaHei UI", sans-serif;
+  letter-spacing: .10em;
+  text-shadow: 0 0 14px rgb(var(--ds-accent-rgb) / .26);
 }
 
 .dream-skin-home [data-feature="game-source"]::after {
@@ -719,7 +760,7 @@ html.codex-dream-skin:is([data-dream-art-safe="center"], [data-dream-art-safe-ar
 
 .dream-skin-home .group\/home-suggestions { overflow: visible !important; }
 
-.dream-skin-home .group\/home-suggestions button {
+.dream-skin-home .group\/home-suggestions button:not(.group\/home-suggestion-list-item) {
   position: relative !important;
   min-height: 118px !important;
   padding: 14px 13px 12px !important;
@@ -744,7 +785,7 @@ html.codex-dream-skin:is([data-dream-art-safe="center"], [data-dream-art-safe-ar
   color: var(--ds-text) !important;
 }
 
-.dream-skin-home .group\/home-suggestions button:hover {
+.dream-skin-home .group\/home-suggestions button:not(.group\/home-suggestion-list-item):hover {
   transform: translateY(-2px) !important;
   border-color: rgb(var(--ds-accent-rgb) / .42) !important;
   box-shadow: 0 12px 28px rgb(var(--ds-bg-rgb) / .24) !important;
@@ -753,8 +794,11 @@ html.codex-dream-skin:is([data-dream-art-safe="center"], [data-dream-art-safe-ar
 .dream-skin-home .group\/home-suggestions button > span:first-child > span:first-child {
   width: 38px;
   height: 38px;
-  display: grid !important;
-  place-items: center;
+  /* Native spans carry justify-start; grid + place-items cannot override
+     justify-content, so the glyph parks at the circle's left edge. (#176) */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   margin: 0 auto;
   border: 1px solid rgb(var(--ds-accent-rgb) / .24);
   border-radius: 50%;
@@ -763,14 +807,38 @@ html.codex-dream-skin:is([data-dream-art-safe="center"], [data-dream-art-safe-ar
   box-shadow: 0 0 0 6px rgb(var(--ds-accent-rgb) / .05);
 }
 
-.dream-skin-home .group\/home-suggestions button svg {
+.dream-skin-home .group\/home-suggestions button:not(.group\/home-suggestion-list-item) svg {
   width: 21px !important;
   height: 21px !important;
+  display: block !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
   color: var(--ds-accent) !important;
 }
 
-.dream-skin-home .group\/home-suggestions button > span:first-child { justify-content: center !important; }
-.dream-skin-home .group\/home-suggestions button > span:last-child { align-items: center !important; text-align: center !important; }
+.dream-skin-home .group\/home-suggestions button:not(.group\/home-suggestion-list-item) > span:first-child { justify-content: center !important; }
+.dream-skin-home .group\/home-suggestions button:not(.group\/home-suggestion-list-item) > span:last-child { align-items: center !important; text-align: center !important; }
+
+/* Composer suggestion dropdown rows: keep the native compact list layout and
+   left alignment, only add readable chrome over the artwork. */
+.dream-skin-home .group\/home-suggestions button.group\/home-suggestion-list-item {
+  min-height: 40px !important;
+  padding: 7px 12px !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .14) !important;
+  border-radius: 12px !important;
+  background: rgb(var(--ds-panel-rgb) / .66) !important;
+  color: var(--ds-text) !important;
+  backdrop-filter: blur(8px) saturate(105%) !important;
+}
+
+.dream-skin-home .group\/home-suggestions button.group\/home-suggestion-list-item:hover {
+  border-color: rgb(var(--ds-accent-rgb) / .38) !important;
+  background: rgb(var(--ds-panel-2-rgb) / .78) !important;
+}
+
+.dream-skin-home .group\/home-suggestions button.group\/home-suggestion-list-item svg {
+  color: var(--ds-accent) !important;
+}
 
 html.codex-dream-skin .composer-surface-chrome {
   overflow: visible !important;
@@ -1063,6 +1131,7 @@ html.codex-dream-skin [data-message-author-role] { border-radius: 16px; }
 
 @media (max-width: 1120px) {
   .dream-skin-status { display: none !important; }
+  .dream-skin-quote { display: none !important; }
   .dream-skin-home { --thread-content-max-width: min(940px, calc(100cqw - 30px)) !important; }
   .dream-skin-home > div:first-child > div:first-child > div:first-child { width: calc(100% - 28px) !important; }
 }

@@ -50,7 +50,7 @@ For injection, CSS, launch, or restore changes, also run `macos/scripts/verify-d
 Run the Windows regression suite:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\run-tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\windows\tests\run-tests.ps1
 ```
 
 For install, launch, injection, or restore changes, exercise the affected scripts and `windows/scripts/verify-dream-skin.ps1`. Include the Windows version and Codex source in the pull request.

@@ -4,10 +4,28 @@
 
 ### 修复
 
+- Gothic Void Crusade 预设的 `appearance` 从 `auto` 固定为 `dark`（与 macOS 同步，#134 引入时误用了 auto）：暗色专属背景不再跟随客户端浅色外壳渲染。已在用该预设的用户需重新切换一次该主题才会拿到修复。
+- Windows Release 构建不再依赖 Chocolatey 精简版 Inno Setup 是否附带非官方翻译目录；固定并校验 Inno 6.7.1 官方简体中文语言文件后从隔离 staging 编译，保证 CI 与 Release runner 都能生成双语 Setup.exe。
 - 收起或重建左侧栏时不再因找不到 `aside.app-shell-left-panel` 而整页卸掉皮肤；只要主内容壳层仍在就继续应用当前主题，避免闪回 Codex 原生配色。透明辅助窗口仍会清理残留样式。
 - 托盘「暂停皮肤」现在与 macOS 一致：写入暂停标记后立刻通过 CDP 执行 `injector --remove` 卸下当前窗口皮肤，不再只等 watcher 轮询；「继续显示皮肤」会清除暂停并重新应用。
 - Windows 注入器补齐与 macOS 相同的窗口内操作浮层（loading / 成功 / 失败）；暂停、继续与重新应用时在 Codex 主区显示「正在暂停皮肤…」「正在应用皮肤…」等进度，不再只有托盘气泡。
-- 安装/主题库初始化会把 macOS 同款「Gothic Void Crusade / 哥特虚空远征」播种到已保存主题（`presets/preset-gothic-void-crusade`），可与「桥本有菜」一并在托盘切换；默认活动主题仍为桥本有菜。
+- 源码安装/主题库初始化会把 macOS 同款「Gothic Void Crusade / 哥特虚空远征」播种到已保存主题（`presets/preset-gothic-void-crusade`），可与源码中的「桥本有菜」参考主题一并在托盘切换；公开 Setup.exe 只携带并默认播种 Gothic Void Crusade。
+- 同步 macOS 的首页建议卡图标居中修复（#176 / #181 核心部分）：原生 span 的 `justify-start` 使 grid + `place-items` 无法居中图标徽章内的字形，改为 flex 强制居中。
+
+## 1.3.0 — 2026-07-19
+
+### 发布
+
+- 新增面向普通用户的 Inno Setup 安装包；安装器内置经过 SHA-256 校验的 Node.js 运行时，按当前用户安装，不需要源码目录或全局 Node.js。
+- 新增 SmartScreen 未签名发行包的图形界面放行说明。只在确认文件来自项目 Release 后使用“更多信息 → 仍要运行”，不要求关闭 Defender 或执行 PowerShell 放行命令。
+- 新增手动覆盖更新流程与状态保留说明；主题、图片和配置备份不会因更新安装器而删除。
+- 新增 Release workflow：校验 tag 与双端版本一致性，构建 Setup.exe、生成 SHA-256 校验和并创建待审核的 Draft Release。
+- Setup.exe 只把安装目录中的 payload 作为不可变种子，实际执行统一来自 `%LOCALAPPDATA%\CodexDreamSkin\engine`；同版本缺文件时会自动修复，升级时先安全关闭旧托盘并原子替换引擎。
+- 托盘新增正式图标、点击检查更新、打开 DreamSkin.cc 与登录启动开关；不做后台联网，登录启动在安装向导中默认不勾选。
+- 卸载确认后先调用受管恢复引擎；只有 Codex 外观、CDP 与运行状态安全恢复成功才删除安装文件，失败会中止卸载并保留修复入口。
+- 安装、启动、托盘与恢复均使用 `RemoteSigned`，不再要求普通用户执行 `.ps1`、修改 Execution Policy 或安装全局 Node.js。
+- Release 构建会用固定 SHA-256 核验的 Gothic Void Crusade 替换源码中的人物参考素材；Setup.exe 同时携带项目 LICENSE/NOTICE 与 Node.js 自带许可证。
+>>>>>>> origin/main
 
 ## 1.2.0 — 2026-07-17
 
