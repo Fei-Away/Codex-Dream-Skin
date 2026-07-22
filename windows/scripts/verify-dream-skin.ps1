@@ -32,6 +32,15 @@ try {
     }
   }
   if ($null -eq $cdpIdentity) {
+    # A Store auto-update replaces the "current" package while an older
+    # registered version still owns the verified endpoint.
+    $runningRegistered = Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $Port
+    if ($null -ne $runningRegistered) {
+      $codex = $runningRegistered.Codex
+      $cdpIdentity = $runningRegistered.Identity
+    }
+  }
+  if ($null -eq $cdpIdentity) {
     throw "No verified Codex CDP endpoint is active on loopback port $Port."
   }
   if ($null -ne $state -and $state.browserId -and "$($state.browserId)" -cne $cdpIdentity.BrowserId) {

@@ -1074,6 +1074,23 @@ try {
     -not $startSource.Contains('Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot')) {
     throw 'Start does not preserve an existing pause marker when startup rolls back.'
   }
+  if (-not $startSource.Contains('$verifyDeadline') -or
+    -not $startSource.Contains('Start-Sleep -Seconds 3')) {
+    throw 'Start lost the verification retry window; a single early-boot miss must not tear the startup down.'
+  }
+  if (-not $startSource.Contains('WaitForExit(15000)')) {
+    throw 'Startup rollback no longer waits long enough for its own injector to exit; short waits leave duelling watchers.'
+  }
+  if (-not $startSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
+    throw 'Start lost the any-registered endpoint fallback for Store auto-updates.'
+  }
+  $verifyScriptSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
+  if (-not $verifyScriptSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
+    throw 'Verify lost the any-registered endpoint fallback for Store auto-updates.'
+  }
+  if (-not (Get-Command Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -CommandType Function -ErrorAction SilentlyContinue)) {
+    throw 'The any-registered CDP identity helper is missing from common-windows.ps1.'
+  }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
   foreach ($requiredRendererBehavior in @(
