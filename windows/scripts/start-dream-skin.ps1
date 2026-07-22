@@ -244,7 +244,8 @@ try {
     while ($true) {
       $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
         $Injector, '--verify', '--port', "$Port",
-        '--browser-id', $cdpIdentity.BrowserId, '--timeout-ms', '30000')
+        '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
+        '--timeout-ms', '30000')
       Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
       if ($verify.ExitCode -eq 0) { break }
       if ($daemon.HasExited) { throw "The injector exited during startup. See $StderrPath" }

@@ -47,8 +47,13 @@ try {
     throw 'The active CDP browser does not match the saved Dream Skin session; state was preserved.'
   }
 
+  # Without an explicit --theme-dir the injector falls back to the engine's
+  # bundled assets theme, so verification compares the live skin against the
+  # wrong expected theme and never passes.  Always verify against the staged
+  # active theme, exactly like the watcher applies it.
+  $themePaths = Get-DreamSkinThemePaths -StateRoot (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
   $arguments = @($injector, '--verify', '--port', "$Port", '--browser-id', $cdpIdentity.BrowserId,
-    '--timeout-ms', '30000')
+    '--theme-dir', $themePaths.Active, '--timeout-ms', '30000')
   if ($ScreenshotPath) { $arguments += @('--screenshot', $ScreenshotPath) }
   & $node.Path @arguments
   $verifyExitCode = $LASTEXITCODE
