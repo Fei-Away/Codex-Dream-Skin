@@ -14,10 +14,12 @@ try {
   $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
   $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
   New-Item -ItemType Directory -Path $runtimeSourceRoot | Out-Null
-  foreach ($directoryName in @('assets', 'scripts', 'presets')) {
+  foreach ($directoryName in @('assets', 'scripts', 'presets', 'platform', 'studio')) {
     Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
       -Recurse -Force -ErrorAction Stop
   }
+  Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $Root) 'shared') `
+    -Destination (Join-Path $runtimeSourceRoot 'shared') -Recurse -Force -ErrorAction Stop
   $zoneMarkedSourceScript = Join-Path $runtimeSourceRoot 'scripts\start-dream-skin.ps1'
   Set-Content -LiteralPath $zoneMarkedSourceScript -Stream 'Zone.Identifier' `
     -Value "[ZoneTransfer]`r`nZoneId=3`r`n" -Encoding Ascii
@@ -28,17 +30,24 @@ try {
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
   $sourcePrefix = $runtimeSourceRoot.TrimEnd('\') + '\'
   $runtimeSourceFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts'), (Join-Path $runtimeSourceRoot 'presets') `
+    Get-ChildItem -LiteralPath `
+      (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts'), `
+      (Join-Path $runtimeSourceRoot 'presets'), (Join-Path $runtimeSourceRoot 'platform'), `
+      (Join-Path $runtimeSourceRoot 'studio'), (Join-Path $runtimeSourceRoot 'shared') `
       -Recurse -File -Force
   )
   $runtimeEngineFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts'), (Join-Path $engine.Root 'presets') `
+    Get-ChildItem -LiteralPath `
+      (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts'), `
+      (Join-Path $engine.Root 'presets'), (Join-Path $engine.Root 'platform'), `
+      (Join-Path $engine.Root 'studio'), (Join-Path $engine.Root 'shared') `
       -Recurse -File -Force
   )
   if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
     -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
+    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot) -or
+    -not (Test-DreamSkinPathWithin -Path $engine.Studio -Root $runtimeStateRoot)) {
     throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
   }
   foreach ($sourceFile in $runtimeSourceFiles) {
@@ -96,7 +105,7 @@ try {
 
   $invalidRuntimeRoot = Join-Path $temporaryRoot 'invalid-runtime-source'
   New-Item -ItemType Directory -Path $invalidRuntimeRoot | Out-Null
-  foreach ($directoryName in @('assets', 'scripts')) {
+  foreach ($directoryName in @('assets', 'scripts', 'platform', 'studio', 'shared')) {
     Copy-Item -LiteralPath (Join-Path $runtimeSourceRoot $directoryName) -Destination $invalidRuntimeRoot `
       -Recurse -Force -ErrorAction Stop
   }
@@ -147,15 +156,17 @@ try {
     '$startScript = $engine.Start',
     '$restoreScript = $engine.Restore',
     '$trayScript = $engine.Tray',
+    '$studioScript = $engine.Studio',
     '$shortcut.WorkingDirectory = $engine.Root',
     '$restore.WorkingDirectory = $engine.Root',
-    '$tray.WorkingDirectory = $engine.Root'
+    '$tray.WorkingDirectory = $engine.Root',
+    '$studio.WorkingDirectory = $engine.Root'
   )) {
     if (-not $installSource.Contains($requiredShortcutBinding)) {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
     }
   }
-  if ([regex]::Matches($installSource, '-ExecutionPolicy RemoteSigned').Count -ne 4 -or
+  if ([regex]::Matches($installSource, '-ExecutionPolicy RemoteSigned').Count -ne 5 -or
     $installSource.Contains('-ExecutionPolicy Bypass')) {
     throw 'Installer shortcuts or tray launch still bypass the PowerShell execution policy.'
   }
@@ -173,8 +184,9 @@ try {
   }
   if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
-    throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
+    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.Studio -PathType Leaf)) {
+    throw 'Installed launch, restore, tray, or Studio entry point disappeared with the source checkout.'
   }
   Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
 

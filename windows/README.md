@@ -27,6 +27,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 - `Codex Dream Skin`：启动或重新应用皮肤。
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
+- `Codex Dream Skin Studio`：打开本机 Web 主题库、编辑器和诊断页。
 
 安装命令中的 `Bypass` 只作用于这一次由用户明确发起的安装进程。安装器会先校验运行时副本的 SHA-256，再仅对 `%LOCALAPPDATA%\CodexDreamSkin\engine` 中受管的 PowerShell 副本清除下载区标记。日常快捷方式使用 `RemoteSigned`，不会绕过系统或企业组策略。
 
@@ -41,6 +42,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-
 先退出 Dream Skin 托盘并关闭 Codex，再更新仓库（`git pull`，或重新下载最新源码），然后重新运行上面的安装命令。安装器会原子替换受管运行时并重建快捷方式；当前主题、已保存主题和导入图片不会被删除。
 
 ## 启动与验证
+
+`Codex Dream Skin Studio` 仅监听 `127.0.0.1` 并使用本地令牌。它复用受管 engine、主题仓库、Store 包校验和重启确认，不会建立第二套弱化的启动路径。
 
 推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。
 

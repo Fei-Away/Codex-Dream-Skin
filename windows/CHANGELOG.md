@@ -2,12 +2,32 @@
 
 ## Unreleased
 
+### 新增
+
+- 增加本地 Dream Skin Studio、24 套 Theme v3 官方场景、双调色板编辑器、实时构图、对比度检查和诊断页。
+- 新建任务页增加可交互场景 Hero 与四张行动卡，子菜单转交 Codex 原生上下文、插件、智能体和项目入口。
+
+### 改进
+
+- Studio、主题 schema、主题资源和场景层改由 `shared/` 复用；Windows Store 启动、PowerShell 配置往返、CDP Browser ID 与基础窗口样式继续保留平台实现。
+- Windows 受管 engine 原子复制并校验 `shared/`、Studio 和平台适配器，源码目录移动后仍可独立运行。
+- 移除 Hero 右上角“场景状态”浮层；旧主题中的 `widget` 数据继续兼容。
+
+### 安全
+
+- Studio 主题切换复用既有受管主题仓库与 reparse point 检查；暂停使用 watcher pause marker；启动和恢复继续要求重启确认，不绕过 Store 包身份校验。
+- Studio 快捷方式与启动、恢复、托盘入口一致使用 `RemoteSigned`，不再通过 `ExecutionPolicy Bypass` 绕过 PowerShell 执行策略。
+
 ### 修复
 
 - 收起或重建左侧栏时不再因找不到 `aside.app-shell-left-panel` 而整页卸掉皮肤；只要主内容壳层仍在就继续应用当前主题，避免闪回 Codex 原生配色。透明辅助窗口仍会清理残留样式。
 - 托盘「暂停皮肤」现在与 macOS 一致：写入暂停标记后立刻通过 CDP 执行 `injector --remove` 卸下当前窗口皮肤，不再只等 watcher 轮询；「继续显示皮肤」会清除暂停并重新应用。
 - Windows 注入器补齐与 macOS 相同的窗口内操作浮层（loading / 成功 / 失败）；暂停、继续与重新应用时在 Codex 主区显示「正在暂停皮肤…」「正在应用皮肤…」等进度，不再只有托盘气泡。
 - 安装/主题库初始化会把 macOS 同款「Gothic Void Crusade / 哥特虚空远征」播种到已保存主题（`presets/preset-gothic-void-crusade`），可与「桥本有菜」一并在托盘切换；默认活动主题仍为桥本有菜。
+
+### 说明
+
+- 已覆盖共享 Node、Studio API/UI 和 PowerShell 静态契约；Windows Store Codex 最终视觉效果仍需 Windows 主机验收。
 
 ## 1.2.0 — 2026-07-17
 
