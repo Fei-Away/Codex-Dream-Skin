@@ -1301,6 +1301,8 @@ try {
     '[System.IO.FileAttributes]::ReparsePoint',
     'Ensure-DreamSkinManagedDirectory',
     'Get-DreamSkinValidatedImageMetadata',
+    'Invoke-DreamSkinNative',
+    '-DiscardStderr',
     '16384px / 50MP safety limit',
     'Assert-DreamSkinImageFile -Path $temporary',
     'Assert-DreamSkinImageFile -Path $imageArchive'
@@ -1323,6 +1325,29 @@ try {
     '-e', "process.stderr.write('ignored-warning\n'); process.stdout.write('kept-output')") -DiscardStderr
   if ($discardedProbe.ExitCode -ne 0 -or ($discardedProbe.Output -join '') -cne 'kept-output') {
     throw 'Native stderr discard changed stdout or the real exit code.'
+  }
+
+  $previousNodeOptions = $env:NODE_OPTIONS
+  try {
+    $env:NODE_OPTIONS = '--import=data:text/javascript,process.stderr.write(%22dream-skin-metadata-warning%5Cn%22)'
+    Get-DreamSkinValidatedImageMetadata -Path (Join-Path $Root 'assets\dream-reference.jpg')
+    $friendlyMetadataFailure = $null
+    try {
+      Get-DreamSkinValidatedImageMetadata -Path (Join-Path $temporaryRoot 'invalid-metadata.png')
+    } catch {
+      $friendlyMetadataFailure = $_
+    }
+    if ($null -eq $friendlyMetadataFailure -or
+      $friendlyMetadataFailure.Exception.Message -notlike 'Image metadata is invalid or exceeds*' -or
+      $friendlyMetadataFailure.FullyQualifiedErrorId -like '*NativeCommandError*') {
+      throw 'Image metadata stderr did not preserve success output and the friendly validation error under Stop preference.'
+    }
+  } finally {
+    if ($null -eq $previousNodeOptions) {
+      Remove-Item Env:\NODE_OPTIONS -ErrorAction SilentlyContinue
+    } else {
+      $env:NODE_OPTIONS = $previousNodeOptions
+    }
   }
 
   $selfTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
