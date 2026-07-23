@@ -10,8 +10,9 @@
     "data-dream-skin", SHELL_ATTR,
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
-    "data-dream-art-ready",
+    "data-dream-art-ready", "data-dream-route-phase",
   ];
+  const ROUTE_TRANSITION_MS = 380;
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
   const PAYLOAD_REVISION = __DREAM_SKIN_PAYLOAD_REVISION_JSON__;
@@ -58,6 +59,7 @@
     styleWrites: 0,
     styleRepairs: 0,
     navigationEvents: 0,
+    routeTransitions: 0,
     safetyPasses: 0,
     analysisRuns: 0,
     analysisCacheHits: artAnalysis ? 1 : 0,
@@ -586,6 +588,16 @@
     }
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
+    if (state?.routeTransition?.frame !== null) {
+      if (typeof window.cancelAnimationFrame === "function") {
+        window.cancelAnimationFrame(state.routeTransition.frame);
+      } else {
+        clearTimeout(state.routeTransition.frame);
+      }
+    }
+    if (state?.routeTransition?.timeout !== null) {
+      clearTimeout(state.routeTransition.timeout);
+    }
     if (analysisTimer) clearTimeout(analysisTimer);
     if (state?.mediaHandler && state?.mediaQuery) {
       try { state.mediaQuery.removeEventListener("change", state.mediaHandler); } catch {}
@@ -623,6 +635,37 @@
     if (scheduler.timeout) return;
     scheduler.timeout = setTimeout(flushScheduledEnsure, delay);
   };
+  const routeTransition = { frame: null, timeout: null };
+  const requestRouteFrame = (callback) => typeof window.requestAnimationFrame === "function"
+    ? window.requestAnimationFrame(callback)
+    : setTimeout(callback, 0);
+  const cancelRouteFrame = (frame) => {
+    if (frame === null) return;
+    if (typeof window.cancelAnimationFrame === "function") window.cancelAnimationFrame(frame);
+    else clearTimeout(frame);
+  };
+  const beginRouteTransition = () => {
+    const root = document.documentElement;
+    if (!root) return;
+    cancelRouteFrame(routeTransition.frame);
+    routeTransition.frame = null;
+    if (routeTransition.timeout !== null) clearTimeout(routeTransition.timeout);
+    routeTransition.timeout = null;
+    setAttribute(root, "data-dream-route-phase", "prepare");
+    metrics.routeTransitions += 1;
+    routeTransition.frame = requestRouteFrame(() => {
+      routeTransition.frame = null;
+      if (window[DISABLED_KEY] || window[STATE_KEY]?.installToken !== installToken) return;
+      setAttribute(root, "data-dream-route-phase", "settling");
+      ensure({ scope: true });
+      routeTransition.timeout = setTimeout(() => {
+        routeTransition.timeout = null;
+        if (window[STATE_KEY]?.installToken === installToken) {
+          root.removeAttribute("data-dream-route-phase");
+        }
+      }, ROUTE_TRANSITION_MS);
+    });
+  };
   if (typeof MutationObserver === "function") {
     rootObserver = new MutationObserver(() => scheduleEnsure({ root: true }));
   }
@@ -638,7 +681,7 @@
     ? window.navigation : null;
   const navigationHandler = navigationApi ? () => {
     metrics.navigationEvents += 1;
-    scheduleEnsure({ scope: true }, 180);
+    beginRouteTransition();
   } : null;
 
   window[STATE_KEY] = {
@@ -647,6 +690,7 @@
     rootObserver,
     timer: null,
     scheduler,
+    routeTransition,
     mediaQuery,
     mediaHandler,
     navigation: navigationApi,
@@ -666,6 +710,7 @@
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,
     detectShellAppearance,
+    beginRouteTransition,
   };
   const firstEnsureStartedAt = now();
   ensure({ root: true });

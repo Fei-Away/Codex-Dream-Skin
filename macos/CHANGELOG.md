@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 改进
+
+- 路由可读性层不再等待 180ms 后才更新。统一 runtime 在 Navigation API 事件同一轮写入 `data-dream-route-phase`，下一动画帧按选择器契约复测 scope，并以 380ms 曲线驱动单一继承进度；侧栏与主区使用同一数值叠加任务页 veil，避免两列透明度不同步或梯度瞬间跳变。实现不监听 DOM subtree、不写业务 class、不读布局，并遵守 reduced-motion。
+
 ## 1.3.3 — 2026-07-23
 
 ### 修复

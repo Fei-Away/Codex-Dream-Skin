@@ -52,6 +52,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 ## 启动与验证
 
 推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。
+皮肤验证成功后，启动脚本会按需把托盘控制器交给隐藏的后台进程并立即结束；互斥锁会避免重复托盘。
 
 命令行启动：
 

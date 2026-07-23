@@ -945,6 +945,9 @@ try {
     '--ds-immersive-composer',
     'background-position: var(--ds-art-position)',
     'html[data-dream-skin="active"]',
+    '@property --ds-route-progress',
+    '[data-dream-route-phase="prepare"]',
+    'opacity: var(--ds-route-progress)',
     'main.main-surface:has([role="main"])',
     'main.main-surface:not(:has([role="main"]))'
   )) {
@@ -968,7 +971,17 @@ try {
     throw 'macOS and Windows selector contract assets are not byte-identical.'
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '继续显示皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @(
+    'System.Windows.Forms.NotifyIcon',
+    'DreamSkin.TrayRenderer',
+    'New-DreamSkinTrayIcon',
+    '暂停皮肤',
+    '继续显示皮肤',
+    '更换背景图',
+    '已保存主题',
+    '停止 Dream Skin',
+    '完全恢复 Codex'
+  )) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
   if (-not $traySource.Contains('Invoke-DreamSkinLiveRemove') -or
@@ -1015,7 +1028,7 @@ try {
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
   }
-  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动')) {
+  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin Studio', '登录时启动')) {
     if (-not $traySource.Contains($requiredReleaseAction)) {
       throw "Tray release action is missing: $requiredReleaseAction"
     }
@@ -1036,6 +1049,7 @@ try {
   if ($null -eq $addTrayItemAst) { throw 'Tray item helper could not be loaded for an empty-menu behavior check.' }
   Invoke-Expression $addTrayItemAst.Extent.Text
   Add-Type -AssemblyName System.Windows.Forms
+  Add-Type -AssemblyName System.Drawing
   $emptyMenu = [System.Windows.Forms.ContextMenuStrip]::new()
   try {
     $probeItem = Add-DreamSkinTrayItem -Items $emptyMenu.Items -Text 'first-item-probe' -Action $null -Enabled $false
@@ -1044,6 +1058,21 @@ try {
     }
   } finally {
     $emptyMenu.Dispose()
+  }
+  $traySelfTest = Invoke-DreamSkinNative -FilePath (
+    (Get-Command powershell.exe -ErrorAction Stop).Source
+  ) -ArgumentList @(
+    '-NoProfile',
+    '-STA',
+    '-ExecutionPolicy',
+    'RemoteSigned',
+    '-File',
+    (Join-Path $Root 'scripts\tray-dream-skin.ps1'),
+    '-SelfTest'
+  )
+  if ($traySelfTest.ExitCode -ne 0 -or
+    ($traySelfTest.Output -join "`n") -notmatch 'PASS: branded tray icon and styled empty context menu') {
+    throw "Tray icon/menu self-test failed: $($traySelfTest.Output -join '<NL>')"
   }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
@@ -1057,6 +1086,28 @@ try {
   if ($startSource.Contains('Start-Process -FilePath $codex.Executable') -or
     -not $startSource.Contains('Start-DreamSkinCodex -Codex $codex')) {
     throw 'Start still executes the WindowsApps path instead of activating the registered package.'
+  }
+  $activeMessageIndex = $startSource.IndexOf(
+    'Write-Host "Codex Dream Skin is active on verified loopback port $Port."',
+    [System.StringComparison]::Ordinal
+  )
+  $trayBackgroundIndex = $startSource.IndexOf(
+    'Start-DreamSkinTrayInBackground -TrayPort $Port',
+    [System.StringComparison]::Ordinal
+  )
+  foreach ($requiredTrayLaunchToken in @(
+    'function Start-DreamSkinTrayInBackground',
+    'Test-DreamSkinTrayActive',
+    "Join-Path `$PSScriptRoot 'tray-dream-skin.ps1'",
+    '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File',
+    'Start-Process -FilePath $powershell -ArgumentList $trayArguments -WindowStyle Hidden'
+  )) {
+    if (-not $startSource.Contains($requiredTrayLaunchToken)) {
+      throw "Start no longer detaches the tray safely after launch: $requiredTrayLaunchToken"
+    }
+  }
+  if ($activeMessageIndex -lt 0 -or $trayBackgroundIndex -le $activeMessageIndex) {
+    throw 'Start launches the tray before the skin has completed verification.'
   }
   $stateReadIndex = $startSource.IndexOf('$previousState = Read-DreamSkinState', [System.StringComparison]::Ordinal)
   $restartPromptIndex = $startSource.IndexOf('$restartAuthorized = Confirm-DreamSkinRestart', [System.StringComparison]::Ordinal)
@@ -1105,7 +1156,8 @@ try {
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
   foreach ($requiredRendererBehavior in @(
     'adoptedStyleSheets', 'CSSStyleSheet', 'artMetadata', 'detectShellAppearance',
-    'data-dream-skin', 'window.navigation', 'selectorsSchema', 'codex-dream-skin-selectors/1'
+    'data-dream-skin', 'window.navigation', 'selectorsSchema', 'codex-dream-skin-selectors/1',
+    'beginRouteTransition', 'data-dream-route-phase', 'requestAnimationFrame'
   )) {
     if (-not $rendererSource.Contains($requiredRendererBehavior)) {
       throw "Renderer adaptive behavior is missing: $requiredRendererBehavior"
