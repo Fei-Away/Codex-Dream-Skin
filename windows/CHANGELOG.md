@@ -4,6 +4,27 @@
 
 ### 修复
 
+- 与 macOS 共用的宽幅画作层通过 CSS anchor 自动以 Review / Terminal / Browser / Files 右侧面板的实时左边界作为画布右边界；底部面板改变右侧面板高度时不再触发画作重新缩放或裁切，且无需 renderer 布局读取。
+- 任务页左侧栏与首页使用同一组半透明材质变量，路由切换时不再出现背景明显变深、降饱和的问题。
+
+## 1.3.3 — 2026-07-23
+
+### 修复
+
+- 启动编排三处加固（#222）：① 启动后的一次性验证改为 90 秒重试窗口——慢机器上 Codex 首屏尚未渲染完时不再被误判失败，进而不再连带停掉刚拉起的 watcher、也不再把 Codex 无调试口重启（此前皮肤因此完全不出现）；② 启动失败回滚改用自有进程对象停止注入器并把等待延长到 15 秒——过早判定「did not stop」曾遗留互相清除对方运行时的双 watcher；③ 端点归属校验放宽到任一已注册 OpenAI.Codex 版本——商店自动更新中途换包目录后，不再拒认仍在运行的健康皮肤会话（`verify-dream-skin.ps1` 同步生效，托盘经由 start 脚本自动继承全部修复）。新增回归断言锁定重试窗口、回滚等待与版本回退逻辑。
+- 修复 `--verify` 缺少 `--theme-dir` 参数的隐性错配：注入器在无该参数时回退到引擎 `assets` 内置主题作为期望值，源码安装下 watcher 应用的是暂存激活主题，二者永不一致——验证从一开始就注定失败（重试窗口暴露了这一点）。start 与 `verify-dream-skin.ps1` 现与 watcher 使用同一 `--theme-dir`（macOS 包装器一直如此），并新增断言防回退。
+
+## 1.3.2 — 2026-07-23
+
+### 修复
+
+- 与 macOS 同修：1.3.1 统一 runtime 的路由门控使用了嵌套 `:has()`（CSS 规范禁止，浏览器整条丢弃），导致宽幅画作退化为首页横幅卡、任务页氛围背景失效。契约新增无 `:has()` 的 `home-route-css` 别名并等价改写全部 41 处规则；双端产物同一份源码编译，Windows 侧随包生效。
+- Windows 回归套件中锁定旧嵌套选择器的断言同步更新，并新增编译产物「嵌套 `:has()`」回归测试。
+
+## 1.3.1 — 2026-07-23
+
+### 修复
+
 - Gothic Void Crusade 预设的 `appearance` 从 `auto` 固定为 `dark`（与 macOS 同步，#134 引入时误用了 auto）：暗色专属背景不再跟随客户端浅色外壳渲染。已在用该预设的用户需重新切换一次该主题才会拿到修复。
 - Windows Release 构建不再依赖 Chocolatey 精简版 Inno Setup 是否附带非官方翻译目录；固定并校验 Inno 6.7.1 官方简体中文语言文件后从隔离 staging 编译，保证 CI 与 Release runner 都能生成双语 Setup.exe。
 - 收起或重建左侧栏时不再因找不到 `aside.app-shell-left-panel` 而整页卸掉皮肤；只要主内容壳层仍在就继续应用当前主题，避免闪回 Codex 原生配色。透明辅助窗口仍会清理残留样式。
@@ -11,6 +32,11 @@
 - Windows 注入器补齐与 macOS 相同的窗口内操作浮层（loading / 成功 / 失败）；暂停、继续与重新应用时在 Codex 主区显示「正在暂停皮肤…」「正在应用皮肤…」等进度，不再只有托盘气泡。
 - 源码安装/主题库初始化会把 macOS 同款「Gothic Void Crusade / 哥特虚空远征」播种到已保存主题（`presets/preset-gothic-void-crusade`），可与源码中的「桥本有菜」参考主题一并在托盘切换；公开 Setup.exe 只携带并默认播种 Gothic Void Crusade。
 - 同步 macOS 的首页建议卡图标居中修复（#176 / #181 核心部分）：原生 span 的 `justify-start` 使 grid + `place-items` 无法居中图标徽章内的字形，改为 flex 强制居中。
+
+### 改进
+
+- 托盘、安装器与开始菜单/自启快捷方式的 ICO 改绘为 DreamSkin 品牌 mark，与 dreamskin.cc 网站 favicon 同源：纸白圆角方、发丝描边、墨色对角半区与青色圆点（#217）。
+- 皮肤 runtime 双端统一（#216）：与 macOS 共用 `tools/selectors.json` 选择器契约与单源渲染器，双端注入产物由工具链编译并强制字节一致；运行时只写 `data-dream-*` 属性与 CSS 变量，锚点缺失场景降级 L0。
 
 ## 1.3.0 — 2026-07-19
 
@@ -25,7 +51,6 @@
 - 卸载确认后先调用受管恢复引擎；只有 Codex 外观、CDP 与运行状态安全恢复成功才删除安装文件，失败会中止卸载并保留修复入口。
 - 安装、启动、托盘与恢复均使用 `RemoteSigned`，不再要求普通用户执行 `.ps1`、修改 Execution Policy 或安装全局 Node.js。
 - Release 构建会用固定 SHA-256 核验的 Gothic Void Crusade 替换源码中的人物参考素材；Setup.exe 同时携带项目 LICENSE/NOTICE 与 Node.js 自带许可证。
->>>>>>> origin/main
 
 ## 1.2.0 — 2026-07-17
 

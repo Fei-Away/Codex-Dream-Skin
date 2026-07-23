@@ -48,11 +48,19 @@ commit_deployed_project() {
 
 rollback_deployed_project() {
   local status="$1"
-  /bin/rm -rf "$INSTALL_ROOT"
+  local broken="$INSTALL_ROOT.broken.$$"
+  # Swap with renames only: `rm -rf` on the live root is not atomic, and an
+  # interrupted deletion leaves a mixed-version engine behind.  Deleting the
+  # detached broken tree afterwards is safe to interrupt.
+  if [ -e "$INSTALL_ROOT" ]; then
+    /bin/mv "$INSTALL_ROOT" "$broken" \
+      || fail "Installation failed and the broken engine could not be moved aside."
+  fi
   if [ -n "${DEPLOY_PREVIOUS:-}" ] && [ -e "$DEPLOY_PREVIOUS" ]; then
     /bin/mv "$DEPLOY_PREVIOUS" "$INSTALL_ROOT" \
       || fail "Installation failed and the previous engine could not be restored."
   fi
+  /bin/rm -rf "$broken" 2>/dev/null || true
   DEPLOY_PREVIOUS=""
   return "$status"
 }
@@ -60,6 +68,10 @@ rollback_deployed_project() {
 DEPLOY_PREVIOUS=""
 
 if [ "$IN_PLACE" = "false" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
+  # Run the cheap precondition before any engine bytes move: aborting after
+  # the copy forces a rollback of a perfectly good previous engine, and an
+  # interrupted rollback is how a mixed-version tree ships.
+  codex_is_running && fail "Close Codex before installation so config.toml cannot be rewritten while the app is saving it."
   /bin/mkdir -p "$(dirname "$INSTALL_ROOT")"
   deploy_project
   install_args=(--in-place --port "$PORT")

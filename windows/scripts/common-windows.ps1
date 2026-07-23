@@ -178,6 +178,7 @@ function Install-DreamSkinRuntimeEngine {
     'assets\dream-reference.jpg',
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
+    'assets\selectors.json',
     'assets\theme.json',
     'presets\preset-gothic-void-crusade\background.jpg',
     'presets\preset-gothic-void-crusade\theme.json',
@@ -716,6 +717,25 @@ function Get-DreamSkinVerifiedCdpIdentity {
 function Test-DreamSkinCodexCdpEndpoint {
   param([int]$Port, [Parameter(Mandatory = $true)][object]$Codex)
   return $null -ne (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $Codex)
+}
+
+function Get-DreamSkinVerifiedCdpIdentityForAnyRegistered {
+  # A Store auto-update replaces the "current" package directory while the
+  # older version keeps running and owning the verified endpoint.  Accepting
+  # any registered OpenAI.Codex install keeps the strict owner validation
+  # (every candidate passed the same package identity checks) without
+  # restarting a healthy skinned Codex just because the Store updated.
+  param([int]$Port)
+  foreach ($install in @(Get-DreamSkinRegisteredCodexInstalls)) {
+    $identity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $install
+    if ($null -ne $identity) {
+      return [pscustomobject]@{
+        Identity = $identity
+        Codex = $install
+      }
+    }
+  }
+  return $null
 }
 
 function Select-DreamSkinPort {

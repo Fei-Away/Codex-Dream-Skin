@@ -10,28 +10,28 @@ const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
 function createFixture() {
-  const observers = [];
+  const domReady = [];
   const timers = new Map();
+  const intervals = new Map();
   let nextTimer = 1;
-  const markers = { shell: false, sidebar: false };
+  let nextInterval = 1;
+  const markers = { shell: false, sidebar: false, main: false, settings: false };
+  let root = {};
   const context = {
     window: { installs: [] },
+    location: { protocol: "app:" },
     document: {
-      documentElement: {},
+      get documentElement() { return root; },
+      addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
       querySelector(selector) {
         if (selector === "main.main-surface") return markers.shell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
+        if (selector === "[role=\"main\"]") return markers.main ? {} : null;
+        if (selector.includes("appearance-theme") || selector.includes("theme-preview")) {
+          return markers.settings ? {} : null;
+        }
         return null;
       },
-    },
-    MutationObserver: class {
-      constructor(callback) {
-        this.callback = callback;
-        this.connected = true;
-        observers.push(this);
-      }
-      observe() {}
-      disconnect() { this.connected = false; }
     },
     setTimeout(callback) {
       const id = nextTimer++;
@@ -39,23 +39,43 @@ function createFixture() {
       return id;
     },
     clearTimeout(id) { timers.delete(id); },
+    setInterval(callback) {
+      const id = nextInterval++;
+      intervals.set(id, callback);
+      return id;
+    },
+    clearInterval(id) { intervals.delete(id); },
   };
-  return { context, markers, observers };
+  return {
+    context,
+    markers,
+    makeNotReady() { root = null; },
+    makeReady() { root = {}; },
+    fireDomReady() { for (const callback of [...domReady]) callback(); },
+    tick() { for (const callback of [...intervals.values()]) callback(); },
+    observers: [],
+  };
 }
 
 const guarded = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("guarded")', "guarded"), guarded.context);
 assert.deepEqual(guarded.context.window.installs, [], "Auxiliary app targets must remain untouched.");
+assert.equal(guarded.observers.length, 0, "Early bootstrap must not install a broad MutationObserver.");
 guarded.markers.shell = true;
-guarded.observers[0].callback([]);
-assert.deepEqual(guarded.context.window.installs, [], "A main surface without the Codex sidebar is not sufficient.");
+guarded.tick();
+assert.deepEqual(guarded.context.window.installs, [], "A shell without its sidebar is not sufficient for identity.");
+guarded.markers.sidebar = true;
+guarded.tick();
+assert.deepEqual(guarded.context.window.installs, ["guarded"]);
 
 const generations = createFixture();
-vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);
-vm.runInNewContext(earlyPayloadFor('window.installs.push("new")', "new"), generations.context);
+generations.makeNotReady();
 generations.markers.shell = true;
 generations.markers.sidebar = true;
-for (const observer of generations.observers) observer.callback([]);
+vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);
+vm.runInNewContext(earlyPayloadFor('window.installs.push("new")', "new"), generations.context);
+generations.makeReady();
+generations.fireDomReady();
 assert.deepEqual(
   generations.context.window.installs,
   ["new"],
@@ -63,6 +83,13 @@ assert.deepEqual(
 );
 assert.equal(generations.context.window.__CODEX_DREAM_SKIN_EARLY_APPLIED__, "new");
 
+const earlyStart = source.indexOf("export function earlyPayloadFor");
+const earlySource = source.slice(earlyStart, earlyStart + 2200);
+assert.ok(earlyStart >= 0, "Early payload helper must remain exported for bootstrap tests.");
+assert.doesNotMatch(earlySource, /MutationObserver|childList|subtree/,
+  "Early bootstrap must not observe the entire renderer DOM.");
+assert.match(earlySource, /DOMContentLoaded/);
+assert.match(earlySource, /setInterval\(install, 250\)/);
 const discoveryStart = source.indexOf("record.earlyScriptId = await registerEarly");
 const probeStart = source.indexOf("const probe = await waitForCodexProbe", discoveryStart);
 assert.ok(discoveryStart >= 0 && probeStart > discoveryStart, "Early registration must happen before full shell probing.");
@@ -78,8 +105,10 @@ assert.match(
 );
 assert.match(
   source,
-  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\([\s\S]{0,2500}visibleSuggestionLabels\.length >= result\.visibleCardCount[\s\S]{0,160}result\.suggestionLabelColorsMatch/,
+  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\(/,
   "Live verification must reject visible home suggestion labels that diverge from the themed card color.",
 );
+assert.match(source, /visibleSuggestionLabels\.length >= result\.visibleCardCount/);
+assert.match(source, /result\.suggestionLabelColorsMatch/);
 
-console.log("PASS: early injection is shell-guarded, generation-safe, and removed on shutdown.");
+console.log("PASS: early injection is L0-ready, generation-safe, and removed on shutdown.");

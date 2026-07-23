@@ -11,7 +11,33 @@ const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.3.0";
+const SELECTOR_CONTRACT = JSON.parse(await fs.readFile(
+  path.join(root, "assets", "selectors.json"), "utf8",
+));
+if (SELECTOR_CONTRACT.schema !== "codex-dream-skin-selectors/1" ||
+  !Array.isArray(SELECTOR_CONTRACT.selectors)) {
+  throw new Error("assets/selectors.json has an unsupported schema");
+}
+const SELECTOR_MAP = new Map();
+for (const entry of SELECTOR_CONTRACT.selectors) {
+  if (!entry?.key || !entry.selector || SELECTOR_MAP.has(entry.key)) {
+    throw new Error(`assets/selectors.json has an invalid selector key: ${entry?.key || "<missing>"}`);
+  }
+  SELECTOR_MAP.set(entry.key, entry.selector);
+}
+const selectorFor = (key) => {
+  const selector = SELECTOR_MAP.get(key);
+  if (!selector) throw new Error(`Selector contract is missing ${key}`);
+  return selector;
+};
+const selectorLiteral = (key) => JSON.stringify(selectorFor(key));
+const stableTestidLiteral = (testid) => {
+  if (!SELECTOR_CONTRACT.stableTestids?.includes(testid)) {
+    throw new Error(`Selector contract is missing stable testid ${testid}`);
+  }
+  return JSON.stringify(`[data-testid="${testid}"]`);
+};
+const SKIN_VERSION = "1.3.3";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
@@ -351,16 +377,19 @@ async function listAppTargets(port) {
 async function probeSession(session) {
   return session.evaluate(`(() => {
     const markers = {
-      shell: Boolean(document.querySelector('main.main-surface')),
-      sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
-      composer: Boolean(document.querySelector('.composer-surface-chrome')),
-      main: Boolean(document.querySelector('[role="main"]')),
+      shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
+      sidebar: Boolean(document.querySelector(${selectorLiteral("left-panel")})),
+      composer: Boolean(document.querySelector(${selectorLiteral("composer-chrome")})),
+      main: Boolean(document.querySelector(${selectorLiteral("home-route")})),
     };
+    const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
+      Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       title: document.title,
       href: location.href,
       markers,
-      codex: markers.shell && markers.sidebar,
+      codex: location.protocol === 'app:' &&
+        ((markers.shell && markers.sidebar) || settings || markers.main),
     };
   })()`);
 }
@@ -656,7 +685,7 @@ function operationUiExpression(action, token, state = "loading", message = "") {
       : value === "success" ? 1800 : value === "cancelled" ? 2400 : 6000;
     const issuedAt = (value) => Number(String(value).split(":")[1]) || 0;
     const positionInMainArea = (host) => {
-      const main = document.querySelector("main.main-surface") ||
+      const main = document.querySelector(${selectorLiteral("shell-main")}) ||
         document.querySelector('[role="main"]') || document.documentElement;
       const rect = main.getBoundingClientRect();
       const top = Math.max(0, rect.top);
@@ -804,23 +833,45 @@ async function removeFromSession(session) {
   return session.evaluate(`(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     const state = window.__CODEX_DREAM_SKIN_STATE__;
-    if (state?.cleanup) return state.cleanup();
-    document.documentElement?.classList.remove('codex-dream-skin');
-    document.documentElement?.style.removeProperty('--dream-skin-art');
+    let cleaned = false;
+    try { cleaned = Boolean(state?.cleanup && state.cleanup()); } catch {}
+    if (cleaned) return true;
+    const root = document.documentElement;
+    for (const attribute of [...(root?.attributes || [])]) {
+      if (attribute.name.startsWith('data-dream-')) root.removeAttribute(attribute.name);
+    }
+    for (const property of [...(root?.style || [])]) {
+      if (property.startsWith('--dream-') || property.startsWith('--ds-')) {
+        root.style.removeProperty(property);
+      }
+    }
+    const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
+    if (sheets && 'adoptedStyleSheets' in document) {
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets]
+        .filter((sheet) => !sheets.has(sheet));
+    }
+    delete window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
+    try { if (state?.artUrl) URL.revokeObjectURL(state.artUrl); } catch {}
     document.getElementById('codex-dream-skin-style')?.remove();
-    document.getElementById('codex-dream-skin-chrome')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
     return true;
   })()`);
 }
 
 async function verifyRemovedSession(session) {
-  return session.evaluate(`(() =>
-    !document.documentElement.classList.contains('codex-dream-skin') &&
-    !document.getElementById('codex-dream-skin-style') &&
-    !document.getElementById('codex-dream-skin-chrome') &&
-    !window.__CODEX_DREAM_SKIN_STATE__
-  )()`);
+  return session.evaluate(`(() => {
+    const root = document.documentElement;
+    const hasAttributes = [...root.attributes].some((attribute) =>
+      attribute.name.startsWith('data-dream-'));
+    const hasVariables = [...root.style].some((property) =>
+      property.startsWith('--dream-') || property.startsWith('--ds-'));
+    const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
+    const hasSheets = Boolean(sheets?.size && 'adoptedStyleSheets' in document &&
+      [...document.adoptedStyleSheets].some((sheet) => sheets.has(sheet)));
+    return !hasAttributes && !hasVariables && !hasSheets &&
+      !document.getElementById('codex-dream-skin-style') &&
+      !window.__CODEX_DREAM_SKIN_STATE__;
+  })()`);
 }
 
 async function verifySession(session, expectedThemeId = null, expectedRevision = null) {
@@ -835,12 +886,12 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         visible: r.width > 0 && r.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
       };
     };
-    const homeIndicator = document.querySelector('[data-testid="home-icon"]');
-    const homeSignal = homeIndicator ?? document.querySelector('[data-feature="game-source"]') ??
-      document.querySelector('.group\\\\/home-suggestions');
+    const homeIndicator = document.querySelector(${selectorLiteral("home-icon")});
+    const homeSignal = homeIndicator ?? document.querySelector(${selectorLiteral("game-source")}) ??
+      document.querySelector(${selectorLiteral("home-suggestions")});
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
-    const home = document.querySelector('[role="main"].dream-skin-home');
-    const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
+    const home = document.querySelector(${selectorLiteral("home-route")});
+    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
     const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
     const cardBoxes = cardButtons.map(box);
     const visibleCards = cardBoxes.filter((item) => item?.visible);
@@ -860,19 +911,26 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
       item.color === item.expectedColor);
     const hero = box(home?.firstElementChild?.firstElementChild?.firstElementChild);
-    const projectButton = box(home?.querySelector('.group\\\\/project-selector > button'));
-    const shell = box(document.querySelector('main.main-surface'));
-    const composer = box(document.querySelector('.composer-surface-chrome'));
-    const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
-    const chrome = document.getElementById('codex-dream-skin-chrome');
+    const projectButton = box(home?.querySelector(${selectorLiteral("project-selector")} + " > button"));
+    const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
+    const composer = box(document.querySelector(${selectorLiteral("composer-chrome")}));
+    const sidebar = box(document.querySelector(${selectorLiteral("left-panel")}));
+    const runtime = window.__CODEX_DREAM_SKIN_STATE__;
+    const adopted = runtime?.styleMode === 'adopted' &&
+      [...document.adoptedStyleSheets].includes(runtime.styleSheet);
+    const fallback = runtime?.styleMode === 'style' &&
+      document.getElementById('codex-dream-skin-style') === runtime.styleNode;
     const result = {
-      installed: document.documentElement.classList.contains('codex-dream-skin'),
-      version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
-      themeId: window.__CODEX_DREAM_SKIN_STATE__?.themeId ?? null,
-      revision: window.__CODEX_DREAM_SKIN_STATE__?.revision ?? null,
-      stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
-      chromePresent: Boolean(chrome),
-      chromePointerEvents: getComputedStyle(chrome || document.body).pointerEvents,
+      installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
+      version: runtime?.version ?? null,
+      themeId: runtime?.themeId ?? null,
+      revision: runtime?.revision ?? null,
+      styleMode: runtime?.styleMode ?? null,
+      stylePresent: Boolean(adopted || fallback),
+      scope: runtime?.scope ?? null,
+      businessClassPollution: [...document.querySelectorAll('[class]')].filter((node) =>
+        [...node.classList].some((name) => /^(?:dream-|codex-dream-skin(?:-|$))/.test(name))
+      ).length,
       homeRoute: Boolean(homeRoute),
       homePresent: Boolean(home),
       hero,
@@ -890,9 +948,11 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
+    const structurePass = result.scope?.level === 'L0' ||
+      (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible));
     const basePass = result.installed && result.version === ${JSON.stringify(SKIN_VERSION)} &&
-      result.stylePresent && result.chromePresent && result.chromePointerEvents === 'none' &&
-      Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible) && !result.documentOverflow.x;
+      result.stylePresent && result.businessClassPollution === 0 && structurePass &&
+      !result.documentOverflow.x;
     const expectedThemeId = ${JSON.stringify(expectedThemeId)};
     const expectedRevision = ${JSON.stringify(expectedRevision)};
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
@@ -1106,30 +1166,34 @@ export function earlyPayloadFor(payload, revision) {
     const appliedKey = "__CODEX_DREAM_SKIN_EARLY_APPLIED__";
     const generation = ${JSON.stringify(revision)};
     window[generationKey] = generation;
-    let observer = null;
+    let bootstrapTimer = null;
     let timeout = null;
     const stop = () => {
-      observer?.disconnect();
-      observer = null;
+      if (bootstrapTimer) clearInterval(bootstrapTimer);
+      bootstrapTimer = null;
       if (timeout) clearTimeout(timeout);
       timeout = null;
     };
+    const hasCodexSurface = () => {
+      if (location.protocol !== "app:") return false;
+      const shell = document.querySelector(${selectorLiteral("shell-main")});
+      const sidebar = document.querySelector(${selectorLiteral("left-panel")});
+      const main = document.querySelector(${selectorLiteral("home-route")});
+      const settings = document.querySelector(${selectorLiteral("appearance-radio")}) ||
+        document.querySelector(${stableTestidLiteral("theme-preview")});
+      return Boolean((shell && sidebar) || settings || main);
+    };
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
-      if (!document.documentElement) return false;
-      const shell = document.querySelector('main.main-surface');
-      const sidebar = document.querySelector('aside.app-shell-left-panel');
-      if (!shell || !sidebar) return false;
+      if (!document.documentElement || !hasCodexSurface()) return false;
       stop();
       ${payload};
       window[appliedKey] = generation;
       return true;
     };
     if (install()) return;
-    if (typeof MutationObserver === "function" && document.documentElement) {
-      observer = new MutationObserver(install);
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-    }
+    document.addEventListener?.("DOMContentLoaded", install, { once: true });
+    bootstrapTimer = setInterval(install, 250);
     timeout = setTimeout(stop, 10000);
   })()`;
 }

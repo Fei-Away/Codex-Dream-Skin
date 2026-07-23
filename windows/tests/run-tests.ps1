@@ -828,7 +828,7 @@ try {
   $publicPresetRoot = Join-Path $repositoryRoot 'macos\presets\preset-gothic-void-crusade'
   New-Item -ItemType Directory -Path $releaseFixtureAssets, $releaseFixtureScripts, $releaseFixturePresetDirectory -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $Root 'VERSION') -Destination $releaseFixtureRoot -Force
-  foreach ($releaseAsset in @('dream-skin.css', 'renderer-inject.js')) {
+  foreach ($releaseAsset in @('dream-skin.css', 'renderer-inject.js', 'selectors.json')) {
     Copy-Item -LiteralPath (Join-Path $Root "assets\$releaseAsset") `
       -Destination $releaseFixtureAssets -Force
   }
@@ -937,18 +937,35 @@ try {
 
   $css = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\dream-skin.css')
   foreach ($requiredCss in @(
-    'background-image: var(--dream-art)',
+    'background-image: var(--dream-skin-art)',
     'main.main-surface > header.app-header-tint',
     '[class~="group/application-menu-top-bar"]',
     '.app-shell-main-content-top-fade',
     '.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary',
-    '--dream-immersive-composer',
-    'background-position: var(--dream-art-position)',
-    '.dream-home-utility',
-    ':has(.dream-home-utility) .composer-surface-chrome',
-    ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))'
+    '--ds-immersive-composer',
+    'background-position: var(--ds-art-position)',
+    'html[data-dream-skin="active"]',
+    'main.main-surface:has([role="main"])',
+    'main.main-surface:not(:has([role="main"]))'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
+  }
+  if ($css.Contains('home-suggestion-list-item') -or
+    $css.Contains('.dream-skin-home') -or $css.Contains('.dream-home') -or
+    $css.Contains('.dream-task') -or $css.Contains('codex-dream-skin-chrome')) {
+    throw 'Canonical CSS still contains retired marker classes or fossil selectors.'
+  }
+  $macCssPath = Join-Path (Split-Path -Parent $Root) 'macos\assets\dream-skin.css'
+  if (-not (Test-Path -LiteralPath $macCssPath) -or
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $macCssPath).Hash -cne
+    (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Root 'assets\dream-skin.css')).Hash) {
+    throw 'macOS and Windows canonical CSS assets are not byte-identical.'
+  }
+  $macSelectorsPath = Join-Path (Split-Path -Parent $Root) 'macos\assets\selectors.json'
+  if (-not (Test-Path -LiteralPath $macSelectorsPath) -or
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $macSelectorsPath).Hash -cne
+    (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Root 'assets\selectors.json')).Hash) {
+    throw 'macOS and Windows selector contract assets are not byte-identical.'
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
   foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '继续显示皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
@@ -1057,13 +1074,60 @@ try {
     -not $startSource.Contains('Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot')) {
     throw 'Start does not preserve an existing pause marker when startup rolls back.'
   }
+  if (-not $startSource.Contains('$verifyDeadline') -or
+    -not $startSource.Contains('Start-Sleep -Seconds 3')) {
+    throw 'Start lost the verification retry window; a single early-boot miss must not tear the startup down.'
+  }
+  if (-not $startSource.Contains('WaitForExit(15000)')) {
+    throw 'Startup rollback no longer waits long enough for its own injector to exit; short waits leave duelling watchers.'
+  }
+  if (-not $startSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
+    throw 'Start lost the any-registered endpoint fallback for Store auto-updates.'
+  }
+  $verifyScriptSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
+  if (-not $verifyScriptSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
+    throw 'Verify lost the any-registered endpoint fallback for Store auto-updates.'
+  }
+  foreach ($verifyCaller in @(
+    @{ Name = 'start-dream-skin.ps1'; Source = $startSource },
+    @{ Name = 'verify-dream-skin.ps1'; Source = $verifyScriptSource }
+  )) {
+    $verifyIndex = $verifyCaller.Source.IndexOf("'--verify'", [System.StringComparison]::Ordinal)
+    $themeDirIndex = $verifyCaller.Source.IndexOf("'--theme-dir'", [System.StringComparison]::Ordinal)
+    if ($verifyIndex -lt 0 -or $themeDirIndex -lt 0) {
+      throw "$($verifyCaller.Name) must pass --theme-dir to --verify; the injector's assets fallback compares against the wrong expected theme."
+    }
+  }
+  if (-not (Get-Command Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -CommandType Function -ErrorAction SilentlyContinue)) {
+    throw 'The any-registered CDP identity helper is missing from common-windows.ps1.'
+  }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
-  foreach ($requiredRendererBehavior in @('dream-home-utility', 'artMetadata', 'detectShellAppearance')) {
+  foreach ($requiredRendererBehavior in @(
+    'adoptedStyleSheets', 'CSSStyleSheet', 'artMetadata', 'detectShellAppearance',
+    'data-dream-skin', 'window.navigation', 'selectorsSchema', 'codex-dream-skin-selectors/1'
+  )) {
     if (-not $rendererSource.Contains($requiredRendererBehavior)) {
       throw "Renderer adaptive behavior is missing: $requiredRendererBehavior"
     }
   }
+  foreach ($forbiddenRendererBehavior in @(
+    'getBoundingClientRect', 'ResizeObserver', 'childList', 'subtree',
+    'classList.add', 'classList.remove', 'classList.toggle',
+    'syncRouteState', 'samplingNativeShell', 'dream-home-utility'
+  )) {
+    if ($rendererSource.Contains($forbiddenRendererBehavior)) {
+      throw "Unified renderer still contains retired behavior: $forbiddenRendererBehavior"
+    }
+  }
+  $node = Get-DreamSkinNodeRuntime
+  $projectRoot = Split-Path -Parent $Root
+  $syncToolPath = Join-Path $projectRoot 'tools\sync-runtime-assets.mjs'
+  $syncToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($syncToolPath, '--check')
+  if ($syncToolResult.ExitCode -ne 0) { throw "Runtime contract tool failed: $syncToolPath" }
+  $doctorToolPath = Join-Path $projectRoot 'tools\doctor-selectors.test.mjs'
+  $doctorToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($doctorToolPath)
+  if ($doctorToolResult.ExitCode -ne 0) { throw "Runtime contract tool failed: $doctorToolPath" }
   $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
   foreach ($requiredInjectorBehavior in @(
     'MAX_ART_BYTES', 'createHash', 'readImageMetadata', '50MP safety limit', 'STRONG_THEME_AUDIT_MS',
@@ -1091,7 +1155,6 @@ try {
     throw 'Mismatched live injector identity does not fail closed with preserved state.'
   }
 
-  $node = Get-DreamSkinNodeRuntime
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     '-e', "process.stderr.write('dream-skin-stderr-probe\n'); process.exit(7)")
   if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
