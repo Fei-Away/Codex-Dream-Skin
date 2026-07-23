@@ -18,8 +18,8 @@ jobs:
     name: Static checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
 
@@ -79,6 +79,11 @@ jobs:
             printf 'A runtime script appears to mutate app.asar.\n' >&2
             exit 1
           fi
+          if grep -R -n --include='*.ps1' --include='*.iss' \
+            -F -- '-ExecutionPolicy Bypass' windows/scripts windows/installer >/dev/null; then
+            printf 'Windows runtime or installer code bypasses the PowerShell execution policy.\n' >&2
+            exit 1
+          fi
           if grep -n -E '/usr/bin/python3|(^|[[:space:]])eval([[:space:]]|$)' \
             macos/scripts/common-macos.sh >/dev/null; then
             printf 'The macOS runtime must parse state without python3 or eval.\n' >&2
@@ -89,10 +94,14 @@ jobs:
         shell: bash
         run: |
           expected="$(tr -d '\r\n' < macos/VERSION)"
+          windows_version="$(tr -d '\r\n' < windows/VERSION)"
+          package_version="$(node -p "JSON.parse(require('fs').readFileSync('macos/package.json','utf8')).version")"
           common="$(sed -n 's/^SKIN_VERSION="\([^"]*\)"$/\1/p' macos/scripts/common-macos.sh)"
           macos_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' macos/scripts/injector.mjs)"
           windows_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' windows/scripts/injector.mjs)"
           test -n "$expected"
+          test "$windows_version" = "$expected"
+          test "$package_version" = "$expected"
           test "$common" = "$expected"
           test "$macos_injector" = "$expected"
           test "$windows_injector" = "$expected"
@@ -117,21 +126,52 @@ jobs:
           - name: PowerShell 7
             executable: pwsh.exe
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
 
       - name: Run Windows regression suite
         shell: cmd
-        run: ${{ matrix.executable }} -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\run-tests.ps1
+        run: ${{ matrix.executable }} -NoLogo -NoProfile -ExecutionPolicy RemoteSigned -File .\windows\tests\run-tests.ps1
+
+      - name: Run Windows installer static checks
+        shell: cmd
+        run: ${{ matrix.executable }} -NoLogo -NoProfile -ExecutionPolicy RemoteSigned -File .\windows\tests\installer-static.tests.ps1
+
+      - name: Install pinned Inno Setup
+        if: matrix.executable == 'powershell.exe'
+        shell: pwsh
+        run: |
+          $requiredVersion = '6.7.1'
+          choco upgrade innosetup --version=$requiredVersion --allow-downgrade --no-progress --yes
+          if ($LASTEXITCODE -ne 0) { throw "Could not install Inno Setup $requiredVersion." }
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw 'ISCC.exe is missing.' }
+          "ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Compile Windows Setup.exe
+        if: matrix.executable == 'powershell.exe'
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'codex-dream-skin-ci-installer'
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\installer\build-release.ps1 `
+            -OutputDirectory $output -IsccPath $env:ISCC_PATH
+          if ($LASTEXITCODE -ne 0) { throw "Windows release builder failed with exit code $LASTEXITCODE." }
+          $version = [System.IO.File]::ReadAllText((Resolve-Path .\windows\VERSION)).Trim()
+          $artifact = Join-Path $output "CodexDreamSkin-Setup-v$version.exe"
+          if (-not (Test-Path -LiteralPath $artifact -PathType Leaf) -or
+            (Get-Item -LiteralPath $artifact).Length -le 0) {
+            throw 'Windows installer artifact is missing or empty.'
+          }
 
   macos-tests:
     name: macOS repository regressions
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
 
@@ -147,3 +187,16 @@ jobs:
           CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS: "1"
           CODEX_DREAM_SKIN_SKIP_DOCTOR: "1"
         run: ./macos/tests/run-tests.sh
+
+      - name: Build and test the native menu bar app
+        run: swift test --package-path macos/menubar-app
+
+      - name: Compile and verify the universal DMG
+        run: ./macos/scripts/build-dmg.sh --skip-tests
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CodexDreamSkin-dmg
+          path: macos/release/*.dmg
+          retention-days: 7

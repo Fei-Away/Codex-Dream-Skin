@@ -1,13 +1,6 @@
-import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import path from "node:path";
-import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const macosRoot = path.resolve(here, "..");
-const template = await fs.readFile(path.join(macosRoot, "assets", "renderer-inject.js"), "utf8");
-const css = await fs.readFile(path.join(macosRoot, "assets", "dream-skin.css"), "utf8");
+import { runRendererRuntimeTest } from "../../tools/renderer-runtime.test.mjs";
 
 assert.doesNotMatch(
   css,

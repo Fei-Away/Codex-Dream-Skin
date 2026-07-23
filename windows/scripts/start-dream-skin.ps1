@@ -52,6 +52,17 @@ try {
   $currentProcesses = Get-DreamSkinCodexProcesses -Codex $currentCodex
   $codexToStop = $currentCodex
   $cdpIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $currentCodex
+  if ($null -eq $cdpIdentity) {
+    # After a Store auto-update the running (older) package still owns the
+    # verified endpoint while Get-DreamSkinCodexInstall already resolves to
+    # the new one.  Adopt the running install instead of restarting it.
+    $runningRegistered = Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $Port
+    if ($null -ne $runningRegistered) {
+      $cdpIdentity = $runningRegistered.Identity
+      $codex = $runningRegistered.Codex
+      $codexToStop = $runningRegistered.Codex
+    }
+  }
   $savedIsDifferent = [bool]($null -ne $savedCodex -and
     -not (Test-DreamSkinPathEqual -Left $savedCodex.Executable -Right $currentCodex.Executable))
   if ($savedIsDifferent) {
@@ -225,29 +236,41 @@ try {
     }
     Write-DreamSkinState -Path $StatePath -State $state
 
-    $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
-      $Injector, '--verify', '--port', "$Port",
-      '--browser-id', $cdpIdentity.BrowserId, '--timeout-ms', '30000')
-    Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
-    if ($verify.ExitCode -ne 0) { throw "Dream Skin verification failed. See $VerifyPath" }
+    # The one-shot verify races Codex's first paint: on a slow machine the
+    # shell markers are not rendered yet when the daemon has barely started,
+    # and a single early miss used to tear the whole startup down.  The
+    # watcher keeps applying in the background, so retry until a deadline.
+    $verifyDeadline = (Get-Date).AddSeconds(90)
+    while ($true) {
+      $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+        $Injector, '--verify', '--port', "$Port",
+        '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
+        '--timeout-ms', '30000')
+      Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
+      if ($verify.ExitCode -eq 0) { break }
+      if ($daemon.HasExited) { throw "The injector exited during startup. See $StderrPath" }
+      if ((Get-Date) -ge $verifyDeadline) { throw "Dream Skin verification failed. See $VerifyPath" }
+      Start-Sleep -Seconds 3
+    }
   } catch {
     $startupError = $_
+    # We own the daemon Process object, so stop it directly: the object is
+    # immune to PID reuse, and identity re-validation cannot spuriously
+    # refuse.  Slow machines also need more than a moment for teardown; a
+    # premature "did not stop" here is what used to leave duelling watchers.
     $injectorStopped = $true
-    if ($null -ne $state) {
-      try {
-        $injectorStopped = Stop-DreamSkinRecordedInjector -State $state
-      } catch {
-        $injectorStopped = $false
-        Write-Warning $_.Exception.Message
+    if ($null -ne $daemon) {
+      if (-not $daemon.HasExited) {
+        try {
+          Stop-Process -InputObject $daemon -Force -ErrorAction Stop
+        } catch {
+          Write-Warning 'The newly created injector could not be signalled during startup rollback.'
+        }
       }
-    } elseif ($null -ne $daemon -and -not $daemon.HasExited) {
-      try {
-        Stop-Process -InputObject $daemon -Force -ErrorAction Stop
-        [void]$daemon.WaitForExit(5000)
-        $injectorStopped = $daemon.HasExited
-      } catch {
-        $injectorStopped = $false
-        Write-Warning 'The newly created injector could not be stopped during startup rollback.'
+      [void]$daemon.WaitForExit(15000)
+      $injectorStopped = $daemon.HasExited
+      if (-not $injectorStopped) {
+        Write-Warning "The rollback injector has not exited yet: PID $($daemon.Id). State was preserved so the next start can reconcile it."
       }
     }
     if ($injectorStopped -and -not $launchedWithCdp) {

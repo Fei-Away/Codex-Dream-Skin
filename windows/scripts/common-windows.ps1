@@ -55,9 +55,12 @@ function Get-DreamSkinRuntimeEnginePaths {
   return [pscustomobject]@{
     Root = $root
     Scripts = $scripts
+    Runtime = Join-Path $root 'runtime'
+    Version = Join-Path $root 'VERSION'
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
+    CheckUpdate = Join-Path $scripts 'check-update.ps1'
   }
 }
 
@@ -78,6 +81,51 @@ function Test-DreamSkinTrayActive {
   } finally {
     if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
     $mutex.Dispose()
+  }
+}
+
+function Stop-DreamSkinTrayProcess {
+  param(
+    [string[]]$ScriptPaths = @(),
+    [switch]$RequireStopped
+  )
+  if ($ScriptPaths.Count -eq 0) {
+    $ScriptPaths = @((Get-DreamSkinRuntimeEnginePaths).Tray)
+  }
+  $normalized = @($ScriptPaths | ForEach-Object {
+    try { [System.IO.Path]::GetFullPath($_) } catch { $null }
+  } | Where-Object { $_ })
+  $failures = @()
+  try {
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" `
+      -ErrorAction Stop
+    foreach ($process in $processes) {
+      if ($process.ProcessId -eq $PID -or -not $process.CommandLine) { continue }
+      $matchesTray = $false
+      foreach ($scriptPath in $normalized) {
+        if ($process.CommandLine.IndexOf($scriptPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+          $matchesTray = $true
+          break
+        }
+      }
+      if (-not $matchesTray) { continue }
+      try {
+        Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+        Wait-Process -Id $process.ProcessId -Timeout 5 -ErrorAction SilentlyContinue
+      } catch {
+        $failures += "PID $($process.ProcessId): $($_.Exception.Message)"
+      }
+    }
+  } catch {
+    $failures += $_.Exception.Message
+  }
+  if ($failures.Count -gt 0) {
+    $message = 'Could not close the Dream Skin tray automatically: ' + ($failures -join '; ')
+    if ($RequireStopped) { throw $message }
+    Write-Warning $message
+  }
+  if ($RequireStopped -and (Test-DreamSkinTrayActive)) {
+    throw 'The Dream Skin tray is still active. Exit it and retry the operation.'
   }
 }
 
@@ -126,13 +174,16 @@ function Install-DreamSkinRuntimeEngine {
   $fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
   $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $fullStateRoot
   $required = @(
+    'VERSION',
     'assets\dream-reference.jpg',
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
+    'assets\selectors.json',
     'assets\theme.json',
     'presets\preset-gothic-void-crusade\background.jpg',
     'presets\preset-gothic-void-crusade\theme.json',
     'scripts\common-windows.ps1',
+    'scripts\check-update.ps1',
     'scripts\config-utf8.ps1',
     'scripts\image-metadata.mjs',
     'scripts\injector.mjs',
@@ -143,13 +194,21 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\tray-dream-skin.ps1',
     'scripts\verify-dream-skin.ps1'
   )
+  $sourceHasBundledRuntime = Test-Path -LiteralPath (Join-Path $sourceRoot 'runtime') `
+    -PathType Container
+  if ($sourceHasBundledRuntime) {
+    $required += @('runtime\node\node.exe', 'runtime\node\LICENSE')
+  }
   foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot $relative) -PathType Leaf)) {
       throw "Dream Skin runtime source is incomplete: $relative"
     }
   }
-  $runtimeDirectories = @('assets', 'scripts', 'presets')
-  foreach ($directoryName in $runtimeDirectories) {
+  $sourceDirectories = @('assets', 'scripts', 'presets')
+  if ($sourceHasBundledRuntime) {
+    $sourceDirectories += 'runtime'
+  }
+  foreach ($directoryName in $sourceDirectories) {
     $sourceDirectory = Join-Path $sourceRoot $directoryName
     if ((Test-DreamSkinPathEqual -Left $fullStateRoot -Right $sourceDirectory) -or
       (Test-DreamSkinPathWithin -Path $fullStateRoot -Root $sourceDirectory)) {
@@ -165,7 +224,9 @@ function Install-DreamSkinRuntimeEngine {
   Ensure-DreamSkinManagedDirectory -Path $stagingRoot -Root $fullStateRoot
 
   try {
-    foreach ($directoryName in $runtimeDirectories) {
+    Copy-Item -LiteralPath (Join-Path $sourceRoot 'VERSION') -Destination $stagingRoot `
+      -Force -ErrorAction Stop
+    foreach ($directoryName in $sourceDirectories) {
       Copy-Item -LiteralPath (Join-Path $sourceRoot $directoryName) -Destination $stagingRoot `
         -Recurse -Force -ErrorAction Stop
     }
@@ -177,17 +238,13 @@ function Install-DreamSkinRuntimeEngine {
     }
 
     $sourcePrefix = $sourceRoot.TrimEnd('\') + '\'
-    $sourceTrees = @(
-      foreach ($directoryName in $runtimeDirectories) { Join-Path $sourceRoot $directoryName }
+    $sourceFileRoots = @($sourceDirectories | ForEach-Object { Join-Path $sourceRoot $_ })
+    $stagedFileRoots = @($sourceDirectories | ForEach-Object { Join-Path $stagingRoot $_ })
+    $sourceFiles = @((Get-Item -LiteralPath (Join-Path $sourceRoot 'VERSION'))) + @(
+      Get-ChildItem -LiteralPath $sourceFileRoots -Recurse -File -Force -ErrorAction Stop
     )
-    $stagedTrees = @(
-      foreach ($directoryName in $runtimeDirectories) { Join-Path $stagingRoot $directoryName }
-    )
-    $sourceFiles = @(
-      Get-ChildItem -LiteralPath $sourceTrees -Recurse -File -Force -ErrorAction Stop
-    )
-    $stagedFiles = @(
-      Get-ChildItem -LiteralPath $stagedTrees -Recurse -File -Force -ErrorAction Stop
+    $stagedFiles = @((Get-Item -LiteralPath (Join-Path $stagingRoot 'VERSION'))) + @(
+      Get-ChildItem -LiteralPath $stagedFileRoots -Recurse -File -Force -ErrorAction Stop
     )
     if ($sourceFiles.Count -ne $stagedFiles.Count) {
       throw 'Staged Dream Skin runtime file count does not match its source.'
@@ -206,6 +263,12 @@ function Install-DreamSkinRuntimeEngine {
     foreach ($runtimeScript in Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'scripts') `
       -Filter '*.ps1' -Recurse -File -Force -ErrorAction Stop) {
       Unblock-File -LiteralPath $runtimeScript.FullName -ErrorAction Stop
+    }
+    if (Test-Path -LiteralPath (Join-Path $stagingRoot 'runtime') -PathType Container) {
+      foreach ($runtimeFile in Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'runtime') `
+        -Recurse -File -Force -ErrorAction Stop) {
+        Unblock-File -LiteralPath $runtimeFile.FullName -ErrorAction Stop
+      }
     }
 
     $hasBackup = $false
@@ -310,16 +373,19 @@ function Invoke-DreamSkinNative {
   }
 }
 
-function Get-DreamSkinNodeRuntime {
-  param([int]$MinimumMajor = 22)
-
-  $command = Get-Command node.exe -ErrorAction SilentlyContinue
-  if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
-  if (-not $command) { throw "Node.js $MinimumMajor or newer is required and was not found in PATH." }
-  $versionProbe = Invoke-DreamSkinNative -FilePath $command.Source -ArgumentList @('-p', 'process.versions.node') -DiscardStderr
+function Get-DreamSkinValidatedNodeRuntime {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [int]$MinimumMajor = 22
+  )
+  $candidate = [System.IO.Path]::GetFullPath($Path)
+  if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+    throw "Node.js runtime does not exist: $candidate"
+  }
+  $versionProbe = Invoke-DreamSkinNative -FilePath $candidate -ArgumentList @('-p', 'process.versions.node') -DiscardStderr
   $version = ($versionProbe.Output -join '').Trim()
   if ($versionProbe.ExitCode -ne 0 -or -not $version) { throw 'The Node.js runtime could not be validated.' }
-  $pathProbe = Invoke-DreamSkinNative -FilePath $command.Source -ArgumentList @('-p', 'process.execPath') -DiscardStderr
+  $pathProbe = Invoke-DreamSkinNative -FilePath $candidate -ArgumentList @('-p', 'process.execPath') -DiscardStderr
   $runtimePath = ($pathProbe.Output -join '').Trim()
   if ($pathProbe.ExitCode -ne 0 -or -not $runtimePath -or -not (Test-Path -LiteralPath $runtimePath)) {
     throw 'The Node.js executable path could not be validated.'
@@ -329,6 +395,27 @@ function Get-DreamSkinNodeRuntime {
     throw "Node.js $MinimumMajor or newer is required; found $version at $runtimePath."
   }
   return [pscustomobject]@{ Path = $runtimePath; Version = $version; Major = $major }
+}
+
+function Get-DreamSkinNodeRuntime {
+  param([int]$MinimumMajor = 22)
+
+  if ($env:CODEX_DREAM_SKIN_NODE) {
+    return Get-DreamSkinValidatedNodeRuntime -Path $env:CODEX_DREAM_SKIN_NODE -MinimumMajor $MinimumMajor
+  }
+
+  $runtimeRoot = Split-Path -Parent $PSScriptRoot
+  $bundledNode = Join-Path $runtimeRoot 'runtime\node\node.exe'
+  if (Test-Path -LiteralPath $bundledNode -PathType Leaf) {
+    return Get-DreamSkinValidatedNodeRuntime -Path $bundledNode -MinimumMajor $MinimumMajor
+  }
+
+  $command = Get-Command node.exe -ErrorAction SilentlyContinue
+  if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
+  if (-not $command) {
+    throw "Bundled Node.js is missing and Node.js $MinimumMajor or newer was not found in PATH."
+  }
+  return Get-DreamSkinValidatedNodeRuntime -Path $command.Source -MinimumMajor $MinimumMajor
 }
 
 function ConvertTo-DreamSkinCodexInstall {
@@ -630,6 +717,25 @@ function Get-DreamSkinVerifiedCdpIdentity {
 function Test-DreamSkinCodexCdpEndpoint {
   param([int]$Port, [Parameter(Mandatory = $true)][object]$Codex)
   return $null -ne (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $Codex)
+}
+
+function Get-DreamSkinVerifiedCdpIdentityForAnyRegistered {
+  # A Store auto-update replaces the "current" package directory while the
+  # older version keeps running and owning the verified endpoint.  Accepting
+  # any registered OpenAI.Codex install keeps the strict owner validation
+  # (every candidate passed the same package identity checks) without
+  # restarting a healthy skinned Codex just because the Store updated.
+  param([int]$Port)
+  foreach ($install in @(Get-DreamSkinRegisteredCodexInstalls)) {
+    $identity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $install
+    if ($null -ne $identity) {
+      return [pscustomobject]@{
+        Identity = $identity
+        Codex = $install
+      }
+    }
+  }
+  return $null
 }
 
 function Select-DreamSkinPort {

@@ -50,7 +50,7 @@ macos/scripts/doctor-macos.sh
 运行 Windows 回归测试：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\tests\run-tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\windows\tests\run-tests.ps1
 ```
 
 改动安装、启动、注入或恢复流程时，请运行对应脚本和 `windows/scripts/verify-dream-skin.ps1`，并在 PR 中注明 Windows 版本与 Codex 来源。

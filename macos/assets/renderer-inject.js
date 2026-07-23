@@ -1,10 +1,13 @@
+// Canonical cross-platform renderer. Run tools/sync-runtime-assets.mjs after editing.
 ((cssText, artDataUrl, themeConfig) => {
+  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main.main-surface","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header.app-header-tint","tier":"L1","scope":"all","required":true},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
+  const STYLE_REGISTRY_KEY = "__CODEX_DREAM_SKIN_STYLE_SHEETS__";
   const STYLE_ID = "codex-dream-skin-style";
-  const CHROME_ID = "codex-dream-skin-chrome";
   const SHELL_ATTR = "data-dream-shell";
-  const ART_ATTRS = [
+  const ROOT_ATTRS = [
+    "data-dream-skin", SHELL_ATTR,
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
     "data-dream-art-ready",
@@ -26,8 +29,12 @@
     "--dream-art-focus-x", "--dream-art-focus-y", "--dream-art-position",
     "--dream-skin-focus-x", "--dream-skin-focus-y", "--dream-skin-art-position",
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
-    "--dream-skin-project-label",
+    "--dream-skin-project-label", "--dream-skin-brand-subtitle", "--dream-skin-status",
+    "--dream-skin-quote", "--dream-skin-art",
   ];
+  const selectorByKey = new Map(SELECTOR_CONTRACT.selectors.map((entry) => [entry.key, entry]));
+  const stableTestidSelector = (testid) => SELECTOR_CONTRACT.stableTestids?.includes(testid)
+    ? `[data-testid="${testid}"]` : null;
   const installToken = {};
   const existingAnalysisCache = window[ANALYSIS_CACHE_KEY];
   const analysisCache = existingAnalysisCache && typeof existingAnalysisCache.get === "function" &&
@@ -35,8 +42,11 @@
   window[ANALYSIS_CACHE_KEY] = analysisCache;
   let artAnalysis = typeof THEME.artKey === "string" ? analysisCache.get(THEME.artKey) ?? null : null;
   let analysisTimer = null;
-  let samplingNativeShell = false;
   let rootObserver = null;
+  let bodyReadyHandler = null;
+  let styleMode = null;
+  let styleNode = null;
+  let styleSheet = null;
   const now = () => typeof performance === "object" && typeof performance.now === "function"
     ? performance.now() : Date.now();
   const metrics = {
@@ -46,15 +56,22 @@
     layoutReads: 0,
     attributeWrites: 0,
     styleWrites: 0,
-    textWrites: 0,
+    styleRepairs: 0,
+    navigationEvents: 0,
+    safetyPasses: 0,
     analysisRuns: 0,
     analysisCacheHits: artAnalysis ? 1 : 0,
     firstEnsureMs: null,
     analysisMs: null,
   };
-  window[DISABLED_KEY] = false;
 
   const previous = window[STATE_KEY];
+  if (typeof previous?.cleanup === "function") previous.cleanup();
+  window[DISABLED_KEY] = false;
+
+  const existingStyleRegistry = window[STYLE_REGISTRY_KEY];
+  const styleRegistry = existingStyleRegistry instanceof Set ? existingStyleRegistry : new Set();
+  window[STYLE_REGISTRY_KEY] = styleRegistry;
   const artUrl = (() => {
     const comma = artDataUrl.indexOf(",");
     const mime = /^data:([^;,]+)/.exec(artDataUrl)?.[1] || "image/png";
@@ -63,20 +80,6 @@
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
   })();
-
-  if (previous?.observer) previous.observer.disconnect();
-  if (previous?.rootObserver) previous.rootObserver.disconnect();
-  if (previous?.resizeObserver) previous.resizeObserver.disconnect();
-  if (previous?.timer) clearInterval(previous.timer);
-  if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
-  if (previous?.scheduler?.frame != null && typeof cancelAnimationFrame === "function") {
-    cancelAnimationFrame(previous.scheduler.frame);
-  }
-  if (previous?.analysisTimer) clearTimeout(previous.analysisTimer);
-  if (previous?.resizeHandler) window.removeEventListener("resize", previous.resizeHandler);
-  if (previous?.mediaHandler && previous?.mediaQuery) {
-    try { previous.mediaQuery.removeEventListener("change", previous.mediaHandler); } catch {}
-  }
 
   const cssString = (value) => JSON.stringify(String(value ?? ""));
 
@@ -92,13 +95,6 @@
     if (root.getAttribute(name) !== normalized) {
       root.setAttribute(name, normalized);
       metrics.attributeWrites += 1;
-    }
-  };
-
-  const setTextContent = (node, value) => {
-    if (node && node.textContent !== value) {
-      node.textContent = value;
-      metrics.textWrites += 1;
     }
   };
 
@@ -160,98 +156,11 @@
     return { r: channel(1 / 3) * 255, g: channel(0) * 255, b: channel(-1 / 3) * 255 };
   };
 
-  const luminance = ({ r, g, b }) => {
-    const lin = [r, g, b].map((c) => {
-      const x = c / 255;
-      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-  };
-
-  /** Detect Codex app light/dark shell for CSS branching. */
-  const detectShellMode = () => {
+  const detectShellAppearance = () => {
     const root = document.documentElement;
-    const body = document.body;
-    const cls = `${root.className || ""} ${body?.className || ""}`.toLowerCase();
-
-    if (/\b(dark|theme-dark|appearance-dark)\b/.test(cls)) return "dark";
-    if (/\b(light|theme-light|appearance-light)\b/.test(cls)) return "light";
-
-    const dataTheme = (
-      root.getAttribute("data-theme") ||
-      root.getAttribute("data-appearance") ||
-      root.getAttribute("data-color-mode") ||
-      body?.getAttribute("data-theme") ||
-      body?.getAttribute("data-appearance") ||
-      ""
-    ).toLowerCase();
-    if (dataTheme.includes("dark")) return "dark";
-    if (dataTheme.includes("light")) return "light";
-
-    // Radios in profile menu (if present in DOM)
-    const checked = document.querySelector('input[name="appearance-theme"]:checked');
-    if (checked) {
-      const label = (checked.getAttribute("aria-label") || checked.value || "").toLowerCase();
-      if (label.includes("暗") || label.includes("dark")) return "dark";
-      if (label.includes("浅") || label.includes("light")) return "light";
-      if (label.includes("系统") || label.includes("system")) {
-        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      }
-    }
-
-    // The skin itself declares color-scheme on :root.  Once installed,
-    // reading getComputedStyle(root) directly would therefore keep `auto`
-    // themes locked to the previous shell mode. Temporarily remove only our
-    // own root class/attribute, sample the native computed scheme, then restore
-    // synchronously. Mutation records created by this probe are drained below
-    // so the root observer does not schedule a redundant ensure pass.
-    try {
-      const hadSkin = root.classList.contains("codex-dream-skin");
-      const savedShell = root.getAttribute(SHELL_ATTR);
-      samplingNativeShell = true;
-      if (hadSkin) root.classList.remove("codex-dream-skin");
-      if (savedShell !== null) root.removeAttribute(SHELL_ATTR);
-      let colorScheme = "";
-      try {
-        colorScheme = getComputedStyle(root).colorScheme || "";
-      } finally {
-        if (hadSkin) root.classList.add("codex-dream-skin");
-        if (savedShell !== null) root.setAttribute(SHELL_ATTR, savedShell);
-        rootObserver?.takeRecords?.();
-        samplingNativeShell = false;
-      }
-      if (colorScheme.includes("dark") && !colorScheme.includes("light")) return "dark";
-      if (colorScheme.includes("light") && !colorScheme.includes("dark")) return "light";
-    } catch {
-      samplingNativeShell = false;
-    }
-
-    try {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    } catch {}
-
-    // Only use surface luminance before the skin owns those surfaces. Sampling
-    // our own translucent layers would create route-dependent light/dark flips.
-    if (!root.classList.contains("codex-dream-skin")) {
-      const samples = [
-        body,
-        document.querySelector("main.main-surface"),
-        document.querySelector("aside.app-shell-left-panel"),
-      ].filter(Boolean);
-      let votesLight = 0;
-      let votesDark = 0;
-      for (const el of samples) {
-        try {
-          const rgb = parseRgb(getComputedStyle(el).backgroundColor);
-          if (!rgb) continue;
-          const L = luminance(rgb);
-          if (L >= 0.55) votesLight += 1;
-          else if (L <= 0.25) votesDark += 1;
-        } catch {}
-      }
-      if (votesLight > votesDark) return "light";
-      if (votesDark > votesLight) return "dark";
-    }
+    if (root?.classList?.contains("electron-dark")) return "dark";
+    if (root?.classList?.contains("electron-light")) return "light";
+    try { return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch {}
     return "light";
   };
 
@@ -295,14 +204,23 @@
     // Image luminance may tune accents and scrims, but auto appearance follows
     // Codex/ChatGPT (or the OS fallback) so a bright wallpaper cannot flip a
     // native dark session back to a light shell after analysis.
-    return detectShellMode();
+    return detectShellAppearance();
   };
 
   const applyTheme = (root, shell) => {
-    const colors = THEME.colors || {};
-    const explicit = new Set(Array.isArray(THEME.explicitColorKeys) ? THEME.explicitColorKeys : []);
+    const declaredColors = THEME.colors && typeof THEME.colors === "object" ? THEME.colors : {};
+    const legacyPalette = THEME.palette && typeof THEME.palette === "object" ? THEME.palette : {};
+    // macOS themes use the full `colors` contract; older Windows themes used
+    // `palette.accent`. Accept both while keeping one renderer source.
+    const colors = Object.keys(declaredColors).length ? declaredColors : legacyPalette;
+    const hasExplicitKeyList = Array.isArray(THEME.explicitColorKeys);
+    const explicit = new Set(hasExplicitKeyList ? THEME.explicitColorKeys : []);
+    if (!hasExplicitKeyList && (THEME.colorMode === "explicit" || !Object.hasOwn(THEME, "colorMode"))) {
+      for (const key of Object.keys(declaredColors)) explicit.add(key);
+    }
+    if (typeof legacyPalette.accent === "string") explicit.add("accent");
     const adaptive = makeAdaptivePalette(artAnalysis?.accentRgb, shell);
-    const legacyLight = !THEME.appearance && shell === "light";
+    const legacyLight = (THEME.appearance === undefined || THEME.appearance === "auto") && shell === "light";
     const structural = new Set(["background", "panel", "panelAlt", "text", "muted"]);
     const pick = (name) => {
       const allowExplicit = explicit.has(name) && !(legacyLight && structural.has(name));
@@ -344,6 +262,11 @@
     }
     setStyleProperty(root, "--dream-skin-name", cssString(THEME.name || "Codex Dream Skin"));
     setStyleProperty(root, "--dream-skin-tagline", cssString(THEME.tagline || "Make something wonderful."));
+    setStyleProperty(root, "--dream-skin-quote", cssString(THEME.quote || "MAKE SOMETHING WONDERFUL"));
+    setStyleProperty(root, "--dream-skin-brand-subtitle", cssString(
+      THEME.brandSubtitle || "CODEX DREAM SKIN",
+    ));
+    setStyleProperty(root, "--dream-skin-status", cssString(THEME.statusText || "DREAM SKIN ONLINE"));
     setStyleProperty(root, "--dream-skin-project-prefix", cssString(THEME.projectPrefix || "选择项目 · "));
     setStyleProperty(root, "--dream-skin-project-label", cssString(THEME.projectLabel || "◉  选择项目"));
   };
@@ -524,246 +447,258 @@
     image.src = artUrl;
   });
 
-  let chromeParts = null;
-  let observedShellMain = null;
-  let resizeObserver = null;
-
-  const ensureStyle = (root) => {
-    let style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement("style");
-      style.id = STYLE_ID;
-      style.textContent = cssText;
-      style.dataset.dreamSkinVersion = VERSION;
-      (document.head || root).appendChild(style);
-    } else if (style.dataset.dreamSkinStyleRevision !== STYLE_REVISION) {
-      style.textContent = cssText;
+  const installStyle = () => {
+    try {
+      if (!("adoptedStyleSheets" in document) || typeof CSSStyleSheet !== "function") {
+        throw new Error("Constructable stylesheets are unavailable");
+      }
+      const sheet = new CSSStyleSheet();
+      if (typeof sheet.replaceSync !== "function") throw new Error("replaceSync is unavailable");
+      sheet.replaceSync(cssText);
+      const retained = [...document.adoptedStyleSheets]
+        .filter((candidate) => !styleRegistry.has(candidate));
+      document.adoptedStyleSheets = [...retained, sheet];
+      styleRegistry.clear();
+      styleRegistry.add(sheet);
+      document.getElementById(STYLE_ID)?.remove();
+      styleSheet = sheet;
+      styleMode = "adopted";
+      return;
+    } catch {
+      styleSheet = null;
     }
-    style.dataset.dreamSkinVersion = VERSION;
-    style.dataset.dreamSkinStyleRevision = STYLE_REVISION;
-    return style;
+
+    styleNode = document.getElementById(STYLE_ID) || document.createElement("style");
+    styleNode.id = STYLE_ID;
+    styleNode.textContent = cssText;
+    if (!styleNode.parentElement) (document.head || document.documentElement).appendChild(styleNode);
+    styleMode = "style";
   };
+
+  const ensureStyle = () => {
+    if (styleMode === "adopted" && styleSheet) {
+      const current = [...document.adoptedStyleSheets];
+      if (!current.includes(styleSheet)) {
+        document.adoptedStyleSheets = [...current, styleSheet];
+        metrics.styleRepairs += 1;
+      }
+      return;
+    }
+    if (styleNode && document.getElementById(STYLE_ID) !== styleNode) {
+      document.getElementById(STYLE_ID)?.remove();
+      (document.head || document.documentElement).appendChild(styleNode);
+      metrics.styleRepairs += 1;
+    }
+  };
+
+  installStyle();
 
   const applyRootState = (root) => {
     metrics.rootPasses += 1;
-    ensureStyle(root);
+    ensureStyle();
     const shell = resolvedShell();
+    setAttribute(root, "data-dream-skin", "active");
     setAttribute(root, SHELL_ATTR, shell);
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
-    root.classList.add("codex-dream-skin");
     return shell;
   };
 
-  const syncRouteState = (shell, { layout = false } = {}) => {
-    metrics.routePasses += 1;
-    const root = document.documentElement;
-    if (!root) return;
-    shell ||= root.getAttribute(SHELL_ATTR) || resolvedShell();
-    const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
-    const homeIndicator = document.querySelector('[data-testid="home-icon"]');
-    const home = homeIndicator?.closest('[role="main"]') ||
-      [...document.querySelectorAll('[role="main"]')].find((candidate) =>
-        candidate.querySelector('[data-feature="game-source"]') &&
-        candidate.querySelector('.group\\\\/home-suggestions')) || null;
-    for (const candidate of document.querySelectorAll('[role="main"].dream-skin-home')) {
-      if (candidate !== home) candidate.classList.remove("dream-skin-home");
-    }
-    if (home) home.classList.add("dream-skin-home");
-    const homeUtilityBars = new Set(home
-      ? home.querySelectorAll('[class*="_homeUtilityBar_"]')
-      : []);
-    for (const candidate of document.querySelectorAll(".dream-skin-home-utility")) {
-      if (!homeUtilityBars.has(candidate)) candidate.classList.remove("dream-skin-home-utility");
-    }
-    for (const candidate of homeUtilityBars) candidate.classList.add("dream-skin-home-utility");
-
-    if (!shellMain || !document.body) return;
-    if (observedShellMain !== shellMain) {
-      resizeObserver?.disconnect();
-      resizeObserver?.observe(shellMain);
-      observedShellMain = shellMain;
-      layout = true;
-    }
-    shellMain.classList.toggle("dream-skin-home-shell", Boolean(home));
-    let chrome = document.getElementById(CHROME_ID);
-    let created = false;
-    if (!chrome || chrome.parentElement !== document.body) {
-      chrome?.remove();
-      chrome = document.createElement("div");
-      chrome.id = CHROME_ID;
-      chrome.setAttribute("aria-hidden", "true");
-      chrome.innerHTML = `
-        <div class="dream-skin-brand">
-          <span class="dream-skin-portal-mark">◉</span>
-          <span><b></b><small></small></span>
-        </div>
-        <div class="dream-skin-status"><i></i><span></span></div>
-        <div class="dream-skin-quote"></div>
-        <div class="dream-skin-particles"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="dream-skin-orbit"></div>`;
-      document.body.appendChild(chrome);
-      created = true;
-      chromeParts = null;
-    }
-    if (!chromeParts || chromeParts.chrome !== chrome) {
-      chromeParts = {
-        chrome,
-        name: chrome.querySelector(".dream-skin-brand b"),
-        subtitle: chrome.querySelector(".dream-skin-brand small"),
-        status: chrome.querySelector(".dream-skin-status span"),
-        quote: chrome.querySelector(".dream-skin-quote"),
-      };
-    }
-    setTextContent(chromeParts.name, THEME.name || "Codex Dream Skin");
-    setTextContent(chromeParts.subtitle, THEME.brandSubtitle || "CODEX DREAM SKIN");
-    setTextContent(chromeParts.status, THEME.statusText || "DREAM SKIN ONLINE");
-    setTextContent(chromeParts.quote, THEME.quote || "MAKE SOMETHING WONDERFUL");
-    if (layout || created) {
-      metrics.layoutReads += 1;
-      const shellBox = shellMain.getBoundingClientRect();
-      setStyleProperty(chrome, "left", `${Math.round(shellBox.left)}px`);
-      setStyleProperty(chrome, "top", `${Math.round(shellBox.top)}px`);
-      setStyleProperty(chrome, "width", `${Math.round(shellBox.width)}px`);
-      setStyleProperty(chrome, "height", `${Math.round(shellBox.height)}px`);
-    }
-    chrome.classList.toggle("dream-skin-home-shell", Boolean(home));
-    if (chrome.dataset.dreamShell !== shell) {
-      chrome.dataset.dreamShell = shell;
-      metrics.attributeWrites += 1;
-    }
+  const selectorHit = (key) => {
+    const selector = selectorByKey.get(key)?.selector;
+    if (!selector) return false;
+    try { return Boolean(document.querySelector(selector)); } catch { return false; }
   };
 
-  const ensure = ({ root: rootPass = true, route = true, layout = true } = {}) => {
+  const stableTestidHit = (testid) => {
+    const selector = stableTestidSelector(testid);
+    if (!selector) return false;
+    try { return Boolean(document.querySelector(selector)); } catch { return false; }
+  };
+
+  const scopeMatches = (scope, baseState, overlay) => {
+    const active = new Set([baseState]);
+    if (baseState !== "settings") active.add("all");
+    if (overlay) active.add("overlay");
+    const tokens = String(scope || "all").toLowerCase().match(/[a-z]+/g) || ["all"];
+    return tokens.some((token) => token !== "config" && active.has(token));
+  };
+
+  const detectScope = () => {
+    const overlay = selectorHit("overlay-menu") || selectorHit("overlay-dialog") ||
+      selectorHit("overlay-popper");
+    let baseState = "thread";
+    if (selectorHit("appearance-radio") || stableTestidHit("theme-preview")) baseState = "settings";
+    else if (selectorHit("home-icon") || selectorHit("home-route")) baseState = "home";
+    else if (!selectorHit("shell-main")) baseState = "settings";
+    const missingL1 = SELECTOR_CONTRACT.selectors
+      .filter((entry) => entry.tier === "L1" && entry.required &&
+        scopeMatches(entry.scope, baseState, overlay) && !selectorHit(entry.key))
+      .map((entry) => entry.key);
+    return {
+      state: overlay ? "overlay" : baseState,
+      baseState,
+      overlay,
+      // Settings replaces (or partially replaces) the app shell on macOS and
+      // can retain a shell on Windows.  It is therefore always an L0 scope;
+      // never treat the absence of the home/thread L1 anchors as a failure.
+      level: baseState === "settings" || missingL1.length ? "L0" : "L1",
+      missingL1,
+    };
+  };
+
+  const refreshScope = () => {
+    metrics.routePasses += 1;
+    const scope = detectScope();
+    const state = window[STATE_KEY];
+    if (state?.installToken === installToken) state.scope = scope;
+    return scope;
+  };
+
+  const ensure = ({ root: rootPass = true, scope: scopePass = false } = {}) => {
     if (window[DISABLED_KEY]) return;
     const root = document.documentElement;
     if (!root) return;
     metrics.ensureCalls += 1;
-    const shell = rootPass ? applyRootState(root) : null;
-    if (route) syncRouteState(shell, { layout });
+    if (rootPass) applyRootState(root);
+    if (scopePass) refreshScope();
   };
 
   const cleanup = () => {
     const state = window[STATE_KEY];
     if (state?.installToken !== installToken) return false;
     window[DISABLED_KEY] = true;
-    document.documentElement?.classList.remove("codex-dream-skin");
-    document.documentElement?.removeAttribute(SHELL_ATTR);
-    for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
-    document.documentElement?.style.removeProperty("--dream-skin-art");
-    for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);
-    document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
-    document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
-    document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
-    document.getElementById(STYLE_ID)?.remove();
-    document.getElementById(CHROME_ID)?.remove();
-    state?.observer?.disconnect();
+    const root = document.documentElement;
+    for (const name of ROOT_ATTRS) root?.removeAttribute(name);
+    for (const attribute of [...(root?.attributes || [])]) {
+      if (attribute.name.startsWith("data-dream-")) root.removeAttribute(attribute.name);
+    }
+    for (const name of THEME_VARIABLES) root?.style.removeProperty(name);
+    for (const property of [...(root?.style || [])]) {
+      if (property.startsWith("--dream-") || property.startsWith("--ds-")) {
+        root.style.removeProperty(property);
+      }
+    }
     state?.rootObserver?.disconnect();
-    state?.resizeObserver?.disconnect();
+    if (bodyReadyHandler && typeof document.removeEventListener === "function") {
+      document.removeEventListener("DOMContentLoaded", bodyReadyHandler);
+    }
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
-    if (state?.scheduler?.frame != null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(state.scheduler.frame);
-    }
     if (analysisTimer) clearTimeout(analysisTimer);
-    if (state?.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
     if (state?.mediaHandler && state?.mediaQuery) {
       try { state.mediaQuery.removeEventListener("change", state.mediaHandler); } catch {}
     }
+    if (state?.navigationHandler && state?.navigation) {
+      try { state.navigation.removeEventListener("navigate", state.navigationHandler); } catch {}
+    }
+    if (styleSheet) {
+      try {
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets]
+          .filter((candidate) => candidate !== styleSheet);
+      } catch {}
+      styleRegistry.delete(styleSheet);
+    }
+    styleNode?.remove();
+    if (document.getElementById(STYLE_ID) === styleNode) document.getElementById(STYLE_ID)?.remove();
+    if (styleRegistry.size === 0) delete window[STYLE_REGISTRY_KEY];
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
     delete window[STATE_KEY];
     return true;
   };
 
-  const scheduler = { timeout: null, frame: null, root: false, route: false, layout: false };
+  const scheduler = { timeout: null, root: false, scope: false };
   const flushScheduledEnsure = () => {
-    if (scheduler.frame !== null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(scheduler.frame);
-    }
     if (scheduler.timeout) clearTimeout(scheduler.timeout);
-    scheduler.frame = null;
     scheduler.timeout = null;
-    const pending = { root: scheduler.root, route: scheduler.route, layout: scheduler.layout };
+    const pending = { root: scheduler.root, scope: scheduler.scope };
     scheduler.root = false;
-    scheduler.route = false;
-    scheduler.layout = false;
+    scheduler.scope = false;
     ensure(pending);
   };
-  const scheduleEnsure = ({ root = false, route = true, layout = false } = {}) => {
+  const scheduleEnsure = ({ root = false, scope = false } = {}, delay = 64) => {
     scheduler.root ||= root;
-    scheduler.route ||= route;
-    scheduler.layout ||= layout;
-    if (scheduler.timeout || scheduler.frame !== null) return;
-    if (typeof requestAnimationFrame === "function") {
-      scheduler.frame = requestAnimationFrame(flushScheduledEnsure);
-      scheduler.timeout = setTimeout(flushScheduledEnsure, 96);
-    } else {
-      scheduler.timeout = setTimeout(flushScheduledEnsure, 64);
-    }
+    scheduler.scope ||= scope;
+    if (scheduler.timeout) return;
+    scheduler.timeout = setTimeout(flushScheduledEnsure, delay);
   };
-  const observer = new MutationObserver(() => scheduleEnsure({ route: true }));
-  rootObserver = new MutationObserver(() => {
-    if (samplingNativeShell) return;
-    scheduleEnsure({ root: true, route: true });
-  });
-  const resizeHandler = () => scheduleEnsure({ route: true, layout: true });
-  if (typeof ResizeObserver === "function") {
-    resizeObserver = new ResizeObserver(() => scheduleEnsure({ route: true, layout: true }));
+  if (typeof MutationObserver === "function") {
+    rootObserver = new MutationObserver(() => scheduleEnsure({ root: true }));
   }
 
   let mediaQuery = null;
   let mediaHandler = null;
   try {
     mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaHandler = () => scheduleEnsure({ root: true, route: true });
+    mediaHandler = () => scheduleEnsure({ root: true });
   } catch {}
+
+  const navigationApi = window.navigation && typeof window.navigation.addEventListener === "function"
+    ? window.navigation : null;
+  const navigationHandler = navigationApi ? () => {
+    metrics.navigationEvents += 1;
+    scheduleEnsure({ scope: true }, 180);
+  } : null;
 
   window[STATE_KEY] = {
     ensure,
     cleanup,
-    observer,
     rootObserver,
-    resizeObserver,
     timer: null,
     scheduler,
-    resizeHandler,
     mediaQuery,
     mediaHandler,
+    navigation: navigationApi,
+    navigationHandler,
     artUrl,
     installToken,
+    styleMode,
+    styleNode,
+    styleSheet,
+    styleRevision: STYLE_REVISION,
     analysis: artAnalysis,
     artMetadata: ART_METADATA,
+    scope: null,
+    selectorsSchema: SELECTOR_CONTRACT.schema,
     metrics,
     version: VERSION,
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,
-    detectShellMode,
+    detectShellAppearance,
   };
   const firstEnsureStartedAt = now();
-  ensure({ layout: !previous || !document.getElementById(CHROME_ID) });
+  ensure({ root: true });
+  const initialScope = refreshScope();
   metrics.firstEnsureMs = Number((now() - firstEnsureStartedAt).toFixed(3));
-  if (previous?.artUrl && previous.artUrl !== artUrl) URL.revokeObjectURL(previous.artUrl);
 
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
-  rootObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode", "style"],
-  });
-  if (document.body) {
-    rootObserver.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode", "style"],
-    });
+  if (rootObserver) {
+    const observeAttributes = (node) => {
+      if (!node) return;
+      rootObserver.observe(node, {
+        attributes: true,
+        attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode"],
+      });
+    };
+    observeAttributes(document.documentElement);
+    if (document.body) observeAttributes(document.body);
+    else if (typeof document.addEventListener === "function") {
+      bodyReadyHandler = () => {
+        if (!window[DISABLED_KEY]) observeAttributes(document.body);
+      };
+      document.addEventListener("DOMContentLoaded", bodyReadyHandler, { once: true });
+    }
   }
-  const timer = setInterval(() => ensure(), 4000);
+  const timer = setInterval(() => {
+    metrics.safetyPasses += 1;
+    ensure({ root: true });
+  }, 30000);
   window[STATE_KEY].timer = timer;
-  window.addEventListener("resize", resizeHandler, { passive: true });
-  if (mediaHandler && mediaQuery) {
+  if (mediaHandler && mediaQuery && typeof mediaQuery.addEventListener === "function") {
     mediaQuery.addEventListener("change", mediaHandler);
+  }
+  if (navigationHandler && navigationApi) {
+    navigationApi.addEventListener("navigate", navigationHandler);
   }
   const analysisPromise = artAnalysis ? Promise.resolve(null) : analyzeArt();
   window[STATE_KEY].analysisTimer = analysisTimer;
@@ -776,7 +711,7 @@
       analysisCache.set(THEME.artKey, analysis);
       while (analysisCache.size > 8) analysisCache.delete(analysisCache.keys().next().value);
     }
-    ensure({ root: true, route: false, layout: false });
+    ensure({ root: true });
   }).catch(() => {});
   return {
     installed: true,
@@ -784,6 +719,8 @@
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,
     shell: resolvedShell(),
+    scope: initialScope,
+    styleMode,
     analysis: artAnalysis,
   };
 })(__DREAM_SKIN_CSS_JSON__, __DREAM_SKIN_ART_JSON__, __DREAM_SKIN_THEME_JSON__)

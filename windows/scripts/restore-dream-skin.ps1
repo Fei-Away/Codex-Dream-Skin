@@ -14,22 +14,6 @@ $PortExplicit = $PSBoundParameters.ContainsKey('Port')
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
-function Stop-DreamSkinTrayProcess {
-  $trayScript = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'tray-dream-skin.ps1'))
-  try {
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" `
-      -ErrorAction Stop
-    foreach ($process in $processes) {
-      if ($process.ProcessId -eq $PID -or -not $process.CommandLine) { continue }
-      if ($process.CommandLine.IndexOf($trayScript, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-        Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
-      }
-    }
-  } catch {
-    Write-Warning "Could not close the Dream Skin tray automatically: $($_.Exception.Message)"
-  }
-}
-
 $operationLock = Enter-DreamSkinOperationLock
 try {
   if ($RestoreBaseTheme -and $RecoverConfigBackup) {
