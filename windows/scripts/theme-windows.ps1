@@ -183,6 +183,15 @@ function Write-DreamSkinTheme {
   Write-DreamSkinUtf8FileAtomically -Path $themePath -Content ($json + "`r`n")
 }
 
+function Get-DreamSkinActiveThemeAppearance {
+  param([Parameter(Mandatory = $true)][string]$ThemeDirectory)
+  try {
+    $appearance = "$((Read-DreamSkinTheme -ThemeDirectory $ThemeDirectory).Theme.appearance)"
+    if ($appearance -in @('light', 'dark')) { return $appearance }
+  } catch {}
+  return 'auto'
+}
+
 function Initialize-DreamSkinThemeStore {
   param(
     [Parameter(Mandatory = $true)][string]$SkillRoot,

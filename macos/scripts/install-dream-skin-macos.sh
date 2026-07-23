@@ -97,7 +97,7 @@ if [ ! -f "$THEME_DIR/theme.json" ]; then
 fi
 [ -f "$CONFIG_PATH" ] || fail "Codex config not found: $CONFIG_PATH. Launch Codex once, close it, and rerun the installer."
 "$NODE" "$INJECTOR" --check-payload --theme-dir "$THEME_DIR" >/dev/null
-"$NODE" "$SCRIPT_DIR/theme-config.mjs" install "$CONFIG_PATH" "$THEME_BACKUP_PATH"
+sync_appearance_pin
 
 shell_quote() {
   "$NODE" -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$1"

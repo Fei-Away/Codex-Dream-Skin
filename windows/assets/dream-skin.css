@@ -103,6 +103,25 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
   --ds-task-immersive-far: rgb(var(--ds-panel-rgb) / .66);
 }
 
+/* Native token surfaces (dropdown/popover) resolve from Codex's own
+   appearanceTheme, not the skin; when that disagrees with data-dream-shell the
+   popover keeps the opposite palette (#233). Remap the dropdown token family to
+   skin variables so those surfaces inherit the theme in both shells. */
+html[data-dream-skin="active"] {
+  --color-token-dropdown-background: var(--ds-panel);
+}
+
+html[data-dream-skin="active"] [class~="bg-token-dropdown-background"] {
+  color: var(--ds-text);
+  --color-token-foreground: var(--ds-text);
+  --color-token-text-secondary: var(--ds-muted);
+  --color-token-muted-foreground: var(--ds-muted);
+  --color-token-description-foreground: var(--ds-muted);
+  --color-token-list-hover-background: rgb(var(--ds-panel-2-rgb) / .9);
+  --color-token-border: var(--ds-line);
+  --color-token-border-default: var(--ds-line);
+}
+
 html[data-dream-skin="active"]:is([data-dream-art-safe="left"], [data-dream-art-safe-area="left"]) {
   --ds-safe-side: left;
   --ds-art-position: 100% var(--ds-focus-y);
