@@ -4,7 +4,8 @@ param(
   [switch]$RestartExisting,
   [switch]$PromptRestart,
   [string]$ProfilePath,
-  [switch]$ForegroundInjector
+  [switch]$ForegroundInjector,
+  [switch]$RecoverExisting
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,6 +17,9 @@ $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 $operationLock = Enter-DreamSkinOperationLock
 try {
   Assert-DreamSkinPort -Port $Port
+  if ($RecoverExisting -and ($RestartExisting -or $PromptRestart)) {
+    throw 'RecoverExisting cannot restart Codex or prompt for restart consent.'
+  }
   if ($ProfilePath) { $ProfilePath = [System.IO.Path]::GetFullPath($ProfilePath) }
   $node = Get-DreamSkinNodeRuntime
   $currentCodex = Get-DreamSkinCodexInstall
@@ -29,8 +33,12 @@ try {
   $VerifyPath = Join-Path $StateRoot 'verify.log'
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot
   $pauseWasSet = Test-DreamSkinPaused -StateRoot $StateRoot
+  $pauseCleared = $false
 
   $previousState = Read-DreamSkinState -Path $StatePath
+  if ($RecoverExisting -and -not $ProfilePath -and $null -ne $previousState -and $previousState.profilePath) {
+    $ProfilePath = [System.IO.Path]::GetFullPath("$($previousState.profilePath)")
+  }
   if (-not $PortExplicit -and $null -ne $previousState -and $previousState.port) {
     $savedPort = [int]$previousState.port
     Assert-DreamSkinPort -Port $savedPort
@@ -94,6 +102,9 @@ try {
     Get-DreamSkinCodexProcesses -Codex $codexToStop
   }
   $closedExistingCodex = $false
+  if ($RecoverExisting -and -not $debugReady) {
+    throw 'No verified existing Codex CDP session is available for injector recovery.'
+  }
   if (-not $debugReady -and $codexProcesses.Count -gt 0) {
     $restartAuthorized = [bool]$RestartExisting
     if (-not $restartAuthorized -and $PromptRestart) {
@@ -113,7 +124,11 @@ try {
 
   $launchedWithCdp = $false
   try {
-    if ($null -eq (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex)) {
+    $existingIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
+    if ($RecoverExisting -and $null -eq $existingIdentity) {
+      throw 'The verified Codex CDP session closed before injector recovery completed.'
+    }
+    if ($null -eq $existingIdentity) {
       if (-not (Test-DreamSkinPortAvailable -Port $Port)) {
         if ($PortExplicit) { throw "Port $Port is already occupied by an unverified listener. Choose another port." }
         $Port = Select-DreamSkinPort -PreferredPort $Port
@@ -175,8 +190,14 @@ try {
 
   # Keep a paused, already-running watcher paused until all state checks and any
   # restart consent have succeeded.  A cancelled prompt must be side-effect free.
-  Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-  $pauseCleared = $true
+  if ($RecoverExisting) {
+    if (Test-DreamSkinPaused -StateRoot $StateRoot) {
+      throw 'Injector recovery stopped because Dream Skin was paused before it could attach.'
+    }
+  } else {
+    Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
+    $pauseCleared = $true
+  }
 
   if ($ForegroundInjector) {
     try {

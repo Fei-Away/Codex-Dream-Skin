@@ -830,12 +830,30 @@ function Get-DreamSkinProcessStartedAt {
   }
 }
 
-function Stop-DreamSkinRecordedInjector {
+function Get-DreamSkinRecordedInjectorProcess {
   param([AllowNull()][object]$State)
-  if ($null -eq $State -or -not $State.injectorPid) { return $true }
+  if ($null -eq $State -or -not $State.injectorPid) { return $null }
   $processId = [int]$State.injectorPid
-  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
-  if (-not $process) { return $true }
+  $processHandle = Get-Process -Id $processId -ErrorAction SilentlyContinue
+  if ($null -eq $processHandle) { return $null }
+  try {
+    $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction Stop
+  } catch {
+    if ($processHandle.HasExited) {
+      $processHandle.Dispose()
+      return $null
+    }
+    $processHandle.Dispose()
+    throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
+  }
+  if (-not $processInfo) {
+    if ($processHandle.HasExited) {
+      $processHandle.Dispose()
+      return $null
+    }
+    $processHandle.Dispose()
+    throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
+  }
 
   $expectedInjector = if ($State.injectorPath) {
     "$($State.injectorPath)"
@@ -844,9 +862,10 @@ function Stop-DreamSkinRecordedInjector {
   } else {
     $null
   }
-  $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $process
-  $commandLine = "$($process.CommandLine)"
+  $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $processInfo
+  $commandLine = "$($processInfo.CommandLine)"
   if (-not $processPath -or -not $commandLine) {
+    $processHandle.Dispose()
     throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
   }
   $isNodeExecutable = [System.IO.Path]::GetFileName("$processPath") -ieq 'node.exe'
@@ -865,18 +884,76 @@ function Stop-DreamSkinRecordedInjector {
     $browserPattern = '(?:^|\s)(?i:--browser-id)(?:=|\s+)' + [regex]::Escape("$($State.browserId)") + '(?=$|\s)'
     $injectorMatches = $injectorMatches -and [regex]::IsMatch($commandLine, $browserPattern)
   }
-  $startedAt = Get-DreamSkinProcessStartedAt -ProcessId $processId
+  try {
+    $startedAt = $processHandle.StartTime.ToUniversalTime().ToString('o')
+  } catch {
+    if ($processHandle.HasExited) {
+      $processHandle.Dispose()
+      return $null
+    }
+    $processHandle.Dispose()
+    throw "The recorded injector PID $processId is running, but its start time cannot be inspected. State was preserved."
+  }
   $startMatches = -not $State.injectorStartedAt -or $startedAt -eq "$($State.injectorStartedAt)"
   $identityMatches = [bool]($isNodeExecutable -and $nodeMatches -and $injectorMatches -and $startMatches)
 
   if (-not $identityMatches) {
+    $processHandle.Dispose()
     throw "The recorded injector PID $processId is running, but its visible identity does not match the saved Dream Skin process. State was preserved."
   }
 
-  Stop-Process -Id $processId -Force -ErrorAction Stop
-  try { Wait-Process -Id $processId -Timeout 5 -ErrorAction Stop } catch {}
-  if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
-    throw "The recorded Dream Skin injector did not stop: PID $processId"
+  return $processHandle
+}
+
+function Get-DreamSkinInjectorRecoveryContext {
+  param([AllowNull()][object]$State)
+  if ($null -eq $State -or -not $State.port) { return $null }
+  $recordedInjector = Get-DreamSkinRecordedInjectorProcess -State $State
+  if ($null -ne $recordedInjector) {
+    $recordedInjector.Dispose()
+    return $null
+  }
+
+  $port = 0
+  if (-not [int]::TryParse("$($State.port)", [ref]$port)) { return $null }
+  Assert-DreamSkinPort -Port $port
+  if (Test-DreamSkinPortAvailable -Port $port) { return $null }
+
+  $codex = Get-DreamSkinCodexInstallFromState -State $State
+  $identity = if ($null -ne $codex) {
+    Get-DreamSkinVerifiedCdpIdentity -Port $port -Codex $codex
+  } else {
+    $null
+  }
+  if ($null -eq $identity) {
+    $registered = Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $port
+    if ($null -eq $registered) { return $null }
+    $codex = $registered.Codex
+    $identity = $registered.Identity
+  }
+
+  return [pscustomobject]@{
+    Port = $port
+    BrowserId = $identity.BrowserId
+    Codex = $codex
+  }
+}
+
+function Stop-DreamSkinRecordedInjector {
+  param([AllowNull()][object]$State)
+  $process = Get-DreamSkinRecordedInjectorProcess -State $State
+  if ($null -eq $process) { return $true }
+  $processId = [int]$process.Id
+  try {
+    if (-not $process.HasExited) {
+      Stop-Process -InputObject $process -Force -ErrorAction Stop
+    }
+    [void]$process.WaitForExit(15000)
+    if (-not $process.HasExited) {
+      throw "The recorded Dream Skin injector did not stop: PID $processId"
+    }
+  } finally {
+    $process.Dispose()
   }
   return $true
 }
