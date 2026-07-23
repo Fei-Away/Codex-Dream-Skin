@@ -153,6 +153,8 @@ Get-AppxPackage -Name OpenAI.Codex
 
 通过 `Codex Dream Skin` 快捷方式启动 Codex，再运行验证脚本。普通 Codex 启动方式不会打开 Dream Skin 所需的调试会话。
 
+Codex Store `26.715.10079.0` 起，owl runtime 可能把应用包激活参数转换为 `codex://` 路径。当前启动器会识别这一行为，并对同一个已验证 Store 包内的精确 `ChatGPT.exe` 尝试一次原始参数回退；不会修改文件或 WindowsApps 权限。若错误明确显示 `access-denied`，说明本机 WindowsApps ACL 同时禁止该回退，当前 Codex/Windows 组合无法在项目安全边界内开启 CDP。不要接管 WindowsApps 所有权或修改官方包；请保留完整错误并关注 Issue #235 的上游兼容状态。
+
 ### Codex 更新后皮肤失效
 
 重新运行安装器和启动快捷方式。脚本会重新发现当前注册的 Store 包，不依赖旧版本的可执行文件路径。

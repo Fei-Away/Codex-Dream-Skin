@@ -632,6 +632,47 @@ try {
     (Test-DreamSkinCommandLineToken -CommandLine $watchCommand -Token 'Dream Skin\injector.mjs')) {
     throw 'Injector command-line token validation is not boundary-safe.'
   }
+  $forwardedDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" --remote-debugging-port=9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus -Processes @($forwardedDebugProcess) -Port 9335) -cne 'forwarded') {
+    throw 'A raw Chromium debugging argument was not recognized as forwarded.'
+  }
+  $redirectedDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new?path=--remote-debugging-port%3D9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus -Processes @($redirectedDebugProcess) -Port 9335) -cne 'protocol-redirected') {
+    throw 'An owl codex:// debugging-argument redirect was not recognized.'
+  }
+  $unencodedRedirectedDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new?path=--remote-debugging-port=9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus `
+      -Processes @($unencodedRedirectedDebugProcess) -Port 9335) -cne 'protocol-redirected') {
+    throw 'An unencoded debugging flag inside codex:// was confused with a raw Chromium argument.'
+  }
+  $separateRawDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new --remote-debugging-port=9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus `
+      -Processes @($separateRawDebugProcess) -Port 9335) -cne 'forwarded') {
+    throw 'A separate raw debugging argument was hidden by an ordinary codex:// argument.'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus `
+      -Processes @($redirectedDebugProcess, $forwardedDebugProcess) -Port 9335) -cne 'forwarded') {
+    throw 'A raw forwarded argument did not take precedence over a protocol-looking helper process.'
+  }
+  $ordinaryProtocolProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new?path=C%3A%5Cwork'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus -Processes @($ordinaryProtocolProcess) -Port 9335) -cne 'not-forwarded' -or
+    (Get-DreamSkinCodexDebugArgumentStatus -Processes @() -Port 9335) -cne 'uninspectable') {
+    throw 'Debugging argument inspection confused an ordinary protocol launch or an empty process set.'
+  }
+  if ((Get-DreamSkinDirectLaunchFailureKind -Exception ([System.UnauthorizedAccessException]::new('denied'))) -cne 'access-denied' -or
+    (Get-DreamSkinDirectLaunchFailureKind -Exception ([System.InvalidOperationException]::new('failed'))) -cne 'start-failed') {
+    throw 'Direct Store launch failures were not classified safely.'
+  }
   if (-not (Test-DreamSkinBrowserId -Value 'browser-123') -or
     (Test-DreamSkinBrowserId -Value 'browser 123')) {
     throw 'CDP browser ID validation is not boundary-safe.'
@@ -716,6 +757,124 @@ try {
     $fakeInstall.AppUserModelId -cne 'OpenAI.Codex_test!App' -or
     -not (Test-DreamSkinPathEqual -Left $fakeInstall.Executable -Right $fakeExecutable)) {
     throw 'Registered Appx package identity conversion failed.'
+  }
+  Assert-DreamSkinCodexDirectLaunchTarget -Codex $fakeInstall
+  $invalidDirectTarget = [pscustomobject]@{
+    PackageRoot = $fakeInstall.PackageRoot
+    Executable = (Join-Path $fakeInstall.PackageRoot 'other\ChatGPT.exe')
+    PackageFullName = $fakeInstall.PackageFullName
+    PackageFamilyName = $fakeInstall.PackageFamilyName
+    ApplicationId = $fakeInstall.ApplicationId
+    AppUserModelId = $fakeInstall.AppUserModelId
+    SignatureKind = $fakeInstall.SignatureKind
+  }
+  $invalidDirectTargetRejected = $false
+  try { Assert-DreamSkinCodexDirectLaunchTarget -Codex $invalidDirectTarget } catch {
+    $invalidDirectTargetRejected = $true
+  }
+  if (-not $invalidDirectTargetRejected) { throw 'Direct launch accepted an executable outside the validated Store manifest path.' }
+
+  $launcherFunctionNames = @(
+    'Start-DreamSkinCodex',
+    'Wait-DreamSkinCodexDebugArgumentStatus',
+    'Start-DreamSkinCodexDirect',
+    'Stop-DreamSkinCodex',
+    'Get-DreamSkinCodexProcesses'
+  )
+  $originalLauncherFunctions = @{}
+  foreach ($functionName in $launcherFunctionNames) {
+    $originalLauncherFunctions[$functionName] = (Get-Command $functionName -CommandType Function).ScriptBlock
+  }
+  try {
+    Set-Item 'function:Start-DreamSkinCodex' -Value { param($Codex, $Arguments) return 101 }
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'forwarded' }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value { throw 'Direct fallback must not run for compatible package activation.' }
+    Set-Item 'function:Stop-DreamSkinCodex' -Value {
+      param($Codex, [int[]]$PreserveProcessIds, [switch]$AllowForce)
+    }
+    Set-Item 'function:Get-DreamSkinCodexProcesses' -Value {
+      return @(
+        [pscustomobject]@{ ProcessId = 10 },
+        [pscustomobject]@{ ProcessId = 20 },
+        [pscustomobject]@{ ProcessId = 30 }
+      )
+    }
+    $newProcesses = @(Get-DreamSkinCodexProcessesExcept -Codex $fakeInstall -PreserveProcessIds @(10, 30))
+    if ($newProcesses.Count -ne 1 -or $newProcesses[0].ProcessId -ne 20) {
+      throw 'Launch rollback did not preserve the exact pre-launch Codex PID set.'
+    }
+    $compatibleLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($compatibleLaunch.ProcessId -ne 101 -or $compatibleLaunch.Strategy -cne 'package-activation') {
+      throw 'Compatible package activation did not remain the preferred launch strategy.'
+    }
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'uninspectable' }
+    $uninspectableLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($uninspectableLaunch.Strategy -cne 'package-activation' -or
+      $uninspectableLaunch.ArgumentStatus -cne 'uninspectable') {
+      throw 'An uninspectable package process was not kept on the conservative package-activation path.'
+    }
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'not-forwarded' }
+    $notForwardedLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($notForwardedLaunch.Strategy -cne 'package-activation' -or
+      $notForwardedLaunch.ArgumentStatus -cne 'not-forwarded') {
+      throw 'A command-line observation without explicit protocol redirection triggered an unsafe fallback.'
+    }
+
+    $script:dreamSkinDebugStatusCall = 0
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value {
+      param($Codex, $Port)
+      $script:dreamSkinDebugStatusCall += 1
+      if ($script:dreamSkinDebugStatusCall -eq 1) { return 'protocol-redirected' }
+      return 'forwarded'
+    }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value { param($Codex, $Arguments) return 202 }
+    $fallbackLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($fallbackLaunch.ProcessId -ne 202 -or $fallbackLaunch.Strategy -cne 'direct-store-executable' -or
+      $fallbackLaunch.PackageArgumentStatus -cne 'protocol-redirected') {
+      throw 'owl protocol redirection did not use the validated direct Store executable fallback.'
+    }
+
+    $script:dreamSkinDebugStatusCall = 0
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value {
+      param($Codex, $Port)
+      $script:dreamSkinDebugStatusCall += 1
+      if ($script:dreamSkinDebugStatusCall -eq 1) { return 'protocol-redirected' }
+      return 'not-forwarded'
+    }
+    $directArgumentFailureReported = $false
+    try {
+      $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+        -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    } catch {
+      $directArgumentFailureReported = $_.Exception.Message.Contains(
+        'package activation or validated direct launch')
+    }
+    if (-not $directArgumentFailureReported) {
+      throw 'A direct fallback that also dropped the CDP argument did not fail closed.'
+    }
+
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'protocol-redirected' }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value {
+      throw [System.UnauthorizedAccessException]::new('denied')
+    }
+    $accessDeniedReported = $false
+    try {
+      $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+        -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    } catch {
+      $accessDeniedReported = $_.Exception.Message.Contains('(access-denied)') -and
+        $_.Exception.Message.Contains('protected app package')
+    }
+    if (-not $accessDeniedReported) { throw 'A blocked direct Store launch did not produce the compatibility error.' }
+  } finally {
+    foreach ($functionName in $launcherFunctionNames) {
+      Set-Item ("function:$functionName") -Value $originalLauncherFunctions[$functionName]
+    }
+    Remove-Variable -Name dreamSkinDebugStatusCall -Scope Script -ErrorAction SilentlyContinue
   }
   $fakeManifest.Package.Applications.Application[1].Id = 'Invalid App'
   if ($null -ne (ConvertTo-DreamSkinCodexInstall -Package $fakePackage -Manifest $fakeManifest)) {
@@ -1055,8 +1214,8 @@ try {
   }
   $startSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\start-dream-skin.ps1')
   if ($startSource.Contains('Start-Process -FilePath $codex.Executable') -or
-    -not $startSource.Contains('Start-DreamSkinCodex -Codex $codex')) {
-    throw 'Start still executes the WindowsApps path instead of activating the registered package.'
+    -not $startSource.Contains('Start-DreamSkinCodexForDebugging -Codex $codex')) {
+    throw 'Start bypasses the guarded package-activation and Store-executable launch strategy.'
   }
   $stateReadIndex = $startSource.IndexOf('$previousState = Read-DreamSkinState', [System.StringComparison]::Ordinal)
   $restartPromptIndex = $startSource.IndexOf('$restartAuthorized = Confirm-DreamSkinRestart', [System.StringComparison]::Ordinal)
