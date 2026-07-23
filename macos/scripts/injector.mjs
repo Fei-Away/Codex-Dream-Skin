@@ -11,7 +11,33 @@ const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.2.0";
+const SELECTOR_CONTRACT = JSON.parse(await fs.readFile(
+  path.join(root, "assets", "selectors.json"), "utf8",
+));
+if (SELECTOR_CONTRACT.schema !== "codex-dream-skin-selectors/1" ||
+  !Array.isArray(SELECTOR_CONTRACT.selectors)) {
+  throw new Error("assets/selectors.json has an unsupported schema");
+}
+const SELECTOR_MAP = new Map();
+for (const entry of SELECTOR_CONTRACT.selectors) {
+  if (!entry?.key || !entry.selector || SELECTOR_MAP.has(entry.key)) {
+    throw new Error(`assets/selectors.json has an invalid selector key: ${entry?.key || "<missing>"}`);
+  }
+  SELECTOR_MAP.set(entry.key, entry.selector);
+}
+const selectorFor = (key) => {
+  const selector = SELECTOR_MAP.get(key);
+  if (!selector) throw new Error(`Selector contract is missing ${key}`);
+  return selector;
+};
+const selectorLiteral = (key) => JSON.stringify(selectorFor(key));
+const stableTestidLiteral = (testid) => {
+  if (!SELECTOR_CONTRACT.stableTestids?.includes(testid)) {
+    throw new Error(`Selector contract is missing stable testid ${testid}`);
+  }
+  return JSON.stringify(`[data-testid="${testid}"]`);
+};
+const SKIN_VERSION = "1.3.3";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
@@ -151,6 +177,39 @@ const DUO_CHARACTER_ICON_FILES = Object.freeze({
 let staticPayloadAssets = null;
 let duoPayloadAssets = null;
 let operationSequence = 0;
+
+function skyGardenExtensionCleanupPayload() {
+  return `(() => {
+    window.__CODEX_DREAM_SKIN_SKY_GARDEN_DISABLED__ = true;
+    const state = window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
+    try {
+      if (state?.cleanup) return Boolean(state.cleanup());
+    } catch {}
+    const root = document.documentElement;
+    root?.classList.remove('codex-dream-skin');
+    root?.removeAttribute('data-dream-theme-id');
+    root?.removeAttribute('data-dream-motion-state');
+    root?.removeAttribute('data-dream-duo-foreground-mode');
+    document.querySelectorAll('.dream-skin-home, .dream-skin-home-shell, .dream-skin-home-utility')
+      .forEach((node) => {
+        node.classList.remove('dream-skin-home', 'dream-skin-home-shell', 'dream-skin-home-utility');
+      });
+    document.querySelectorAll('[data-dream-character-icon]').forEach((node) => node.remove());
+    document.querySelectorAll('[data-dream-character-role]').forEach((node) => {
+      node.removeAttribute('data-dream-character-role');
+      node.removeAttribute('data-dream-character-kind');
+    });
+    document.querySelectorAll('[data-dream-native-icon]').forEach((node) => {
+      node.removeAttribute('data-dream-native-icon');
+    });
+    document.getElementById('codex-dream-skin-sky-garden-style')?.remove();
+    document.getElementById('codex-dream-skin-chrome')?.remove();
+    document.getElementById('codex-dream-skin-motion-stage')?.remove();
+    document.getElementById('codex-dream-skin-sidebar-widget')?.remove();
+    delete window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
+    return true;
+  })()`;
+}
 
 function parseArgs(argv) {
   const options = {
@@ -413,17 +472,20 @@ async function probeSession(session) {
   return session.evaluate(`(() => {
     const avatarButton = document.querySelector('[data-testid="avatar-mascot-button"]');
     const markers = {
-      shell: Boolean(document.querySelector('main.main-surface')),
-      sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
-      composer: Boolean(document.querySelector('.composer-surface-chrome')),
-      main: Boolean(document.querySelector('[role="main"]')),
+      shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
+      sidebar: Boolean(document.querySelector(${selectorLiteral("left-panel")})),
+      composer: Boolean(document.querySelector(${selectorLiteral("composer-chrome")})),
+      main: Boolean(document.querySelector(${selectorLiteral("home-route")})),
       avatar: Boolean(avatarButton?.querySelector('[data-testid="codex-avatar"]')),
     };
+    const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
+      Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       title: document.title,
       href: location.href,
       markers,
-      codex: markers.shell && markers.sidebar,
+      codex: location.protocol === 'app:' &&
+        ((markers.shell && markers.sidebar) || settings || markers.main),
       avatarOverlay: markers.avatar,
     };
   })()`);
@@ -683,6 +745,8 @@ async function loadDuoPayloadAssets(themeId) {
     return {
       cacheHit: true,
       revision: "",
+      extensionCss: "",
+      extensionTemplate: "",
       duoIcons: {},
       duoWidgetArt: "",
       duoForegroundArt: "",
@@ -705,6 +769,8 @@ async function loadDuoPayloadAssets(themeId) {
     const iconRoot = path.join(DUO_ASSET_ROOT, "duo-character-icons");
     const iconEntries = Object.entries(DUO_CHARACTER_ICON_FILES);
     duoPayloadAssets = Promise.all([
+      fs.readFile(path.join(root, "assets", "sky-garden-duo-extension.css"), "utf8"),
+      fs.readFile(path.join(root, "assets", "sky-garden-duo-extension.js"), "utf8"),
       fs.readFile(path.join(DUO_ASSET_ROOT, DUO_WIDGET_IMAGE_FILE)),
       fs.readFile(path.join(DUO_ASSET_ROOT, DUO_FOREGROUND_IMAGE_FILE)),
       fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_IMAGE_FILE)),
@@ -713,12 +779,14 @@ async function loadDuoPayloadAssets(themeId) {
       fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_RIGHT_LEGS_IMAGE_FILE)),
       fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_BLINK_IMAGE_FILE)),
       ...iconEntries.map(([, filename]) => fs.readFile(path.join(iconRoot, filename))),
-    ]).then(([widgetBuffer, foregroundBuffer, loungeBuffer, loungeBodyBuffer, loungeLeftLegsBuffer, loungeRightLegsBuffer, loungeBlinkBuffer, ...iconBuffers]) => {
+    ]).then(([extensionCss, extensionTemplate, widgetBuffer, foregroundBuffer, loungeBuffer, loungeBodyBuffer, loungeLeftLegsBuffer, loungeRightLegsBuffer, loungeBlinkBuffer, ...iconBuffers]) => {
       const duoIcons = Object.fromEntries(iconEntries.map(([role], index) => [
         role,
         `data:image/webp;base64,${iconBuffers[index].toString("base64")}`,
       ]));
       const staticRevision = createHash("sha256")
+        .update(extensionCss)
+        .update(extensionTemplate)
         .update(widgetBuffer)
         .update(foregroundBuffer)
         .update(loungeBuffer)
@@ -728,6 +796,8 @@ async function loadDuoPayloadAssets(themeId) {
         .update(loungeBlinkBuffer);
       for (const icon of iconBuffers) staticRevision.update(icon);
       return {
+        extensionCss,
+        extensionTemplate,
         duoIcons,
         duoWidgetArt: `data:image/png;base64,${widgetBuffer.toString("base64")}`,
         duoForegroundArt: `data:image/png;base64,${foregroundBuffer.toString("base64")}`,
@@ -767,6 +837,7 @@ async function loadPayload(themeDir) {
   const duoAssets = await loadDuoPayloadAssets(loaded.theme.id);
   const { css, template } = staticAssets;
   const {
+    extensionCss, extensionTemplate,
     duoIcons, duoWidgetArt, duoForegroundArt, duoLoungeArt,
     duoLoungeBodyArt, duoLoungeLeftLegsArt, duoLoungeRightLegsArt, duoLoungeBlinkArt,
   } = duoAssets;
@@ -794,21 +865,35 @@ async function loadPayload(themeDir) {
     .update(JSON.stringify(theme))
     .digest("hex")
     .slice(0, 20);
-  const payload = template
+  const canonicalPayload = template
     .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
-    .replace("__DREAM_DUO_ICONS_JSON__", JSON.stringify(duoIcons))
-    .replace("__DREAM_DUO_WIDGET_ART_JSON__", JSON.stringify(duoWidgetArt))
-    .replace("__DREAM_DUO_FOREGROUND_ART_JSON__", JSON.stringify(duoForegroundArt))
-    .replace("__DREAM_DUO_LOUNGE_ART_JSON__", JSON.stringify(duoLoungeArt))
-    .replace("__DREAM_DUO_LOUNGE_BODY_ART_JSON__", JSON.stringify(duoLoungeBodyArt))
-    .replace("__DREAM_DUO_LOUNGE_LEFT_LEGS_ART_JSON__", JSON.stringify(duoLoungeLeftLegsArt))
-    .replace("__DREAM_DUO_LOUNGE_RIGHT_LEGS_ART_JSON__", JSON.stringify(duoLoungeRightLegsArt))
-    .replace("__DREAM_DUO_LOUNGE_BLINK_ART_JSON__", JSON.stringify(duoLoungeBlinkArt))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
     .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
     .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision));
+  const extensionPayload = theme.id === DUO_THEME_ID
+    ? extensionTemplate
+      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(extensionCss))
+      .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
+      .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
+      .replace("__DREAM_DUO_ICONS_JSON__", JSON.stringify(duoIcons))
+      .replace("__DREAM_DUO_WIDGET_ART_JSON__", JSON.stringify(duoWidgetArt))
+      .replace("__DREAM_DUO_FOREGROUND_ART_JSON__", JSON.stringify(duoForegroundArt))
+      .replace("__DREAM_DUO_LOUNGE_ART_JSON__", JSON.stringify(duoLoungeArt))
+      .replace("__DREAM_DUO_LOUNGE_BODY_ART_JSON__", JSON.stringify(duoLoungeBodyArt))
+      .replace("__DREAM_DUO_LOUNGE_LEFT_LEGS_ART_JSON__", JSON.stringify(duoLoungeLeftLegsArt))
+      .replace("__DREAM_DUO_LOUNGE_RIGHT_LEGS_ART_JSON__", JSON.stringify(duoLoungeRightLegsArt))
+      .replace("__DREAM_DUO_LOUNGE_BLINK_ART_JSON__", JSON.stringify(duoLoungeBlinkArt))
+      .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
+      .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
+      .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision))
+    : "";
+  const payload = [
+    skyGardenExtensionCleanupPayload(),
+    canonicalPayload,
+    extensionPayload,
+  ].filter(Boolean).join(";\n");
   return {
     imageBytes: art.length,
     widgetBytes: duoAssets.widgetBytes,
@@ -827,6 +912,10 @@ async function loadPayload(themeDir) {
       extrasCacheHit: duoAssets.cacheHit,
     },
   };
+}
+
+export async function buildPayloadForTheme(themeDir) {
+  return loadPayload(themeDir);
 }
 
 async function applyToSession(session, payload) {
@@ -851,7 +940,7 @@ function operationUiExpression(action, token, state = "loading", message = "") {
       : value === "success" ? 1800 : value === "cancelled" ? 2400 : 6000;
     const issuedAt = (value) => Number(String(value).split(":")[1]) || 0;
     const positionInMainArea = (host) => {
-      const main = document.querySelector("main.main-surface") ||
+      const main = document.querySelector(${selectorLiteral("shell-main")}) ||
         document.querySelector('[role="main"]') || document.documentElement;
       const rect = main.getBoundingClientRect();
       const top = Math.max(0, rect.top);
@@ -996,49 +1085,57 @@ async function presentOperationUi(session, token, state, message, timeoutMs = 10
 }
 
 async function removeFromSession(session) {
-  return session.evaluate(`(() => {
+  return session.evaluate(`${skyGardenExtensionCleanupPayload()};(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     const state = window.__CODEX_DREAM_SKIN_STATE__;
-    if (state?.cleanup) return state.cleanup();
-    document.documentElement?.classList.remove('codex-dream-skin');
-    document.documentElement?.removeAttribute('data-dream-theme-id');
-    document.documentElement?.removeAttribute('data-dream-motion-state');
-    document.documentElement?.removeAttribute('data-dream-duo-foreground-mode');
-    document.documentElement?.style.removeProperty('--dream-skin-art');
-    document.documentElement?.style.removeProperty('--dream-motion-x');
-    document.documentElement?.style.removeProperty('--dream-motion-y');
-    document.documentElement?.style.removeProperty('--dream-duo-foreground-height');
-    document.getElementById('codex-dream-skin-style')?.remove();
-    document.getElementById('codex-dream-skin-chrome')?.remove();
-    document.getElementById('codex-dream-skin-motion-stage')?.remove();
-    document.getElementById('codex-dream-skin-sidebar-widget')?.remove();
-    document.querySelectorAll('[data-dream-character-icon]').forEach((node) => node.remove());
-    document.querySelectorAll('[data-dream-character-role]').forEach((node) => {
-      node.removeAttribute('data-dream-character-role');
-      node.removeAttribute('data-dream-character-kind');
-    });
-    document.querySelectorAll('[data-dream-native-icon]').forEach((node) => {
-      node.removeAttribute('data-dream-native-icon');
-    });
+    let cleaned = false;
+    try { cleaned = Boolean(state?.cleanup && state.cleanup()); } catch {}
+    if (!cleaned) {
+      const root = document.documentElement;
+      for (const attribute of [...(root?.attributes || [])]) {
+        if (attribute.name.startsWith('data-dream-')) root.removeAttribute(attribute.name);
+      }
+      for (const property of [...(root?.style || [])]) {
+        if (property.startsWith('--dream-') || property.startsWith('--ds-')) {
+          root.style.removeProperty(property);
+        }
+      }
+      const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
+      if (sheets && 'adoptedStyleSheets' in document) {
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets]
+          .filter((sheet) => !sheets.has(sheet));
+      }
+      try { if (state?.artUrl) URL.revokeObjectURL(state.artUrl); } catch {}
+      document.getElementById('codex-dream-skin-style')?.remove();
+    }
+    delete window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
     delete window.__CODEX_DREAM_SKIN_STATE__;
     return true;
   })()`);
 }
 
 async function verifyRemovedSession(session) {
-  return session.evaluate(`(() =>
-    !document.documentElement.classList.contains('codex-dream-skin') &&
-    !document.getElementById('codex-dream-skin-style') &&
-    !document.getElementById('codex-dream-skin-chrome') &&
-    !document.getElementById('codex-dream-skin-motion-stage') &&
-    !document.getElementById('codex-dream-skin-sidebar-widget') &&
-    !document.querySelector('[data-dream-character-icon]') &&
-    !document.querySelector('[data-dream-character-role]') &&
-    !document.querySelector('[data-dream-native-icon]') &&
-    !document.documentElement.hasAttribute('data-dream-motion-state') &&
-    !document.documentElement.hasAttribute('data-dream-duo-foreground-mode') &&
-    !window.__CODEX_DREAM_SKIN_STATE__
-  )()`);
+  return session.evaluate(`(() => {
+    const root = document.documentElement;
+    const hasAttributes = [...root.attributes].some((attribute) =>
+      attribute.name.startsWith('data-dream-'));
+    const hasVariables = [...root.style].some((property) =>
+      property.startsWith('--dream-') || property.startsWith('--ds-'));
+    const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
+    const hasSheets = Boolean(sheets?.size && 'adoptedStyleSheets' in document &&
+      [...document.adoptedStyleSheets].some((sheet) => sheets.has(sheet)));
+    return !hasAttributes && !hasVariables && !hasSheets &&
+      !document.getElementById('codex-dream-skin-style') &&
+      !document.getElementById('codex-dream-skin-sky-garden-style') &&
+      !document.getElementById('codex-dream-skin-chrome') &&
+      !document.getElementById('codex-dream-skin-motion-stage') &&
+      !document.getElementById('codex-dream-skin-sidebar-widget') &&
+      !document.querySelector('[data-dream-character-icon]') &&
+      !document.querySelector('[data-dream-character-role]') &&
+      !document.querySelector('[data-dream-native-icon]') &&
+      !window.__CODEX_DREAM_SKIN_STATE__ &&
+      !window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
+  })()`);
 }
 
 async function verifySession(session, expectedThemeId = null, expectedRevision = null) {
@@ -1053,12 +1150,12 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         visible: r.width > 0 && r.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
       };
     };
-    const homeIndicator = document.querySelector('[data-testid="home-icon"]');
-    const homeSignal = homeIndicator ?? document.querySelector('[data-feature="game-source"]') ??
-      document.querySelector('.group\\\\/home-suggestions');
+    const homeIndicator = document.querySelector(${selectorLiteral("home-icon")});
+    const homeSignal = homeIndicator ?? document.querySelector(${selectorLiteral("game-source")}) ??
+      document.querySelector(${selectorLiteral("home-suggestions")});
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
-    const home = document.querySelector('[role="main"].dream-skin-home');
-    const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
+    const home = document.querySelector(${selectorLiteral("home-route")});
+    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
     const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
     const cardBoxes = cardButtons.map(box);
     const visibleCards = cardBoxes.filter((item) => item?.visible);
@@ -1078,13 +1175,18 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
       item.color === item.expectedColor);
     const hero = box(home?.firstElementChild?.firstElementChild?.firstElementChild);
-    const projectButton = box(home?.querySelector('.group\\\\/project-selector > button'));
-    const shell = box(document.querySelector('main.main-surface'));
-    const composer = box(document.querySelector('.composer-surface-chrome'));
-    const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
-    const chrome = document.getElementById('codex-dream-skin-chrome');
+    const projectButton = box(home?.querySelector(${selectorLiteral("project-selector")} + " > button"));
+    const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
+    const composer = box(document.querySelector(${selectorLiteral("composer-chrome")}));
+    const sidebar = box(document.querySelector(${selectorLiteral("left-panel")}));
     const root = document.documentElement;
-    const skinState = window.__CODEX_DREAM_SKIN_STATE__;
+    const runtime = window.__CODEX_DREAM_SKIN_STATE__;
+    const skyGardenState = window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
+    const adopted = runtime?.styleMode === 'adopted' &&
+      [...document.adoptedStyleSheets].includes(runtime.styleSheet);
+    const fallback = runtime?.styleMode === 'style' &&
+      document.getElementById('codex-dream-skin-style') === runtime.styleNode;
+    const chrome = document.getElementById('codex-dream-skin-chrome');
     const motionStage = document.getElementById('codex-dream-skin-motion-stage');
     const foreground = motionStage?.querySelector('.dream-duo-characters') ?? null;
     const lounge = motionStage?.querySelector('.dream-duo-lounge') ?? null;
@@ -1092,14 +1194,21 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const loungeLegLayers = lounge?.querySelectorAll('.dream-duo-lounge-left-legs, .dream-duo-lounge-right-legs').length ?? 0;
     const loungeBlink = lounge?.querySelector('.dream-duo-lounge-blink') ?? null;
     const sidebarWidget = document.getElementById('codex-dream-skin-sidebar-widget');
-    const themeId = root.getAttribute('data-dream-theme-id');
+    const themeId = runtime?.themeId ?? null;
     const motionState = root.getAttribute('data-dream-motion-state');
     const result = {
-      installed: root.classList.contains('codex-dream-skin'),
-      version: skinState?.version ?? null,
-      themeId: skinState?.themeId ?? null,
-      revision: skinState?.revision ?? null,
-      stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
+      installed: root.getAttribute('data-dream-skin') === 'active',
+      version: runtime?.version ?? null,
+      themeId,
+      revision: runtime?.revision ?? null,
+      styleMode: runtime?.styleMode ?? null,
+      stylePresent: Boolean(adopted || fallback),
+      scope: runtime?.scope ?? null,
+      businessClassPollution: [...document.querySelectorAll('[class]')].filter((node) =>
+        [...node.classList].some((name) => /^(?:dream-|codex-dream-skin(?:-|$))/.test(name))
+      ).length,
+      skyGardenActive: skyGardenState?.themeId === 'preset-sky-garden-duo',
+      skyGardenStylePresent: Boolean(document.getElementById('codex-dream-skin-sky-garden-style')),
       chromePresent: Boolean(chrome),
       chromePointerEvents: getComputedStyle(chrome || document.body).pointerEvents,
       homeRoute: Boolean(homeRoute),
@@ -1128,19 +1237,20 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         loungeBlinkPresent: Boolean(loungeBlink),
         avoidanceMode: root.getAttribute('data-dream-duo-foreground-mode') || 'normal',
         pointerEvents: getComputedStyle(motionStage || document.body).pointerEvents,
-        active: Boolean(skinState?.metrics?.motionActive),
+        active: Boolean(skyGardenState?.metrics?.motionActive),
         sidebarWidgetPresent: Boolean(sidebarWidget),
-        frames: skinState?.metrics?.motionFrames ?? 0,
-        pointerMoves: skinState?.metrics?.motionPointerEvents ?? 0,
+        frames: skyGardenState?.metrics?.motionFrames ?? 0,
+        pointerMoves: skyGardenState?.metrics?.motionPointerEvents ?? 0,
       },
       characters: {
         iconCount: document.querySelectorAll('[data-dream-character-icon]').length,
         targetCount: document.querySelectorAll('[data-dream-character-role]').length,
         nativeMarkerCount: document.querySelectorAll('[data-dream-native-icon]').length,
-        creates: skinState?.metrics?.characterIconCreates ?? 0,
+        creates: skyGardenState?.metrics?.characterIconCreates ?? 0,
       },
     };
-    const motionPass = themeId !== 'preset-sky-garden-duo' || (
+    const skyGardenPass = themeId !== 'preset-sky-garden-duo' || (
+      result.skyGardenActive && result.skyGardenStylePresent &&
       result.motion.stagePresent && result.motion.petalCount === 14 &&
       result.motion.foregroundPresent && result.motion.loungePresent &&
       result.motion.loungeRigPresent && result.motion.loungeLegLayers === 2 && result.motion.loungeBlinkPresent &&
@@ -1153,10 +1263,13 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       result.characters.iconCount >= 5 &&
       result.characters.targetCount === result.characters.iconCount
     );
+    const structurePass = result.scope?.level === 'L0' ||
+      (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible));
+    const classPass = result.businessClassPollution === 0 ||
+      (themeId === 'preset-sky-garden-duo' && result.skyGardenActive);
     const basePass = result.installed && result.version === ${JSON.stringify(SKIN_VERSION)} &&
-      result.stylePresent && result.chromePresent && result.chromePointerEvents === 'none' &&
-      Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible) && !result.documentOverflow.x &&
-      motionPass && characterPass;
+      result.stylePresent && classPass && structurePass && !result.documentOverflow.x &&
+      skyGardenPass && characterPass;
     const expectedThemeId = ${JSON.stringify(expectedThemeId)};
     const expectedRevision = ${JSON.stringify(expectedRevision)};
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
@@ -1398,30 +1511,34 @@ export function earlyPayloadFor(payload, revision) {
     const appliedKey = "__CODEX_DREAM_SKIN_EARLY_APPLIED__";
     const generation = ${JSON.stringify(revision)};
     window[generationKey] = generation;
-    let observer = null;
+    let bootstrapTimer = null;
     let timeout = null;
     const stop = () => {
-      observer?.disconnect();
-      observer = null;
+      if (bootstrapTimer) clearInterval(bootstrapTimer);
+      bootstrapTimer = null;
       if (timeout) clearTimeout(timeout);
       timeout = null;
     };
+    const hasCodexSurface = () => {
+      if (location.protocol !== "app:") return false;
+      const shell = document.querySelector(${selectorLiteral("shell-main")});
+      const sidebar = document.querySelector(${selectorLiteral("left-panel")});
+      const main = document.querySelector(${selectorLiteral("home-route")});
+      const settings = document.querySelector(${selectorLiteral("appearance-radio")}) ||
+        document.querySelector(${stableTestidLiteral("theme-preview")});
+      return Boolean((shell && sidebar) || settings || main);
+    };
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
-      if (!document.documentElement) return false;
-      const shell = document.querySelector('main.main-surface');
-      const sidebar = document.querySelector('aside.app-shell-left-panel');
-      if (!shell || !sidebar) return false;
+      if (!document.documentElement || !hasCodexSurface()) return false;
       stop();
       ${payload};
       window[appliedKey] = generation;
       return true;
     };
     if (install()) return;
-    if (typeof MutationObserver === "function" && document.documentElement) {
-      observer = new MutationObserver(install);
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-    }
+    document.addEventListener?.("DOMContentLoaded", install, { once: true });
+    bootstrapTimer = setInterval(install, 250);
     timeout = setTimeout(stop, 10000);
   })()`;
 }
@@ -1473,7 +1590,12 @@ function watchPayloadSources(themeDir, onDirty) {
         const staticChanged = kind === "static" && (
           directory === characterIconRoot || directory === DUO_ASSET_ROOT
           || (directory === assetsRoot &&
-            (!name || name === "dream-skin.css" || name === "renderer-inject.js"))
+            (!name || [
+              "dream-skin.css",
+              "renderer-inject.js",
+              "sky-garden-duo-extension.css",
+              "sky-garden-duo-extension.js",
+            ].includes(name)))
         );
         if (kind === "static" && !staticChanged) return;
         onDirty({ staticChanged });

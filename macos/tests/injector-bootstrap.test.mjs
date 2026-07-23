@@ -3,35 +3,36 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { earlyPayloadFor } from "../scripts/injector.mjs";
+import { buildPayloadForTheme, earlyPayloadFor } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const macosRoot = path.resolve(here, "..");
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
 function createFixture() {
-  const observers = [];
+  const domReady = [];
   const timers = new Map();
+  const intervals = new Map();
   let nextTimer = 1;
-  const markers = { shell: false, sidebar: false };
+  let nextInterval = 1;
+  const markers = { shell: false, sidebar: false, main: false, settings: false };
+  let root = {};
   const context = {
     window: { installs: [] },
+    location: { protocol: "app:" },
     document: {
-      documentElement: {},
+      get documentElement() { return root; },
+      addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
       querySelector(selector) {
         if (selector === "main.main-surface") return markers.shell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
+        if (selector === "[role=\"main\"]") return markers.main ? {} : null;
+        if (selector.includes("appearance-theme") || selector.includes("theme-preview")) {
+          return markers.settings ? {} : null;
+        }
         return null;
       },
-    },
-    MutationObserver: class {
-      constructor(callback) {
-        this.callback = callback;
-        this.connected = true;
-        observers.push(this);
-      }
-      observe() {}
-      disconnect() { this.connected = false; }
     },
     setTimeout(callback) {
       const id = nextTimer++;
@@ -39,23 +40,43 @@ function createFixture() {
       return id;
     },
     clearTimeout(id) { timers.delete(id); },
+    setInterval(callback) {
+      const id = nextInterval++;
+      intervals.set(id, callback);
+      return id;
+    },
+    clearInterval(id) { intervals.delete(id); },
   };
-  return { context, markers, observers };
+  return {
+    context,
+    markers,
+    makeNotReady() { root = null; },
+    makeReady() { root = {}; },
+    fireDomReady() { for (const callback of [...domReady]) callback(); },
+    tick() { for (const callback of [...intervals.values()]) callback(); },
+    observers: [],
+  };
 }
 
 const guarded = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("guarded")', "guarded"), guarded.context);
 assert.deepEqual(guarded.context.window.installs, [], "Auxiliary app targets must remain untouched.");
+assert.equal(guarded.observers.length, 0, "Early bootstrap must not install a broad MutationObserver.");
 guarded.markers.shell = true;
-guarded.observers[0].callback([]);
-assert.deepEqual(guarded.context.window.installs, [], "A main surface without the Codex sidebar is not sufficient.");
+guarded.tick();
+assert.deepEqual(guarded.context.window.installs, [], "A shell without its sidebar is not sufficient for identity.");
+guarded.markers.sidebar = true;
+guarded.tick();
+assert.deepEqual(guarded.context.window.installs, ["guarded"]);
 
 const generations = createFixture();
-vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);
-vm.runInNewContext(earlyPayloadFor('window.installs.push("new")', "new"), generations.context);
+generations.makeNotReady();
 generations.markers.shell = true;
 generations.markers.sidebar = true;
-for (const observer of generations.observers) observer.callback([]);
+vm.runInNewContext(earlyPayloadFor('window.installs.push("old")', "old"), generations.context);
+vm.runInNewContext(earlyPayloadFor('window.installs.push("new")', "new"), generations.context);
+generations.makeReady();
+generations.fireDomReady();
 assert.deepEqual(
   generations.context.window.installs,
   ["new"],
@@ -63,6 +84,13 @@ assert.deepEqual(
 );
 assert.equal(generations.context.window.__CODEX_DREAM_SKIN_EARLY_APPLIED__, "new");
 
+const earlyStart = source.indexOf("export function earlyPayloadFor");
+const earlySource = source.slice(earlyStart, earlyStart + 2200);
+assert.ok(earlyStart >= 0, "Early payload helper must remain exported for bootstrap tests.");
+assert.doesNotMatch(earlySource, /MutationObserver|childList|subtree/,
+  "Early bootstrap must not observe the entire renderer DOM.");
+assert.match(earlySource, /DOMContentLoaded/);
+assert.match(earlySource, /setInterval\(install, 250\)/);
 const discoveryStart = source.indexOf("record.earlyScriptId = await registerEarly");
 const probeStart = source.indexOf("const probe = await waitForCodexProbe", discoveryStart);
 assert.ok(discoveryStart >= 0 && probeStart > discoveryStart, "Early registration must happen before full shell probing.");
@@ -78,105 +106,39 @@ assert.match(
 );
 assert.match(
   source,
-  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\([\s\S]{0,160}item\.color === item\.expectedColor\)/,
-  "Live verification must compare visible home suggestion labels with the themed card color.",
-);
-assert.match(
-  source,
-  /visibleSuggestionLabels\.length >= result\.visibleCardCount[\s\S]{0,160}result\.suggestionLabelColorsMatch/,
+  /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\(/,
   "Live verification must reject visible home suggestion labels that diverge from the themed card color.",
 );
+assert.match(source, /visibleSuggestionLabels\.length >= result\.visibleCardCount/);
+assert.match(source, /result\.suggestionLabelColorsMatch/);
 assert.match(
   source,
-  /verifyRemovedSession[\s\S]*codex-dream-skin-motion-stage/,
-  "Soft-off verification must reject a leaked dedicated motion stage.",
+  /sky-garden-duo-extension\.css[\s\S]+sky-garden-duo-extension\.js/,
+  "The trusted Sky Garden extension must load from dedicated macOS-only assets.",
 );
 assert.match(
   source,
-  /verifyRemovedSession[\s\S]*codex-dream-skin-sidebar-widget/,
-  "Soft-off verification must reject a leaked sidebar companion widget.",
+  /\[\s*"dream-skin\.css",\s*"renderer-inject\.js",\s*"sky-garden-duo-extension\.css",\s*"sky-garden-duo-extension\.js",\s*\]\.includes\(name\)/,
+  "The watcher must invalidate cached payloads when either trusted extension asset changes.",
 );
 assert.match(
   source,
-  /motion:\s*\{[\s\S]{0,700}petalCount:[\s\S]{0,700}foregroundPresent:[\s\S]{0,700}loungePresent:[\s\S]{0,700}avoidanceMode:[\s\S]{0,700}sidebarWidgetPresent:[\s\S]{0,900}motionPass/,
-  "Live verification must report and enforce the dedicated motion, foreground, lounge, avoidance, and sidebar-widget contract.",
+  /const extensionPayload = theme\.id === DUO_THEME_ID[\s\S]+skyGardenExtensionCleanupPayload\(\),[\s\S]+canonicalPayload,[\s\S]+extensionPayload/,
+  "Payload composition must clean the optional extension, install the canonical runtime, then install Sky Garden UI.",
 );
-assert.match(
-  source,
-  /DUO_WIDGET_IMAGE_FILE[\s\S]{0,160}duo-sidebar-widget-v3\.png/,
-  "The injector must load the stable long-gown artwork for the theme card.",
-);
-assert.match(
-  source,
-  /DUO_FOREGROUND_IMAGE_FILE[\s\S]{0,160}duo-foreground-characters-jk-v1\.png/,
-  "The injector must load the high-resolution transparent loafer duo for the foreground layer.",
-);
-assert.match(
-  source,
-  /DUO_LOUNGE_IMAGE_FILE[\s\S]{0,160}duo-lounge-jk-v1\.png/,
-  "The injector must load the horizontal reclining duo for the upper safe area.",
-);
-assert.match(source, /DUO_LOUNGE_BODY_IMAGE_FILE[\s\S]{0,180}duo-lounge-body-v2\.webp/);
-assert.match(source, /DUO_LOUNGE_LEFT_LEGS_IMAGE_FILE[\s\S]{0,180}duo-lounge-left-legs-v2\.webp/);
-assert.match(source, /DUO_LOUNGE_RIGHT_LEGS_IMAGE_FILE[\s\S]{0,180}duo-lounge-right-legs-v2\.webp/);
-assert.match(source, /DUO_LOUNGE_BLINK_IMAGE_FILE[\s\S]{0,180}duo-lounge-blink-v1\.webp/);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_WIDGET_ART_JSON__",\s*JSON\.stringify\(duoWidgetArt\)\)/,
-);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_FOREGROUND_ART_JSON__",\s*JSON\.stringify\(duoForegroundArt\)\)/,
-);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_LOUNGE_ART_JSON__",\s*JSON\.stringify\(duoLoungeArt\)\)/,
-);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_LOUNGE_BODY_ART_JSON__",\s*JSON\.stringify\(duoLoungeBodyArt\)\)/,
-);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_LOUNGE_LEFT_LEGS_ART_JSON__",\s*JSON\.stringify\(duoLoungeLeftLegsArt\)\)/,
-);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_LOUNGE_RIGHT_LEGS_ART_JSON__",\s*JSON\.stringify\(duoLoungeRightLegsArt\)\)/,
-);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_LOUNGE_BLINK_ART_JSON__",\s*JSON\.stringify\(duoLoungeBlinkArt\)\)/,
-);
-assert.match(source, /const DUO_THEME_ID = "preset-sky-garden-duo"/);
-assert.match(source, /themeId !== DUO_THEME_ID[\s\S]{0,300}duoIcons:\s*\{\}/,
-  "Non-duo presets must not load or embed the trusted character asset pack.");
-assert.match(source, /widgetBytes:\s*duoAssets\.widgetBytes/);
-assert.match(source, /foregroundBytes:\s*duoAssets\.foregroundBytes/);
-assert.match(source, /loungeBytes:\s*duoAssets\.loungeBytes/);
-assert.match(source, /loungeBodyBytes:\s*duoAssets\.loungeBodyBytes/);
-assert.match(source, /loungeLegBytes:\s*duoAssets\.loungeLegBytes/);
-assert.match(source, /loungeBlinkBytes:\s*duoAssets\.loungeBlinkBytes/);
-assert.match(
-  source,
-  /DUO_CHARACTER_ICON_FILES[\s\S]{0,2400}nav-new-task\.webp[\s\S]{0,2400}control-send\.webp/,
-  "The injector must load the complete generated character icon pack.",
-);
-assert.match(
-  source,
-  /replace\("__DREAM_DUO_ICONS_JSON__",\s*JSON\.stringify\(duoIcons\)\)/,
-  "The character icon pack must be embedded once as a renderer payload object.",
-);
-assert.match(source, /characterIconBytes:\s*duoAssets\.characterIconBytes/);
-assert.match(
-  source,
-  /DUO_ASSET_ROOT[\s\S]{0,1800}duo-character-icons[\s\S]+watchPayloadSources/,
-  "Generated character icon edits must invalidate the cached renderer payload.",
-);
-assert.match(
-  source,
-  /watchPayloadSources[\s\S]{0,2500}add\(DUO_ASSET_ROOT, "static"\)[\s\S]{0,200}add\(characterIconRoot, "static"\)/,
-  "Trusted preset artwork and icon edits must invalidate the cached renderer payload.",
+const removeStart = source.indexOf("async function removeFromSession");
+const extensionCleanupStart = source.indexOf("skyGardenExtensionCleanupPayload()", removeStart);
+const canonicalCleanupStart = source.indexOf("__CODEX_DREAM_SKIN_DISABLED__", extensionCleanupStart);
+assert.ok(
+  removeStart >= 0 && extensionCleanupStart > removeStart && canonicalCleanupStart > extensionCleanupStart,
+  "Soft removal must clean the trusted extension before removing the canonical runtime.",
 );
 
-console.log("PASS: early injection is shell-guarded, generation-safe, and removed on shutdown.");
+const duoPayload = await buildPayloadForTheme(path.join(macosRoot, "presets", "preset-sky-garden-duo"));
+const genericPayload = await buildPayloadForTheme(path.join(macosRoot, "presets", "preset-gothic-void-crusade"));
+new vm.Script(duoPayload.payload);
+new vm.Script(genericPayload.payload);
+assert.match(duoPayload.payload, /dream-duo-lounge-rig/);
+assert.doesNotMatch(genericPayload.payload, /dream-duo-lounge-rig/);
+
+console.log("PASS: early injection is L0-ready, generation-safe, and removed on shutdown.");

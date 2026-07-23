@@ -51,11 +51,96 @@ if /usr/bin/grep -F -q 'CODEX_EXPECTED_TEAM_ID' "$ROOT/scripts/common-macos.sh" 
   exit 1
 fi
 
+# The native menu bar control plane and XCTest require a complete, matching
+# Xcode platform. CommandLineTools-only hosts report this platform blocker;
+# build-menubar-app.sh is still independently verifiable with DREAMSKIN_SDK.
+if /usr/bin/xcrun --sdk macosx --show-sdk-platform-path >/dev/null 2>&1; then
+  /usr/bin/swift build --package-path "$ROOT/menubar-app" --product CodexDreamSkinMenuBar
+  /usr/bin/swift test --package-path "$ROOT/menubar-app"
+else
+  printf 'SKIP: native SwiftPM build/XCTest require a full matching Xcode macOS platform.\n'
+fi
+/usr/bin/plutil -lint "$ROOT/menubar-app/Resources/Info.plist.template" >/dev/null
+/usr/bin/grep -F -q '<key>LSUIElement</key>' "$ROOT/menubar-app/Resources/Info.plist.template"
+/usr/bin/grep -F -q '<key>LSMinimumSystemVersion</key>' "$ROOT/menubar-app/Resources/Info.plist.template"
+UPDATE_JSON="$({
+  CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$ROOT/tests/fixtures/latest-release.json" \
+    "$ROOT/scripts/check-update-macos.sh" --json
+})"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (value.currentVersion !== "v1.3.3" || value.latestVersion !== "v9.8.7") process.exit(1);
+  if (!value.updateAvailable) process.exit(1);
+  if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
+' "$UPDATE_JSON"
+if /usr/bin/grep -R -n -E --exclude-dir='.build' \
+  'xattr|spctl[[:space:]]+--master-disable' \
+  "$ROOT/menubar-app" "$ROOT/scripts/build-menubar-app.sh" "$ROOT/scripts/build-dmg.sh" >/dev/null; then
+  printf 'Native distribution must not bypass Gatekeeper or remove quarantine attributes.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -n -F -q 'xattr' \
+  "$ROOT/scripts/build-client-release.sh" "$ROOT/scripts/build-release.sh" >/dev/null; then
+  printf 'Standalone release builders must not strip quarantine or include the restricted Arina preset.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q "presets/preset-arina-hashimoto/" \
+  "$ROOT/scripts/build-client-release.sh" "$ROOT/scripts/build-release.sh"; then
+  printf 'Standalone release builders must explicitly exclude the restricted Arina preset.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q 'DEPLOY_PREVIOUS' "$ROOT/scripts/install-dream-skin-macos.sh" ||
+   ! /usr/bin/grep -F -q 'rollback_deployed_project' "$ROOT/scripts/install-dream-skin-macos.sh"; then
+  printf 'The macOS outer installer must roll back a failed engine deployment.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q 'INSTALL_ROOT.broken' "$ROOT/scripts/install-dream-skin-macos.sh"; then
+  printf 'Installer rollback must detach the broken engine with a rename instead of rm -rf on the live root.\n' >&2
+  exit 1
+fi
+INSTALL_GUARD_LINE="$(/usr/bin/grep -n 'codex_is_running && fail "Close Codex before installation' \
+  "$ROOT/scripts/install-dream-skin-macos.sh" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+INSTALL_DEPLOY_LINE="$(/usr/bin/grep -n '^  deploy_project$' \
+  "$ROOT/scripts/install-dream-skin-macos.sh" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+if [ -z "$INSTALL_GUARD_LINE" ] || [ -z "$INSTALL_DEPLOY_LINE" ] ||
+   [ "$INSTALL_GUARD_LINE" -ge "$INSTALL_DEPLOY_LINE" ]; then
+  printf 'The Codex-running guard must run before deploy_project copies any engine bytes.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q '# CodexDreamSkinStudio launcher' \
+   "$ROOT/scripts/restore-dream-skin-macos.sh"; then
+  printf 'macOS uninstall must remove only launchers owned by Dream Skin.\n' >&2
+  exit 1
+fi
+
+# Shared runtime contract: selectors and renderer/CSS sources are compiled
+# once, then staged byte-for-byte into both platform asset directories.
+PROJECT_ROOT="$(cd "$ROOT/.." && pwd -P)"
+"$NODE" "$PROJECT_ROOT/tools/sync-runtime-assets.mjs" --check
+"$NODE" "$PROJECT_ROOT/tools/doctor-selectors.test.mjs"
+if ! /usr/bin/cmp -s "$ROOT/assets/dream-skin.css" "$PROJECT_ROOT/windows/assets/dream-skin.css" ||
+    ! /usr/bin/cmp -s "$ROOT/assets/renderer-inject.js" "$PROJECT_ROOT/windows/assets/renderer-inject.js" ||
+    ! /usr/bin/cmp -s "$ROOT/assets/selectors.json" "$PROJECT_ROOT/windows/assets/selectors.json"; then
+  printf 'macOS and Windows runtime assets are not byte-identical.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -E -q 'getBoundingClientRect|ResizeObserver|childList|subtree|classList\.(add|remove|toggle)|syncRouteState|samplingNativeShell' \
+    "$ROOT/assets/renderer-inject.js"; then
+  printf 'Unified renderer still contains retired layout/class or broad-observer behavior.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -E -q 'home-suggestion-list-item|\.dream-skin-home|\.dream-home|\.dream-task|codex-dream-skin-chrome' \
+    "$ROOT/assets/dream-skin.css"; then
+  printf 'Canonical CSS still contains retired marker classes or fossil selectors.\n' >&2
+  exit 1
+fi
+
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/pet-state-hold.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
+"$NODE" "$ROOT/tests/sky-garden-duo-extension.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
 "$ROOT/tests/pet-seeding.test.sh"
 
@@ -139,6 +224,8 @@ STANDALONE_DOCS="$TMP/standalone-source-docs"
 /usr/bin/grep -F -q 'https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/windows/assets/theme.json' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 [ -f "$STANDALONE_ROOT/docs/images/hero-banner-red-white.png" ]
+[ ! -e "$STANDALONE_ROOT/docs/images/presets/arina-hashimoto-source.png" ]
+/usr/bin/grep -F -q 'arina-hashimoto' "$STANDALONE_ROOT/NOTICE.md"
 /usr/bin/grep -F -q '`docs/images/presets/arina-hashimoto-source.png`' \
   "$STANDALONE_ROOT/NOTICE.md"
 /usr/bin/grep -F -q 'not included in this macOS archive' \
@@ -332,7 +419,7 @@ run_signed_runtime_state_tests() {
 STOP_HOME="$TMP/stop-home"
 STOP_STATE_ROOT="$STOP_HOME/Library/Application Support/CodexDreamSkinStudio"
 /bin/mkdir -p "$STOP_STATE_ROOT"
-"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 30000);' &
+"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 600000);' &
 DUMMY_PID="$!"
 "$NODE" -e '
   const fs = require("node:fs");
@@ -396,7 +483,7 @@ DUMMY_PID=""
 STATUS_HOME="$TMP/status-home"
 STATUS_STATE_ROOT="$STATUS_HOME/Library/Application Support/CodexDreamSkinStudio"
 /bin/mkdir -p "$STATUS_STATE_ROOT"
-"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 30000);' &
+"$NODE" -e 'process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 600000);' &
 STATUS_PID="$!"
 "$NODE" -e '
   const fs = require("node:fs");
@@ -424,7 +511,7 @@ STATUS_PID=""
 # real bundled Node process so command/path/start checks pass and only the
 # token boundary distinguishes this case.
 STATUS_FAKE_INJECTOR="$TMP/status-fake-injector.mjs"
-/usr/bin/printf 'setTimeout(() => {}, 30000);\n' > "$STATUS_FAKE_INJECTOR"
+/usr/bin/printf 'setTimeout(() => {}, 600000);\n' > "$STATUS_FAKE_INJECTOR"
 "$NODE" "$STATUS_FAKE_INJECTOR" --watch --port 93410 --theme-dir "$TMP" &
 STATUS_PID="$!"
 /bin/sleep 0.08
@@ -861,7 +948,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.2.0" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.3.3" ]' _ "$ROOT"
 if [ "${CODEX_DREAM_SKIN_SKIP_DOCTOR:-0}" = "1" ]; then
   printf 'SKIP: Doctor requires an installed, signed Codex app.\n'
   DOCTOR_RESULT="skipped"

@@ -1,28 +1,13 @@
-((cssText, artDataUrl, themeConfig, duoIcons, duoWidgetArt, duoForegroundArt, duoLoungeArt, duoLoungeBodyArt, duoLoungeLeftLegsArt, duoLoungeRightLegsArt, duoLoungeBlinkArt) => {
+// Canonical cross-platform renderer. Run tools/sync-runtime-assets.mjs after editing.
+((cssText, artDataUrl, themeConfig) => {
+  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main.main-surface","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header.app-header-tint","tier":"L1","scope":"all","required":true},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
+  const STYLE_REGISTRY_KEY = "__CODEX_DREAM_SKIN_STYLE_SHEETS__";
   const STYLE_ID = "codex-dream-skin-style";
-  const CHROME_ID = "codex-dream-skin-chrome";
-  const MOTION_STAGE_ID = "codex-dream-skin-motion-stage";
-  const DUO_WIDGET_ID = "codex-dream-skin-sidebar-widget";
-  const DUO_ICON_ATTR = "data-dream-character-icon";
-  const DUO_ROLE_ATTR = "data-dream-character-role";
-  const DUO_KIND_ATTR = "data-dream-character-kind";
-  const DUO_NATIVE_ICON_ATTR = "data-dream-native-icon";
   const SHELL_ATTR = "data-dream-shell";
-  const THEME_ATTR = "data-dream-theme-id";
-  const MOTION_ATTR = "data-dream-motion-state";
-  const DUO_FOREGROUND_MODE_ATTR = "data-dream-duo-foreground-mode";
-  const DUO_THEME_ID = "preset-sky-garden-duo";
-  const DUO_OVERLAY_SELECTOR = [
-    '[role="dialog"]',
-    '[role="menu"]',
-    '[role="listbox"]',
-    '[data-radix-popper-content-wrapper]',
-    '[class*="z-[60]"]',
-    '[class*="thread-floating-content"]',
-  ].join(",");
-  const ART_ATTRS = [
+  const ROOT_ATTRS = [
+    "data-dream-skin", SHELL_ATTR,
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
     "data-dream-art-ready",
@@ -34,42 +19,6 @@
   const ART = THEME.art && typeof THEME.art === "object" ? THEME.art : {};
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
     ? THEME.artMetadata : null;
-  const IS_DUO_THEME = THEME.id === DUO_THEME_ID;
-  const DUO_ICONS = duoIcons && typeof duoIcons === "object" ? duoIcons : {};
-  const DUO_WIDGET_ART = typeof duoWidgetArt === "string" ? duoWidgetArt : "";
-  const DUO_FOREGROUND_ART = typeof duoForegroundArt === "string" ? duoForegroundArt : "";
-  const DUO_LOUNGE_ART = typeof duoLoungeArt === "string" ? duoLoungeArt : "";
-  const DUO_LOUNGE_BODY_ART = typeof duoLoungeBodyArt === "string" ? duoLoungeBodyArt : "";
-  const DUO_LOUNGE_LEFT_LEGS_ART = typeof duoLoungeLeftLegsArt === "string" ? duoLoungeLeftLegsArt : "";
-  const DUO_LOUNGE_RIGHT_LEGS_ART = typeof duoLoungeRightLegsArt === "string" ? duoLoungeRightLegsArt : "";
-  const DUO_LOUNGE_BLINK_ART = typeof duoLoungeBlinkArt === "string" ? duoLoungeBlinkArt : "";
-  const HAS_DUO_ICONS = Object.keys(DUO_ICONS).length > 0;
-  const DUO_PALETTES = {
-    light: {
-      background: "#edf3ff",
-      panel: "#f8faff",
-      panelAlt: "#e7edfb",
-      accent: "#7899d4",
-      accentAlt: "#a8c1ef",
-      secondary: "#8b78c9",
-      highlight: "#6653aa",
-      text: "#25293a",
-      muted: "#6c7693",
-      line: "rgba(120, 153, 212, .30)",
-    },
-    dark: {
-      background: "#10131f",
-      panel: "#171b2a",
-      panelAlt: "#20263a",
-      accent: "#9dbbff",
-      accentAlt: "#c3d5ff",
-      secondary: "#a08be5",
-      highlight: "#8067cf",
-      text: "#f1f4ff",
-      muted: "#a8b0cb",
-      line: "rgba(157, 187, 255, .32)",
-    },
-  };
   const ANALYSIS_CACHE_KEY = "__CODEX_DREAM_SKIN_ANALYSIS_CACHE__";
   const THEME_VARIABLES = [
     "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime",
@@ -80,11 +29,12 @@
     "--dream-art-focus-x", "--dream-art-focus-y", "--dream-art-position",
     "--dream-skin-focus-x", "--dream-skin-focus-y", "--dream-skin-art-position",
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
-    "--dream-skin-project-label",
-    "--dream-motion-x", "--dream-motion-y", "--dream-duo-foreground-height",
-    "--dream-duo-lounge-left", "--dream-duo-lounge-top", "--dream-duo-lounge-right",
-    "--dream-duo-lounge-translate-x", "--dream-duo-lounge-height",
+    "--dream-skin-project-label", "--dream-skin-brand-subtitle", "--dream-skin-status",
+    "--dream-skin-quote", "--dream-skin-art",
   ];
+  const selectorByKey = new Map(SELECTOR_CONTRACT.selectors.map((entry) => [entry.key, entry]));
+  const stableTestidSelector = (testid) => SELECTOR_CONTRACT.stableTestids?.includes(testid)
+    ? `[data-testid="${testid}"]` : null;
   const installToken = {};
   const existingAnalysisCache = window[ANALYSIS_CACHE_KEY];
   const analysisCache = existingAnalysisCache && typeof existingAnalysisCache.get === "function" &&
@@ -92,8 +42,11 @@
   window[ANALYSIS_CACHE_KEY] = analysisCache;
   let artAnalysis = typeof THEME.artKey === "string" ? analysisCache.get(THEME.artKey) ?? null : null;
   let analysisTimer = null;
-  let samplingNativeShell = false;
   let rootObserver = null;
+  let bodyReadyHandler = null;
+  let styleMode = null;
+  let styleNode = null;
+  let styleSheet = null;
   const now = () => typeof performance === "object" && typeof performance.now === "function"
     ? performance.now() : Date.now();
   const metrics = {
@@ -103,23 +56,22 @@
     layoutReads: 0,
     attributeWrites: 0,
     styleWrites: 0,
-    textWrites: 0,
+    styleRepairs: 0,
+    navigationEvents: 0,
+    safetyPasses: 0,
     analysisRuns: 0,
     analysisCacheHits: artAnalysis ? 1 : 0,
-    motionFrames: 0,
-    motionPointerEvents: 0,
-    motionStageCreates: 0,
-    motionAvoidanceChecks: 0,
-    motionAvoidanceMode: "normal",
-    sidebarWidgetCreates: 0,
-    characterIconCreates: 0,
-    motionActive: false,
     firstEnsureMs: null,
     analysisMs: null,
   };
-  window[DISABLED_KEY] = false;
 
   const previous = window[STATE_KEY];
+  if (typeof previous?.cleanup === "function") previous.cleanup();
+  window[DISABLED_KEY] = false;
+
+  const existingStyleRegistry = window[STYLE_REGISTRY_KEY];
+  const styleRegistry = existingStyleRegistry instanceof Set ? existingStyleRegistry : new Set();
+  window[STYLE_REGISTRY_KEY] = styleRegistry;
   const artUrl = (() => {
     const comma = artDataUrl.indexOf(",");
     const mime = /^data:([^;,]+)/.exec(artDataUrl)?.[1] || "image/png";
@@ -128,23 +80,6 @@
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
   })();
-
-  previous?.motion?.dispose?.();
-  previous?.removeDuoCharacterIcons?.();
-  document.getElementById(DUO_WIDGET_ID)?.remove();
-  if (previous?.observer) previous.observer.disconnect();
-  if (previous?.rootObserver) previous.rootObserver.disconnect();
-  if (previous?.resizeObserver) previous.resizeObserver.disconnect();
-  if (previous?.timer) clearInterval(previous.timer);
-  if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
-  if (previous?.scheduler?.frame != null && typeof cancelAnimationFrame === "function") {
-    cancelAnimationFrame(previous.scheduler.frame);
-  }
-  if (previous?.analysisTimer) clearTimeout(previous.analysisTimer);
-  if (previous?.resizeHandler) window.removeEventListener("resize", previous.resizeHandler);
-  if (previous?.mediaHandler && previous?.mediaQuery) {
-    try { previous.mediaQuery.removeEventListener("change", previous.mediaHandler); } catch {}
-  }
 
   const cssString = (value) => JSON.stringify(String(value ?? ""));
 
@@ -160,13 +95,6 @@
     if (root.getAttribute(name) !== normalized) {
       root.setAttribute(name, normalized);
       metrics.attributeWrites += 1;
-    }
-  };
-
-  const setTextContent = (node, value) => {
-    if (node && node.textContent !== value) {
-      node.textContent = value;
-      metrics.textWrites += 1;
     }
   };
 
@@ -228,98 +156,11 @@
     return { r: channel(1 / 3) * 255, g: channel(0) * 255, b: channel(-1 / 3) * 255 };
   };
 
-  const luminance = ({ r, g, b }) => {
-    const lin = [r, g, b].map((c) => {
-      const x = c / 255;
-      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-  };
-
-  /** Detect Codex app light/dark shell for CSS branching. */
-  const detectShellMode = () => {
+  const detectShellAppearance = () => {
     const root = document.documentElement;
-    const body = document.body;
-    const cls = `${root.className || ""} ${body?.className || ""}`.toLowerCase();
-
-    if (/\b(dark|theme-dark|appearance-dark)\b/.test(cls)) return "dark";
-    if (/\b(light|theme-light|appearance-light)\b/.test(cls)) return "light";
-
-    const dataTheme = (
-      root.getAttribute("data-theme") ||
-      root.getAttribute("data-appearance") ||
-      root.getAttribute("data-color-mode") ||
-      body?.getAttribute("data-theme") ||
-      body?.getAttribute("data-appearance") ||
-      ""
-    ).toLowerCase();
-    if (dataTheme.includes("dark")) return "dark";
-    if (dataTheme.includes("light")) return "light";
-
-    // Radios in profile menu (if present in DOM)
-    const checked = document.querySelector('input[name="appearance-theme"]:checked');
-    if (checked) {
-      const label = (checked.getAttribute("aria-label") || checked.value || "").toLowerCase();
-      if (label.includes("暗") || label.includes("dark")) return "dark";
-      if (label.includes("浅") || label.includes("light")) return "light";
-      if (label.includes("系统") || label.includes("system")) {
-        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      }
-    }
-
-    // The skin itself declares color-scheme on :root.  Once installed,
-    // reading getComputedStyle(root) directly would therefore keep `auto`
-    // themes locked to the previous shell mode. Temporarily remove only our
-    // own root class/attribute, sample the native computed scheme, then restore
-    // synchronously. Mutation records created by this probe are drained below
-    // so the root observer does not schedule a redundant ensure pass.
-    try {
-      const hadSkin = root.classList.contains("codex-dream-skin");
-      const savedShell = root.getAttribute(SHELL_ATTR);
-      samplingNativeShell = true;
-      if (hadSkin) root.classList.remove("codex-dream-skin");
-      if (savedShell !== null) root.removeAttribute(SHELL_ATTR);
-      let colorScheme = "";
-      try {
-        colorScheme = getComputedStyle(root).colorScheme || "";
-      } finally {
-        if (hadSkin) root.classList.add("codex-dream-skin");
-        if (savedShell !== null) root.setAttribute(SHELL_ATTR, savedShell);
-        rootObserver?.takeRecords?.();
-        samplingNativeShell = false;
-      }
-      if (colorScheme.includes("dark") && !colorScheme.includes("light")) return "dark";
-      if (colorScheme.includes("light") && !colorScheme.includes("dark")) return "light";
-    } catch {
-      samplingNativeShell = false;
-    }
-
-    try {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    } catch {}
-
-    // Only use surface luminance before the skin owns those surfaces. Sampling
-    // our own translucent layers would create route-dependent light/dark flips.
-    if (!root.classList.contains("codex-dream-skin")) {
-      const samples = [
-        body,
-        document.querySelector("main.main-surface"),
-        document.querySelector("aside.app-shell-left-panel"),
-      ].filter(Boolean);
-      let votesLight = 0;
-      let votesDark = 0;
-      for (const el of samples) {
-        try {
-          const rgb = parseRgb(getComputedStyle(el).backgroundColor);
-          if (!rgb) continue;
-          const L = luminance(rgb);
-          if (L >= 0.55) votesLight += 1;
-          else if (L <= 0.25) votesDark += 1;
-        } catch {}
-      }
-      if (votesLight > votesDark) return "light";
-      if (votesDark > votesLight) return "dark";
-    }
+    if (root?.classList?.contains("electron-dark")) return "dark";
+    if (root?.classList?.contains("electron-light")) return "light";
+    try { return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch {}
     return "light";
   };
 
@@ -363,18 +204,25 @@
     // Image luminance may tune accents and scrims, but auto appearance follows
     // Codex/ChatGPT (or the OS fallback) so a bright wallpaper cannot flip a
     // native dark session back to a light shell after analysis.
-    return detectShellMode();
+    return detectShellAppearance();
   };
 
   const applyTheme = (root, shell) => {
-    const colors = THEME.colors || {};
-    const explicit = new Set(Array.isArray(THEME.explicitColorKeys) ? THEME.explicitColorKeys : []);
+    const declaredColors = THEME.colors && typeof THEME.colors === "object" ? THEME.colors : {};
+    const legacyPalette = THEME.palette && typeof THEME.palette === "object" ? THEME.palette : {};
+    // macOS themes use the full `colors` contract; older Windows themes used
+    // `palette.accent`. Accept both while keeping one renderer source.
+    const colors = Object.keys(declaredColors).length ? declaredColors : legacyPalette;
+    const hasExplicitKeyList = Array.isArray(THEME.explicitColorKeys);
+    const explicit = new Set(hasExplicitKeyList ? THEME.explicitColorKeys : []);
+    if (!hasExplicitKeyList && (THEME.colorMode === "explicit" || !Object.hasOwn(THEME, "colorMode"))) {
+      for (const key of Object.keys(declaredColors)) explicit.add(key);
+    }
+    if (typeof legacyPalette.accent === "string") explicit.add("accent");
     const adaptive = makeAdaptivePalette(artAnalysis?.accentRgb, shell);
-    const dedicated = IS_DUO_THEME ? DUO_PALETTES[shell] : null;
-    const legacyLight = !THEME.appearance && shell === "light";
+    const legacyLight = (THEME.appearance === undefined || THEME.appearance === "auto") && shell === "light";
     const structural = new Set(["background", "panel", "panelAlt", "text", "muted"]);
     const pick = (name) => {
-      if (dedicated && typeof dedicated[name] === "string") return dedicated[name];
       const allowExplicit = explicit.has(name) && !(legacyLight && structural.has(name));
       return allowExplicit && typeof colors[name] === "string" ? colors[name] : adaptive[name];
     };
@@ -390,9 +238,7 @@
       "--ds-purple": pick("highlight"),
       "--ds-text": pick("text"),
       "--ds-muted": pick("muted"),
-      "--ds-line": dedicated?.line || (
-        explicit.has("line") && typeof colors.line === "string" ? colors.line : adaptive.line
-      ),
+      "--ds-line": explicit.has("line") && typeof colors.line === "string" ? colors.line : adaptive.line,
     };
 
     for (const [name, value] of Object.entries(variables)) {
@@ -416,6 +262,11 @@
     }
     setStyleProperty(root, "--dream-skin-name", cssString(THEME.name || "Codex Dream Skin"));
     setStyleProperty(root, "--dream-skin-tagline", cssString(THEME.tagline || "Make something wonderful."));
+    setStyleProperty(root, "--dream-skin-quote", cssString(THEME.quote || "MAKE SOMETHING WONDERFUL"));
+    setStyleProperty(root, "--dream-skin-brand-subtitle", cssString(
+      THEME.brandSubtitle || "CODEX DREAM SKIN",
+    ));
+    setStyleProperty(root, "--dream-skin-status", cssString(THEME.statusText || "DREAM SKIN ONLINE"));
     setStyleProperty(root, "--dream-skin-project-prefix", cssString(THEME.projectPrefix || "选择项目 · "));
     setStyleProperty(root, "--dream-skin-project-label", cssString(THEME.projectLabel || "◉  选择项目"));
   };
@@ -596,650 +447,258 @@
     image.src = artUrl;
   });
 
-  let chromeParts = null;
-  let observedShellMain = null;
-  let resizeObserver = null;
-  let duoMotion = null;
-
-  const ensureStyle = (root) => {
-    let style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement("style");
-      style.id = STYLE_ID;
-      style.textContent = cssText;
-      style.dataset.dreamSkinVersion = VERSION;
-      (document.head || root).appendChild(style);
-    } else if (style.dataset.dreamSkinStyleRevision !== STYLE_REVISION) {
-      style.textContent = cssText;
+  const installStyle = () => {
+    try {
+      if (!("adoptedStyleSheets" in document) || typeof CSSStyleSheet !== "function") {
+        throw new Error("Constructable stylesheets are unavailable");
+      }
+      const sheet = new CSSStyleSheet();
+      if (typeof sheet.replaceSync !== "function") throw new Error("replaceSync is unavailable");
+      sheet.replaceSync(cssText);
+      const retained = [...document.adoptedStyleSheets]
+        .filter((candidate) => !styleRegistry.has(candidate));
+      document.adoptedStyleSheets = [...retained, sheet];
+      styleRegistry.clear();
+      styleRegistry.add(sheet);
+      document.getElementById(STYLE_ID)?.remove();
+      styleSheet = sheet;
+      styleMode = "adopted";
+      return;
+    } catch {
+      styleSheet = null;
     }
-    style.dataset.dreamSkinVersion = VERSION;
-    style.dataset.dreamSkinStyleRevision = STYLE_REVISION;
-    return style;
+
+    styleNode = document.getElementById(STYLE_ID) || document.createElement("style");
+    styleNode.id = STYLE_ID;
+    styleNode.textContent = cssText;
+    if (!styleNode.parentElement) (document.head || document.documentElement).appendChild(styleNode);
+    styleMode = "style";
   };
+
+  const ensureStyle = () => {
+    if (styleMode === "adopted" && styleSheet) {
+      const current = [...document.adoptedStyleSheets];
+      if (!current.includes(styleSheet)) {
+        document.adoptedStyleSheets = [...current, styleSheet];
+        metrics.styleRepairs += 1;
+      }
+      return;
+    }
+    if (styleNode && document.getElementById(STYLE_ID) !== styleNode) {
+      document.getElementById(STYLE_ID)?.remove();
+      (document.head || document.documentElement).appendChild(styleNode);
+      metrics.styleRepairs += 1;
+    }
+  };
+
+  installStyle();
 
   const applyRootState = (root) => {
     metrics.rootPasses += 1;
-    ensureStyle(root);
+    ensureStyle();
     const shell = resolvedShell();
+    setAttribute(root, "data-dream-skin", "active");
     setAttribute(root, SHELL_ATTR, shell);
-    setAttribute(root, THEME_ATTR, THEME.id || "custom");
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
-    if (!root.classList.contains("codex-dream-skin")) root.classList.add("codex-dream-skin");
     return shell;
   };
 
-  const createDuoMotion = (root, shellMain) => {
-    document.getElementById(MOTION_STAGE_ID)?.remove();
-    const stage = document.createElement("div");
-    stage.id = MOTION_STAGE_ID;
-    stage.setAttribute("aria-hidden", "true");
-    const animatedLounge = Boolean(
-      DUO_LOUNGE_ART && DUO_LOUNGE_BODY_ART &&
-      DUO_LOUNGE_LEFT_LEGS_ART && DUO_LOUNGE_RIGHT_LEGS_ART,
-    );
-    const loungeMarkup = DUO_LOUNGE_ART ? `
-      <div class="dream-duo-lounge${animatedLounge ? " dream-duo-lounge-animated" : ""}">
-        <img class="dream-duo-lounge-static" src="${DUO_LOUNGE_ART}" alt="">
-        ${animatedLounge ? `<div class="dream-duo-lounge-rig">
-          <img class="dream-duo-lounge-left-legs" src="${DUO_LOUNGE_LEFT_LEGS_ART}" alt="">
-          <img class="dream-duo-lounge-right-legs" src="${DUO_LOUNGE_RIGHT_LEGS_ART}" alt="">
-          <img class="dream-duo-lounge-body" src="${DUO_LOUNGE_BODY_ART}" alt="">
-          ${DUO_LOUNGE_BLINK_ART ? `<img class="dream-duo-lounge-blink" src="${DUO_LOUNGE_BLINK_ART}" alt="">` : ""}
-        </div>` : ""}
-      </div>` : "";
-    stage.innerHTML = `
-      <div class="dream-duo-art"></div>
-      <div class="dream-duo-light dream-duo-light-flow"></div>
-      ${loungeMarkup}
-      ${DUO_FOREGROUND_ART ? `<img class="dream-duo-characters" src="${DUO_FOREGROUND_ART}" alt="">` : ""}
-      <div class="dream-duo-petals">${"<i></i>".repeat(14)}</div>`;
-    shellMain.appendChild(stage);
-    metrics.motionStageCreates += 1;
-    metrics.motionActive = true;
-
-    let disposed = false;
-    let blockerResizeObserver = null;
-    const observedBlockers = new Set();
-    const blockerSizes = new WeakMap();
-    const loungePositionVariables = [
-      "--dream-duo-lounge-left",
-      "--dream-duo-lounge-top",
-      "--dream-duo-lounge-right",
-      "--dream-duo-lounge-translate-x",
-      "--dream-duo-lounge-height",
-    ];
-
-    const visibleRect = (node) => {
-      if (!node) return null;
-      const rect = node.getBoundingClientRect?.();
-      const style = getComputedStyle(node);
-      if (
-        !rect || rect.width < 160 || rect.height < 80
-        || style.display === "none" || style.visibility === "hidden"
-        || Number(style.opacity) === 0
-      ) return null;
-      return {
-        left: Number(rect.left), top: Number(rect.top),
-        right: Number(rect.right), bottom: Number(rect.bottom),
-        width: Number(rect.width), height: Number(rect.height),
-      };
-    };
-    const blockingRects = () => {
-      const candidates = new Set();
-      for (const node of document.querySelectorAll(DUO_OVERLAY_SELECTOR)) {
-        const rect = visibleRect(node);
-        if (!rect) continue;
-        const style = getComputedStyle(node);
-        if (style.pointerEvents !== "none") {
-          candidates.add(node);
-          continue;
-        }
-        const descendants = [...(node.querySelectorAll?.("*") ?? [])]
-          .map((child) => ({ child, rect: visibleRect(child), style: getComputedStyle(child) }))
-          .filter((entry) => entry.rect && entry.style.pointerEvents !== "none")
-          .sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height);
-        if (descendants[0]) candidates.add(descendants[0].child);
-      }
-      return [...candidates]
-        .map((node) => ({ node, rect: visibleRect(node) }))
-        .filter((entry) => entry.rect);
-    };
-    const blockerSize = (node) => {
-      const rect = node?.getBoundingClientRect?.();
-      if (!rect) return "";
-      return `${Math.round(Number(rect.width) || 0)}:${Math.round(Number(rect.height) || 0)}`;
-    };
-    const clearLoungePosition = () => {
-      for (const name of loungePositionVariables) {
-        if (!root.style.getPropertyValue(name)) continue;
-        root.style.removeProperty(name);
-        metrics.styleWrites += 1;
-      }
-    };
-    const positionLoungeAbove = (blockers, main, viewportHeight) => {
-      if (!blockers.length) {
-        clearLoungePosition();
-        return;
-      }
-      const primary = blockers.reduce((largest, entry) => {
-        if (!largest) return entry;
-        const area = entry.rect.width * entry.rect.height;
-        const largestArea = largest.rect.width * largest.rect.height;
-        return area > largestArea ? entry : largest;
-      }, null);
-      const mainLeft = Number(main.left) || 0;
-      const mainTop = Number(main.top) || 0;
-      const mainWidth = Number(main.width) || 0;
-      const mainHeight = Number(main.height) || 0;
-      const defaultLoungeHeight = clamp(viewportHeight * 0.13, 96, 132);
-      const minimumTop = Math.max(8, 12 - mainTop);
-      const loungeSizingOverlap = 4;
-      const loungeEdgeOverlap = 12;
-      const availableAbove = primary.rect.top - mainTop - minimumTop + loungeSizingOverlap;
-      const loungeHeight = clamp(Math.min(defaultLoungeHeight, availableAbove), 48, defaultLoungeHeight);
-      const loungeWidth = Math.min(mainWidth * 0.42, 360, loungeHeight * (1942 / 809));
-      const rawCenter = primary.rect.left - mainLeft + primary.rect.width / 2;
-      const center = clamp(rawCenter, loungeWidth / 2 + 12, mainWidth - loungeWidth / 2 - 12);
-      const maximumTop = Math.max(minimumTop, mainHeight - loungeHeight - 8);
-      const top = clamp(primary.rect.top - mainTop - loungeHeight + loungeEdgeOverlap, minimumTop, maximumTop);
-      setStyleProperty(root, "--dream-duo-lounge-left", `${Math.round(center)}px`);
-      setStyleProperty(root, "--dream-duo-lounge-top", `${Math.round(top)}px`);
-      setStyleProperty(root, "--dream-duo-lounge-right", "auto");
-      setStyleProperty(root, "--dream-duo-lounge-translate-x", "-50%");
-      setStyleProperty(root, "--dream-duo-lounge-height", `${Math.round(loungeHeight)}px`);
-    };
-    const updateAvoidance = () => {
-      if (disposed) return "normal";
-      metrics.motionAvoidanceChecks += 1;
-      const main = shellMain.getBoundingClientRect?.();
-      if (!main || main.width <= 0 || main.height <= 0) return "normal";
-      const viewportWidth = Math.max(1, Number(window.innerWidth) || main.width);
-      const viewportHeight = Math.max(1, Number(window.innerHeight) || main.height);
-      const mainLeft = Number(main.left) || 0;
-      const mainTop = Number(main.top) || 0;
-      const mainRight = Number.isFinite(Number(main.right)) ? Number(main.right) : mainLeft + main.width;
-      const mainBottom = Number.isFinite(Number(main.bottom)) ? Number(main.bottom) : mainTop + main.height;
-      const desiredHeight = clamp(main.height * 0.44, 300, 460);
-      const desiredWidth = Math.min(main.width * 0.42, desiredHeight * 0.75);
-      const rightOffset = clamp(viewportWidth * 0.018, 10, 28);
-      const bottomOffset = clamp(viewportHeight * 0.018, 8, 22);
-      const zone = {
-        left: mainRight - rightOffset - desiredWidth,
-        right: mainRight - rightOffset,
-        top: mainBottom - bottomOffset - desiredHeight,
-        bottom: mainBottom - bottomOffset,
-      };
-      const blockers = blockingRects();
-      positionLoungeAbove(blockers, main, viewportHeight);
-      const nextBlockers = new Set(blockers.map((entry) => entry.node));
-      for (const blocker of observedBlockers) {
-        if (nextBlockers.has(blocker)) continue;
-        blockerResizeObserver?.unobserve?.(blocker);
-        observedBlockers.delete(blocker);
-        blockerSizes.delete(blocker);
-      }
-      for (const blocker of nextBlockers) {
-        if (observedBlockers.has(blocker)) continue;
-        blockerSizes.set(blocker, blockerSize(blocker));
-        blockerResizeObserver?.observe(blocker);
-        observedBlockers.add(blocker);
-      }
-      const overlaps = blockers.map((entry) => entry.rect).filter((rect) =>
-        rect.left < zone.right && rect.right > zone.left
-        && rect.top < zone.bottom && rect.bottom > zone.top
-      );
-      let mode = "normal";
-      let safeHeight = null;
-      if (overlaps.length) {
-        const blockingBottom = Math.max(...overlaps.map((rect) => Math.min(mainBottom, rect.bottom)));
-        const availableHeight = Math.floor(zone.bottom - blockingBottom - 12);
-        if (availableHeight < desiredHeight - 4) {
-          if (availableHeight >= 240) {
-            mode = "scaled";
-            safeHeight = clamp(availableHeight, 240, desiredHeight);
-          } else {
-            mode = "hidden";
-          }
-        }
-      }
-      metrics.motionAvoidanceMode = mode;
-      if (mode === "normal") root.removeAttribute(DUO_FOREGROUND_MODE_ATTR);
-      else setAttribute(root, DUO_FOREGROUND_MODE_ATTR, mode);
-      if (safeHeight === null) {
-        if (root.style.getPropertyValue("--dream-duo-foreground-height")) {
-          root.style.removeProperty("--dream-duo-foreground-height");
-          metrics.styleWrites += 1;
-        }
-      }
-      else setStyleProperty(root, "--dream-duo-foreground-height", `${Math.round(safeHeight)}px`);
-      return mode;
-    };
-    if (typeof ResizeObserver === "function") {
-      blockerResizeObserver = new ResizeObserver((entries) => {
-        let changed = false;
-        for (const entry of entries || []) {
-          const blocker = entry?.target;
-          if (!observedBlockers.has(blocker)) continue;
-          const nextSize = blockerSize(blocker);
-          if (nextSize === blockerSizes.get(blocker)) continue;
-          blockerSizes.set(blocker, nextSize);
-          changed = true;
-        }
-        if (changed) updateAvoidance();
-      });
-    }
-    const visibilityHandler = () => {
-      setAttribute(root, MOTION_ATTR, document.hidden ? "paused" : "running");
-    };
-    const dispose = () => {
-      if (disposed) return;
-      disposed = true;
-      blockerResizeObserver?.disconnect();
-      observedBlockers.clear();
-      clearLoungePosition();
-      document.removeEventListener("visibilitychange", visibilityHandler);
-      stage.remove();
-      root.removeAttribute(MOTION_ATTR);
-      root.removeAttribute(DUO_FOREGROUND_MODE_ATTR);
-      root.style.removeProperty("--dream-duo-foreground-height");
-      metrics.motionActive = false;
-    };
-
-    document.addEventListener("visibilitychange", visibilityHandler);
-    visibilityHandler();
-    updateAvoidance();
-    return { stage, main: shellMain, dispose, updateAvoidance };
+  const selectorHit = (key) => {
+    const selector = selectorByKey.get(key)?.selector;
+    if (!selector) return false;
+    try { return Boolean(document.querySelector(selector)); } catch { return false; }
   };
 
-  const DUO_NAV_TARGETS = [
-    { role: "newTask", kind: "nav", aliases: ["新建任务", "new task", "new chat"] },
-    { role: "pullRequests", kind: "nav", aliases: ["拉取请求", "pull requests", "pull request"] },
-    { role: "sites", kind: "nav", aliases: ["站点", "sites", "site"] },
-    { role: "scheduled", kind: "nav", aliases: ["已安排", "计划任务", "scheduled"] },
-    { role: "plugins", kind: "nav", aliases: ["插件", "plugins", "plugin"] },
-    { role: "search", kind: "search", aliases: ["搜索", "search"] },
-  ];
-  const DUO_CONTROL_TARGETS = [
-    {
-      role: "newTask",
-      kind: "control",
-      aliases: ["添加附件", "添加文件", "附加", "attach", "add files", "add context"],
-    },
-    {
-      role: "permissions",
-      kind: "control",
-      aliases: ["完全访问", "权限", "full access", "permissions", "permission"],
-    },
-    { role: "send", kind: "control", aliases: ["发送", "发送消息", "send", "send message"] },
-  ];
-
-  const normalizedControlText = (value) => String(value ?? "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLocaleLowerCase();
-
-  const targetMatches = (target, aliases) => {
-    const metadata = ["aria-label", "title", "data-testid"]
-      .map((name) => normalizedControlText(target.getAttribute?.(name)))
-      .filter(Boolean);
-    const text = normalizedControlText(target.textContent);
-    return aliases.some((rawAlias) => {
-      const alias = normalizedControlText(rawAlias);
-      if (!alias) return false;
-      if (metadata.some((value) => value === alias || value.includes(alias))) return true;
-      return text === alias || text.startsWith(`${alias} `);
-    });
+  const stableTestidHit = (testid) => {
+    const selector = stableTestidSelector(testid);
+    if (!selector) return false;
+    try { return Boolean(document.querySelector(selector)); } catch { return false; }
   };
 
-  const clearDuoCharacterTarget = (target) => {
-    target.querySelectorAll?.(`[${DUO_ICON_ATTR}]`).forEach((node) => node.remove());
-    target.querySelectorAll?.(`[${DUO_NATIVE_ICON_ATTR}]`).forEach((node) => {
-      node.removeAttribute(DUO_NATIVE_ICON_ATTR);
-    });
-    target.removeAttribute?.(DUO_ROLE_ATTR);
-    target.removeAttribute?.(DUO_KIND_ATTR);
+  const scopeMatches = (scope, baseState, overlay) => {
+    const active = new Set([baseState]);
+    if (baseState !== "settings") active.add("all");
+    if (overlay) active.add("overlay");
+    const tokens = String(scope || "all").toLowerCase().match(/[a-z]+/g) || ["all"];
+    return tokens.some((token) => token !== "config" && active.has(token));
   };
 
-  const removeDuoCharacterIcons = () => {
-    document.querySelectorAll(`[${DUO_ICON_ATTR}]`).forEach((node) => node.remove());
-    document.querySelectorAll(`[${DUO_ROLE_ATTR}]`).forEach((node) => {
-      node.removeAttribute(DUO_ROLE_ATTR);
-      node.removeAttribute(DUO_KIND_ATTR);
-    });
-    document.querySelectorAll(`[${DUO_NATIVE_ICON_ATTR}]`).forEach((node) => {
-      node.removeAttribute(DUO_NATIVE_ICON_ATTR);
-    });
+  const detectScope = () => {
+    const overlay = selectorHit("overlay-menu") || selectorHit("overlay-dialog") ||
+      selectorHit("overlay-popper");
+    let baseState = "thread";
+    if (selectorHit("appearance-radio") || stableTestidHit("theme-preview")) baseState = "settings";
+    else if (selectorHit("home-icon") || selectorHit("home-route")) baseState = "home";
+    else if (!selectorHit("shell-main")) baseState = "settings";
+    const missingL1 = SELECTOR_CONTRACT.selectors
+      .filter((entry) => entry.tier === "L1" && entry.required &&
+        scopeMatches(entry.scope, baseState, overlay) && !selectorHit(entry.key))
+      .map((entry) => entry.key);
+    return {
+      state: overlay ? "overlay" : baseState,
+      baseState,
+      overlay,
+      // Settings replaces (or partially replaces) the app shell on macOS and
+      // can retain a shell on Windows.  It is therefore always an L0 scope;
+      // never treat the absence of the home/thread L1 anchors as a failure.
+      level: baseState === "settings" || missingL1.length ? "L0" : "L1",
+      missingL1,
+    };
   };
 
-  const decorateDuoCharacterTarget = (target, definition) => {
-    const src = DUO_ICONS[definition.role];
-    if (!target || typeof src !== "string" || !src.startsWith("data:image/webp;base64,")) return false;
-    const existing = target.querySelector?.(`[${DUO_ICON_ATTR}]`);
-    if (existing?.getAttribute?.(DUO_ICON_ATTR) !== definition.role) existing?.remove();
-    if (!target.querySelector?.(`[${DUO_ICON_ATTR}]`)) {
-      const icon = document.createElement("span");
-      icon.className = "dream-duo-character-icon";
-      icon.setAttribute(DUO_ICON_ATTR, definition.role);
-      icon.setAttribute("aria-hidden", "true");
-      const image = document.createElement("img");
-      image.src = src;
-      image.alt = "";
-      image.decoding = "async";
-      image.draggable = false;
-      icon.appendChild(image);
-      if (typeof target.insertBefore === "function") target.insertBefore(icon, target.firstChild || null);
-      else target.prepend?.(icon);
-      metrics.characterIconCreates += 1;
-    }
-    target.setAttribute(DUO_ROLE_ATTR, definition.role);
-    target.setAttribute(DUO_KIND_ATTR, definition.kind);
-    const nativeIcon = target.querySelector?.("svg");
-    nativeIcon?.setAttribute(DUO_NATIVE_ICON_ATTR, "true");
-    return true;
-  };
-
-  const syncDuoCharacterTargets = (selector, definitions, matched) => {
-    const usedRoles = new Set();
-    for (const target of document.querySelectorAll(selector)) {
-      const definition = definitions.find((candidate) =>
-        !usedRoles.has(candidate.role) && targetMatches(target, candidate.aliases));
-      if (!definition) continue;
-      if (decorateDuoCharacterTarget(target, definition)) {
-        matched.add(target);
-        usedRoles.add(definition.role);
-      }
-    }
-  };
-
-  const ensureDuoCharacterIcons = () => {
-    if (!IS_DUO_THEME || !HAS_DUO_ICONS) {
-      removeDuoCharacterIcons();
-      return;
-    }
-    const matched = new Set();
-    syncDuoCharacterTargets(
-      "aside.app-shell-left-panel button, aside.app-shell-left-panel a",
-      DUO_NAV_TARGETS,
-      matched,
-    );
-    syncDuoCharacterTargets(".composer-surface-chrome button", DUO_CONTROL_TARGETS, matched);
-    for (const target of document.querySelectorAll(`[${DUO_ROLE_ATTR}]`)) {
-      if (!matched.has(target)) clearDuoCharacterTarget(target);
-    }
-  };
-
-  const ensureDuoWidget = () => {
-    const existing = document.getElementById(DUO_WIDGET_ID);
-    if (!IS_DUO_THEME || !DUO_WIDGET_ART) {
-      existing?.remove();
-      return null;
-    }
-    const sidebar = document.querySelector("aside.app-shell-left-panel");
-    const scroller = sidebar?.querySelector?.(".vertical-scroll-fade-mask");
-    if (!scroller) {
-      existing?.remove();
-      return null;
-    }
-    if (existing?.parentElement === scroller) return existing;
-    existing?.remove();
-    const widget = document.createElement("div");
-    widget.id = DUO_WIDGET_ID;
-    widget.setAttribute("aria-hidden", "true");
-    widget.innerHTML = `
-      <span class="dream-duo-widget-copy">
-        <strong>天空花园</strong>
-        <small>白昼 · 暗夜</small>
-      </span>
-      <span class="dream-duo-widget-stars"><i></i><i></i><i></i></span>
-      <img src="${DUO_WIDGET_ART}" alt="">`;
-    scroller.insertBefore(widget, scroller.children[1] || null);
-    metrics.sidebarWidgetCreates += 1;
-    return widget;
-  };
-
-  const syncRouteState = (shell, { layout = false } = {}) => {
+  const refreshScope = () => {
     metrics.routePasses += 1;
-    const root = document.documentElement;
-    if (!root) return;
-    shell ||= root.getAttribute(SHELL_ATTR) || resolvedShell();
-    const shellMain = document.querySelector("main.main-surface") || document.querySelector("main");
-    const homeIndicator = document.querySelector('[data-testid="home-icon"]');
-    const home = homeIndicator?.closest('[role="main"]') ||
-      [...document.querySelectorAll('[role="main"]')].find((candidate) =>
-        candidate.querySelector('[data-feature="game-source"]') &&
-        candidate.querySelector('.group\\\\/home-suggestions')) || null;
-    for (const candidate of document.querySelectorAll('[role="main"].dream-skin-home')) {
-      if (candidate !== home) candidate.classList.remove("dream-skin-home");
-    }
-    if (home) home.classList.add("dream-skin-home");
-    const homeUtilityBars = new Set(home
-      ? home.querySelectorAll('[class*="_homeUtilityBar_"]')
-      : []);
-    for (const candidate of document.querySelectorAll(".dream-skin-home-utility")) {
-      if (!homeUtilityBars.has(candidate)) candidate.classList.remove("dream-skin-home-utility");
-    }
-    for (const candidate of homeUtilityBars) candidate.classList.add("dream-skin-home-utility");
-
-    ensureDuoCharacterIcons();
-
-    if (!shellMain || !document.body) return;
-    if (IS_DUO_THEME) {
-      ensureDuoWidget();
-      if (
-        !duoMotion
-        || duoMotion.main !== shellMain
-        || document.getElementById(MOTION_STAGE_ID) !== duoMotion.stage
-      ) {
-        duoMotion?.dispose();
-        duoMotion = createDuoMotion(root, shellMain);
-        const state = window[STATE_KEY];
-        if (state?.installToken === installToken) state.motion = duoMotion;
-      }
-      duoMotion?.updateAvoidance?.();
-    } else {
-      document.getElementById(DUO_WIDGET_ID)?.remove();
-      duoMotion?.dispose();
-      duoMotion = null;
-      root.removeAttribute(MOTION_ATTR);
-      document.getElementById(MOTION_STAGE_ID)?.remove();
-    }
-    if (observedShellMain !== shellMain) {
-      resizeObserver?.disconnect();
-      resizeObserver?.observe(shellMain);
-      observedShellMain = shellMain;
-      layout = true;
-    }
-    shellMain.classList.toggle("dream-skin-home-shell", Boolean(home));
-    let chrome = document.getElementById(CHROME_ID);
-    let created = false;
-    if (!chrome || chrome.parentElement !== document.body) {
-      chrome?.remove();
-      chrome = document.createElement("div");
-      chrome.id = CHROME_ID;
-      chrome.setAttribute("aria-hidden", "true");
-      chrome.innerHTML = `
-        <div class="dream-skin-brand">
-          <span class="dream-skin-portal-mark">◉</span>
-          <span><b></b><small></small></span>
-        </div>
-        <div class="dream-skin-status"><i></i><span></span></div>
-        <div class="dream-skin-quote"></div>
-        <div class="dream-skin-particles"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="dream-skin-orbit"></div>`;
-      document.body.appendChild(chrome);
-      created = true;
-      chromeParts = null;
-    }
-    if (!chromeParts || chromeParts.chrome !== chrome) {
-      chromeParts = {
-        chrome,
-        name: chrome.querySelector(".dream-skin-brand b"),
-        subtitle: chrome.querySelector(".dream-skin-brand small"),
-        status: chrome.querySelector(".dream-skin-status span"),
-        quote: chrome.querySelector(".dream-skin-quote"),
-      };
-    }
-    setTextContent(chromeParts.name, THEME.name || "Codex Dream Skin");
-    setTextContent(chromeParts.subtitle, THEME.brandSubtitle || "CODEX DREAM SKIN");
-    setTextContent(chromeParts.status, THEME.statusText || "DREAM SKIN ONLINE");
-    setTextContent(chromeParts.quote, THEME.quote || "MAKE SOMETHING WONDERFUL");
-    if (layout || created) {
-      metrics.layoutReads += 1;
-      const shellBox = shellMain.getBoundingClientRect();
-      setStyleProperty(chrome, "left", `${Math.round(shellBox.left)}px`);
-      setStyleProperty(chrome, "top", `${Math.round(shellBox.top)}px`);
-      setStyleProperty(chrome, "width", `${Math.round(shellBox.width)}px`);
-      setStyleProperty(chrome, "height", `${Math.round(shellBox.height)}px`);
-    }
-    chrome.classList.toggle("dream-skin-home-shell", Boolean(home));
-    if (chrome.dataset.dreamShell !== shell) {
-      chrome.dataset.dreamShell = shell;
-      metrics.attributeWrites += 1;
-    }
+    const scope = detectScope();
+    const state = window[STATE_KEY];
+    if (state?.installToken === installToken) state.scope = scope;
+    return scope;
   };
 
-  const ensure = ({ root: rootPass = true, route = true, layout = true } = {}) => {
+  const ensure = ({ root: rootPass = true, scope: scopePass = false } = {}) => {
     if (window[DISABLED_KEY]) return;
     const root = document.documentElement;
     if (!root) return;
     metrics.ensureCalls += 1;
-    const shell = rootPass ? applyRootState(root) : null;
-    if (route) syncRouteState(shell, { layout });
+    if (rootPass) applyRootState(root);
+    if (scopePass) refreshScope();
   };
 
   const cleanup = () => {
     const state = window[STATE_KEY];
     if (state?.installToken !== installToken) return false;
     window[DISABLED_KEY] = true;
-    document.documentElement?.classList.remove("codex-dream-skin");
-    document.documentElement?.removeAttribute(SHELL_ATTR);
-    document.documentElement?.removeAttribute(THEME_ATTR);
-    document.documentElement?.removeAttribute(MOTION_ATTR);
-    document.documentElement?.removeAttribute(DUO_FOREGROUND_MODE_ATTR);
-    for (const name of ART_ATTRS) document.documentElement?.removeAttribute(name);
-    document.documentElement?.style.removeProperty("--dream-skin-art");
-    for (const name of THEME_VARIABLES) document.documentElement?.style.removeProperty(name);
-    document.querySelectorAll(".dream-skin-home").forEach((node) => node.classList.remove("dream-skin-home"));
-    document.querySelectorAll(".dream-skin-home-shell").forEach((node) => node.classList.remove("dream-skin-home-shell"));
-    document.querySelectorAll(".dream-skin-home-utility").forEach((node) => node.classList.remove("dream-skin-home-utility"));
-    removeDuoCharacterIcons();
-    document.getElementById(STYLE_ID)?.remove();
-    document.getElementById(CHROME_ID)?.remove();
-    document.getElementById(DUO_WIDGET_ID)?.remove();
-    duoMotion?.dispose();
-    duoMotion = null;
-    document.getElementById(MOTION_STAGE_ID)?.remove();
-    state?.observer?.disconnect();
+    const root = document.documentElement;
+    for (const name of ROOT_ATTRS) root?.removeAttribute(name);
+    for (const attribute of [...(root?.attributes || [])]) {
+      if (attribute.name.startsWith("data-dream-")) root.removeAttribute(attribute.name);
+    }
+    for (const name of THEME_VARIABLES) root?.style.removeProperty(name);
+    for (const property of [...(root?.style || [])]) {
+      if (property.startsWith("--dream-") || property.startsWith("--ds-")) {
+        root.style.removeProperty(property);
+      }
+    }
     state?.rootObserver?.disconnect();
-    state?.resizeObserver?.disconnect();
+    if (bodyReadyHandler && typeof document.removeEventListener === "function") {
+      document.removeEventListener("DOMContentLoaded", bodyReadyHandler);
+    }
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
-    if (state?.scheduler?.frame != null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(state.scheduler.frame);
-    }
     if (analysisTimer) clearTimeout(analysisTimer);
-    if (state?.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
     if (state?.mediaHandler && state?.mediaQuery) {
       try { state.mediaQuery.removeEventListener("change", state.mediaHandler); } catch {}
     }
+    if (state?.navigationHandler && state?.navigation) {
+      try { state.navigation.removeEventListener("navigate", state.navigationHandler); } catch {}
+    }
+    if (styleSheet) {
+      try {
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets]
+          .filter((candidate) => candidate !== styleSheet);
+      } catch {}
+      styleRegistry.delete(styleSheet);
+    }
+    styleNode?.remove();
+    if (document.getElementById(STYLE_ID) === styleNode) document.getElementById(STYLE_ID)?.remove();
+    if (styleRegistry.size === 0) delete window[STYLE_REGISTRY_KEY];
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
     delete window[STATE_KEY];
     return true;
   };
 
-  const scheduler = { timeout: null, frame: null, root: false, route: false, layout: false };
+  const scheduler = { timeout: null, root: false, scope: false };
   const flushScheduledEnsure = () => {
-    if (scheduler.frame !== null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(scheduler.frame);
-    }
     if (scheduler.timeout) clearTimeout(scheduler.timeout);
-    scheduler.frame = null;
     scheduler.timeout = null;
-    const pending = { root: scheduler.root, route: scheduler.route, layout: scheduler.layout };
+    const pending = { root: scheduler.root, scope: scheduler.scope };
     scheduler.root = false;
-    scheduler.route = false;
-    scheduler.layout = false;
+    scheduler.scope = false;
     ensure(pending);
   };
-  const scheduleEnsure = ({ root = false, route = true, layout = false } = {}) => {
+  const scheduleEnsure = ({ root = false, scope = false } = {}, delay = 64) => {
     scheduler.root ||= root;
-    scheduler.route ||= route;
-    scheduler.layout ||= layout;
-    if (scheduler.timeout || scheduler.frame !== null) return;
-    if (typeof requestAnimationFrame === "function") {
-      scheduler.frame = requestAnimationFrame(flushScheduledEnsure);
-      scheduler.timeout = setTimeout(flushScheduledEnsure, 96);
-    } else {
-      scheduler.timeout = setTimeout(flushScheduledEnsure, 64);
-    }
+    scheduler.scope ||= scope;
+    if (scheduler.timeout) return;
+    scheduler.timeout = setTimeout(flushScheduledEnsure, delay);
   };
-  const observer = new MutationObserver(() => scheduleEnsure({ route: true }));
-  rootObserver = new MutationObserver(() => {
-    if (samplingNativeShell) return;
-    scheduleEnsure({ root: true, route: true });
-  });
-  const resizeHandler = () => scheduleEnsure({ route: true, layout: true });
-  if (typeof ResizeObserver === "function") {
-    resizeObserver = new ResizeObserver(() => scheduleEnsure({ route: true, layout: true }));
+  if (typeof MutationObserver === "function") {
+    rootObserver = new MutationObserver(() => scheduleEnsure({ root: true }));
   }
 
   let mediaQuery = null;
   let mediaHandler = null;
   try {
     mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaHandler = () => scheduleEnsure({ root: true, route: true });
+    mediaHandler = () => scheduleEnsure({ root: true });
   } catch {}
+
+  const navigationApi = window.navigation && typeof window.navigation.addEventListener === "function"
+    ? window.navigation : null;
+  const navigationHandler = navigationApi ? () => {
+    metrics.navigationEvents += 1;
+    scheduleEnsure({ scope: true }, 180);
+  } : null;
 
   window[STATE_KEY] = {
     ensure,
     cleanup,
-    observer,
     rootObserver,
-    resizeObserver,
     timer: null,
     scheduler,
-    resizeHandler,
     mediaQuery,
     mediaHandler,
+    navigation: navigationApi,
+    navigationHandler,
     artUrl,
     installToken,
+    styleMode,
+    styleNode,
+    styleSheet,
+    styleRevision: STYLE_REVISION,
     analysis: artAnalysis,
     artMetadata: ART_METADATA,
+    scope: null,
+    selectorsSchema: SELECTOR_CONTRACT.schema,
     metrics,
     version: VERSION,
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,
-    motion: duoMotion,
-    removeDuoCharacterIcons,
-    detectShellMode,
+    detectShellAppearance,
   };
   const firstEnsureStartedAt = now();
-  ensure({ layout: !previous || !document.getElementById(CHROME_ID) });
-  window[STATE_KEY].motion = duoMotion;
+  ensure({ root: true });
+  const initialScope = refreshScope();
   metrics.firstEnsureMs = Number((now() - firstEnsureStartedAt).toFixed(3));
-  if (previous?.artUrl && previous.artUrl !== artUrl) URL.revokeObjectURL(previous.artUrl);
 
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
-  rootObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode", "style"],
-  });
-  if (document.body) {
-    rootObserver.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode", "style"],
-    });
+  if (rootObserver) {
+    const observeAttributes = (node) => {
+      if (!node) return;
+      rootObserver.observe(node, {
+        attributes: true,
+        attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode"],
+      });
+    };
+    observeAttributes(document.documentElement);
+    if (document.body) observeAttributes(document.body);
+    else if (typeof document.addEventListener === "function") {
+      bodyReadyHandler = () => {
+        if (!window[DISABLED_KEY]) observeAttributes(document.body);
+      };
+      document.addEventListener("DOMContentLoaded", bodyReadyHandler, { once: true });
+    }
   }
-  const timer = setInterval(() => ensure(), 4000);
+  const timer = setInterval(() => {
+    metrics.safetyPasses += 1;
+    ensure({ root: true });
+  }, 30000);
   window[STATE_KEY].timer = timer;
-  window.addEventListener("resize", resizeHandler, { passive: true });
-  if (mediaHandler && mediaQuery) {
+  if (mediaHandler && mediaQuery && typeof mediaQuery.addEventListener === "function") {
     mediaQuery.addEventListener("change", mediaHandler);
+  }
+  if (navigationHandler && navigationApi) {
+    navigationApi.addEventListener("navigate", navigationHandler);
   }
   const analysisPromise = artAnalysis ? Promise.resolve(null) : analyzeArt();
   window[STATE_KEY].analysisTimer = analysisTimer;
@@ -1252,7 +711,7 @@
       analysisCache.set(THEME.artKey, analysis);
       while (analysisCache.size > 8) analysisCache.delete(analysisCache.keys().next().value);
     }
-    ensure({ root: true, route: false, layout: false });
+    ensure({ root: true });
   }).catch(() => {});
   return {
     installed: true,
@@ -1260,18 +719,8 @@
     themeId: THEME.id || "custom",
     revision: PAYLOAD_REVISION,
     shell: resolvedShell(),
+    scope: initialScope,
+    styleMode,
     analysis: artAnalysis,
   };
-})(
-  __DREAM_SKIN_CSS_JSON__,
-  __DREAM_SKIN_ART_JSON__,
-  __DREAM_SKIN_THEME_JSON__,
-  __DREAM_DUO_ICONS_JSON__,
-  __DREAM_DUO_WIDGET_ART_JSON__,
-  __DREAM_DUO_FOREGROUND_ART_JSON__,
-  __DREAM_DUO_LOUNGE_ART_JSON__,
-  __DREAM_DUO_LOUNGE_BODY_ART_JSON__,
-  __DREAM_DUO_LOUNGE_LEFT_LEGS_ART_JSON__,
-  __DREAM_DUO_LOUNGE_RIGHT_LEGS_ART_JSON__,
-  __DREAM_DUO_LOUNGE_BLINK_ART_JSON__
-)
+})(__DREAM_SKIN_CSS_JSON__, __DREAM_SKIN_ART_JSON__, __DREAM_SKIN_THEME_JSON__)

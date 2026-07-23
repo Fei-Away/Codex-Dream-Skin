@@ -17,6 +17,15 @@ It does **not** grant rights to:
 
 `assets/portal-hero.png` is original abstract geometric art generated for this open-source repository (no characters). Replace it with your own image before shipping a branded theme to customers.
 
+## Gothic Void Crusade
+
+`presets/preset-gothic-void-crusade/background.jpg` was created and contributed
+by [seansong-ideogram](https://github.com/seansong-ideogram) through pull request
+[#134](https://github.com/Fei-Away/Codex-Dream-Skin/pull/134) for inclusion in
+this MIT-licensed project. It is the redistributable default artwork included in
+the public macOS and Windows installers. Its name and artwork do not imply
+OpenAI/Codex affiliation or endorsement.
+
 ## Sky Garden Duo artwork
 
 The files under `presets/preset-sky-garden-duo/` and
@@ -42,11 +51,34 @@ The following user/maintainer-supplied files are excluded from the MIT software 
 - `../docs/images/presets/arina-hashimoto-light.jpg`
 - `../docs/images/presets/arina-hashimoto-dark.jpg`
 
-They are included at the maintainer's direction as a local theme preset, source archive, and real runtime previews. They are not official OpenAI/Codex artwork. The preset name is a maintainer label and does not imply the named person's participation, approval, or endorsement. Their inclusion does not certify or grant third-party likeness, model-output, or redistribution rights. Downstream redistribution and commercial use require an independent rights review; the two runtime screenshots are documentation previews and must never be imported as wallpapers.
+They are included in the source repository at the maintainer's direction as a
+local reference preset, source archive, and real runtime previews. They are
+excluded from the public v1.3+ DMG and Setup.exe assets. They are not official
+OpenAI/Codex artwork. The preset name is a maintainer label and does not imply
+the named person's participation, approval, or endorsement. Their repository
+inclusion does not certify or grant third-party likeness, model-output, or
+redistribution rights. Downstream redistribution and commercial use require an
+independent rights review; the two runtime screenshots are documentation
+previews and must never be imported as wallpapers.
 
 ## Runtime
 
-This project does not redistribute Node.js. At runtime it validates and uses the Node.js executable already signed and bundled inside the user's official Codex desktop application.
+- The macOS package does not redistribute Node.js. It validates and uses the
+  Node.js executable already signed and bundled inside the user's official
+  Codex desktop application.
+- The Windows Setup.exe redistributes only `node.exe` and `LICENSE` from the
+  pinned official Node.js v22.23.1 win-x64 archive after verifying its published
+  SHA-256. Node.js is distributed under its own license; that license is kept
+  beside the bundled executable in `runtime/node/LICENSE`.
+
+## Inno Setup Simplified Chinese messages
+
+The Windows installer is compiled with Inno Setup. Its Simplified Chinese
+messages file is vendored unchanged from the official Inno Setup source tag
+`is-6_7_1` at
+`windows/installer/languages/ChineseSimplified.isl`, maintained by Zhenghan
+Yang and distributed under the Inno Setup License. The full license is retained
+at `windows/installer/languages/Inno-Setup-License.txt`.
 
 ## Security model
 
