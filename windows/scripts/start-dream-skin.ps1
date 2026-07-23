@@ -114,6 +114,15 @@ try {
   $launchedWithCdp = $false
   try {
     if ($null -eq (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex)) {
+      # Codex is closed on this path; sync the appearanceTheme pin to the
+      # active theme before launching (config writes race the app while it runs).
+      try {
+        Install-DreamSkinBaseTheme -ConfigPath (Join-Path $HOME '.codex\config.toml') `
+          -BackupPath (Join-Path $StateRoot 'config.before-dream-skin.toml') `
+          -AppearanceTheme (Get-DreamSkinActiveThemeAppearance -ThemeDirectory $themePaths.Active)
+      } catch {
+        Write-Warning "Could not sync Codex appearanceTheme to the active theme: $($_.Exception.Message)"
+      }
       if (-not (Test-DreamSkinPortAvailable -Port $Port)) {
         if ($PortExplicit) { throw "Port $Port is already occupied by an unverified listener. Choose another port." }
         $Port = Select-DreamSkinPort -PreferredPort $Port
