@@ -45,6 +45,7 @@ Install location after step 2:
 | Engine | `~/.codex/codex-dream-skin-studio` |
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
+| Bundled Codex pet | `~/.codex/pets/dream-skin-sky-garden-duo` |
 
 ## Customer ZIP (optional packaging)
 
@@ -108,6 +109,46 @@ own `custom-*` themes from “换一张图” and the currently active theme cop
 never touched.
 
 To contribute a preset, see [`presets/README.md`](./presets/README.md).
+
+## Native Codex pet: Sky Garden Duo
+
+The macOS package also includes the native V2 pet **天空花园双姝**. It is one
+paired pet containing Day and Night, with 73 used animation frames across idle,
+left/right drag responses, wave, an elegant grounded hover greeting, failure,
+input waiting, focused task processing, review, and 16 gaze directions. Dream
+Skin only seeds the files; Codex owns the floating
+overlay, drag position, task-state transitions, reduced-motion behavior, and
+cross-task activity alerts. Dream Skin does not install CSS or JavaScript frame
+overrides into the pet overlay, so hover, drag, click, and task-state timing stay
+under native Codex control.
+
+The main installer seeds the pet automatically. Existing installs can add or
+refresh it without restarting Codex:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/install-bundled-pets-macos.sh
+```
+
+Then open **Settings > Pets**, press **Refresh**, and select
+**天空花园双姝**. Use `/pet` in a task to wake or tuck away the selected pet.
+The theme card, sidebar character icons, reclining top pair, and composer-side
+characters remain separate theme UI and continue to work whether the native pet
+is visible or hidden.
+
+To share the pet, distribute the complete directory containing `pet.json`,
+`spritesheet.webp`, and `.codex-dream-skin-pet`; recipients place that directory
+under `~/.codex/pets/` and refresh **Settings > Pets**. Do not distribute only
+the WebP file.
+
+To remove only this managed pet while leaving the theme intact:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/remove-sky-garden-pet-macos.sh
+```
+
+The installer refreshes an existing copy only when its engine ownership marker
+is present. It never overwrites an unmarked pet directory with the same ID and
+never touches unrelated custom pets.
 
 ## Image guidelines
 

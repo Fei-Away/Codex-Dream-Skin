@@ -234,6 +234,36 @@ seed_bundled_presets() {
   done
 }
 
+seed_bundled_pets() {
+  local pets_root="$HOME/.codex/pets"
+  local src="$PROJECT_ROOT/pets/dream-skin-sky-garden-duo"
+  local id="dream-skin-sky-garden-duo"
+  local dest="$pets_root/$id"
+  local marker=".codex-dream-skin-pet"
+  local temporary="$pets_root/.${id}.installing.$$"
+
+  [ -f "$src/pet.json" ] || return 0
+  [ -s "$src/spritesheet.webp" ] || return 0
+  [ -f "$src/$marker" ] || return 0
+
+  /bin/mkdir -p "$pets_root"
+  /bin/chmod 700 "$pets_root"
+  if [ -e "$dest" ] && [ ! -f "$dest/$marker" ]; then
+    printf 'ChatGPT Dream Skin: preserving user-owned pet directory: %s\n' "$dest" >&2
+    return 0
+  fi
+
+  /bin/rm -rf "$temporary"
+  /bin/mkdir -p "$temporary"
+  /bin/cp "$src/pet.json" "$src/spritesheet.webp" "$src/$marker" "$temporary/"
+  /bin/chmod 700 "$temporary"
+  /bin/chmod 600 "$temporary/pet.json" "$temporary/spritesheet.webp" "$temporary/$marker"
+  if [ -e "$dest" ]; then
+    /bin/rm -rf "$dest"
+  fi
+  /bin/mv "$temporary" "$dest"
+}
+
 discover_codex_app() {
   local candidate=""
   local identifier=""

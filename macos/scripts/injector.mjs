@@ -16,6 +16,9 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
 const DUO_THEME_ID = "preset-sky-garden-duo";
+const DUO_PET_DISPLAY_NAME = "天空花园双姝";
+const PET_STATE_HOLD_STYLE_ID = "codex-dream-skin-pet-state-hold";
+const PET_STATE_HOLD_REGISTRY_KEY = "__CODEX_DREAM_SKIN_PET_STATE_HOLD__";
 const DUO_ASSET_ROOT = path.join(root, "assets", "preset-extras", DUO_THEME_ID);
 const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
@@ -237,6 +240,44 @@ function isValidCdpPageTarget(item, port) {
   }
 }
 
+export function isAvatarOverlayTargetUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "app:"
+      && url.pathname === "/index.html"
+      && url.searchParams.get("initialRoute") === "/avatar-overlay";
+  } catch {
+    return false;
+  }
+}
+
+export function petNativeRestorePayloadFor(displayName = DUO_PET_DISPLAY_NAME) {
+  return `(() => {
+    const styleId = ${JSON.stringify(PET_STATE_HOLD_STYLE_ID)};
+    const registryKey = ${JSON.stringify(PET_STATE_HOLD_REGISTRY_KEY)};
+    const displayName = ${JSON.stringify(displayName)};
+    const legacyState = window[registryKey];
+    const legacyStyle = document.getElementById(styleId);
+    const removedLegacyStyle = Boolean(legacyState || legacyStyle);
+    try { legacyState?.cleanup?.(); } catch {}
+    document.getElementById(styleId)?.remove();
+    delete window[registryKey];
+    return { applied: true, nativeControl: true, removedLegacyStyle, displayName };
+  })()`;
+}
+
+export function petStateHoldCleanupPayload() {
+  return `(() => {
+    const registryKey = ${JSON.stringify(PET_STATE_HOLD_REGISTRY_KEY)};
+    const styleId = ${JSON.stringify(PET_STATE_HOLD_STYLE_ID)};
+    const state = window[registryKey];
+    if (state?.cleanup) return state.cleanup();
+    document.getElementById(styleId)?.remove();
+    delete window[registryKey];
+    return true;
+  })()`;
+}
+
 class CdpSession {
   constructor(target, port) {
     this.target = target;
@@ -370,17 +411,20 @@ async function listAppTargets(port) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const avatarButton = document.querySelector('[data-testid="avatar-mascot-button"]');
     const markers = {
       shell: Boolean(document.querySelector('main.main-surface')),
       sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
       composer: Boolean(document.querySelector('.composer-surface-chrome')),
       main: Boolean(document.querySelector('[role="main"]')),
+      avatar: Boolean(avatarButton?.querySelector('[data-testid="codex-avatar"]')),
     };
     return {
       title: document.title,
       href: location.href,
       markers,
       codex: markers.shell && markers.sidebar,
+      avatarOverlay: markers.avatar,
     };
   })()`);
 }
@@ -391,6 +435,17 @@ async function waitForCodexProbe(session, timeoutMs = 1800) {
   while (Date.now() < deadline) {
     probe = await probeSession(session);
     if (probe?.codex) return probe;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return probe;
+}
+
+async function waitForAvatarOverlayProbe(session, timeoutMs = 1800) {
+  const deadline = Date.now() + timeoutMs;
+  let probe = null;
+  while (Date.now() < deadline) {
+    probe = await probeSession(session);
+    if (probe?.avatarOverlay) return probe;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   return probe;
@@ -427,6 +482,24 @@ async function connectCodexTargets(port, timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, 350));
   }
   throw new Error(`No verified ChatGPT renderer on 127.0.0.1:${port}: ${lastError?.message ?? "timed out"}`);
+}
+
+async function connectAvatarOverlayTargets(port, timeoutMs = 1800) {
+  const targets = (await listAppTargets(port)).filter((target) =>
+    isAvatarOverlayTargetUrl(target.url));
+  const connected = [];
+  for (const target of targets) {
+    let session;
+    try {
+      session = await connectTarget(target, port);
+      const probe = await waitForAvatarOverlayProbe(session, timeoutMs);
+      if (probe?.avatarOverlay) connected.push({ target, session, probe });
+      else session.close();
+    } catch {
+      session?.close();
+    }
+  }
+  return connected;
 }
 
 function assertContainedPath(rootPath, candidatePath, label) {
@@ -1175,6 +1248,9 @@ async function runFinishOperation(options) {
 
 async function runOneShot(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs);
+  const petConnected = options.mode === "once" || options.mode === "remove"
+    ? await connectAvatarOverlayTargets(options.port, Math.min(options.timeoutMs, 1800))
+    : [];
   const operationToken = options.mode === "once" || options.mode === "remove"
     ? options.operationToken ?? nextOperationToken()
     : null;
@@ -1198,11 +1274,29 @@ async function runOneShot(options) {
       )));
     }
     for (const { session } of connected) session.close();
+    for (const { session } of petConnected) session.close();
     throw error;
   }
   const payload = loaded?.payload ?? null;
   const results = [];
+  const petResults = [];
   let screenshotCaptured = false;
+
+  for (const { target, session, probe } of petConnected) {
+    try {
+      const result = options.mode === "remove" || loaded?.theme.id !== DUO_THEME_ID
+        ? await session.evaluate(petStateHoldCleanupPayload())
+        : await session.evaluate(petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME));
+      if (options.mode === "once" && loaded?.theme.id === DUO_THEME_ID && !result?.applied) {
+        throw new Error("Native pet control restore did not apply");
+      }
+      petResults.push({ targetId: target.id, url: target.url, probe, result });
+    } catch (error) {
+      petResults.push({ targetId: target.id, url: target.url, probe, error: error.message });
+    } finally {
+      session.close();
+    }
+  }
 
   for (const { target, session, probe } of connected) {
     try {
@@ -1285,9 +1379,16 @@ async function runOneShot(options) {
     }
   }
 
-  console.log(JSON.stringify({ mode: options.mode, version: SKIN_VERSION, port: options.port, targets: results }, null, 2));
+  console.log(JSON.stringify({
+    mode: options.mode,
+    version: SKIN_VERSION,
+    port: options.port,
+    targets: results,
+    petOverlays: petResults,
+  }, null, 2));
   const failed = results.length === 0 || results.some((item) =>
-    item.error || (options.mode === "remove" ? item.result !== true : !item.result?.pass));
+    item.error || (options.mode === "remove" ? item.result !== true : !item.result?.pass))
+    || petResults.some((item) => item.error);
   if (failed) process.exitCode = 2;
 }
 
@@ -1322,6 +1423,39 @@ export function earlyPayloadFor(payload, revision) {
       observer.observe(document.documentElement, { childList: true, subtree: true });
     }
     timeout = setTimeout(stop, 10000);
+  })()`;
+}
+
+export function petNativeRestoreEarlyPayloadFor(
+  displayName = DUO_PET_DISPLAY_NAME,
+  revision = SKIN_VERSION,
+) {
+  const payload = petNativeRestorePayloadFor(displayName);
+  return `(() => {
+    const generationKey = "__CODEX_DREAM_SKIN_PET_EARLY_GENERATION__";
+    const appliedKey = "__CODEX_DREAM_SKIN_PET_EARLY_APPLIED__";
+    const generation = ${JSON.stringify(revision)};
+    const deadline = Date.now() + 10000;
+    window[generationKey] = generation;
+    let timer = null;
+    const stop = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+    const install = () => {
+      if (window[generationKey] !== generation || Date.now() >= deadline) {
+        stop();
+        return;
+      }
+      if (!document.documentElement) {
+        timer = setTimeout(install, 16);
+        return;
+      }
+      ${payload};
+      window[appliedKey] = generation;
+      stop();
+    };
+    install();
   })()`;
 }
 
@@ -1531,6 +1665,13 @@ async function runWatch(options) {
     return result.identifier ?? null;
   };
 
+  const registerPetEarly = async (session, revision) => {
+    const result = await session.send("Page.addScriptToEvaluateOnNewDocument", {
+      source: petNativeRestoreEarlyPayloadFor(DUO_PET_DISPLAY_NAME, revision),
+    });
+    return result.identifier ?? null;
+  };
+
   const removeEarlyIdentifier = async (record, identifier, { strict = false } = {}) => {
     if (!identifier) return true;
     if (record.session.closed) {
@@ -1566,10 +1707,23 @@ async function runWatch(options) {
     return identifier;
   };
 
+  const registerPetEarlyForRecord = async (record, revision) => {
+    const identifier = await registerPetEarly(record.session, revision);
+    if (identifier) record.earlyScriptIds.add(identifier);
+    return identifier;
+  };
+
   const invalidateEarly = async (record, { strict = false } = {}) => {
     record.needsLoadFallback = false;
     if (record.session.closed) {
       if (strict) throw new Error("Renderer session closed before pause invalidation");
+    } else if (record.kind === "pet-overlay") {
+      await record.session.evaluate(
+        petStateHoldCleanupPayload(),
+        strict ? 1500 : 10000,
+      ).catch((error) => {
+        if (strict) throw error;
+      });
     } else {
       await record.session.evaluate(`(() => {
         window.__CODEX_DREAM_SKIN_EARLY_GENERATION__ = ${JSON.stringify(`disabled:${process.pid}`)};
@@ -1605,7 +1759,7 @@ async function runWatch(options) {
       next = await loadPayload(options.themeDir);
     } catch (error) {
       await Promise.all([...sessions.values()].map(async (record) => {
-        if (record.session.closed) return;
+        if (record.session.closed || record.kind === "pet-overlay") return;
         const externalOperation = activeOperation;
         const operationToken = externalOperation?.token ?? nextOperationToken();
         record.operationToken = operationToken;
@@ -1628,6 +1782,21 @@ async function runWatch(options) {
     for (const record of sessions.values()) {
       const { session } = record;
       if (session.closed) continue;
+      if (record.kind === "pet-overlay") {
+        try {
+          await invalidateEarly(record);
+          if (current.theme.id !== DUO_THEME_ID) continue;
+          const nextIdentifier = await registerPetEarlyForRecord(record, current.revision);
+          record.earlyScriptId = nextIdentifier;
+          record.needsLoadFallback = !nextIdentifier;
+          const result = await session.evaluate(petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME));
+          if (!result?.applied) throw new Error("Native pet control restore did not apply");
+        } catch (error) {
+          record.needsLoadFallback = true;
+          console.error(`[dream-skin] native pet restore failed: ${error.message}`);
+        }
+        continue;
+      }
       const externalOperation = activeOperation;
       const operationToken = externalOperation?.token ?? nextOperationToken();
       record.operationToken = operationToken;
@@ -1702,7 +1871,7 @@ async function runWatch(options) {
         mutationEpoch += 1;
       }
       await Promise.all([...sessions.values()].map(async (record) => {
-        if (record.session.closed) return;
+        if (record.session.closed || record.kind === "pet-overlay") return;
         if (busy) {
           const kind = operation.status === "pausing" ? "pause" : "apply";
           record.operationToken = operation.token;
@@ -1820,8 +1989,12 @@ async function runWatch(options) {
         beginTargetSetup();
         try {
           session = await connectTarget(target, options.port);
+          const targetKind = isAvatarOverlayTargetUrl(target.url)
+            ? "pet-overlay"
+            : "codex";
           record = {
             session,
+            kind: targetKind,
             earlyScriptId: null,
             earlyScriptIds: new Set(),
             needsLoadFallback: false,
@@ -1836,7 +2009,10 @@ async function runWatch(options) {
             setTimeout(() => {
               if (session.closed || controlOnly || mutationEpoch !== fallbackEpoch
                 || !record.needsLoadFallback) return;
-              applyToSession(session, current.payload).catch((error) => {
+              const fallbackPayload = record.kind === "pet-overlay"
+                ? petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME)
+                : current.payload;
+              applyToSession(session, fallbackPayload).catch((error) => {
                 console.error(`[dream-skin] fallback reinject failed: ${error.message}`);
               });
             }, 0);
@@ -1844,6 +2020,35 @@ async function runWatch(options) {
           const initialOperation = activeOperation;
           recoveryOperation = initialOperation ? null : cycleRecovery;
           const pausing = initialOperation?.status === "pausing";
+          if (record.kind === "pet-overlay") {
+            const probe = await waitForAvatarOverlayProbe(session);
+            if (!probe?.avatarOverlay) {
+              session.close();
+              sessions.delete(target.id);
+              continue;
+            }
+            if (controlOnly || pausing || current.theme.id !== DUO_THEME_ID) {
+              await invalidateEarly(record);
+              continue;
+            }
+            try {
+              record.earlyScriptId = await registerPetEarlyForRecord(
+                record,
+                current.revision,
+              );
+              const result = await session.evaluate(
+                petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME),
+              );
+              if (!result?.applied) throw new Error("Native pet control restore did not apply");
+              record.needsLoadFallback = !record.earlyScriptId;
+              rejected.delete(target.id);
+              console.log(`[dream-skin] restored native pet overlay ${target.id}`);
+            } catch (error) {
+              record.needsLoadFallback = true;
+              throw error;
+            }
+            continue;
+          }
           if (!controlOnly) {
             try {
               record.earlyScriptId = await registerEarlyForRecord(
@@ -1976,6 +2181,10 @@ async function runWatch(options) {
     await Promise.all([...sessions.values()].map((record) =>
       record.operationToken && !record.operationExternal
         ? bestEffortOperationUi(record.session, "hide", record.operationToken, "loading", "")
+        : Promise.resolve(false)));
+    await Promise.all([...sessions.values()].map((record) =>
+      record.kind === "pet-overlay" && !record.session.closed
+        ? record.session.evaluate(petStateHoldCleanupPayload()).catch(() => false)
         : Promise.resolve(false)));
     await Promise.all([...sessions.values()].map((record) => removeEarly(record)));
     for (const record of sessions.values()) record.session.close();
