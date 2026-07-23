@@ -350,6 +350,22 @@ codex_is_running() {
   [ -n "$(codex_main_pids)" ]
 }
 
+active_theme_appearance() {
+  "$NODE" -e '
+const fs = require("node:fs");
+let appearance = "auto";
+try { appearance = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).appearance; } catch {}
+process.stdout.write(appearance === "light" || appearance === "dark" ? appearance : "auto");
+' "$THEME_DIR/theme.json"
+}
+
+# Pin Codex appearanceTheme to the staged theme's declared appearance (or put
+# the user's original line back for auto themes). Callers must only run this
+# while Codex is closed; config writes race the app's own saves otherwise.
+sync_appearance_pin() {
+  "$NODE" "$SCRIPT_DIR/theme-config.mjs" install "$CONFIG_PATH" "$THEME_BACKUP_PATH" "$(active_theme_appearance)"
+}
+
 process_started_at() {
   /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
 }

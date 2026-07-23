@@ -2,16 +2,22 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-const [mode, configPath, backupPath] = process.argv.slice(2);
-// Backup these keys so Restore can put them back. Do NOT force dark —
-// Dream Skin CSS auto-adapts to light/dark via data-dream-shell.
+const [mode, configPath, backupPath, appearanceArg] = process.argv.slice(2);
+// Backup these keys so Restore can put them back. When the active theme pins an
+// appearance (light|dark), install also pins Codex appearanceTheme to match —
+// native token surfaces (dropdown/popover, #233) follow appearanceTheme, not the
+// skin. "auto" themes restore the user's original line instead.
 const settings = new Map([
   ["appearanceTheme", null],
   ["appearanceDarkCodeThemeId", null],
 ]);
 
 if (!["install", "restore"].includes(mode) || !configPath || !backupPath) {
-  throw new Error("Usage: theme-config.mjs <install|restore> <config-path> <backup-path>");
+  throw new Error("Usage: theme-config.mjs <install|restore> <config-path> <backup-path> [appearance]");
+}
+const appearance = appearanceArg || "auto";
+if (!["auto", "light", "dark"].includes(appearance)) {
+  throw new Error(`Unsupported appearance "${appearanceArg}"; expected auto, light, or dark.`);
 }
 
 function desktopSection(content) {
@@ -260,20 +266,22 @@ async function main() {
       await atomicWrite(backupPath, `${JSON.stringify(backup, null, 2)}\n`, 0o600);
     }
 
-    // Only apply non-null settings. null means "backup only / leave user's appearance alone".
-    let body = section.body;
-    let changed = false;
-    for (const [key, line] of settings) {
-      if (line === null) continue;
-      body = replaceSetting(body, key, line);
-      changed = true;
-    }
-    if (changed) {
+    // Pin appearanceTheme while a fixed-appearance theme is active; "auto"
+    // writes the pre-install line back so the user's own choice returns.
+    const backup = JSON.parse(decodeStrictUtf8(await fs.readFile(backupPath), "Theme backup"));
+    validateBackup(backup);
+    const desired = appearance === "auto"
+      ? backup.values.appearanceTheme ?? null
+      : `appearanceTheme = "${appearance}"`;
+    const body = replaceSetting(section.body, "appearanceTheme", desired);
+    if (body !== section.body) {
       const updated = content.slice(0, section.bodyStart) + body + content.slice(section.bodyEnd);
       await assertConfigUnchanged(originalBytes, originalStat);
       await atomicWrite(configPath, updated, originalStat.mode & 0o777, originalBytes, originalStat);
     }
-    console.log("Saved base-theme backup; left Codex appearanceTheme unchanged (skin auto-adapts light/dark).");
+    console.log(appearance === "auto"
+      ? "Saved base-theme backup; left Codex appearanceTheme at the user's own value (auto theme adapts to either shell)."
+      : `Saved base-theme backup; pinned Codex appearanceTheme = "${appearance}" to match the theme (Restore puts the original back).`);
     return;
   }
 

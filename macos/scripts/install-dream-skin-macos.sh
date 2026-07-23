@@ -94,10 +94,22 @@ codex_is_running && fail "Close Codex before installation so config.toml cannot 
 seed_bundled_presets
 if [ ! -f "$THEME_DIR/theme.json" ]; then
   "$SCRIPT_DIR/switch-theme-macos.sh" --id preset-gothic-void-crusade --no-apply >/dev/null
+else
+  # Re-stage official presets so metadata upgrades (e.g. the #183 appearance
+  # pin) reach an active copy staged by an older engine.
+  ACTIVE_THEME_ID="$("$NODE" -e '
+const fs = require("node:fs");
+let id = "";
+try { id = String(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).id ?? ""); } catch {}
+process.stdout.write(/^preset-[A-Za-z0-9_-]{1,72}$/.test(id) ? id : "");
+' "$THEME_DIR/theme.json")"
+  if [ -n "$ACTIVE_THEME_ID" ] && [ -d "$STATE_ROOT/themes/$ACTIVE_THEME_ID" ]; then
+    "$SCRIPT_DIR/switch-theme-macos.sh" --id "$ACTIVE_THEME_ID" --no-apply >/dev/null
+  fi
 fi
 [ -f "$CONFIG_PATH" ] || fail "Codex config not found: $CONFIG_PATH. Launch Codex once, close it, and rerun the installer."
 "$NODE" "$INJECTOR" --check-payload --theme-dir "$THEME_DIR" >/dev/null
-"$NODE" "$SCRIPT_DIR/theme-config.mjs" install "$CONFIG_PATH" "$THEME_BACKUP_PATH"
+sync_appearance_pin
 
 shell_quote() {
   "$NODE" -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$1"

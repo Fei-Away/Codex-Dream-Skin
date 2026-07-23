@@ -42,7 +42,8 @@ try {
   $null = Initialize-DreamSkinThemeStore -SkillRoot $engine.Root -StateRoot $StateRoot
   $ConfigPath = Join-Path $HOME '.codex\config.toml'
   $BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
-  Install-DreamSkinBaseTheme -ConfigPath $ConfigPath -BackupPath $BackupPath
+  Install-DreamSkinBaseTheme -ConfigPath $ConfigPath -BackupPath $BackupPath `
+    -AppearanceTheme (Get-DreamSkinActiveThemeAppearance -ThemeDirectory $themePaths.Active)
 
   if (-not $NoShortcuts) {
     $shell = New-Object -ComObject WScript.Shell

@@ -96,6 +96,11 @@ fi
 
 INJECTOR_PID=""
 if [ "$DEBUG_READY" = "false" ]; then
+  # Codex is closed on this path (never started, or stopped just above), so it
+  # is safe to sync the appearanceTheme pin to the staged theme before launch.
+  # Best-effort: a config we refuse to rewrite should not block starting.
+  sync_appearance_pin >/dev/null \
+    || printf 'Warning: could not sync Codex appearanceTheme to the active theme; native menus may keep the previous appearance.\n' >&2
   PORT="$(select_available_port "$PORT")"
   printf 'Launching ChatGPT with skin debug port %s…\n' "$PORT" >&2
   launch_codex_with_cdp "$PORT"

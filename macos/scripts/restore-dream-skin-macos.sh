@@ -30,7 +30,10 @@ if [ "$UNINSTALL" = "true" ] && [ ! -e "$STATE_PATH" ] &&
   fi
   backup_appearance="$(/usr/bin/plutil -extract values.appearanceTheme raw -o - "$THEME_BACKUP_PATH" 2>/dev/null || true)"
   backup_dark_code="$(/usr/bin/plutil -extract values.appearanceDarkCodeThemeId raw -o - "$THEME_BACKUP_PATH" 2>/dev/null || true)"
-  if [ "$backup_appearance" = "null" ] && [ "$backup_dark_code" = "null" ]; then
+  # Install may have pinned appearanceTheme even when the backup recorded no
+  # original line; a pinned config still needs the full restore below.
+  if [ "$backup_appearance" = "null" ] && [ "$backup_dark_code" = "null" ] &&
+      ! /usr/bin/grep -E -q '^[[:space:]]*appearanceTheme[[:space:]]*=' "$CONFIG_PATH" 2>/dev/null; then
     /bin/rm -f "$THEME_BACKUP_PATH"
     printf 'The install created no config overrides; safe engine-only cleanup.\n'
     exit 0
