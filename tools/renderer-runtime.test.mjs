@@ -35,6 +35,7 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   const observers = [];
   const timers = new Map();
   const intervals = new Map();
+  const frames = new Map();
   const listeners = new Map();
   const revoked = [];
   let nextId = 0;
@@ -91,6 +92,12 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   }
   const window = {
     navigation,
+    requestAnimationFrame(callback) {
+      const id = ++nextId;
+      frames.set(id, callback);
+      return id;
+    },
+    cancelAnimationFrame(id) { frames.delete(id); },
     matchMedia() {
       return {
         matches: nativeAppearance === "dark",
@@ -135,8 +142,14 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
       if (timer.delay <= maximumDelay) { timers.delete(id); timer.callback(); }
     }
   };
+  const flushAnimationFrames = () => {
+    for (const [id, callback] of [...frames]) {
+      frames.delete(id);
+      callback(16);
+    }
+  };
   return {
-    attrs, context, document, flushTimers, intervals, listeners, nodes, observers,
+    attrs, context, document, flushAnimationFrames, flushTimers, frames, intervals, listeners, nodes, observers,
     payloadFor, revoked, root, rootClasses, rootStyle, timers, window,
   };
 }
@@ -193,6 +206,13 @@ export async function runRendererRuntimeTest(assetRoot) {
   // and the measured fossil selector must be absent from the canonical CSS.
   assert.doesNotMatch(css, /(?:^|[.#\s])(?:codex-dream-skin|dream-skin-home|dream-home|dream-task)(?:[\s.#:{>]|$)|home-suggestion-list-item/);
   assert.match(css, /html\[data-dream-skin="active"\]/);
+  assert.match(css, /@property --ds-route-progress/);
+  assert.match(css, /\[data-dream-route-phase="prepare"\]/);
+  assert.match(css, /--ds-route-transition:\s*380ms cubic-bezier/);
+  assert.ok((css.match(/opacity:\s*var\(--ds-route-progress\)/g) || []).length >= 2,
+    "Sidebar and main route overlays must consume the same progress value.");
+  assert.doesNotMatch(template, /scheduleEnsure\(\{\s*scope:\s*true\s*\},\s*180\)/,
+    "Navigation must not retain the retired 180ms route debounce.");
   // Home gating must stay single-level: CSS forbids :has() inside :has(),
   // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
@@ -232,9 +252,17 @@ export async function runRendererRuntimeTest(assetRoot) {
   const navigationHandler = home.listeners.get("navigation:navigate");
   assert.equal(typeof navigationHandler, "function");
   navigationHandler();
-  home.flushTimers(180);
+  assert.equal(home.attrs.get("data-dream-route-phase"), "prepare",
+    "Navigation must reset route progress in the same event turn.");
+  assert.equal(state.metrics.routePasses, 1,
+    "Scope measurement waits for the next animation frame, not an arbitrary debounce.");
+  home.flushAnimationFrames();
+  assert.equal(home.attrs.get("data-dream-route-phase"), "settling");
   assert.equal(state.metrics.navigationEvents, 1);
+  assert.equal(state.metrics.routeTransitions, 1);
   assert.equal(state.metrics.routePasses, 2);
+  home.flushTimers(380);
+  assert.equal(home.attrs.has("data-dream-route-phase"), false);
 
   const settings = makeFixture({ nativeAppearance: "light", settings: true });
   vm.runInNewContext(settings.payloadFor(), settings.context);

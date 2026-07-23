@@ -59,6 +59,7 @@ Exit the Dream Skin tray and close Codex, update the checkout (`git pull`, or do
 ## Launch and verify
 
 The `Codex Dream Skin` shortcut is the recommended launcher. It asks for confirmation before restarting an open Codex window.
+After the skin verifies successfully, the launcher hands the tray controller to a hidden background process and exits; a mutex prevents duplicate tray instances.
 
 Command-line launch:
 

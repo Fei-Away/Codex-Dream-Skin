@@ -13,6 +13,18 @@ $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
+function Start-DreamSkinTrayInBackground {
+  param([Parameter(Mandatory = $true)][int]$TrayPort)
+  if (Test-DreamSkinTrayActive) { return }
+
+  $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
+  $trayScript = Join-Path $PSScriptRoot 'tray-dream-skin.ps1'
+  $trayToken = ConvertTo-DreamSkinProcessArgument -Value $trayScript
+  $trayArguments = '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' +
+    $trayToken + " -Port $TrayPort"
+  Start-Process -FilePath $powershell -ArgumentList $trayArguments -WindowStyle Hidden | Out-Null
+}
+
 $operationLock = Enter-DreamSkinOperationLock
 try {
   Assert-DreamSkinPort -Port $Port
@@ -306,6 +318,7 @@ try {
   }
 
   Write-Host "Codex Dream Skin is active on verified loopback port $Port."
+  Start-DreamSkinTrayInBackground -TrayPort $Port
 } finally {
   if ($null -ne $operationLock) { Exit-DreamSkinOperationLock -Mutex $operationLock }
 }

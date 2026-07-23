@@ -1,3 +1,9 @@
+@property --ds-route-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
 /* Canonical cross-platform skin. Run tools/sync-runtime-assets.mjs after editing. */
 :root[data-dream-skin="active"] {
   color-scheme: dark !important;
@@ -56,6 +62,14 @@
   --ds-task-immersive-edge: rgb(var(--ds-bg-rgb) / .82);
   --ds-task-immersive-mid: rgb(var(--ds-bg-rgb) / .74);
   --ds-task-immersive-far: rgb(var(--ds-bg-rgb) / .60);
+  --ds-task-sidebar-overlay: rgb(var(--ds-panel-rgb) / .44);
+  --ds-task-sidebar-edge-overlay: rgb(var(--ds-bg-rgb) / .70);
+  --ds-task-overlay-edge: rgb(var(--ds-bg-rgb) / .70);
+  --ds-task-overlay-mid: rgb(var(--ds-bg-rgb) / .65);
+  --ds-task-overlay-far: rgb(var(--ds-bg-rgb) / .52);
+  --ds-route-progress: 1;
+  --ds-route-transition: 380ms cubic-bezier(.25, .32, .25, 1);
+  transition: --ds-route-progress var(--ds-route-transition);
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"] {
@@ -101,6 +115,23 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
   --ds-task-immersive-edge: rgb(var(--ds-panel-rgb) / .86);
   --ds-task-immersive-mid: rgb(var(--ds-panel-rgb) / .78);
   --ds-task-immersive-far: rgb(var(--ds-panel-rgb) / .66);
+  --ds-task-sidebar-overlay: rgb(var(--ds-panel-rgb) / .46);
+  --ds-task-sidebar-edge-overlay: rgb(var(--ds-panel-rgb) / .75);
+  --ds-task-overlay-edge: rgb(var(--ds-panel-rgb) / .75);
+  --ds-task-overlay-mid: rgb(var(--ds-panel-rgb) / .69);
+  --ds-task-overlay-far: rgb(var(--ds-panel-rgb) / .60);
+}
+
+/* Navigation begins at the click/navigation event, not after route DOM settles.
+   The renderer advances to "settling" on the next animation frame so Chromium
+   can interpolate one inherited value without layout reads or subtree watches. */
+html[data-dream-skin="active"][data-dream-route-phase="prepare"] {
+  --ds-route-progress: 0;
+  transition: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-route-phase="settling"] {
+  --ds-route-progress: 1;
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="left"], [data-dream-art-safe-area="left"]) {
@@ -316,12 +347,35 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_LEFT_PANEL__ {
   background: linear-gradient(90deg,
-    var(--ds-task-immersive-sidebar),
-    var(--ds-task-immersive-edge) 100%) !important;
+    var(--ds-immersive-sidebar),
+    var(--ds-immersive-edge) 100%) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
+  isolation: isolate;
+}
+
+/* The sidebar and main surface share this inherited progress value. Keeping the
+   stronger task wash in separate overlays avoids a discrete gradient swap. */
+html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_LEFT_PANEL__::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    var(--ds-task-sidebar-overlay),
+    var(--ds-task-sidebar-edge-overlay));
+  opacity: var(--ds-route-progress);
+  will-change: opacity;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_LEFT_PANEL__ > :first-child {
+  position: relative;
+  z-index: 1;
 }
 
 /* Native sidebar resize chrome inherits the sidebar background and extends
@@ -334,9 +388,9 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) {
   background: linear-gradient(90deg,
-    var(--ds-task-immersive-edge),
-    var(--ds-task-immersive-mid) 64%,
-    var(--ds-task-immersive-far)) !important;
+    var(--ds-immersive-edge),
+    var(--ds-immersive-mid) 64%,
+    var(--ds-immersive-far)) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -344,7 +398,17 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]
   __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))::before {
-  content: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    var(--ds-task-overlay-edge),
+    var(--ds-task-overlay-mid) 64%,
+    var(--ds-task-overlay-far));
+  opacity: var(--ds-route-progress);
+  will-change: opacity;
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
@@ -1084,6 +1148,10 @@ html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :root[data-dream-skin="active"] {
+    --ds-route-transition: 0ms linear;
+  }
+
   html[data-dream-skin="active"] *,
   html[data-dream-skin="active"] *::before,
   html[data-dream-skin="active"] *::after {
