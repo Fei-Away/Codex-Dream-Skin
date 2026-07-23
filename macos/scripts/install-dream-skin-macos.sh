@@ -92,6 +92,7 @@ require_macos_runtime
 ensure_state_root
 codex_is_running && fail "Close Codex before installation so config.toml cannot be rewritten while the app is saving it."
 seed_bundled_presets
+seed_bundled_pets
 if [ ! -f "$THEME_DIR/theme.json" ]; then
   "$SCRIPT_DIR/switch-theme-macos.sh" --id preset-gothic-void-crusade --no-apply >/dev/null
 else
