@@ -763,12 +763,13 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:first-child > span:first-child {
   width: 38px;
   height: 38px;
-  /* Native spans carry justify-start; grid + place-items cannot override
-     justify-content, so the glyph parks at the circle's left edge. (#176) */
+  /* Native cards use justify-start; force the glyph into the circle center. */
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  margin: 0 auto;
+  place-content: center !important;
+  place-items: center !important;
+  margin: 0 auto !important;
   border: 1px solid rgb(var(--ds-accent-rgb) / .24);
   border-radius: 50%;
   color: var(--ds-accent) !important;
@@ -782,11 +783,24 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
   display: block !important;
   margin: 0 !important;
   flex: 0 0 auto !important;
+  justify-self: center !important;
+  align-self: center !important;
   color: var(--ds-accent) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:first-child { justify-content: center !important; }
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:last-child { align-items: center !important; text-align: center !important; }
+.dream-skin-home .group\/home-suggestions button > span:first-child {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.dream-skin-home .group\/home-suggestions button > span:last-child {
+  width: 100% !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
 
 html[data-dream-skin="active"] .composer-surface-chrome {
   overflow: visible !important;
