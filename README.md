@@ -85,50 +85,6 @@
 
 > 可下载的用户源图是 [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png)（`1672 × 941`）；源码参考预设使用 [`macos/presets/preset-arina-hashimoto/background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；未确认人物与素材权利前不得把它打进公开安装包。
 
-## 概念效果图（不可直接导入）
-
-下面八张图用于表达可实现的视觉方向，但它们是带界面的概念效果图，不是可直接使用的主题背景。需要同类效果时，先按[参考生图提示词](./docs/reference-background-prompt-guide.md)生成无 UI 的 `2560 × 1440` 素材；八种风格的详细拆解见[概念图提示词](./docs/background-generation-prompts.md)。
-
-<p align="center">
-  <img src="docs/images/gallery/skin-01.jpg" alt="粉系定制" width="900"><br>
-  <sub>粉系定制</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-02.jpg" alt="财神打工" width="900"><br>
-  <sub>财神打工版</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-03.jpg" alt="红白科幻" width="900"><br>
-  <sub>红白科幻</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-04.jpg" alt="清透定制" width="900"><br>
-  <sub>清透定制</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-05.jpg" alt="灵感小宇宙" width="900"><br>
-  <sub>灵感小宇宙</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-06.jpg" alt="紫夜限定" width="900"><br>
-  <sub>紫夜限定</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-07.jpg" alt="青蓝虚拟歌姬" width="900"><br>
-  <sub>青蓝虚拟歌姬</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-08.jpg" alt="舞台黑金" width="900"><br>
-  <sub>舞台黑金</sub>
-</p>
-
 ## 它能做什么
 
 - **真·可交互**：侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去

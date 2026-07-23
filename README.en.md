@@ -95,54 +95,6 @@ to use and save it for one-click switching.
 
 > The downloadable user source is [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png) (`1672 × 941`); the source-only reference preset uses the normalized derived [`background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; do not put it in a public installer without confirmed likeness and asset rights.
 
-## Concept gallery (not importable backgrounds)
-
-These eight images communicate achievable visual directions, but they are
-interface mockups rather than usable theme backgrounds. Generate a UI-free
-`2560 × 1440` image with the copy-ready [reference prompt guide](./docs/reference-background-prompt-guide.en.md)
-before importing a similar look. See the [concept prompt breakdown](./docs/background-generation-prompts.md)
-for the eight individual styles.
-
-<p align="center">
-  <img src="docs/images/gallery/skin-01.jpg" alt="Pink Custom" width="900"><br>
-  <sub>Pink Custom</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-02.jpg" alt="God of Wealth" width="900"><br>
-  <sub>God of Wealth</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-03.jpg" alt="Red-White Sci-Fi" width="900"><br>
-  <sub>Red-White Sci-Fi</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-04.jpg" alt="Clear Custom" width="900"><br>
-  <sub>Clear Custom</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-05.jpg" alt="Inspiration" width="900"><br>
-  <sub>Inspiration</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-06.jpg" alt="Purple Night" width="900"><br>
-  <sub>Purple Night</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-07.jpg" alt="Cyan Virtual Singer" width="900"><br>
-  <sub>Cyan Virtual Singer</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-08.jpg" alt="Stage Black-Gold" width="900"><br>
-  <sub>Stage Black-Gold</sub>
-</p>
-
 ## What it does
 
 - **Real UI** — Sidebar, cards, project picker, and input stay native. Not a fake full-window screenshot.
