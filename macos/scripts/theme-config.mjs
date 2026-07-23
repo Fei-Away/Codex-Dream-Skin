@@ -3,8 +3,8 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 const [mode, configPath, backupPath] = process.argv.slice(2);
-// Backup these keys so Restore can put them back. Do NOT force dark —
-// Dream Skin CSS auto-adapts to light/dark via data-dream-shell.
+// Non-null entries are managed settings that install must back up for Restore.
+// Keep these null because Dream Skin auto-adapts via data-dream-shell.
 const settings = new Map([
   ["appearanceTheme", null],
   ["appearanceDarkCodeThemeId", null],
@@ -228,6 +228,20 @@ async function main() {
   const originalStat = await fs.lstat(configPath);
   if (originalStat.isSymbolicLink() || !originalStat.isFile()) {
     throw new Error("Codex config must be a regular file, not a symbolic link.");
+  }
+  const hasPlannedSettingWrites = [...settings.values()].some((line) => line !== null);
+  if (!hasPlannedSettingWrites) {
+    if (mode === "install") {
+      console.log("Left Codex appearance settings unchanged; no config backup was needed.");
+      return;
+    }
+    try {
+      await fs.access(backupPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      console.log("No selective theme backup is available; config.toml was left unchanged.");
+      return;
+    }
   }
   if (content.includes('"""') || content.includes("'''")) {
     throw new Error("Refusing to rewrite TOML containing multiline strings.");
