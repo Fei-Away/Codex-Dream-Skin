@@ -85,7 +85,11 @@ CSS/images.
 8. Config backup/restore requires Codex to be closed, strict UTF-8, an operation
    lock, same-directory atomic replacement, and an unchanged-byte check.
 
-CDP is powerful and unauthenticated on loopback. Prefer Restore when you are done theming.
+CDP is powerful and unauthenticated on loopback. Another process on the same
+computer may connect while the CDP-enabled Codex process is running. Removing
+the CSS or stopping only the injector does not remove the debug-port launch
+argument; use Restore with `--restart-codex`, or fully quit Codex and reopen it
+normally, to end the exposure window. See [`../SECURITY.md`](../SECURITY.md).
 
 ## Bundled presets
 
