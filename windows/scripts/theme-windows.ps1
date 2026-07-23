@@ -235,16 +235,16 @@ function Initialize-DreamSkinThemeStore {
   $presetTheme = Join-Path $presetDirectory 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $presetDirectory
   Assert-DreamSkinNoReparseComponents -Path $presetTheme
-  if (-not (Test-Path -LiteralPath $presetTheme -PathType Leaf)) {
-    Ensure-DreamSkinManagedDirectory -Path $presetDirectory -Root $paths.Root
-    $presetImage = Join-Path $presetDirectory $assetImageName
-    Assert-DreamSkinNoReparseComponents -Path $presetImage
-    Copy-Item -LiteralPath $assetImage -Destination $presetImage -Force
-    Assert-DreamSkinNoReparseComponents -Path $presetImage
-    Assert-DreamSkinImageFile -Path $presetImage
-    Assert-DreamSkinNoReparseComponents -Path $presetTheme
-    Copy-Item -LiteralPath (Join-Path $assetRoot 'theme.json') -Destination $presetTheme -Force
-  }
+  # Refresh the saved copy on every run (matching macOS seeding) so preset
+  # metadata upgrades — e.g. the #183 appearance pin — reach existing installs.
+  Ensure-DreamSkinManagedDirectory -Path $presetDirectory -Root $paths.Root
+  $presetImage = Join-Path $presetDirectory $assetImageName
+  Assert-DreamSkinNoReparseComponents -Path $presetImage
+  Copy-Item -LiteralPath $assetImage -Destination $presetImage -Force
+  Assert-DreamSkinNoReparseComponents -Path $presetImage
+  Assert-DreamSkinImageFile -Path $presetImage
+  Assert-DreamSkinNoReparseComponents -Path $presetTheme
+  Copy-Item -LiteralPath (Join-Path $assetRoot 'theme.json') -Destination $presetTheme -Force
   # Bundled Gothic Void Crusade (same pack as macOS presets/).
   $gothicSource = Join-Path $SkillRoot 'presets\preset-gothic-void-crusade'
   $gothicDirectory = Join-Path $paths.Saved 'preset-gothic-void-crusade'
@@ -254,8 +254,7 @@ function Initialize-DreamSkinThemeStore {
   Assert-DreamSkinNoReparseComponents -Path $gothicDirectory
   Assert-DreamSkinNoReparseComponents -Path $gothicTheme
   if ((Test-Path -LiteralPath $gothicSourceTheme -PathType Leaf) -and
-    (Test-Path -LiteralPath $gothicSourceImage -PathType Leaf) -and
-    -not (Test-Path -LiteralPath $gothicTheme -PathType Leaf)) {
+    (Test-Path -LiteralPath $gothicSourceImage -PathType Leaf)) {
     Ensure-DreamSkinManagedDirectory -Path $gothicDirectory -Root $paths.Root
     $gothicImage = Join-Path $gothicDirectory 'background.jpg'
     Assert-DreamSkinNoReparseComponents -Path $gothicImage
@@ -265,6 +264,33 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinImageFile -Path $gothicImage
     Assert-DreamSkinNoReparseComponents -Path $gothicTheme
     Copy-Item -LiteralPath $gothicSourceTheme -Destination $gothicTheme -Force
+  }
+  # Refresh the staged active copy of official presets too; otherwise metadata
+  # staged by an older engine (e.g. pre-#183 appearance "auto") keeps steering
+  # the appearanceTheme pin after upgrades.
+  if (Test-Path -LiteralPath $activeTheme -PathType Leaf) {
+    $activeId = ''
+    try {
+      $activeId = "$((Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata).Theme.id)"
+    } catch {}
+    $refreshSource = $null
+    if ($activeId -ceq $bundledPresetId) { $refreshSource = $assetRoot }
+    elseif ($activeId -ceq 'preset-gothic-void-crusade' -and
+      (Test-Path -LiteralPath $gothicSourceTheme -PathType Leaf)) { $refreshSource = $gothicSource }
+    if ($null -ne $refreshSource) {
+      $sourcePack = Read-DreamSkinTheme -ThemeDirectory $refreshSource
+      $sourceJson = Read-DreamSkinUtf8File -Path $sourcePack.ThemePath
+      $activeJson = Read-DreamSkinUtf8File -Path $activeTheme
+      if ($sourceJson -cne $activeJson) {
+        $sourceImageName = [System.IO.Path]::GetFileName($sourcePack.ImagePath)
+        $refreshedImage = Join-Path $paths.Active $sourceImageName
+        Assert-DreamSkinNoReparseComponents -Path $refreshedImage
+        Copy-Item -LiteralPath $sourcePack.ImagePath -Destination $refreshedImage -Force
+        Assert-DreamSkinNoReparseComponents -Path $refreshedImage
+        Assert-DreamSkinImageFile -Path $refreshedImage
+        Copy-Item -LiteralPath $sourcePack.ThemePath -Destination $activeTheme -Force
+      }
+    }
   }
   $null = Read-DreamSkinTheme -ThemeDirectory $paths.Active
   return $paths
