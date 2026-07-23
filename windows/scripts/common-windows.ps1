@@ -830,12 +830,21 @@ function Get-DreamSkinProcessStartedAt {
   }
 }
 
-function Stop-DreamSkinRecordedInjector {
+function Get-DreamSkinRecordedInjectorProcess {
   param([AllowNull()][object]$State)
-  if ($null -eq $State -or -not $State.injectorPid) { return $true }
+  if ($null -eq $State -or -not $State.injectorPid) { return $null }
   $processId = [int]$State.injectorPid
-  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
-  if (-not $process) { return $true }
+  if (-not (Get-Process -Id $processId -ErrorAction SilentlyContinue)) { return $null }
+  try {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction Stop
+  } catch {
+    if (-not (Get-Process -Id $processId -ErrorAction SilentlyContinue)) { return $null }
+    throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
+  }
+  if (-not $process) {
+    if (-not (Get-Process -Id $processId -ErrorAction SilentlyContinue)) { return $null }
+    throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
+  }
 
   $expectedInjector = if ($State.injectorPath) {
     "$($State.injectorPath)"
@@ -873,6 +882,44 @@ function Stop-DreamSkinRecordedInjector {
     throw "The recorded injector PID $processId is running, but its visible identity does not match the saved Dream Skin process. State was preserved."
   }
 
+  return $process
+}
+
+function Get-DreamSkinInjectorRecoveryContext {
+  param([AllowNull()][object]$State)
+  if ($null -eq $State -or -not $State.port) { return $null }
+  if ($null -ne (Get-DreamSkinRecordedInjectorProcess -State $State)) { return $null }
+
+  $port = 0
+  if (-not [int]::TryParse("$($State.port)", [ref]$port)) { return $null }
+  Assert-DreamSkinPort -Port $port
+  if (Test-DreamSkinPortAvailable -Port $port) { return $null }
+
+  $codex = Get-DreamSkinCodexInstallFromState -State $State
+  $identity = if ($null -ne $codex) {
+    Get-DreamSkinVerifiedCdpIdentity -Port $port -Codex $codex
+  } else {
+    $null
+  }
+  if ($null -eq $identity) {
+    $registered = Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $port
+    if ($null -eq $registered) { return $null }
+    $codex = $registered.Codex
+    $identity = $registered.Identity
+  }
+
+  return [pscustomobject]@{
+    Port = $port
+    BrowserId = $identity.BrowserId
+    Codex = $codex
+  }
+}
+
+function Stop-DreamSkinRecordedInjector {
+  param([AllowNull()][object]$State)
+  $process = Get-DreamSkinRecordedInjectorProcess -State $State
+  if ($null -eq $process) { return $true }
+  $processId = [int]$process.ProcessId
   Stop-Process -Id $processId -Force -ErrorAction Stop
   try { Wait-Process -Id $processId -Timeout 5 -ErrorAction Stop } catch {}
   if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {

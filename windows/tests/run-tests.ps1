@@ -1084,6 +1084,17 @@ try {
   if (-not $startSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
     throw 'Start lost the any-registered endpoint fallback for Store auto-updates.'
   }
+  $recoveryGuardIndex = $startSource.IndexOf(
+    'if ($RecoverExisting -and $null -eq $existingIdentity)', [System.StringComparison]::Ordinal
+  )
+  $codexLaunchIndex = $startSource.IndexOf(
+    '$null = Start-DreamSkinCodex -Codex $codex -Arguments $arguments', [System.StringComparison]::Ordinal
+  )
+  if (-not $startSource.Contains("RecoverExisting cannot restart Codex") -or
+    -not $startSource.Contains('Injector recovery stopped because Dream Skin was paused') -or
+    $recoveryGuardIndex -lt 0 -or $codexLaunchIndex -le $recoveryGuardIndex) {
+    throw 'Injector recovery can still launch, restart, or resume Codex after its verified endpoint disappears.'
+  }
   $verifyScriptSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
   if (-not $verifyScriptSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
     throw 'Verify lost the any-registered endpoint fallback for Store auto-updates.'
@@ -1153,6 +1164,141 @@ try {
   $commonSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\common-windows.ps1')
   if (-not $commonSource.Contains('State was preserved.')) {
     throw 'Mismatched live injector identity does not fail closed with preserved state.'
+  }
+  $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
+  foreach ($requiredRecoveryBehavior in @(
+    'Get-DreamSkinRecordedInjectorProcess',
+    'Get-DreamSkinInjectorRecoveryContext',
+    'Get-DreamSkinVerifiedCdpIdentity',
+    'Get-DreamSkinVerifiedCdpIdentityForAnyRegistered',
+    '[System.Windows.Forms.Timer]::new()',
+    " '-RecoverExisting'"
+  )) {
+    $source = if ($requiredRecoveryBehavior -in @(
+      '[System.Windows.Forms.Timer]::new()',
+      " '-RecoverExisting'"
+    )) { $traySource } else { $commonSource }
+    if (-not $source.Contains($requiredRecoveryBehavior)) {
+      throw "Safe tray recovery behavior is missing: $requiredRecoveryBehavior"
+    }
+  }
+
+  $realRecordedInjectorProbe = (Get-Command Get-DreamSkinRecordedInjectorProcess -CommandType Function).ScriptBlock
+  $realPortAvailabilityProbe = (Get-Command Test-DreamSkinPortAvailable -CommandType Function).ScriptBlock
+  $realStateInstallProbe = (Get-Command Get-DreamSkinCodexInstallFromState -CommandType Function).ScriptBlock
+  $realIdentityProbe = (Get-Command Get-DreamSkinVerifiedCdpIdentity -CommandType Function).ScriptBlock
+  $realRegisteredIdentityProbe = (
+    Get-Command Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -CommandType Function
+  ).ScriptBlock
+  $recoveryProbe = @{
+    InjectorRunning = $false
+    PortAvailable = $false
+    Identity = [pscustomobject]@{ BrowserId = 'browser-reopened' }
+    RegisteredIdentity = $null
+  }
+  try {
+    function Get-DreamSkinRecordedInjectorProcess {
+      param([AllowNull()][object]$State)
+      if ($recoveryProbe.InjectorRunning) {
+        return [pscustomobject]@{ ProcessId = 42 }
+      }
+      return $null
+    }
+    function Test-DreamSkinPortAvailable {
+      param([int]$Port)
+      return [bool]$recoveryProbe.PortAvailable
+    }
+    function Get-DreamSkinCodexInstallFromState {
+      param([AllowNull()][object]$State)
+      return [pscustomobject]@{ Executable = 'official-codex-fixture.exe' }
+    }
+    function Get-DreamSkinVerifiedCdpIdentity {
+      param([int]$Port, [Parameter(Mandatory = $true)][object]$Codex)
+      return $recoveryProbe.Identity
+    }
+    function Get-DreamSkinVerifiedCdpIdentityForAnyRegistered {
+      param([int]$Port)
+      return $recoveryProbe.RegisteredIdentity
+    }
+
+    $recoveryState = [pscustomobject]@{ port = 9335; injectorPid = 1234 }
+    $recoveryContext = Get-DreamSkinInjectorRecoveryContext -State $recoveryState
+    if ($null -eq $recoveryContext -or $recoveryContext.Port -ne 9335 -or
+      $recoveryContext.BrowserId -cne 'browser-reopened') {
+      throw 'A stopped injector with a verified official Codex endpoint was not recoverable.'
+    }
+    $recoveryProbe.InjectorRunning = $true
+    if ($null -ne (Get-DreamSkinInjectorRecoveryContext -State $recoveryState)) {
+      throw 'Tray recovery would start a second injector while the recorded watcher is alive.'
+    }
+    $recoveryProbe.InjectorRunning = $false
+    $recoveryProbe.PortAvailable = $true
+    if ($null -ne (Get-DreamSkinInjectorRecoveryContext -State $recoveryState)) {
+      throw 'Tray recovery would launch Codex when the saved CDP port has closed.'
+    }
+    $recoveryProbe.PortAvailable = $false
+    $recoveryProbe.Identity = $null
+    if ($null -ne (Get-DreamSkinInjectorRecoveryContext -State $recoveryState)) {
+      throw 'Tray recovery accepted a CDP endpoint without official Codex ownership.'
+    }
+  } finally {
+    Set-Item -Path Function:\Get-DreamSkinRecordedInjectorProcess -Value $realRecordedInjectorProbe
+    Set-Item -Path Function:\Test-DreamSkinPortAvailable -Value $realPortAvailabilityProbe
+    Set-Item -Path Function:\Get-DreamSkinCodexInstallFromState -Value $realStateInstallProbe
+    Set-Item -Path Function:\Get-DreamSkinVerifiedCdpIdentity -Value $realIdentityProbe
+    Set-Item -Path Function:\Get-DreamSkinVerifiedCdpIdentityForAnyRegistered `
+      -Value $realRegisteredIdentityProbe
+  }
+
+  $fakeInjectorPath = Join-Path $temporaryRoot 'recorded-injector-fixture.mjs'
+  [System.IO.File]::WriteAllText(
+    $fakeInjectorPath,
+    'setInterval(() => {}, 1000);',
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $fakeInjector = Start-Process -FilePath $node.Path -ArgumentList @(
+    (ConvertTo-DreamSkinProcessArgument -Value $fakeInjectorPath),
+    '--watch', '--port', '9335', '--browser-id', 'browser-recovery-test'
+  ) -WindowStyle Hidden -PassThru
+  try {
+    Start-Sleep -Milliseconds 300
+    $fakeStartedAt = Get-DreamSkinProcessStartedAt -ProcessId $fakeInjector.Id
+    if (-not $fakeStartedAt) { throw 'The injector identity fixture did not start.' }
+    $fakeState = [pscustomobject]@{
+      port = 9335
+      injectorPid = $fakeInjector.Id
+      injectorStartedAt = $fakeStartedAt
+      injectorPath = $fakeInjectorPath
+      nodePath = $node.Path
+      browserId = 'browser-recovery-test'
+    }
+    $recordedProcess = Get-DreamSkinRecordedInjectorProcess -State $fakeState
+    if ($null -eq $recordedProcess -or [int]$recordedProcess.ProcessId -ne $fakeInjector.Id) {
+      throw 'A live recorded injector did not pass exact process-identity validation.'
+    }
+    $mismatchedState = $fakeState.PSObject.Copy()
+    $mismatchedState.browserId = 'browser-other'
+    $mismatchRejected = $false
+    try { $null = Get-DreamSkinRecordedInjectorProcess -State $mismatchedState } catch {
+      $mismatchRejected = $true
+    }
+    if (-not $mismatchRejected -or $fakeInjector.HasExited) {
+      throw 'A mismatched PID was not preserved and rejected during recovery probing.'
+    }
+    if (-not (Stop-DreamSkinRecordedInjector -State $fakeState)) {
+      throw 'The exact recorded injector was not stopped.'
+    }
+    [void]$fakeInjector.WaitForExit(5000)
+    if (-not $fakeInjector.HasExited -or
+      $null -ne (Get-DreamSkinRecordedInjectorProcess -State $fakeState)) {
+      throw 'A stopped injector still appears live to the recovery monitor.'
+    }
+  } finally {
+    if (-not $fakeInjector.HasExited) {
+      Stop-Process -Id $fakeInjector.Id -Force -ErrorAction SilentlyContinue
+      [void]$fakeInjector.WaitForExit(5000)
+    }
+    $fakeInjector.Dispose()
   }
 
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(

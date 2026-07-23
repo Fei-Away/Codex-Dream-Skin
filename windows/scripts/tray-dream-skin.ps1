@@ -23,6 +23,11 @@ $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
 $acquired = $false
 $notify = $null
 $trayIcon = $null
+$recoveryTimer = $null
+$recoveryMonitor = @{
+  Process = $null
+  NextAttemptAt = [datetime]::MinValue
+}
 try {
   try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
   if (-not $acquired) { exit 0 }
@@ -55,7 +60,31 @@ try {
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
     $argumentLine = '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
-    Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
+    return Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden -PassThru
+  }
+
+  function Invoke-DreamSkinTrayRecovery {
+    if (Test-DreamSkinPaused -StateRoot $StateRoot) { return }
+    if ($null -ne $recoveryMonitor.Process) {
+      try {
+        if (-not $recoveryMonitor.Process.HasExited) { return }
+        $recoveryMonitor.Process.Dispose()
+      } catch {}
+      $recoveryMonitor.Process = $null
+    }
+    $now = Get-Date
+    if ($now -lt $recoveryMonitor.NextAttemptAt) { return }
+
+    $state = Read-DreamSkinState -Path $paths.State
+    $context = Get-DreamSkinInjectorRecoveryContext -State $state
+    if ($null -eq $context) { return }
+
+    # The start script repeats the official-package/CDP ownership checks and
+    # RecoverExisting prevents this monitor from launching or restarting Codex.
+    $recoveryMonitor.NextAttemptAt = $now.AddSeconds(30)
+    $recoveryMonitor.Process = Start-DreamSkinPowerShell -Script $startScript -Arguments @(
+      '-Port', "$($context.Port)", '-RecoverExisting'
+    )
   }
 
   function Add-DreamSkinTrayItem {
@@ -245,8 +274,25 @@ try {
       Show-DreamSkinTrayError -Message $_.Exception.Message
     }
   })
+  $recoveryTimer = [System.Windows.Forms.Timer]::new()
+  $recoveryTimer.Interval = 5000
+  $recoveryTimer.add_Tick({
+    try {
+      Invoke-DreamSkinTrayRecovery
+    } catch {
+      $recoveryMonitor.NextAttemptAt = (Get-Date).AddSeconds(30)
+    }
+  })
+  $recoveryTimer.Start()
   [System.Windows.Forms.Application]::Run()
 } finally {
+  if ($null -ne $recoveryTimer) {
+    $recoveryTimer.Stop()
+    $recoveryTimer.Dispose()
+  }
+  if ($null -ne $recoveryMonitor.Process) {
+    try { $recoveryMonitor.Process.Dispose() } catch {}
+  }
   if ($null -ne $notify) { $notify.Dispose() }
   if ($null -ne $trayIcon) { $trayIcon.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
