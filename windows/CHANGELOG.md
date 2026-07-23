@@ -1,5 +1,12 @@
 # Windows Changelog
 
+## 未发布
+
+### 修复
+
+- 处理 Codex Store `26.715.10079.0` 的 owl runtime 兼容性断点（#235）：继续优先使用清单派生 AUMID 的系统包激活；只有进程命令行明确证实 `--remote-debugging-port` 被转换成 `codex://...path=` 时，才保留启动前记录的 Codex PID、关闭本轮新增进程，并对同一个已验证 Store 包内的精确 `app\ChatGPT.exe` 尝试原始参数启动。该回退只在本机 ACL 允许且 production runtime 实际开放 CDP 时生效；Access Denied、参数仍未保留或最终没有可信监听都会给出对应错误并正常回滚，不把候选回退宣称为所有机器通用修复。
+- 新策略不接管 WindowsApps 权限、不复制或修改官方二进制、`app.asar` 或签名；旧版仍走原有包激活路径。新增参数转发/协议重定向识别、Store 目标约束、兼容旧版、直启回退与 Access Denied 错误回归测试。
+
 ## 1.3.3 — 2026-07-23
 
 ### 修复

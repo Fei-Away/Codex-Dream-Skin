@@ -24,6 +24,7 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 - Attach the "选择项目" treatment to Codex's real project-selector toolbar and keep the current project button clickable; never draw a disconnected replacement.
 - Keep decorative layers `pointer-events: none` and keep real buttons, navigation, and composer above them.
 - On app updates, rerun install and launch; the scripts discover the current Appx package dynamically. Saved paths are never trusted for process control unless they still match a registered package identity.
+- Keep manifest-derived package activation as the preferred Windows launch. The exact Store `app\ChatGPT.exe` fallback is allowed only after visible process arguments prove owl encoded the CDP flag inside `codex://`, and only with the package identity/path checks in `common-windows.ps1`. Preserve the pre-launch PID set during rollback. Treat access denial as terminal; never change WindowsApps ACLs to make the fallback run.
 - The default launcher scans for a free port when `9335` is occupied. An explicitly requested occupied port fails closed.
 - Keep the injection daemon running for navigation/reload resilience. Its state and logs live under `%LOCALAPPDATA%\CodexDreamSkin`.
 - The watcher registers a generation-checked early payload for connected renderers so reload/navigation can paint the skin before the normal load-event fallback; unsupported CDP targets fall back safely.
