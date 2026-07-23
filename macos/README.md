@@ -55,6 +55,7 @@ Install location after step 2:
 | Engine | `~/.codex/codex-dream-skin-studio` |
 | State / logs / user images | `~/Library/Application Support/CodexDreamSkinStudio` |
 | Theme backup | under Application Support (`theme-backup.json`) |
+| Bundled Codex pet | `~/.codex/pets/dream-skin-sky-garden-duo` |
 
 ## Legacy standalone ZIP (maintainer/offline packaging only)
 
@@ -89,11 +90,26 @@ CDP is powerful and unauthenticated on loopback. Prefer Restore when you are don
 
 ## Bundled presets
 
-The public DMG seeds **Gothic Void Crusade**, contributed through PR #134, as
-its redistributable default. A source checkout also contains the
-**桥本有菜 / Arina Hashimoto** reference material, but the public app bundle
-deliberately excludes it until independent likeness and redistribution rights
-are confirmed.
+The public macOS package seeds two redistributable presets:
+**Gothic Void Crusade** and **天空花园双姝 / Sky Garden Duo**. Gothic Void
+Crusade remains the default when no active theme exists. A source checkout also
+contains the **桥本有菜 / Arina Hashimoto** reference material, but the public
+app bundle deliberately excludes it until independent likeness and
+redistribution rights are confirmed.
+
+Switch to Sky Garden Duo with:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh --id preset-sky-garden-duo
+```
+
+Sky Garden Duo is a complete UI preset rather than a wallpaper-only pack. In
+addition to the standard background and color metadata, it enables a themed
+sidebar card, character navigation icons, a foreground companion pair, a
+reclining top companion, flowing light, and falling petals. These files live in
+the engine-owned `assets/preset-extras/preset-sky-garden-duo/` directory and are
+loaded only when the exact built-in preset id is active. User theme JSON cannot
+load arbitrary CSS, JavaScript, or extra files.
 
 The user-provided source PNG is `1672 × 941`. Its pack contains a standardized
 derived `2560 × 1440` JPEG plus theme metadata; the derived export does not add
@@ -112,6 +128,46 @@ never touched. Existing locally saved reference themes are not deleted by an
 upgrade, but they are not copied into newly downloaded public packages.
 
 To contribute a preset, see [`presets/README.md`](./presets/README.md).
+
+## Native Codex pet: Sky Garden Duo
+
+The macOS package also includes the native V2 pet **天空花园双姝**. It is one
+paired pet containing Day and Night, with 73 used animation frames across idle,
+left/right drag responses, wave, an elegant grounded hover greeting, failure,
+input waiting, focused task processing, review, and 16 gaze directions. Dream
+Skin only seeds the files; Codex owns the floating
+overlay, drag position, task-state transitions, reduced-motion behavior, and
+cross-task activity alerts. Dream Skin does not install CSS or JavaScript frame
+overrides into the pet overlay, so hover, drag, click, and task-state timing stay
+under native Codex control.
+
+The main installer seeds the pet automatically. Existing installs can add or
+refresh it without restarting Codex:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/install-bundled-pets-macos.sh
+```
+
+Then open **Settings > Pets**, press **Refresh**, and select
+**天空花园双姝**. Use `/pet` in a task to wake or tuck away the selected pet.
+The theme card, sidebar character icons, reclining top pair, and composer-side
+characters remain separate theme UI and continue to work whether the native pet
+is visible or hidden.
+
+To share the pet, distribute the complete directory containing `pet.json`,
+`spritesheet.webp`, and `.codex-dream-skin-pet`; recipients place that directory
+under `~/.codex/pets/` and refresh **Settings > Pets**. Do not distribute only
+the WebP file.
+
+To remove only this managed pet while leaving the theme intact:
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/remove-sky-garden-pet-macos.sh
+```
+
+The installer refreshes an existing copy only when its engine ownership marker
+is present. It never overwrites an unmarked pet directory with the same ID and
+never touches unrelated custom pets.
 
 ## Image guidelines
 

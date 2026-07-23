@@ -3,9 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { earlyPayloadFor } from "../scripts/injector.mjs";
+import { buildPayloadForTheme, earlyPayloadFor } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const macosRoot = path.resolve(here, "..");
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
@@ -110,5 +111,34 @@ assert.match(
 );
 assert.match(source, /visibleSuggestionLabels\.length >= result\.visibleCardCount/);
 assert.match(source, /result\.suggestionLabelColorsMatch/);
+assert.match(
+  source,
+  /sky-garden-duo-extension\.css[\s\S]+sky-garden-duo-extension\.js/,
+  "The trusted Sky Garden extension must load from dedicated macOS-only assets.",
+);
+assert.match(
+  source,
+  /\[\s*"dream-skin\.css",\s*"renderer-inject\.js",\s*"sky-garden-duo-extension\.css",\s*"sky-garden-duo-extension\.js",\s*\]\.includes\(name\)/,
+  "The watcher must invalidate cached payloads when either trusted extension asset changes.",
+);
+assert.match(
+  source,
+  /const extensionPayload = theme\.id === DUO_THEME_ID[\s\S]+skyGardenExtensionCleanupPayload\(\),[\s\S]+canonicalPayload,[\s\S]+extensionPayload/,
+  "Payload composition must clean the optional extension, install the canonical runtime, then install Sky Garden UI.",
+);
+const removeStart = source.indexOf("async function removeFromSession");
+const extensionCleanupStart = source.indexOf("skyGardenExtensionCleanupPayload()", removeStart);
+const canonicalCleanupStart = source.indexOf("__CODEX_DREAM_SKIN_DISABLED__", extensionCleanupStart);
+assert.ok(
+  removeStart >= 0 && extensionCleanupStart > removeStart && canonicalCleanupStart > extensionCleanupStart,
+  "Soft removal must clean the trusted extension before removing the canonical runtime.",
+);
+
+const duoPayload = await buildPayloadForTheme(path.join(macosRoot, "presets", "preset-sky-garden-duo"));
+const genericPayload = await buildPayloadForTheme(path.join(macosRoot, "presets", "preset-gothic-void-crusade"));
+new vm.Script(duoPayload.payload);
+new vm.Script(genericPayload.payload);
+assert.match(duoPayload.payload, /dream-duo-lounge-rig/);
+assert.doesNotMatch(genericPayload.payload, /dream-duo-lounge-rig/);
 
 console.log("PASS: early injection is L0-ready, generation-safe, and removed on shutdown.");

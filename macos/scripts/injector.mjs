@@ -41,6 +41,11 @@ const SKIN_VERSION = "1.3.3";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 16 * 1024 * 1024;
+const DUO_THEME_ID = "preset-sky-garden-duo";
+const DUO_PET_DISPLAY_NAME = "天空花园双姝";
+const PET_STATE_HOLD_STYLE_ID = "codex-dream-skin-pet-state-hold";
+const PET_STATE_HOLD_REGISTRY_KEY = "__CODEX_DREAM_SKIN_PET_STATE_HOLD__";
+const DUO_ASSET_ROOT = path.join(root, "assets", "preset-extras", DUO_THEME_ID);
 const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
@@ -152,8 +157,59 @@ const OPERATION_UI_CSS = `
     }
   }
 `;
+const DUO_WIDGET_IMAGE_FILE = "duo-sidebar-widget-v3.png";
+const DUO_FOREGROUND_IMAGE_FILE = "duo-foreground-characters-jk-v1.png";
+const DUO_LOUNGE_IMAGE_FILE = "duo-lounge-jk-v1.png";
+const DUO_LOUNGE_BODY_IMAGE_FILE = "duo-lounge-body-v2.webp";
+const DUO_LOUNGE_LEFT_LEGS_IMAGE_FILE = "duo-lounge-left-legs-v2.webp";
+const DUO_LOUNGE_RIGHT_LEGS_IMAGE_FILE = "duo-lounge-right-legs-v2.webp";
+const DUO_LOUNGE_BLINK_IMAGE_FILE = "duo-lounge-blink-v1.webp";
+const DUO_CHARACTER_ICON_FILES = Object.freeze({
+  newTask: "nav-new-task.webp",
+  pullRequests: "nav-pull-requests.webp",
+  sites: "nav-sites.webp",
+  scheduled: "nav-scheduled.webp",
+  plugins: "nav-plugins.webp",
+  search: "nav-search.webp",
+  permissions: "control-permissions.webp",
+  send: "control-send.webp",
+});
 let staticPayloadAssets = null;
+let duoPayloadAssets = null;
 let operationSequence = 0;
+
+function skyGardenExtensionCleanupPayload() {
+  return `(() => {
+    window.__CODEX_DREAM_SKIN_SKY_GARDEN_DISABLED__ = true;
+    const state = window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
+    try {
+      if (state?.cleanup) return Boolean(state.cleanup());
+    } catch {}
+    const root = document.documentElement;
+    root?.classList.remove('codex-dream-skin');
+    root?.removeAttribute('data-dream-theme-id');
+    root?.removeAttribute('data-dream-motion-state');
+    root?.removeAttribute('data-dream-duo-foreground-mode');
+    document.querySelectorAll('.dream-skin-home, .dream-skin-home-shell, .dream-skin-home-utility')
+      .forEach((node) => {
+        node.classList.remove('dream-skin-home', 'dream-skin-home-shell', 'dream-skin-home-utility');
+      });
+    document.querySelectorAll('[data-dream-character-icon]').forEach((node) => node.remove());
+    document.querySelectorAll('[data-dream-character-role]').forEach((node) => {
+      node.removeAttribute('data-dream-character-role');
+      node.removeAttribute('data-dream-character-kind');
+    });
+    document.querySelectorAll('[data-dream-native-icon]').forEach((node) => {
+      node.removeAttribute('data-dream-native-icon');
+    });
+    document.getElementById('codex-dream-skin-sky-garden-style')?.remove();
+    document.getElementById('codex-dream-skin-chrome')?.remove();
+    document.getElementById('codex-dream-skin-motion-stage')?.remove();
+    document.getElementById('codex-dream-skin-sidebar-widget')?.remove();
+    delete window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
+    return true;
+  })()`;
+}
 
 function parseArgs(argv) {
   const options = {
@@ -241,6 +297,44 @@ function isValidCdpPageTarget(item, port) {
   } catch {
     return false;
   }
+}
+
+export function isAvatarOverlayTargetUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "app:"
+      && url.pathname === "/index.html"
+      && url.searchParams.get("initialRoute") === "/avatar-overlay";
+  } catch {
+    return false;
+  }
+}
+
+export function petNativeRestorePayloadFor(displayName = DUO_PET_DISPLAY_NAME) {
+  return `(() => {
+    const styleId = ${JSON.stringify(PET_STATE_HOLD_STYLE_ID)};
+    const registryKey = ${JSON.stringify(PET_STATE_HOLD_REGISTRY_KEY)};
+    const displayName = ${JSON.stringify(displayName)};
+    const legacyState = window[registryKey];
+    const legacyStyle = document.getElementById(styleId);
+    const removedLegacyStyle = Boolean(legacyState || legacyStyle);
+    try { legacyState?.cleanup?.(); } catch {}
+    document.getElementById(styleId)?.remove();
+    delete window[registryKey];
+    return { applied: true, nativeControl: true, removedLegacyStyle, displayName };
+  })()`;
+}
+
+export function petStateHoldCleanupPayload() {
+  return `(() => {
+    const registryKey = ${JSON.stringify(PET_STATE_HOLD_REGISTRY_KEY)};
+    const styleId = ${JSON.stringify(PET_STATE_HOLD_STYLE_ID)};
+    const state = window[registryKey];
+    if (state?.cleanup) return state.cleanup();
+    document.getElementById(styleId)?.remove();
+    delete window[registryKey];
+    return true;
+  })()`;
 }
 
 class CdpSession {
@@ -376,11 +470,13 @@ async function listAppTargets(port) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const avatarButton = document.querySelector('[data-testid="avatar-mascot-button"]');
     const markers = {
       shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: Boolean(document.querySelector(${selectorLiteral("left-panel")})),
       composer: Boolean(document.querySelector(${selectorLiteral("composer-chrome")})),
       main: Boolean(document.querySelector(${selectorLiteral("home-route")})),
+      avatar: Boolean(avatarButton?.querySelector('[data-testid="codex-avatar"]')),
     };
     const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
@@ -390,6 +486,7 @@ async function probeSession(session) {
       markers,
       codex: location.protocol === 'app:' &&
         ((markers.shell && markers.sidebar) || settings || markers.main),
+      avatarOverlay: markers.avatar,
     };
   })()`);
 }
@@ -400,6 +497,17 @@ async function waitForCodexProbe(session, timeoutMs = 1800) {
   while (Date.now() < deadline) {
     probe = await probeSession(session);
     if (probe?.codex) return probe;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return probe;
+}
+
+async function waitForAvatarOverlayProbe(session, timeoutMs = 1800) {
+  const deadline = Date.now() + timeoutMs;
+  let probe = null;
+  while (Date.now() < deadline) {
+    probe = await probeSession(session);
+    if (probe?.avatarOverlay) return probe;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   return probe;
@@ -436,6 +544,24 @@ async function connectCodexTargets(port, timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, 350));
   }
   throw new Error(`No verified ChatGPT renderer on 127.0.0.1:${port}: ${lastError?.message ?? "timed out"}`);
+}
+
+async function connectAvatarOverlayTargets(port, timeoutMs = 1800) {
+  const targets = (await listAppTargets(port)).filter((target) =>
+    isAvatarOverlayTargetUrl(target.url));
+  const connected = [];
+  for (const target of targets) {
+    let session;
+    try {
+      session = await connectTarget(target, port);
+      const probe = await waitForAvatarOverlayProbe(session, timeoutMs);
+      if (probe?.avatarOverlay) connected.push({ target, session, probe });
+      else session.close();
+    } catch {
+      session?.close();
+    }
+  }
+  return connected;
 }
 
 function assertContainedPath(rootPath, candidatePath, label) {
@@ -614,8 +740,92 @@ async function loadStaticPayloadAssets() {
   return { css, template, cacheHit };
 }
 
+async function loadDuoPayloadAssets(themeId) {
+  if (themeId !== DUO_THEME_ID) {
+    return {
+      cacheHit: true,
+      revision: "",
+      extensionCss: "",
+      extensionTemplate: "",
+      duoIcons: {},
+      duoWidgetArt: "",
+      duoForegroundArt: "",
+      duoLoungeArt: "",
+      duoLoungeBodyArt: "",
+      duoLoungeLeftLegsArt: "",
+      duoLoungeRightLegsArt: "",
+      duoLoungeBlinkArt: "",
+      widgetBytes: 0,
+      foregroundBytes: 0,
+      loungeBytes: 0,
+      loungeBodyBytes: 0,
+      loungeLegBytes: 0,
+      loungeBlinkBytes: 0,
+      characterIconBytes: 0,
+    };
+  }
+  const cacheHit = Boolean(duoPayloadAssets);
+  if (!duoPayloadAssets) {
+    const iconRoot = path.join(DUO_ASSET_ROOT, "duo-character-icons");
+    const iconEntries = Object.entries(DUO_CHARACTER_ICON_FILES);
+    duoPayloadAssets = Promise.all([
+      fs.readFile(path.join(root, "assets", "sky-garden-duo-extension.css"), "utf8"),
+      fs.readFile(path.join(root, "assets", "sky-garden-duo-extension.js"), "utf8"),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_WIDGET_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_FOREGROUND_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_BODY_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_LEFT_LEGS_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_RIGHT_LEGS_IMAGE_FILE)),
+      fs.readFile(path.join(DUO_ASSET_ROOT, DUO_LOUNGE_BLINK_IMAGE_FILE)),
+      ...iconEntries.map(([, filename]) => fs.readFile(path.join(iconRoot, filename))),
+    ]).then(([extensionCss, extensionTemplate, widgetBuffer, foregroundBuffer, loungeBuffer, loungeBodyBuffer, loungeLeftLegsBuffer, loungeRightLegsBuffer, loungeBlinkBuffer, ...iconBuffers]) => {
+      const duoIcons = Object.fromEntries(iconEntries.map(([role], index) => [
+        role,
+        `data:image/webp;base64,${iconBuffers[index].toString("base64")}`,
+      ]));
+      const staticRevision = createHash("sha256")
+        .update(extensionCss)
+        .update(extensionTemplate)
+        .update(widgetBuffer)
+        .update(foregroundBuffer)
+        .update(loungeBuffer)
+        .update(loungeBodyBuffer)
+        .update(loungeLeftLegsBuffer)
+        .update(loungeRightLegsBuffer)
+        .update(loungeBlinkBuffer);
+      for (const icon of iconBuffers) staticRevision.update(icon);
+      return {
+        extensionCss,
+        extensionTemplate,
+        duoIcons,
+        duoWidgetArt: `data:image/png;base64,${widgetBuffer.toString("base64")}`,
+        duoForegroundArt: `data:image/png;base64,${foregroundBuffer.toString("base64")}`,
+        duoLoungeArt: `data:image/png;base64,${loungeBuffer.toString("base64")}`,
+        duoLoungeBodyArt: `data:image/webp;base64,${loungeBodyBuffer.toString("base64")}`,
+        duoLoungeLeftLegsArt: `data:image/webp;base64,${loungeLeftLegsBuffer.toString("base64")}`,
+        duoLoungeRightLegsArt: `data:image/webp;base64,${loungeRightLegsBuffer.toString("base64")}`,
+        duoLoungeBlinkArt: `data:image/webp;base64,${loungeBlinkBuffer.toString("base64")}`,
+        widgetBytes: widgetBuffer.length,
+        foregroundBytes: foregroundBuffer.length,
+        loungeBytes: loungeBuffer.length,
+        loungeBodyBytes: loungeBodyBuffer.length,
+        loungeLegBytes: loungeLeftLegsBuffer.length + loungeRightLegsBuffer.length,
+        loungeBlinkBytes: loungeBlinkBuffer.length,
+        characterIconBytes: iconBuffers.reduce((total, icon) => total + icon.length, 0),
+        revision: staticRevision.digest("hex").slice(0, 20),
+      };
+    }).catch((error) => {
+      duoPayloadAssets = null;
+      throw error;
+    });
+  }
+  return { ...await duoPayloadAssets, cacheHit };
+}
+
 function invalidateStaticPayloadAssets() {
   staticPayloadAssets = null;
+  duoPayloadAssets = null;
 }
 
 async function loadPayload(themeDir) {
@@ -624,9 +834,19 @@ async function loadPayload(themeDir) {
     loadStaticPayloadAssets(),
     loadTheme(themeDir),
   ]);
+  const duoAssets = await loadDuoPayloadAssets(loaded.theme.id);
   const { css, template } = staticAssets;
+  const {
+    extensionCss, extensionTemplate,
+    duoIcons, duoWidgetArt, duoForegroundArt, duoLoungeArt,
+    duoLoungeBodyArt, duoLoungeLeftLegsArt, duoLoungeRightLegsArt, duoLoungeBlinkArt,
+  } = duoAssets;
   const { art, extension, theme } = loaded;
-  const styleRevision = createHash("sha256").update(css).digest("hex").slice(0, 20);
+  const styleRevision = createHash("sha256")
+    .update(css)
+    .update(duoAssets.revision)
+    .digest("hex")
+    .slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
   if (!artMetadata) {
     throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
@@ -641,26 +861,61 @@ async function loadPayload(themeDir) {
     .update(SKIN_VERSION)
     .update(css)
     .update(template)
+    .update(duoAssets.revision)
     .update(JSON.stringify(theme))
     .digest("hex")
     .slice(0, 20);
-  const payload = template
+  const canonicalPayload = template
     .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
     .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
     .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision));
+  const extensionPayload = theme.id === DUO_THEME_ID
+    ? extensionTemplate
+      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(extensionCss))
+      .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
+      .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
+      .replace("__DREAM_DUO_ICONS_JSON__", JSON.stringify(duoIcons))
+      .replace("__DREAM_DUO_WIDGET_ART_JSON__", JSON.stringify(duoWidgetArt))
+      .replace("__DREAM_DUO_FOREGROUND_ART_JSON__", JSON.stringify(duoForegroundArt))
+      .replace("__DREAM_DUO_LOUNGE_ART_JSON__", JSON.stringify(duoLoungeArt))
+      .replace("__DREAM_DUO_LOUNGE_BODY_ART_JSON__", JSON.stringify(duoLoungeBodyArt))
+      .replace("__DREAM_DUO_LOUNGE_LEFT_LEGS_ART_JSON__", JSON.stringify(duoLoungeLeftLegsArt))
+      .replace("__DREAM_DUO_LOUNGE_RIGHT_LEGS_ART_JSON__", JSON.stringify(duoLoungeRightLegsArt))
+      .replace("__DREAM_DUO_LOUNGE_BLINK_ART_JSON__", JSON.stringify(duoLoungeBlinkArt))
+      .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
+      .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
+      .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision))
+    : "";
+  const payload = [
+    skyGardenExtensionCleanupPayload(),
+    canonicalPayload,
+    extensionPayload,
+  ].filter(Boolean).join(";\n");
   return {
     imageBytes: art.length,
+    widgetBytes: duoAssets.widgetBytes,
+    foregroundBytes: duoAssets.foregroundBytes,
+    loungeBytes: duoAssets.loungeBytes,
+    loungeBodyBytes: duoAssets.loungeBodyBytes,
+    loungeLegBytes: duoAssets.loungeLegBytes,
+    loungeBlinkBytes: duoAssets.loungeBlinkBytes,
+    characterIconBytes: duoAssets.characterIconBytes,
     payload,
     revision,
     theme,
     timings: {
       buildMs: Number((performance.now() - startedAt).toFixed(3)),
       staticCacheHit: staticAssets.cacheHit,
+      extrasCacheHit: duoAssets.cacheHit,
     },
   };
+}
+
+export async function buildPayloadForTheme(themeDir) {
+  return loadPayload(themeDir);
 }
 
 async function applyToSession(session, payload) {
@@ -830,29 +1085,30 @@ async function presentOperationUi(session, token, state, message, timeoutMs = 10
 }
 
 async function removeFromSession(session) {
-  return session.evaluate(`(() => {
+  return session.evaluate(`${skyGardenExtensionCleanupPayload()};(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     let cleaned = false;
     try { cleaned = Boolean(state?.cleanup && state.cleanup()); } catch {}
-    if (cleaned) return true;
-    const root = document.documentElement;
-    for (const attribute of [...(root?.attributes || [])]) {
-      if (attribute.name.startsWith('data-dream-')) root.removeAttribute(attribute.name);
-    }
-    for (const property of [...(root?.style || [])]) {
-      if (property.startsWith('--dream-') || property.startsWith('--ds-')) {
-        root.style.removeProperty(property);
+    if (!cleaned) {
+      const root = document.documentElement;
+      for (const attribute of [...(root?.attributes || [])]) {
+        if (attribute.name.startsWith('data-dream-')) root.removeAttribute(attribute.name);
       }
-    }
-    const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
-    if (sheets && 'adoptedStyleSheets' in document) {
-      document.adoptedStyleSheets = [...document.adoptedStyleSheets]
-        .filter((sheet) => !sheets.has(sheet));
+      for (const property of [...(root?.style || [])]) {
+        if (property.startsWith('--dream-') || property.startsWith('--ds-')) {
+          root.style.removeProperty(property);
+        }
+      }
+      const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
+      if (sheets && 'adoptedStyleSheets' in document) {
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets]
+          .filter((sheet) => !sheets.has(sheet));
+      }
+      try { if (state?.artUrl) URL.revokeObjectURL(state.artUrl); } catch {}
+      document.getElementById('codex-dream-skin-style')?.remove();
     }
     delete window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
-    try { if (state?.artUrl) URL.revokeObjectURL(state.artUrl); } catch {}
-    document.getElementById('codex-dream-skin-style')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
     return true;
   })()`);
@@ -870,7 +1126,15 @@ async function verifyRemovedSession(session) {
       [...document.adoptedStyleSheets].some((sheet) => sheets.has(sheet)));
     return !hasAttributes && !hasVariables && !hasSheets &&
       !document.getElementById('codex-dream-skin-style') &&
-      !window.__CODEX_DREAM_SKIN_STATE__;
+      !document.getElementById('codex-dream-skin-sky-garden-style') &&
+      !document.getElementById('codex-dream-skin-chrome') &&
+      !document.getElementById('codex-dream-skin-motion-stage') &&
+      !document.getElementById('codex-dream-skin-sidebar-widget') &&
+      !document.querySelector('[data-dream-character-icon]') &&
+      !document.querySelector('[data-dream-character-role]') &&
+      !document.querySelector('[data-dream-native-icon]') &&
+      !window.__CODEX_DREAM_SKIN_STATE__ &&
+      !window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
   })()`);
 }
 
@@ -915,15 +1179,27 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
     const composer = box(document.querySelector(${selectorLiteral("composer-chrome")}));
     const sidebar = box(document.querySelector(${selectorLiteral("left-panel")}));
+    const root = document.documentElement;
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
+    const skyGardenState = window.__CODEX_DREAM_SKIN_SKY_GARDEN_STATE__;
     const adopted = runtime?.styleMode === 'adopted' &&
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
     const fallback = runtime?.styleMode === 'style' &&
       document.getElementById('codex-dream-skin-style') === runtime.styleNode;
+    const chrome = document.getElementById('codex-dream-skin-chrome');
+    const motionStage = document.getElementById('codex-dream-skin-motion-stage');
+    const foreground = motionStage?.querySelector('.dream-duo-characters') ?? null;
+    const lounge = motionStage?.querySelector('.dream-duo-lounge') ?? null;
+    const loungeRig = lounge?.querySelector('.dream-duo-lounge-rig') ?? null;
+    const loungeLegLayers = lounge?.querySelectorAll('.dream-duo-lounge-left-legs, .dream-duo-lounge-right-legs').length ?? 0;
+    const loungeBlink = lounge?.querySelector('.dream-duo-lounge-blink') ?? null;
+    const sidebarWidget = document.getElementById('codex-dream-skin-sidebar-widget');
+    const themeId = runtime?.themeId ?? null;
+    const motionState = root.getAttribute('data-dream-motion-state');
     const result = {
-      installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
+      installed: root.getAttribute('data-dream-skin') === 'active',
       version: runtime?.version ?? null,
-      themeId: runtime?.themeId ?? null,
+      themeId,
       revision: runtime?.revision ?? null,
       styleMode: runtime?.styleMode ?? null,
       stylePresent: Boolean(adopted || fallback),
@@ -931,6 +1207,10 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       businessClassPollution: [...document.querySelectorAll('[class]')].filter((node) =>
         [...node.classList].some((name) => /^(?:dream-|codex-dream-skin(?:-|$))/.test(name))
       ).length,
+      skyGardenActive: skyGardenState?.themeId === 'preset-sky-garden-duo',
+      skyGardenStylePresent: Boolean(document.getElementById('codex-dream-skin-sky-garden-style')),
+      chromePresent: Boolean(chrome),
+      chromePointerEvents: getComputedStyle(chrome || document.body).pointerEvents,
       homeRoute: Boolean(homeRoute),
       homePresent: Boolean(home),
       hero,
@@ -944,15 +1224,52 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       sidebar,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
-        x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-        y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+        x: root.scrollWidth > root.clientWidth,
+        y: root.scrollHeight > root.clientHeight,
+      },
+      motion: {
+        themeId, state: motionState, stagePresent: Boolean(motionStage),
+        petalCount: motionStage?.querySelectorAll('.dream-duo-petals i').length ?? 0,
+        foregroundPresent: Boolean(foreground),
+        loungePresent: Boolean(lounge),
+        loungeRigPresent: Boolean(loungeRig),
+        loungeLegLayers,
+        loungeBlinkPresent: Boolean(loungeBlink),
+        avoidanceMode: root.getAttribute('data-dream-duo-foreground-mode') || 'normal',
+        pointerEvents: getComputedStyle(motionStage || document.body).pointerEvents,
+        active: Boolean(skyGardenState?.metrics?.motionActive),
+        sidebarWidgetPresent: Boolean(sidebarWidget),
+        frames: skyGardenState?.metrics?.motionFrames ?? 0,
+        pointerMoves: skyGardenState?.metrics?.motionPointerEvents ?? 0,
+      },
+      characters: {
+        iconCount: document.querySelectorAll('[data-dream-character-icon]').length,
+        targetCount: document.querySelectorAll('[data-dream-character-role]').length,
+        nativeMarkerCount: document.querySelectorAll('[data-dream-native-icon]').length,
+        creates: skyGardenState?.metrics?.characterIconCreates ?? 0,
       },
     };
+    const skyGardenPass = themeId !== 'preset-sky-garden-duo' || (
+      result.skyGardenActive && result.skyGardenStylePresent &&
+      result.motion.stagePresent && result.motion.petalCount === 14 &&
+      result.motion.foregroundPresent && result.motion.loungePresent &&
+      result.motion.loungeRigPresent && result.motion.loungeLegLayers === 2 && result.motion.loungeBlinkPresent &&
+      ['normal', 'scaled', 'hidden'].includes(result.motion.avoidanceMode) &&
+      result.motion.pointerEvents === 'none' && result.motion.active &&
+      result.motion.sidebarWidgetPresent &&
+      (motionState === 'running' || motionState === 'paused')
+    );
+    const characterPass = themeId !== 'preset-sky-garden-duo' || (
+      result.characters.iconCount >= 5 &&
+      result.characters.targetCount === result.characters.iconCount
+    );
     const structurePass = result.scope?.level === 'L0' ||
       (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible));
+    const classPass = result.businessClassPollution === 0 ||
+      (themeId === 'preset-sky-garden-duo' && result.skyGardenActive);
     const basePass = result.installed && result.version === ${JSON.stringify(SKIN_VERSION)} &&
-      result.stylePresent && result.businessClassPollution === 0 && structurePass &&
-      !result.documentOverflow.x;
+      result.stylePresent && classPass && structurePass && !result.documentOverflow.x &&
+      skyGardenPass && characterPass;
     const expectedThemeId = ${JSON.stringify(expectedThemeId)};
     const expectedRevision = ${JSON.stringify(expectedRevision)};
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
@@ -1044,6 +1361,9 @@ async function runFinishOperation(options) {
 
 async function runOneShot(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs);
+  const petConnected = options.mode === "once" || options.mode === "remove"
+    ? await connectAvatarOverlayTargets(options.port, Math.min(options.timeoutMs, 1800))
+    : [];
   const operationToken = options.mode === "once" || options.mode === "remove"
     ? options.operationToken ?? nextOperationToken()
     : null;
@@ -1067,11 +1387,29 @@ async function runOneShot(options) {
       )));
     }
     for (const { session } of connected) session.close();
+    for (const { session } of petConnected) session.close();
     throw error;
   }
   const payload = loaded?.payload ?? null;
   const results = [];
+  const petResults = [];
   let screenshotCaptured = false;
+
+  for (const { target, session, probe } of petConnected) {
+    try {
+      const result = options.mode === "remove" || loaded?.theme.id !== DUO_THEME_ID
+        ? await session.evaluate(petStateHoldCleanupPayload())
+        : await session.evaluate(petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME));
+      if (options.mode === "once" && loaded?.theme.id === DUO_THEME_ID && !result?.applied) {
+        throw new Error("Native pet control restore did not apply");
+      }
+      petResults.push({ targetId: target.id, url: target.url, probe, result });
+    } catch (error) {
+      petResults.push({ targetId: target.id, url: target.url, probe, error: error.message });
+    } finally {
+      session.close();
+    }
+  }
 
   for (const { target, session, probe } of connected) {
     try {
@@ -1154,9 +1492,16 @@ async function runOneShot(options) {
     }
   }
 
-  console.log(JSON.stringify({ mode: options.mode, version: SKIN_VERSION, port: options.port, targets: results }, null, 2));
+  console.log(JSON.stringify({
+    mode: options.mode,
+    version: SKIN_VERSION,
+    port: options.port,
+    targets: results,
+    petOverlays: petResults,
+  }, null, 2));
   const failed = results.length === 0 || results.some((item) =>
-    item.error || (options.mode === "remove" ? item.result !== true : !item.result?.pass));
+    item.error || (options.mode === "remove" ? item.result !== true : !item.result?.pass))
+    || petResults.some((item) => item.error);
   if (failed) process.exitCode = 2;
 }
 
@@ -1198,6 +1543,41 @@ export function earlyPayloadFor(payload, revision) {
   })()`;
 }
 
+export function petNativeRestoreEarlyPayloadFor(
+  displayName = DUO_PET_DISPLAY_NAME,
+  revision = SKIN_VERSION,
+) {
+  const payload = petNativeRestorePayloadFor(displayName);
+  return `(() => {
+    const generationKey = "__CODEX_DREAM_SKIN_PET_EARLY_GENERATION__";
+    const appliedKey = "__CODEX_DREAM_SKIN_PET_EARLY_APPLIED__";
+    const generation = ${JSON.stringify(revision)};
+    const deadline = Date.now() + 10000;
+    window[generationKey] = generation;
+    let timer = null;
+    const stop = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+    const install = () => {
+      if (window[generationKey] !== generation || Date.now() >= deadline) {
+        stop();
+        return;
+      }
+      if (!document.documentElement) {
+        timer = setTimeout(install, 16);
+        return;
+      }
+      ${payload};
+      window[appliedKey] = generation;
+      stop();
+    };
+    install();
+  })()`;
+}
+
+const characterIconRoot = path.join(DUO_ASSET_ROOT, "duo-character-icons");
+
 function watchPayloadSources(themeDir, onDirty) {
   const assetsRoot = path.join(root, "assets");
   const themeRoot = themeDir ?? assetsRoot;
@@ -1207,8 +1587,16 @@ function watchPayloadSources(themeDir, onDirty) {
     try {
       watcher = watchFs(directory, { persistent: false }, (_event, filename) => {
         const name = filename ? String(filename) : "";
-        const staticChanged = directory === assetsRoot &&
-          (!name || name === "dream-skin.css" || name === "renderer-inject.js");
+        const staticChanged = kind === "static" && (
+          directory === characterIconRoot || directory === DUO_ASSET_ROOT
+          || (directory === assetsRoot &&
+            (!name || [
+              "dream-skin.css",
+              "renderer-inject.js",
+              "sky-garden-duo-extension.css",
+              "sky-garden-duo-extension.js",
+            ].includes(name)))
+        );
         if (kind === "static" && !staticChanged) return;
         onDirty({ staticChanged });
       });
@@ -1222,6 +1610,8 @@ function watchPayloadSources(themeDir, onDirty) {
   };
   add(themeRoot, "theme");
   if (themeRoot !== assetsRoot) add(assetsRoot, "static");
+  if (themeRoot !== DUO_ASSET_ROOT) add(DUO_ASSET_ROOT, "static");
+  if (themeRoot !== characterIconRoot) add(characterIconRoot, "static");
   return () => watchers.forEach((watcher) => watcher.close());
 }
 
@@ -1397,6 +1787,13 @@ async function runWatch(options) {
     return result.identifier ?? null;
   };
 
+  const registerPetEarly = async (session, revision) => {
+    const result = await session.send("Page.addScriptToEvaluateOnNewDocument", {
+      source: petNativeRestoreEarlyPayloadFor(DUO_PET_DISPLAY_NAME, revision),
+    });
+    return result.identifier ?? null;
+  };
+
   const removeEarlyIdentifier = async (record, identifier, { strict = false } = {}) => {
     if (!identifier) return true;
     if (record.session.closed) {
@@ -1432,10 +1829,23 @@ async function runWatch(options) {
     return identifier;
   };
 
+  const registerPetEarlyForRecord = async (record, revision) => {
+    const identifier = await registerPetEarly(record.session, revision);
+    if (identifier) record.earlyScriptIds.add(identifier);
+    return identifier;
+  };
+
   const invalidateEarly = async (record, { strict = false } = {}) => {
     record.needsLoadFallback = false;
     if (record.session.closed) {
       if (strict) throw new Error("Renderer session closed before pause invalidation");
+    } else if (record.kind === "pet-overlay") {
+      await record.session.evaluate(
+        petStateHoldCleanupPayload(),
+        strict ? 1500 : 10000,
+      ).catch((error) => {
+        if (strict) throw error;
+      });
     } else {
       await record.session.evaluate(`(() => {
         window.__CODEX_DREAM_SKIN_EARLY_GENERATION__ = ${JSON.stringify(`disabled:${process.pid}`)};
@@ -1471,7 +1881,7 @@ async function runWatch(options) {
       next = await loadPayload(options.themeDir);
     } catch (error) {
       await Promise.all([...sessions.values()].map(async (record) => {
-        if (record.session.closed) return;
+        if (record.session.closed || record.kind === "pet-overlay") return;
         const externalOperation = activeOperation;
         const operationToken = externalOperation?.token ?? nextOperationToken();
         record.operationToken = operationToken;
@@ -1494,6 +1904,21 @@ async function runWatch(options) {
     for (const record of sessions.values()) {
       const { session } = record;
       if (session.closed) continue;
+      if (record.kind === "pet-overlay") {
+        try {
+          await invalidateEarly(record);
+          if (current.theme.id !== DUO_THEME_ID) continue;
+          const nextIdentifier = await registerPetEarlyForRecord(record, current.revision);
+          record.earlyScriptId = nextIdentifier;
+          record.needsLoadFallback = !nextIdentifier;
+          const result = await session.evaluate(petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME));
+          if (!result?.applied) throw new Error("Native pet control restore did not apply");
+        } catch (error) {
+          record.needsLoadFallback = true;
+          console.error(`[dream-skin] native pet restore failed: ${error.message}`);
+        }
+        continue;
+      }
       const externalOperation = activeOperation;
       const operationToken = externalOperation?.token ?? nextOperationToken();
       record.operationToken = operationToken;
@@ -1568,7 +1993,7 @@ async function runWatch(options) {
         mutationEpoch += 1;
       }
       await Promise.all([...sessions.values()].map(async (record) => {
-        if (record.session.closed) return;
+        if (record.session.closed || record.kind === "pet-overlay") return;
         if (busy) {
           const kind = operation.status === "pausing" ? "pause" : "apply";
           record.operationToken = operation.token;
@@ -1686,8 +2111,12 @@ async function runWatch(options) {
         beginTargetSetup();
         try {
           session = await connectTarget(target, options.port);
+          const targetKind = isAvatarOverlayTargetUrl(target.url)
+            ? "pet-overlay"
+            : "codex";
           record = {
             session,
+            kind: targetKind,
             earlyScriptId: null,
             earlyScriptIds: new Set(),
             needsLoadFallback: false,
@@ -1702,7 +2131,10 @@ async function runWatch(options) {
             setTimeout(() => {
               if (session.closed || controlOnly || mutationEpoch !== fallbackEpoch
                 || !record.needsLoadFallback) return;
-              applyToSession(session, current.payload).catch((error) => {
+              const fallbackPayload = record.kind === "pet-overlay"
+                ? petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME)
+                : current.payload;
+              applyToSession(session, fallbackPayload).catch((error) => {
                 console.error(`[dream-skin] fallback reinject failed: ${error.message}`);
               });
             }, 0);
@@ -1710,6 +2142,35 @@ async function runWatch(options) {
           const initialOperation = activeOperation;
           recoveryOperation = initialOperation ? null : cycleRecovery;
           const pausing = initialOperation?.status === "pausing";
+          if (record.kind === "pet-overlay") {
+            const probe = await waitForAvatarOverlayProbe(session);
+            if (!probe?.avatarOverlay) {
+              session.close();
+              sessions.delete(target.id);
+              continue;
+            }
+            if (controlOnly || pausing || current.theme.id !== DUO_THEME_ID) {
+              await invalidateEarly(record);
+              continue;
+            }
+            try {
+              record.earlyScriptId = await registerPetEarlyForRecord(
+                record,
+                current.revision,
+              );
+              const result = await session.evaluate(
+                petNativeRestorePayloadFor(DUO_PET_DISPLAY_NAME),
+              );
+              if (!result?.applied) throw new Error("Native pet control restore did not apply");
+              record.needsLoadFallback = !record.earlyScriptId;
+              rejected.delete(target.id);
+              console.log(`[dream-skin] restored native pet overlay ${target.id}`);
+            } catch (error) {
+              record.needsLoadFallback = true;
+              throw error;
+            }
+            continue;
+          }
           if (!controlOnly) {
             try {
               record.earlyScriptId = await registerEarlyForRecord(
@@ -1843,6 +2304,10 @@ async function runWatch(options) {
       record.operationToken && !record.operationExternal
         ? bestEffortOperationUi(record.session, "hide", record.operationToken, "loading", "")
         : Promise.resolve(false)));
+    await Promise.all([...sessions.values()].map((record) =>
+      record.kind === "pet-overlay" && !record.session.closed
+        ? record.session.evaluate(petStateHoldCleanupPayload()).catch(() => false)
+        : Promise.resolve(false)));
     await Promise.all([...sessions.values()].map((record) => removeEarly(record)));
     for (const record of sessions.values()) record.session.close();
   }
@@ -1865,6 +2330,13 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         themeId: loaded.theme.id,
         themeName: loaded.theme.name,
         imageBytes: loaded.imageBytes,
+        widgetBytes: loaded.widgetBytes,
+        foregroundBytes: loaded.foregroundBytes,
+        loungeBytes: loaded.loungeBytes,
+        loungeBodyBytes: loaded.loungeBodyBytes,
+        loungeLegBytes: loaded.loungeLegBytes,
+        loungeBlinkBytes: loaded.loungeBlinkBytes,
+        characterIconBytes: loaded.characterIconBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
         artMetadata: loaded.theme.artMetadata ?? null,
         timings: loaded.timings,

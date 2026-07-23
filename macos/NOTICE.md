@@ -26,6 +26,21 @@ this MIT-licensed project. It is the redistributable default artwork included in
 the public macOS and Windows installers. Its name and artwork do not imply
 OpenAI/Codex affiliation or endorsement.
 
+## Sky Garden Duo artwork
+
+The files under `presets/preset-sky-garden-duo/` and
+`assets/preset-extras/preset-sky-garden-duo/` are AI-generated original artwork
+contributed specifically for this project. They depict fictional adult
+characters and do not intentionally reference a real person or an existing
+franchise. The contributor confirmed on 2026-07-21 that these generated assets
+may be redistributed with the project. They are not official OpenAI/Codex
+artwork or an endorsement.
+
+`../docs/images/presets/sky-garden-duo-home.jpg` and
+`../docs/images/presets/sky-garden-duo-task.jpg` are real runtime documentation
+previews with the account name redacted. They contain Codex UI and must not be
+imported or redistributed as theme backgrounds.
+
 ## Arina Hashimoto reference material
 
 The following user/maintainer-supplied files are excluded from the MIT software license:

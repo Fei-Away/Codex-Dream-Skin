@@ -6,12 +6,15 @@
 
 ## 内置实测预设
 
-当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）与
-`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）两套实机验证主题。
-前者是社区作者提供的原创哥特科幻背景；后者使用一张
+当前内置 `preset-gothic-void-crusade/`（Gothic Void Crusade）、
+`preset-arina-hashimoto/`（桥本有菜 / Arina Hashimoto）与
+`preset-sky-garden-duo/`（天空花园双姝 / Sky Garden Duo）三套实机验证主题。
+第一套是社区作者提供的原创哥特科幻背景；第二套使用一张
 `2560 × 1440`（16:9）纯背景：左侧低信息留白承载 Codex 原生标题，人物和花卉主视觉集中在右侧。浅色与暗色截图均来自真实 Codex 注入，不是 AI 绘制的整窗 UI。
 
-来源尺寸必须如实区分：归档的用户源图（不随 preset 播种）是 `1672 × 941` PNG；preset 内的 `background.jpg` 保持其近 16:9 构图，标准化导出为 `2560 × 1440` JPEG，并不代表补回或新增了源图细节。派生文件使用 `sips -z 1440 2560 -s format jpeg -s formatOptions 90` 生成。
+天空花园双姝使用 `2560 × 1440` 冰蓝花园背景，并带完整角色 UI：侧栏主题卡片、导航小人物、右下前景双角色、顶部趴卧双角色、眨眼与摆腿、流动光影和花瓣。角色是原创虚构成年人物，不对应真人或现有动漫、游戏、影视角色。
+
+桥本有菜的来源尺寸必须如实区分：归档的用户源图（不随 preset 播种）是 `1672 × 941` PNG；preset 内的 `background.jpg` 保持其近 16:9 构图，标准化导出为 `2560 × 1440` JPEG，并不代表补回或新增了源图细节。派生文件使用 `sips -z 1440 2560 -s format jpeg -s formatOptions 90` 生成。
 
 - 可导入/可播种的主题素材只有 [`background.jpg`](./preset-arina-hashimoto/background.jpg) 与 [`theme.json`](./preset-arina-hashimoto/theme.json)。
 - 用户提供的 byte-identical 源 PNG 单独归档在 [`docs/images/presets/arina-hashimoto-source.png`](../../docs/images/presets/arina-hashimoto-source.png)，不放进 preset pack，因此不会被安装脚本播种为多余文件。
@@ -24,6 +27,13 @@
 ```bash
 ~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
   --id preset-arina-hashimoto
+```
+
+天空花园双姝：
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-sky-garden-duo
 ```
 
 ## 一套预设的结构
@@ -41,6 +51,10 @@ preset-<slug>/
   - `"dark"` / `"light"`——单模专属图（如深色大教堂、纯白极简）。皮肤外壳固定为该模式，不随客户端切换。
   - 暗色专属画作声明 `auto` 是缺陷不是偏好：客户端处于浅色时，Codex 原生组件（差异卡片、任务条等）按浅色渲染，会与暗图直接打架（#134 曾因此返修）。拿不准就按图的实际明暗写死，不要照抄模板默认值。
 - 人物/场景背景优先提交 `2560 × 1440`（16:9）母版；主视觉放在右侧约 58%～88%，左侧约 50%～58% 保持低信息、低对比。禁止把效果截图、窗口 mockup 或任何带 UI 的图片命名为 `background.*`。
+
+### 可信内置 UI 扩展
+
+普通 preset 仍然只有 `theme.json + background.*`，不能执行自定义 CSS 或 JavaScript。天空花园双姝的额外角色素材属于随引擎审查、测试和发布的可信内置扩展，存放在 `assets/preset-extras/preset-sky-garden-duo/`；注入器只在精确匹配该内置 id 时加载，切换到其他主题后会清理全部节点、监听器和动画。新增此类扩展需要同时修改引擎和测试，不能仅靠用户主题包开启。
 
 ## theme.json 字段全解（投稿必读）
 

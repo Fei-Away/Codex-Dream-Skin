@@ -68,6 +68,33 @@ updates, and uninstall steps.
 
 After installing on macOS, switch directly from **Saved Themes** in the menu bar.
 
+### Sky Garden Duo / 天空花园双姝 (macOS)
+
+This is a complete character UI theme rather than a wallpaper-only preset. It
+adds a sidebar theme card, character navigation mascots, a foreground companion
+pair, a reclining top companion, blink and leg motion, flowing light, and
+falling petals. Decorations never receive pointer events and are removed on a
+hot theme switch or pause without restarting Codex.
+
+<p align="center">
+  <img src="docs/images/presets/sky-garden-duo-home.jpg" alt="Sky Garden Duo running on the real Codex new-task page" width="900"><br>
+  <sub>New-task page · real injected Codex screenshot; account name redacted (preview only)</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/presets/sky-garden-duo-task.jpg" alt="Sky Garden Duo running on a regular Codex task page" width="900"><br>
+  <sub>Regular task page · real injected Codex screenshot; account name redacted (preview only)</sub>
+</p>
+
+```bash
+~/.codex/codex-dream-skin-studio/scripts/switch-theme-macos.sh \
+  --id preset-sky-garden-duo
+```
+
+The character pack is enabled only for the fixed bundled preset id. Imported
+user themes keep the existing `theme.json + background.*` format and cannot
+load arbitrary CSS or JavaScript.
+
 ### Arina Hashimoto / 桥本有菜
 
 “Arina Hashimoto / 桥本有菜” has been verified on the real Codex home screen in

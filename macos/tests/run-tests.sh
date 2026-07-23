@@ -138,8 +138,11 @@ fi
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
+"$NODE" "$ROOT/tests/pet-state-hold.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
+"$NODE" "$ROOT/tests/sky-garden-duo-extension.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
+"$ROOT/tests/pet-seeding.test.sh"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do
@@ -151,6 +154,23 @@ for preset in "$ROOT"/presets/preset-*/; do
     if (!v.pass || v.themeId !== process.argv[2] || v.imageBytes < 1) process.exit(1);
   ' "$PRESET_CHECK" "$PRESET_ID"
 done
+
+# Sky Garden Duo is a trusted built-in extension. Its binary character payload
+# must be embedded for that preset only, never for generic or user themes.
+DUO_CHECK="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload \
+  --theme-dir "$ROOT/presets/preset-sky-garden-duo")"
+GENERIC_CHECK="$("$NODE" "$ROOT/scripts/injector.mjs" --check-payload \
+  --theme-dir "$ROOT/presets/preset-gothic-void-crusade")"
+"$NODE" -e '
+  const duo = JSON.parse(process.argv[1]);
+  const generic = JSON.parse(process.argv[2]);
+  const extraKeys = [
+    "widgetBytes", "foregroundBytes", "loungeBytes", "loungeBodyBytes",
+    "loungeLegBytes", "loungeBlinkBytes", "characterIconBytes",
+  ];
+  if (!extraKeys.every((key) => duo[key] > 0)) process.exit(1);
+  if (!extraKeys.every((key) => generic[key] === 0)) process.exit(1);
+' "$DUO_CHECK" "$GENERIC_CHECK"
 
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
 TEST_INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.tests.$$"
@@ -281,10 +301,12 @@ fi
   [ -f "$themes/preset-gothic-void-crusade/background.jpg" ] || exit 1
   [ -f "$themes/preset-arina-hashimoto/theme.json" ] || exit 1
   [ -f "$themes/preset-arina-hashimoto/background.jpg" ] || exit 1
+  [ -f "$themes/preset-sky-garden-duo/theme.json" ] || exit 1
+  [ -f "$themes/preset-sky-garden-duo/background.jpg" ] || exit 1
   [ -f "$themes/custom-keepme/theme.json" ] || exit 1
   for id in $retired; do [ ! -e "$themes/$id" ] || exit 1; done
   seeded="$(/usr/bin/find "$themes" -maxdepth 1 -type d -name "preset-*" | /usr/bin/wc -l | /usr/bin/tr -d " ")"
-  [ "$seeded" -eq 2 ] || exit 1
+  [ "$seeded" -eq 3 ] || exit 1
 ' _ "$ROOT"
 
 run_signed_runtime_switch_test() {
