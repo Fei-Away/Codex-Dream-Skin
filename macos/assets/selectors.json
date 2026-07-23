@@ -28,6 +28,7 @@
   "selectors": [
     { "key": "shell-main", "selector": "main.main-surface", "tier": "L1", "scope": "all", "required": true, "notes": "全局主表面。mac 设置页缺失（win 存在），缺失时整页仅 L0" },
     { "key": "left-panel", "selector": "aside.app-shell-left-panel", "tier": "L1", "scope": "all", "required": true, "notes": "左侧栏；收起/重建时会移除节点，勿在其消失时清皮" },
+    { "key": "right-panel", "selector": "div[class~=\"bg-token-main-surface-primary\"][class~=\"border-l\"]", "tier": "L2", "scope": "home+thread", "required": false, "notes": "Review / Terminal / Browser / Files 右侧面板的有边框外壳；可与首页或任务页同屏，底部面板不带 border-l。用于 CSS anchor 定位宽幅画作右边界，缺失时自然回退到整窗背景" },
     { "key": "header-tint", "selector": "header.app-header-tint", "tier": "L1", "scope": "all", "required": true, "notes": "顶栏；皮肤不得覆盖其 position/z-index（既有回归约束）" },
     { "key": "home-icon", "selector": "[data-testid=\"home-icon\"]", "tier": "L1", "scope": "home", "required": true, "notes": "首页判定信号，双端一致" },
     { "key": "home-route", "selector": "[role=\"main\"]:has([data-testid=\"home-icon\"])", "tier": "L1", "scope": "home", "required": true, "notes": "首页容器。实测 [role=main] 仅存在于首页——它不是通用路由锚点，thread 页没有" },

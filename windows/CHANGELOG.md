@@ -1,5 +1,12 @@
 # Windows Changelog
 
+## Unreleased
+
+### 修复
+
+- 与 macOS 共用的宽幅画作层通过 CSS anchor 自动以 Review / Terminal / Browser / Files 右侧面板的实时左边界作为画布右边界；底部面板改变右侧面板高度时不再触发画作重新缩放或裁切，且无需 renderer 布局读取。
+- 任务页左侧栏与首页使用同一组半透明材质变量，路由切换时不再出现背景明显变深、降饱和的问题。
+
 ## 1.3.3 — 2026-07-23
 
 ### 修复

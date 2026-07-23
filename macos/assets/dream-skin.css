@@ -190,6 +190,35 @@ html[data-dream-skin="active"] body::before {
   content: none;
 }
 
+/* Wide artwork is painted on a fixed layer so its cover geometry can stop at
+   the native right-side panel instead of continuing underneath it. CSS anchor
+   positioning lets the layout engine track panel resizing without renderer
+   layout reads or DOM marker classes. */
+html[data-dream-skin="active"][data-dream-art-wide="true"] body {
+  position: relative;
+  isolation: isolate;
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="true"] body::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-position: var(--ds-art-position);
+  background-size: cover;
+  background-repeat: no-repeat;
+  transition: right .22s cubic-bezier(.22, 1, .36, 1);
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="true"] div[class~="bg-token-main-surface-primary"][class~="border-l"] {
+  anchor-name: --dream-skin-right-panel;
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="true"]
+  body:has(main.main-surface div[class~="bg-token-main-surface-primary"][class~="border-l"])::after {
+  right: anchor(--dream-skin-right-panel left, 0px);
+}
+
 html[data-dream-skin="active"] aside.app-shell-left-panel {
   background:
     linear-gradient(180deg,
@@ -306,18 +335,21 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"])) body {
+  background-image: none !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"])) body::after {
+  content: "";
   background-image: var(--dream-skin-art) !important;
-  background-position: var(--ds-art-position) !important;
-  background-size: cover !important;
-  background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
   aside.app-shell-left-panel {
+  /* Keep task/edit routes as transparent as the home route so artwork color
+     and saturation remain visually consistent after opening a conversation. */
   background: linear-gradient(90deg,
-    var(--ds-task-immersive-sidebar),
-    var(--ds-task-immersive-edge) 100%) !important;
+    var(--ds-immersive-sidebar),
+    var(--ds-immersive-edge) 100%) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -783,11 +815,12 @@ html[data-dream-skin="active"] .composer-surface-chrome::before { content: none 
 /* A wide image can carry the home screen too. The native hero remains live,
    but the artwork is painted once on the window instead of repeated in a card. */
 html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main.main-surface [role="main"]) body {
+  background-image: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main.main-surface [role="main"]) body::after {
+  content: "";
   background-image: var(--dream-skin-art) !important;
-  background-position: var(--ds-art-position) !important;
-  background-size: cover !important;
-  background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main.main-surface [role="main"])

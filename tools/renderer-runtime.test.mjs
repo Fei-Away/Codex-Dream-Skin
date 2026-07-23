@@ -199,6 +199,26 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
   assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
+  assert.match(
+    css,
+    /div\[class~="bg-token-main-surface-primary"\]\[class~="border-l"\]\s*\{[\s\S]{0,120}anchor-name:\s*--dream-skin-right-panel/,
+    "The native right panel must expose a CSS anchor for artwork geometry.",
+  );
+  assert.match(
+    css,
+    /body:has\(main\.main-surface div\[class~="bg-token-main-surface-primary"\]\[class~="border-l"\]\)::after\s*\{[\s\S]{0,120}right:\s*anchor\(--dream-skin-right-panel left,\s*0px\)/,
+    "Wide artwork must stop at the live right-panel edge without renderer layout reads.",
+  );
+  assert.match(
+    css,
+    /body::after\s*\{[\s\S]{0,220}inset:\s*0;[\s\S]{0,220}background-position:\s*var\(--ds-art-position\);[\s\S]{0,120}background-size:\s*cover;/,
+    "Wide artwork must keep a stable fixed cover layer while panels resize.",
+  );
+  assert.match(
+    css,
+    /main\.main-surface\):not\(:has\(main\.main-surface \[role="main"\]\)\)\s+aside\.app-shell-left-panel\s*\{[\s\S]{0,260}var\(--ds-immersive-sidebar\)[\s\S]{0,100}var\(--ds-immersive-edge\)/,
+    "Task routes must use the same translucent sidebar treatment as home.",
+  );
   assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
   assert.match(css, /content:\s*var\(--dream-skin-status/);
   assert.match(css, /content:\s*var\(--dream-skin-quote/);
