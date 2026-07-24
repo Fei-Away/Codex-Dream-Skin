@@ -19,7 +19,6 @@ runtime/*
 !runtime/validate-safe-css-file.mjs
 
 # local agent context
-AGENTS.md
 TASK_PROGRESS.md
 修复记录*.md
 docs/architecture-cdp-and-cross-platform-grok45.md
