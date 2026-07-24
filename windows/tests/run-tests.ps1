@@ -987,7 +987,9 @@ try {
   $publicPresetRoot = Join-Path $repositoryRoot 'macos\presets\preset-gothic-void-crusade'
   New-Item -ItemType Directory -Path $releaseFixtureAssets, $releaseFixtureScripts, $releaseFixturePresetDirectory -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $Root 'VERSION') -Destination $releaseFixtureRoot -Force
-  foreach ($releaseAsset in @('dream-skin.css', 'renderer-inject.js', 'selectors.json')) {
+  foreach ($releaseAsset in @(
+    'dream-skin.css', 'renderer-inject.js', 'selectors.json', 'theme-package-validator.mjs'
+  )) {
     Copy-Item -LiteralPath (Join-Path $Root "assets\$releaseAsset") `
       -Destination $releaseFixtureAssets -Force
   }

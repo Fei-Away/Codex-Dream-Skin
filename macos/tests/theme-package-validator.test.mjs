@@ -280,7 +280,8 @@ try {
   const extraField = await makeOfficial("extra-field", { extraManifestField: true });
   await expectRejected(extraField.source, "macos", /unsupported field unexpected/, "extra-field");
 
-  if (process.platform === "darwin") {
+  if (process.platform === "darwin" &&
+    process.env.CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS !== "1") {
     const importHome = path.join(tempRoot, "import-home");
     const active = path.join(importHome, "Library", "Application Support", "CodexDreamSkinStudio", "theme");
     await fs.mkdir(active, { recursive: true });
@@ -354,6 +355,9 @@ try {
     assert.deepEqual(await fs.readFile(path.join(active, "background.png")), activeBefore[1]);
 
     console.log("PASS: Studio manifest ZIPs validate on macOS/Windows and import without changing active theme.");
+  } else if (process.platform === "darwin") {
+    console.log("PASS: Studio manifest packages validate on both client platforms.");
+    console.log("SKIP: macOS shell importer integration requires an installed, signed Codex app.");
   } else {
     console.log("PASS: Studio manifest packages validate on both client platforms.");
     console.log("SKIP: macOS shell importer integration requires macOS.");
