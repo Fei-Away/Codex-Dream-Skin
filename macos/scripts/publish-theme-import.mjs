@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
 
 const [stageDirArg, themesRootArg] = process.argv.slice(2);
 if (!stageDirArg || !themesRootArg) {
@@ -9,7 +10,7 @@ if (!stageDirArg || !themesRootArg) {
 }
 
 const MAX_CONFIG_BYTES = 1024 * 1024;
-const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CSS_BYTES = 256 * 1024;
 const MAX_LICENSE_BYTES = 64 * 1024;
 const MAX_MANIFEST_BYTES = 64 * 1024;
@@ -98,6 +99,7 @@ async function readStoredTheme(directory) {
       readOptionalRegular(path.join(directory, "theme.css"), "Saved theme CSS", MAX_CSS_BYTES),
       readOptionalRegular(path.join(directory, "LICENSE.txt"), "Saved theme license", MAX_LICENSE_BYTES),
     ]);
+    if (cssBytes) decodeAndValidateSafeCss(cssBytes);
     return { theme, fingerprint: normalizedFingerprint(theme, imageBytes, cssBytes, licenseBytes) };
   } catch {
     return null;
@@ -170,6 +172,9 @@ async function main() {
     readOptionalRegular(path.join(stageRoot, "manifest.sig"), "Imported reserved signature", MAX_SIGNATURE_BYTES),
   ]);
   const packageFormat = manifestBytes ? "official" : "simple";
+  if (!cssBytes) throw new Error("New theme imports require non-empty theme.css");
+  decodeAndValidateSafeCss(cssBytes);
+  const safeCssStatus = "validated";
   const fingerprint = normalizedFingerprint(sourceTheme, imageBytes, cssBytes, licenseBytes);
   const releaseLock = await acquireLock(themesRoot);
   let temporary = "";
@@ -190,7 +195,7 @@ async function main() {
           renamed: false,
           nameCollision: false,
           packageFormat,
-          cssIgnored: Boolean(cssBytes),
+          safeCssStatus,
           signatureIgnored: Boolean(signatureBytes),
         };
       }
@@ -228,7 +233,7 @@ async function main() {
       renamed,
       nameCollision: existingNames.has(name),
       packageFormat,
-      cssIgnored: Boolean(cssBytes),
+      safeCssStatus,
       signatureIgnored: Boolean(signatureBytes),
     };
   } finally {

@@ -83,8 +83,9 @@ async function makeOfficial(name, options = {}) {
   ];
   const capabilities = ["background", "tokens"];
   const extraFiles = new Map();
-  if (options.css) {
-    const css = Buffer.from(":root { --ds-theme-accent: #7cff46; }\n", "utf8");
+  if (options.css !== false) {
+    const css = Buffer.from(options.cssSource ??
+      '[data-ds-part="composer"] { background-color: var(--ds-theme-color-panel); }\n', "utf8");
     files.push(fileEntry("theme.css", "text/css", css));
     capabilities.push("safe-css");
     extraFiles.set("theme.css", css);
@@ -160,15 +161,42 @@ try {
   assert.deepEqual(macos.output, {
     format: "official",
     image: "background.png",
-    cssIgnored: false,
+    safeCssStatus: "validated",
     signatureIgnored: false,
   });
   assert.deepEqual(windows.output, macos.output);
   assert.deepEqual((await fs.readdir(macos.stage)).sort(), [
     "background.png",
     "manifest.json",
+    "theme.css",
     "theme.json",
   ]);
+
+  const legacyOfficial = await makeOfficial("legacy-official-no-css", { css: false });
+  await expectRejected(
+    legacyOfficial.source,
+    "macos",
+    /New official theme imports require theme\.css/,
+    "legacy-official-no-css",
+  );
+  const [legacyMac, legacyWindows] = await Promise.all([
+    loadMacTheme(legacyOfficial.source),
+    loadWindowsTheme(legacyOfficial.source),
+  ]);
+  assert.equal(legacyMac.safeCssStatus, "none");
+  assert.equal(legacyWindows.safeCssStatus, "none");
+
+  const cssWithoutCapability = await makeOfficial("css-without-capability", {
+    mutateManifest: (manifest) => {
+      manifest.capabilities = manifest.capabilities.filter((value) => value !== "safe-css");
+    },
+  });
+  await expectRejected(
+    cssWithoutCapability.source,
+    "macos",
+    /presence must match the safe-css capability/,
+    "css-without-capability",
+  );
 
   for (const [injector, stage] of [[macosInjector, macos.stage], [windowsInjector, windows.stage]]) {
     const checked = await run(process.execPath, [injector, "--check-payload", "--theme-dir", stage]);
@@ -237,7 +265,7 @@ try {
 
   const optional = await makeOfficial("official-optional", { css: true, license: true, signature: true });
   const optionalResult = await validate(optional.source, "macos", "official-optional");
-  assert.equal(optionalResult.output.cssIgnored, true);
+  assert.equal(optionalResult.output.safeCssStatus, "validated");
   assert.equal(optionalResult.output.signatureIgnored, true);
   assert.deepEqual((await fs.readdir(optionalResult.stage)).sort(), [
     "LICENSE.txt",
@@ -258,8 +286,29 @@ try {
     image: "custom-background.png",
     art: { safeArea: "auto", taskMode: "auto" },
   }));
+  await fs.writeFile(
+    path.join(simpleSource, "theme.css"),
+    '[data-ds-part="root"] { color: var(--ds-theme-color-text); }\n',
+  );
   const simple = await validate(simpleSource, "macos", "simple");
   assert.equal(simple.output.format, "simple");
+  assert.equal(simple.output.safeCssStatus, "validated");
+  const simpleWithoutCss = path.join(tempRoot, "simple-without-css");
+  await fs.mkdir(simpleWithoutCss);
+  await fs.copyFile(fixtureImage, path.join(simpleWithoutCss, "custom-background.png"));
+  await fs.copyFile(path.join(simpleSource, "theme.json"), path.join(simpleWithoutCss, "theme.json"));
+  await expectRejected(
+    simpleWithoutCss,
+    "macos",
+    /must contain exactly theme\.json, theme\.css/,
+    "simple-without-css",
+  );
+
+  const unsafeCss = await makeOfficial("official-unsafe-css", {
+    css: true,
+    cssSource: 'body { background-image: url("https://example.invalid/tracker"); }\n',
+  });
+  await expectRejected(unsafeCss.source, "macos", /registered \[data-ds-part/, "unsafe-css");
 
   const tampered = await makeOfficial("tampered", { mutateImageAfterManifest: true });
   await expectRejected(tampered.source, "macos", /SHA-256/, "tampered");
@@ -318,7 +367,7 @@ try {
     const firstResult = JSON.parse(firstImport.stdout);
     assert.equal(firstResult.status, "imported");
     assert.equal(firstResult.packageFormat, "official");
-    assert.equal(firstResult.cssIgnored, true);
+    assert.equal(firstResult.safeCssStatus, "validated");
     assert.equal(firstResult.signatureIgnored, true);
     const saved = path.join(savedThemesRoot, firstResult.id);
     assert.deepEqual((await fs.readdir(saved)).sort(), ["LICENSE.txt", "background.png", "theme.css", "theme.json"]);

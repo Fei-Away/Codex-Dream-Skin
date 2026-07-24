@@ -10,6 +10,7 @@ import {
   normalizeThemeColor,
   normalizeThemeText,
 } from "../assets/theme-package-validator.mjs";
+import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
@@ -44,7 +45,8 @@ const stableTestidLiteral = (testid) => {
 const SKIN_VERSION = "1.3.3";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
-const MAX_ART_BYTES = 16 * 1024 * 1024;
+const MAX_ART_BYTES = 10 * 1024 * 1024;
+const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
@@ -451,6 +453,42 @@ function assertContainedPath(rootPath, candidatePath, label) {
   throw new Error(`${label} must stay inside its theme directory`);
 }
 
+function sameFileStat(left, right) {
+  return left.isFile() && right.isFile()
+    && left.dev === right.dev
+    && left.ino === right.ino
+    && left.size === right.size
+    && left.mtimeMs === right.mtimeMs
+    && left.ctimeMs === right.ctimeMs;
+}
+
+async function loadSafeCss(assetsRoot) {
+  const cssPath = path.join(assetsRoot, "theme.css");
+  let handle;
+  try {
+    handle = await fs.open(cssPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    if (error.code === "ELOOP") throw new Error("Theme Safe CSS must not be a symbolic link");
+    throw error;
+  }
+  try {
+    const before = await handle.stat();
+    if (!before.isFile() || before.size < 1 || before.size > MAX_SAFE_CSS_BYTES) {
+      throw new Error(`Theme Safe CSS must be a non-empty file no larger than ${MAX_SAFE_CSS_BYTES} bytes`);
+    }
+    const bytes = await handle.readFile();
+    const after = await handle.stat();
+    if (!sameFileStat(before, after) || bytes.length !== after.size) {
+      throw new Error("Theme Safe CSS changed while being loaded");
+    }
+    const { source, validation } = decodeAndValidateSafeCss(bytes);
+    return { path: cssPath, source, stat: after, validation };
+  } finally {
+    await handle.close();
+  }
+}
+
 export async function loadTheme(themeDir) {
   const requestedRoot = themeDir ?? path.join(root, "assets");
   const configPath = path.join(requestedRoot, "theme.json");
@@ -583,7 +621,17 @@ export async function loadTheme(themeDir) {
     if (art.length < 1 || art.length > MAX_ART_BYTES) {
       throw new Error(`Theme image must be a non-empty file no larger than ${MAX_ART_BYTES} bytes`);
     }
-    return { art, assetsRoot, extension, imagePath, theme };
+    const safeCss = await loadSafeCss(assetsRoot);
+    return {
+      art,
+      assetsRoot,
+      extension,
+      imagePath,
+      safeCss: safeCss?.source ?? "",
+      safeCssPath: safeCss?.path ?? null,
+      safeCssStatus: safeCss ? "validated" : "none",
+      theme,
+    };
   } finally {
     await imageHandle.close();
   }
@@ -615,8 +663,9 @@ async function loadPayload(themeDir) {
     loadTheme(themeDir),
   ]);
   const { css, template } = staticAssets;
-  const { art, extension, theme } = loaded;
-  const styleRevision = createHash("sha256").update(css).digest("hex").slice(0, 20);
+  const { art, extension, safeCss, safeCssStatus, theme } = loaded;
+  const combinedCss = safeCss ? `${css}\n${safeCss}\n` : css;
+  const styleRevision = createHash("sha256").update(combinedCss).digest("hex").slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
   if (!artMetadata) {
     throw new Error("Theme image metadata is invalid or exceeds the 16384px / 50MP safety limit");
@@ -629,13 +678,13 @@ async function loadPayload(themeDir) {
   const artDataUrl = `data:${mime};base64,${art.toString("base64")}`;
   const revision = createHash("sha256")
     .update(SKIN_VERSION)
-    .update(css)
+    .update(combinedCss)
     .update(template)
     .update(JSON.stringify(theme))
     .digest("hex")
     .slice(0, 20);
   const payload = template
-    .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
+    .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(combinedCss))
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
@@ -645,6 +694,7 @@ async function loadPayload(themeDir) {
     imageBytes: art.length,
     payload,
     revision,
+    safeCssStatus,
     theme,
     timings: {
       buildMs: Number((performance.now() - startedAt).toFixed(3)),
@@ -835,6 +885,9 @@ async function removeFromSession(session) {
         root.style.removeProperty(property);
       }
     }
+    for (const node of document.querySelectorAll('[data-ds-part]')) {
+      node.removeAttribute('data-ds-part');
+    }
     const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
     if (sheets && 'adoptedStyleSheets' in document) {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets]
@@ -855,10 +908,11 @@ async function verifyRemovedSession(session) {
       attribute.name.startsWith('data-dream-'));
     const hasVariables = [...root.style].some((property) =>
       property.startsWith('--dream-') || property.startsWith('--ds-'));
+    const hasParts = Boolean(document.querySelector('[data-ds-part]'));
     const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
     const hasSheets = Boolean(sheets?.size && 'adoptedStyleSheets' in document &&
       [...document.adoptedStyleSheets].some((sheet) => sheets.has(sheet)));
-    return !hasAttributes && !hasVariables && !hasSheets &&
+    return !hasAttributes && !hasVariables && !hasParts && !hasSheets &&
       !document.getElementById('codex-dream-skin-style') &&
       !window.__CODEX_DREAM_SKIN_STATE__;
   })()`);
@@ -1856,6 +1910,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         themeName: loaded.theme.name,
         imageBytes: loaded.imageBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
+        safeCssStatus: loaded.safeCssStatus,
         artMetadata: loaded.theme.artMetadata ?? null,
         timings: loaded.timings,
       }, null, 2));

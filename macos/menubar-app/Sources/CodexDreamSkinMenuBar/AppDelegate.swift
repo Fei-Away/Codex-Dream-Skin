@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     "assets/dream-skin.css",
     "assets/portal-hero.png",
     "assets/renderer-inject.js",
+    "assets/safe-css-policy.json",
+    "assets/safe-css-validator.mjs",
     "assets/theme-package-validator.mjs",
     "assets/theme.json",
     "presets/preset-gothic-void-crusade/background.jpg",
@@ -46,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     "scripts/status-dream-skin-macos.sh",
     "scripts/switch-theme-macos.sh",
     "scripts/theme-config.mjs",
+    "scripts/validate-safe-css-file.mjs",
     "scripts/verify-dream-skin-macos.sh",
     "scripts/write-theme.mjs"
   ]
@@ -437,12 +440,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       }
       let name = self.cleanMenuText(rawName)
       let id = self.cleanMenuText(rawID)
-      let cssIgnored = value["cssIgnored"] as? Bool ?? false
+      let safeCssStatus = value["safeCssStatus"] as? String ?? "none"
       let signatureIgnored = value["signatureIgnored"] as? Bool ?? false
       if status == "duplicate" {
         var details = "“\(name)”与已保存主题完全相同，没有重复写入。"
-        if cssIgnored {
-          details += "\n包内 theme.css 已校验；当前客户端不会执行自定义 CSS。"
+        if safeCssStatus == "validated" {
+          details += "\n包内 theme.css 已通过本机 Safe CSS 校验，切换到该主题时会一并生效。"
         }
         if signatureIgnored {
           details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
@@ -462,8 +465,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       if nameCollision {
         details += "\n主题库中已有同名主题，可在菜单中按需要选择。"
       }
-      if cssIgnored {
-        details += "\n已保留 theme.css，但当前客户端不会执行自定义 CSS。"
+      if safeCssStatus == "validated" {
+        details += "\ntheme.css 已通过本机 Safe CSS 校验，切换到该主题时会一并生效。"
       }
       if signatureIgnored {
         details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"

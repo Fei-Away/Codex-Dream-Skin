@@ -84,11 +84,11 @@ Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Cod
 
 ### 主题 ZIP 与手动目录
 
-- 两端只接受普通 `.zip`，明确不兼容 `.dreamskin` 后缀。正式 Studio 包包含 `manifest.json`、`theme.json`、恰好一张 `background.webp|jpg|png`，并可选带 `theme.css`、`LICENSE.txt`、`manifest.sig`；文件位于 ZIP 根目录或唯一一层顶级主题目录。仅供本机可信工作流使用的简化格式必须恰好包含 `theme.json` 与其引用图片。
+- 两端只接受普通 `.zip`，明确不兼容 `.dreamskin` 后缀。新的正式 Studio 包必须包含 `manifest.json`、非空 `theme.json`、非空 `theme.css`、恰好一张 `background.webp|jpg|png`，并可选带 `LICENSE.txt`、`manifest.sig`；文件位于 ZIP 根目录或唯一一层顶级主题目录。仅供本机可信工作流使用的简化格式也必须恰好包含 `theme.json`、`theme.css` 与其引用图片。
 - 导入前限制为 32 MiB 压缩文件、32 个条目和 64 MiB 解压总量，并拒绝路径穿越、链接/reparse、嵌套压缩包、未注册负载以及未通过主题/图片校验的内容。正式包还会核对平台、最低客户端版本及清单中每个负载文件的大小与 SHA-256。
-- `theme.css` 会随主题保留但当前不执行，并在导入结果中提示；`manifest.sig` 是预留文件，当前不验证签名也不写入主题库。`LICENSE.txt` 随主题保留。
+- `theme.css` 必须通过同一份 Safe CSS allowlist，本机在导入和每次应用时都会复验；通过后只作用于 12 个注册 `data-ds-part` 部件。升级前已经保存且没有 CSS 的 legacy 主题仍可使用，但不会注入额外 CSS。`manifest.sig` 是预留文件，当前不验证签名也不写入主题库；`LICENSE.txt` 随主题保留。
 - 导入目标始终是 saved themes；不会自动覆盖或应用 active / last-known-good。完全相同的内容返回重复结果，同 ID 的不同主题自动保存到新的安全目录。
-- 手动解压时，把直接包含 `theme.json` 与背景图的完整目录放到 macOS `~/Library/Application Support/CodexDreamSkinStudio/themes/` 或 Windows `%LOCALAPPDATA%\CodexDreamSkin\themes\`。两端控制菜单均提供“打开主题文件夹”；该路径绕过归档校验，只应用于可信内容。
+- 手动解压时，把直接包含 `theme.json`、`theme.css` 与背景图的完整目录放到 macOS `~/Library/Application Support/CodexDreamSkinStudio/themes/` 或 Windows `%LOCALAPPDATA%\CodexDreamSkin\themes\`。两端控制菜单均提供“打开主题文件夹”；该路径绕过归档校验，只应用于可信内容。
 
 ## 预设与图片类型
 
@@ -96,7 +96,7 @@ Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Cod
 - 该 preset pack 中只有 `background.jpg`（`2560 × 1440`、16:9、纯背景）和 `theme.json` 会被播种；它由用户提供的 `1672 × 941` 源 PNG 标准化导出，不代表增加了源图细节。Byte-identical 源图归档在 `docs/images/presets/arina-hashimoto-source.png`，不会随 preset 播种；`arina-hashimoto-light.jpg` 与 `arina-hashimoto-dark.jpg` 是 `2308 × 1572` Retina 浅/暗真实首页截图，未发送输入仅在截图时用临时本地样式遮蔽，只作效果预览，绝不能当背景导入。
 - `macos/presets/preset-gothic-void-crusade/` 是社区作者贡献的原创哥特科幻主题；macOS 没有活动主题时默认启用它。升级只清理固定的旧内置预设 ID，不删除 `custom-*` 或当前活动主题副本。
 - 源码树中的 `windows/assets/dream-reference.jpg` 与 macOS 人物参考素材 byte-identical，仅用于本地参考；Windows Release 构建会在打包前以经过固定哈希核验的 Gothic Void Crusade 替换它，确保 Setup.exe 不分发权利未确认的人物素材。README 实机截图仍只作预览，绝不能作为背景导入。
-- Windows 导入和 macOS 快速加载入口会拒绝空文件或超过 16 MB 的输入；macOS 主定制入口可接收最高 50 MB 的源图，但转换后的主题文件必须不超过 16 MB。两端 payload 构建还会拒绝任一边超过 16384px 或总像素超过 50MP 的声明尺寸；Windows 在复制导入图前复用 Node 元数据解析器执行同一限制。Windows 注入器用图片与主题内容的 SHA-256 修订值识别热更新，并在构建首帧 payload 前同步读取图片比例。
+- Windows 导入和 macOS 快速加载入口会拒绝空文件或超过 10 MB 的输入；macOS 主定制入口可接收最高 50 MB 的源图，但转换后的主题文件必须不超过 10 MB。两端 payload 构建还会拒绝任一边超过 16384px 或总像素超过 50MP 的声明尺寸；Windows 在复制导入图前复用 Node 元数据解析器执行同一限制。Windows 注入器用图片、主题和 Safe CSS 内容的 SHA-256 修订值识别热更新，并在构建首帧 payload 前同步读取图片比例。
 - 自定义生图优先使用 `2560 × 1440`（16:9）：左侧约 50%～58% 保持低信息、低对比，主体放在右侧约 58%～88%。输出必须是连续铺满画布的纯背景，禁止窗口、侧栏、卡片、输入框、文字、Logo 和水印。
 - 可直接复制的无人物、右侧成年人物与参考图编辑模板见 `docs/reference-background-prompt-guide.md`；公共默认提示词不指定真人或名人。
 

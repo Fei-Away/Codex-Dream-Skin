@@ -6,13 +6,14 @@ import { constants as fsConstants } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { decodeAndValidateSafeCss } from "./safe-css-validator.mjs";
 
 const LIMITS = Object.freeze({
   manifest: 65_536,
   theme: 65_536,
   simpleTheme: 1_048_576,
   css: 262_144,
-  image: 16_777_216,
+  image: 10_485_760,
   license: 65_536,
   signature: 4_096,
 });
@@ -409,6 +410,9 @@ function validateManifest(value, platform, clientVersion) {
   if (files.has("theme.css") !== capabilities.has("safe-css")) {
     fail("theme.css presence must match the safe-css capability");
   }
+  if (!files.has("theme.css")) {
+    fail("New official theme imports require theme.css and the safe-css capability");
+  }
   return { manifest, files, background: backgrounds[0] };
 }
 
@@ -464,18 +468,19 @@ async function validateOfficial(root, names, platform, clientVersion) {
   if (detectedImageMedia(bytes.get(background)) !== BACKGROUND_MEDIA.get(background)) {
     fail(`${background} content does not match its extension and mediaType`);
   }
+  decodeAndValidateSafeCss(bytes.get("theme.css"));
   return {
     format: "official",
     image: background,
-    cssIgnored: bytes.has("theme.css"),
+    safeCssStatus: "validated",
     signatureIgnored: bytes.has("manifest.sig"),
     bytes,
   };
 }
 
 async function validateSimple(root, names) {
-  if (names.length !== 2 || !names.includes("theme.json")) {
-    fail("Local simplified ZIP must contain exactly theme.json and its image");
+  if (names.length !== 3 || !names.includes("theme.json") || !names.includes("theme.css")) {
+    fail("Local simplified ZIP must contain exactly theme.json, theme.css, and its image");
   }
   const themeBytes = await readStableFile(root, "theme.json", LIMITS.simpleTheme);
   const theme = assertObject(decodeJson(themeBytes, "theme.json"), "theme.json");
@@ -488,19 +493,27 @@ async function validateSimple(root, names) {
     || !/\.(?:png|jpe?g|webp)$/i.test(theme.image)
     || !names.includes(theme.image)
   ) fail("Local simplified theme image must be beside theme.json");
-  const imageBytes = await readStableFile(root, theme.image, LIMITS.image);
+  const [imageBytes, cssBytes] = await Promise.all([
+    readStableFile(root, theme.image, LIMITS.image),
+    readStableFile(root, "theme.css", LIMITS.css),
+  ]);
   const expectedMedia = /\.png$/i.test(theme.image)
     ? "image/png"
     : /\.webp$/i.test(theme.image) ? "image/webp" : "image/jpeg";
   if (detectedImageMedia(imageBytes) !== expectedMedia) {
     fail(`${theme.image} content does not match its extension`);
   }
+  decodeAndValidateSafeCss(cssBytes);
   return {
     format: "simple",
     image: theme.image,
-    cssIgnored: false,
+    safeCssStatus: "validated",
     signatureIgnored: false,
-    bytes: new Map([["theme.json", themeBytes], [theme.image, imageBytes]]),
+    bytes: new Map([
+      ["theme.json", themeBytes],
+      [theme.image, imageBytes],
+      ["theme.css", cssBytes],
+    ]),
   };
 }
 
@@ -519,7 +532,7 @@ async function main() {
   return {
     format: result.format,
     image: result.image,
-    cssIgnored: result.cssIgnored,
+    safeCssStatus: result.safeCssStatus,
     signatureIgnored: result.signatureIgnored,
   };
 }

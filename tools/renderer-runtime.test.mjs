@@ -32,6 +32,8 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   const rootStyle = styleDeclaration();
   const rootClasses = classList([nativeAppearance === "dark" ? "electron-dark" : "electron-light"]);
   const nodes = new Map();
+  const domNodes = new Set();
+  const selectorNodes = new Map();
   const observers = [];
   const timers = new Map();
   const intervals = new Map();
@@ -39,17 +41,64 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   const revoked = [];
   let nextId = 0;
   let nextBlob = 0;
-  const root = {
-    classList: rootClasses,
-    style: rootStyle,
-    getAttribute(name) { return attrs.get(name) ?? null; },
-    setAttribute(name, value) { attrs.set(name, String(value)); },
-    removeAttribute(name) { attrs.delete(name); },
-    appendChild(node) { node.parentElement = root; if (node.id) nodes.set(node.id, node); return node; },
+  const attributesFor = (values) => [...values].map(([name, value]) => ({ name, value }));
+  const makeDomNode = (name, parentElement = null, values = new Map()) => {
+    const node = {
+      name,
+      parentElement,
+      get attributes() { return attributesFor(values); },
+      getAttribute(attribute) { return values.get(attribute) ?? null; },
+      setAttribute(attribute, value) { values.set(attribute, String(value)); },
+      removeAttribute(attribute) { values.delete(attribute); },
+      appendChild(child) { child.parentElement = node; return child; },
+    };
+    domNodes.add(node);
+    return node;
   };
-  const body = {
-    appendChild(node) { node.parentElement = body; if (node.id) nodes.set(node.id, node); return node; },
+  const root = makeDomNode("root", null, attrs);
+  root.classList = rootClasses;
+  root.style = rootStyle;
+  root.appendChild = (node) => {
+    node.parentElement = root;
+    if (node.id) nodes.set(node.id, node);
+    return node;
   };
+  const body = makeDomNode("body", root);
+  body.appendChild = (node) => {
+    node.parentElement = body;
+    if (node.id) nodes.set(node.id, node);
+    return node;
+  };
+  const register = (selector, node) => {
+    const current = selectorNodes.get(selector) || [];
+    current.push(node);
+    selectorNodes.set(selector, current);
+  };
+  const partFixtures = {};
+  if (!settings) {
+    partFixtures.sidebar = makeDomNode("sidebar", body);
+    partFixtures.main = makeDomNode("main", body);
+    partFixtures.header = makeDomNode("header", body);
+    partFixtures.home = makeDomNode("home", partFixtures.main);
+    partFixtures.homeHero = makeDomNode("home-hero", partFixtures.home);
+    partFixtures.homeIcon = makeDomNode("home-icon", partFixtures.homeHero);
+    partFixtures.projectList = makeDomNode("project-list", partFixtures.home);
+    partFixtures.thread = makeDomNode("thread", partFixtures.main);
+    partFixtures.message = makeDomNode("message", partFixtures.thread);
+    partFixtures.composer = makeDomNode("composer", partFixtures.main);
+    partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
+    register("aside.app-shell-left-panel", partFixtures.sidebar);
+    register("main.main-surface", partFixtures.main);
+    register("header.app-header-tint", partFixtures.header);
+    register('[data-testid="home-icon"]', partFixtures.homeIcon);
+    register('[role="main"]:has([data-testid="home-icon"])', partFixtures.home);
+    register('[role="main"]', partFixtures.home);
+    register(".group\\/project-selector", partFixtures.projectList);
+    register(".thread-scroll-container", partFixtures.thread);
+    register('[data-message-author-role]', partFixtures.message);
+    register(".composer-surface-chrome", partFixtures.composer);
+    register('.composer-surface-chrome [class*="_footer_"]', partFixtures.composerToolbar);
+  }
   const makeStyleNode = () => {
     const node = {
       id: "",
@@ -68,22 +117,25 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     createElement(tag) { return tag === "style" ? makeStyleNode() : { tagName: tag }; },
     getElementById(id) { return nodes.get(id) || null; },
     querySelector(selector) {
-      if (settings && (selector.includes("appearance-theme") || selector.includes("theme-preview"))) return { selector };
-      if (settings) return null;
-      if (selector === "main.main-surface" || selector === "aside.app-shell-left-panel" ||
-        selector === "header.app-header-tint" || selector.includes("[role=\"main\"]") ||
-        selector.includes("[data-testid=\"home-icon\"]")) return { selector };
-      return null;
+      if (settings && (selector.includes("appearance-theme") || selector.includes("theme-preview"))) {
+        return makeDomNode(`settings:${selector}`, body);
+      }
+      return (selectorNodes.get(selector) || [])[0] || null;
     },
-    querySelectorAll() { return []; },
+    querySelectorAll(selector) {
+      if (selector === "[data-ds-part]") {
+        return [...domNodes].filter((node) => node.getAttribute?.("data-ds-part") !== null);
+      }
+      return [...(selectorNodes.get(selector) || [])];
+    },
   };
   const navigation = {
     addEventListener(type, callback) { listeners.set(`navigation:${type}`, callback); },
     removeEventListener(type) { listeners.delete(`navigation:${type}`); },
   };
   class MockMutationObserver {
-    constructor(callback) { this.callback = callback; this.options = null; observers.push(this); }
-    observe(target, options) { this.target = target; this.options = options; }
+    constructor(callback) { this.callback = callback; this.options = null; this.observations = []; observers.push(this); }
+    observe(target, options) { this.target = target; this.options = options; this.observations.push({ target, options }); }
     disconnect() { this.disconnected = true; }
   }
   class MockSheet {
@@ -135,9 +187,14 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
       if (timer.delay <= maximumDelay) { timers.delete(id); timer.callback(); }
     }
   };
+  const addDynamicMessage = () => {
+    const node = makeDomNode(`message-${(selectorNodes.get('[data-message-author-role]') || []).length + 1}`, partFixtures.thread || body);
+    register('[data-message-author-role]', node);
+    return node;
+  };
   return {
-    attrs, context, document, flushTimers, intervals, listeners, nodes, observers,
-    payloadFor, revoked, root, rootClasses, rootStyle, timers, window,
+    addDynamicMessage, attrs, context, document, domNodes, flushTimers, intervals, listeners,
+    nodes, observers, partFixtures, payloadFor, revoked, root, rootClasses, rootStyle, timers, window,
   };
 }
 
@@ -187,7 +244,9 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.doesNotMatch(template, /electron-opaque|home-suggestion-list-item/,
     "Runtime payload must not carry retired selector documentation/fossils.");
   assert.doesNotMatch(template, /classList\.(add|remove|toggle)/);
-  assert.doesNotMatch(template, /getBoundingClientRect|ResizeObserver|childList|subtree/);
+  assert.doesNotMatch(template, /getBoundingClientRect|ResizeObserver/);
+  assert.match(template, /childList:\s*true/);
+  assert.match(template, /subtree:\s*true/);
   // The new contract intentionally keeps the `data-dream-*` attribute names
   // and `--dream-*` custom properties.  Only the retired DOM marker classes
   // and the measured fossil selector must be absent from the canonical CSS.
@@ -217,16 +276,60 @@ export async function runRendererRuntimeTest(assetRoot) {
   const state = home.window.__CODEX_DREAM_SKIN_STATE__;
   assert.equal(home.attrs.get("data-dream-skin"), "active");
   assert.equal(home.attrs.get("data-dream-shell"), "dark");
+  assert.equal(home.attrs.get("data-ds-part"), "root");
   assert.equal(state.styleMode, "adopted");
   assert.equal(home.document.adoptedStyleSheets.length, 1);
   assert.equal(state.scope.baseState, "home");
   assert.equal(state.scope.level, "L1");
   assert.equal(home.rootStyle.values.get("--dream-skin-brand-subtitle"), '"CODEX DREAM SKIN"');
   assert.equal(home.rootStyle.values.get("--dream-skin-status"), '"DREAM SKIN ONLINE"');
+  assert.equal(home.rootStyle.values.get("--ds-theme-surface-radius"), "12px");
+  assert.equal(home.rootStyle.values.get("--ds-theme-surface-opacity"), "1");
+  assert.equal(home.rootStyle.values.get("--ds-theme-surface-blur"), "0px");
+  const publicDefaults = {
+    "--ds-theme-font-family": "system",
+    "--ds-theme-font-scale": "1",
+    "--ds-theme-surface-border-alpha": "0.14",
+    "--ds-theme-surface-shadow": "soft",
+    "--ds-theme-image-zoom": "1",
+    "--ds-theme-image-dim": "0",
+    "--ds-theme-image-task-intensity": "0.35",
+    "--ds-theme-density-scale": "standard",
+    "--ds-theme-motion-level": "standard",
+  };
+  for (const [variable, expected] of Object.entries(publicDefaults)) {
+    assert.equal(home.rootStyle.values.get(variable), expected);
+  }
+  assert.equal(home.rootStyle.values.get("--ds-theme-image-focus-x"), "0.72");
+  assert.equal(home.rootStyle.values.get("--ds-theme-image-focus-y"), "0.5");
   assert.equal(state.metrics.routePasses, 1);
+  assert.equal(state.metrics.partPasses, 1);
   assert.equal(state.metrics.layoutReads, 0, "Runtime must not perform layout reads");
   assert.equal(home.rootClasses.writes.length, 0, "Runtime must not write classes");
-  assert.ok(home.observers.every((observer) => !observer.options?.childList && !observer.options?.subtree));
+  const partObserver = home.observers.find((observer) => observer.options?.childList);
+  const rootObserver = home.observers.find((observer) => observer.options?.attributes);
+  assert.ok(partObserver?.options?.subtree, "Dynamic parts require one subtree child-list observer");
+  assert.ok(rootObserver && !rootObserver.options?.childList && !rootObserver.options?.subtree);
+  const expectedParts = {
+    sidebar: "sidebar",
+    main: "main",
+    header: "header",
+    home: "home",
+    homeHero: "home-hero",
+    projectList: "project-list",
+    thread: "thread",
+    message: "message",
+    composer: "composer",
+    composerToolbar: "composer-toolbar",
+  };
+  for (const [fixtureKey, part] of Object.entries(expectedParts)) {
+    assert.equal(home.partFixtures[fixtureKey].getAttribute("data-ds-part"), part,
+      `${part} must be exposed through the public Safe CSS bridge`);
+  }
+  const dynamicMessage = home.addDynamicMessage();
+  partObserver.callback([{ type: "childList" }]);
+  home.flushTimers(80);
+  assert.equal(dynamicMessage.getAttribute("data-ds-part"), "message");
 
   const full = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);
@@ -268,6 +371,22 @@ export async function runRendererRuntimeTest(assetRoot) {
     assert.equal(explicitLight.rootStyle.values.get(variable), explicitColors[key],
       `Light auto appearance must preserve explicit ${key}`);
   }
+  const publicColorVariables = {
+    "--ds-theme-color-background": "background",
+    "--ds-theme-color-panel": "panel",
+    "--ds-theme-color-panel-alt": "panelAlt",
+    "--ds-theme-color-accent": "accent",
+    "--ds-theme-color-accent-alt": "accentAlt",
+    "--ds-theme-color-secondary": "secondary",
+    "--ds-theme-color-highlight": "highlight",
+    "--ds-theme-color-text": "text",
+    "--ds-theme-color-muted": "muted",
+    "--ds-theme-color-line": "line",
+  };
+  for (const [variable, colorKey] of Object.entries(publicColorVariables)) {
+    assert.equal(explicitLight.rootStyle.values.get(variable), explicitColors[colorKey],
+      `${variable} must expose the validated theme color`);
+  }
   const renderedRgb = {
     "--ds-bg-rgb": "170 187 204",
     "--ds-panel-rgb": "170 187 204",
@@ -285,8 +404,7 @@ export async function runRendererRuntimeTest(assetRoot) {
       `${variable} must support official hex forms and clamp RGB channels`);
   }
 
-  const observer = home.observers[0];
-  observer.callback([]);
+  rootObserver.callback([]);
   home.flushTimers(64);
   assert.equal(state.metrics.routePasses, 1, "Attribute safety pass must not be a route pass");
   const navigationHandler = home.listeners.get("navigation:navigate");
@@ -317,6 +435,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(explicit.attrs.size, 0);
   assert.equal(explicit.rootStyle.values.size, 0);
   assert.equal(explicit.window.__CODEX_DREAM_SKIN_STATE__, undefined);
+  assert.ok([...explicit.domNodes].every((node) => node.getAttribute?.("data-ds-part") === null));
   assert.deepEqual(explicit.revoked, ["blob:fixture-1", "blob:fixture-2"]);
 
   const fallback = makeFixture({ nativeAppearance: "dark", adopted: false });

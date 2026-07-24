@@ -106,6 +106,7 @@ RUNTIME_SCRIPTS=(
   status-dream-skin-macos.sh
   switch-theme-macos.sh
   theme-config.mjs
+  validate-safe-css-file.mjs
   verify-dream-skin-macos.sh
   write-theme.mjs
 )

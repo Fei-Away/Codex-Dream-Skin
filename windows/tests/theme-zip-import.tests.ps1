@@ -34,6 +34,11 @@ function Write-TestThemePack {
     (($theme | ConvertTo-Json -Depth 8) + "`r`n"),
     [System.Text.UTF8Encoding]::new($false)
   )
+  [System.IO.File]::WriteAllText(
+    (Join-Path $Directory 'theme.css'),
+    '[data-ds-part="root"] { color: var(--ds-theme-color-text); }' + "`r`n",
+    [System.Text.UTF8Encoding]::new($false)
+  )
 }
 
 function Write-TestOfficialThemePack {
@@ -77,21 +82,25 @@ function Write-TestOfficialThemePack {
     }
   )
   $capabilities = @('background', 'tokens')
+  $cssPath = Join-Path $Directory 'theme.css'
+  [System.IO.File]::WriteAllText(
+    $cssPath,
+    '[data-ds-part="composer"] { background-color: var(--ds-theme-color-panel); }' + "`r`n",
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $files += [ordered]@{
+    path = 'theme.css'; mediaType = 'text/css'; bytes = (Get-Item -LiteralPath $cssPath).Length
+    sha256 = (Get-FileHash -LiteralPath $cssPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  $capabilities += 'safe-css'
   if ($IncludeOptionalFiles) {
-    $cssPath = Join-Path $Directory 'theme.css'
     $licensePath = Join-Path $Directory 'LICENSE.txt'
-    [System.IO.File]::WriteAllText($cssPath, ":root { --ds-theme-accent: #7cff46; }`r`n", [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText($licensePath, $LicenseText, [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText((Join-Path $Directory 'manifest.sig'), 'reserved-signature', [System.Text.UTF8Encoding]::new($false))
-    $files += [ordered]@{
-      path = 'theme.css'; mediaType = 'text/css'; bytes = (Get-Item -LiteralPath $cssPath).Length
-      sha256 = (Get-FileHash -LiteralPath $cssPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    }
     $files += [ordered]@{
       path = 'LICENSE.txt'; mediaType = 'text/plain'; bytes = (Get-Item -LiteralPath $licensePath).Length
       sha256 = (Get-FileHash -LiteralPath $licensePath -Algorithm SHA256).Hash.ToLowerInvariant()
     }
-    $capabilities += 'safe-css'
   }
   $manifest = [ordered]@{
     packageVersion = 1
@@ -185,7 +194,8 @@ try {
   New-TestZipFromDirectory -Source $officialSource -Archive $officialArchive
   $official = Import-DreamSkinThemeZip -ArchivePath $officialArchive -StateRoot $stateRoot
   if ($official.Status -cne 'Imported' -or $official.Id -cne 'studio.windows-contract' -or
-    $official.PackageFormat -cne 'official' -or -not $official.CssIgnored -or -not $official.SignatureIgnored) {
+    $official.PackageFormat -cne 'official' -or $official.SafeCssStatus -cne 'validated' -or
+    -not $official.SignatureIgnored) {
     throw 'Studio manifest ZIP did not import with its official id and warning metadata.'
   }
   foreach ($savedFile in @('theme.json', 'background.jpg', 'theme.css', 'LICENSE.txt')) {
@@ -202,6 +212,20 @@ try {
   if ($officialDuplicate.Status -cne 'Duplicate' -or $officialDuplicate.Id -cne 'studio.windows-contract') {
     throw 'Studio manifest ZIP duplicate was written twice.'
   }
+
+  $officialWithoutCssSource = Join-Path $temporaryRoot 'official-without-css-source'
+  $officialWithoutCssArchive = Join-Path $temporaryRoot 'official-without-css.zip'
+  Copy-Item -LiteralPath $officialSource -Destination $officialWithoutCssSource -Recurse
+  Remove-Item -LiteralPath (Join-Path $officialWithoutCssSource 'theme.css') -Force
+  New-TestZipFromDirectory -Source $officialWithoutCssSource -Archive $officialWithoutCssArchive
+  Assert-TestImportRejected -Archive $officialWithoutCssArchive -Label 'official package without theme.css'
+
+  $simpleWithoutCssSource = Join-Path $temporaryRoot 'simple-without-css-source'
+  $simpleWithoutCssArchive = Join-Path $temporaryRoot 'simple-without-css.zip'
+  Write-TestThemePack -Directory $simpleWithoutCssSource -Id 'simple-without-css' -Name 'No CSS'
+  Remove-Item -LiteralPath (Join-Path $simpleWithoutCssSource 'theme.css') -Force
+  New-TestZipFromDirectory -Source $simpleWithoutCssSource -Archive $simpleWithoutCssArchive
+  Assert-TestImportRejected -Archive $simpleWithoutCssArchive -Label 'simplified package without theme.css'
 
   foreach ($reservedId in @(
     'con.theme',
@@ -246,7 +270,8 @@ try {
   Write-TestThemePack -Directory $firstSource -Id 'import-test' -Name 'Imported Theme'
   New-TestZipFromDirectory -Source $firstSource -Archive $firstArchive
   $first = Import-DreamSkinThemeZip -ArchivePath $firstArchive -StateRoot $stateRoot
-  if ($first.Status -cne 'Imported' -or $first.Id -cne 'import-test' -or $first.Renamed) {
+  if ($first.Status -cne 'Imported' -or $first.Id -cne 'import-test' -or $first.Renamed -or
+    $first.SafeCssStatus -cne 'validated') {
     throw 'Valid root-level theme ZIP did not import with its requested id.'
   }
   if ((Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $paths.Active) -cne $activeBefore) {

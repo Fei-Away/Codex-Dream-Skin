@@ -178,6 +178,8 @@ function Install-DreamSkinRuntimeEngine {
     'assets\dream-reference.jpg',
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
+    'assets\safe-css-policy.json',
+    'assets\safe-css-validator.mjs',
     'assets\selectors.json',
     'assets\theme-package-validator.mjs',
     'assets\theme.json',
@@ -193,6 +195,7 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
     'scripts\tray-dream-skin.ps1',
+    'scripts\validate-safe-css-file.mjs',
     'scripts\verify-dream-skin.ps1'
   )
   $sourceHasBundledRuntime = Test-Path -LiteralPath (Join-Path $sourceRoot 'runtime') `

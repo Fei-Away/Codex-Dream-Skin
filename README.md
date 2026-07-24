@@ -115,24 +115,25 @@
 
 在 macOS 菜单栏选择“导入主题 ZIP…”，或在 Windows 托盘选择同名菜单。只支持普通 `.zip`，
 不支持 `.dreamskin` 后缀，也不要仅改后缀伪装。正式 Studio 主题包包含 `manifest.json`、
-`theme.json` 和恰好一张 `background.webp|jpg|png`；还可包含 `theme.css`、`LICENSE.txt` 和预留的
+`theme.json`、非空 `theme.css` 和恰好一张 `background.webp|jpg|png`；还可包含 `LICENSE.txt` 和预留的
 `manifest.sig`。这些文件可以位于 ZIP 根目录或唯一一层主题目录。导入器会核对适用平台、最低客户端
-版本，以及清单中每个负载文件的大小和 SHA-256。`theme.css` 会保留但当前不会执行；`manifest.sig`
-当前不参与签名验证。
+版本，以及清单中每个负载文件的大小和 SHA-256。`theme.css` 必须通过本机 Safe CSS 校验，导入后只会
+作用于 12 个注册部件；每次切换/应用仍会重新校验。`manifest.sig` 当前不参与签名验证。
 
-为兼容本机已有工作流，也接受仅含 `theme.json` 和其引用图片的两文件简化 ZIP；该格式没有正式清单的
+本地简化 ZIP 也必须恰好包含非空 `theme.json`、非空 `theme.css` 和其引用图片；该格式没有正式清单的
 完整性与兼容性声明，只应从可信来源使用。压缩包最大 32 MiB、最多 32 个条目、解压后最多 64 MiB。
 导入成功后主题只会加入“已保存的主题”，不会自动替换当前主题；相同内容不会重复写入，同 ID 的不同
 主题会使用新的安全标识保存。
 
-也可以先手动解压，再把包含 `theme.json` 和背景图的完整主题目录移动到本机主题库：
+也可以先手动解压，再把包含 `theme.json`、`theme.css` 和背景图的完整主题目录移动到本机主题库：
 
 - macOS：`~/Library/Application Support/CodexDreamSkinStudio/themes/`
 - Windows：`%LOCALAPPDATA%\CodexDreamSkin\themes\`
 
 菜单里有“打开主题文件夹”快捷入口。移动后重新打开菜单/托盘即可；不要再套一层目录，也不要放链接、
-嵌套压缩包或只有图片而没有 `theme.json` 的文件夹。手动目录不会经过 ZIP 导入器的归档校验，请只使用
-可信内容。两端菜单也可直接打开 DreamSkin.cc 的“主题库 Gallery”和“在线 Studio”。
+嵌套压缩包或缺少三件套的文件夹。手动目录不会经过 ZIP 导入器的归档校验，请只使用可信内容。升级前
+已经保存且没有 CSS 的 legacy 主题仍可切换，但不会注入额外 CSS。两端菜单也可直接打开 DreamSkin.cc
+的“主题库 Gallery”和“在线 Studio”。
 
 ### 开发者：从源码运行
 

@@ -80,19 +80,29 @@ THEME_IMAGE="$("$NODE" "$SCRIPT_DIR/stage-theme.mjs" "$SRC" "$stage")" \
 "$NODE" "$INJECTOR" --check-payload --theme-dir "$stage" >/dev/null \
   || fail "Theme pack failed validation: $THEME_ID"
 THEME_BYTES="$(/usr/bin/stat -f '%z' "$stage/$THEME_IMAGE")"
-[ "$THEME_BYTES" -gt 0 ] && [ "$THEME_BYTES" -le 16777216 ] \
-  || fail "Theme image must be non-empty and no larger than 16 MB."
+[ "$THEME_BYTES" -gt 0 ] && [ "$THEME_BYTES" -le 10485760 ] \
+  || fail "Theme image must be non-empty and no larger than 10 MiB."
+SAFE_CSS_NAME=""
+[ ! -f "$stage/theme.css" ] || SAFE_CSS_NAME="theme.css"
 /bin/chmod 600 "$stage/"*
 for entry in "$stage/"*; do
   [ -f "$entry" ] || continue
   [ "$(/usr/bin/basename "$entry")" = "theme.json" ] && continue
   /bin/mv -f "$entry" "$THEME_DIR/"
 done
+# A legacy theme has no Safe CSS. Remove the previous theme's CSS before the
+# config commit marker so a failed cleanup cannot pair new metadata with old CSS.
+[ -n "$SAFE_CSS_NAME" ] || /bin/rm -f "$THEME_DIR/theme.css"
 # theme.json is the commit marker: the watcher never observes a config that
 # references a partially copied image.
 /bin/mv -f "$stage/theme.json" "$THEME_DIR/theme.json"
-/usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
-  ! -name 'theme.json' ! -name "$THEME_IMAGE" -delete
+if [ -n "$SAFE_CSS_NAME" ]; then
+  /usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
+    ! -name 'theme.json' ! -name "$THEME_IMAGE" ! -name 'theme.css' -delete
+else
+  /usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
+    ! -name 'theme.json' ! -name "$THEME_IMAGE" -delete
+fi
 /bin/rm -rf "$stage"
 stage=""
 

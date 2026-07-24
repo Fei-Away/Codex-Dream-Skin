@@ -61,7 +61,7 @@ else
     || fail "macOS could not convert the selected image. Use PNG, JPEG, HEIC, TIFF, or WebP."
   [ -s "$temporary" ] || fail "The converted image is empty."
   PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$temporary")"
-  [ "$PREPARED_BYTES" -le 16777216 ] || fail "The prepared image is larger than 16 MB. Choose a simpler or smaller image."
+  [ "$PREPARED_BYTES" -le 10485760 ] || fail "The prepared image is larger than 10 MB. Choose a simpler or smaller image."
   /bin/mv -f "$temporary" "$prepared"
   /bin/chmod 600 "$prepared"
 

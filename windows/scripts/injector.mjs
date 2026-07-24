@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +8,7 @@ import {
   normalizeThemeColor,
   normalizeThemeText,
 } from "../assets/theme-package-validator.mjs";
+import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
@@ -38,7 +40,8 @@ const stableTestidLiteral = (testid) => {
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
 const SKIN_VERSION = "1.3.3";
-const MAX_ART_BYTES = 16 * 1024 * 1024;
+const MAX_ART_BYTES = 10 * 1024 * 1024;
+const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
@@ -462,6 +465,42 @@ function normalizedText(value, name, fallback, maxLength = 120) {
   return value;
 }
 
+function sameFileStat(left, right) {
+  return left.isFile() && right.isFile()
+    && left.dev === right.dev
+    && left.ino === right.ino
+    && left.size === right.size
+    && left.mtimeMs === right.mtimeMs
+    && left.ctimeMs === right.ctimeMs;
+}
+
+async function loadSafeCss(themeRoot) {
+  const cssPath = path.join(themeRoot, "theme.css");
+  let handle;
+  try {
+    handle = await fs.open(cssPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    if (error.code === "ELOOP") throw new Error("Theme Safe CSS must not be a symbolic link");
+    throw error;
+  }
+  try {
+    const before = await handle.stat();
+    if (!before.isFile() || before.size < 1 || before.size > MAX_SAFE_CSS_BYTES) {
+      throw new Error(`Theme Safe CSS must be a non-empty file no larger than ${MAX_SAFE_CSS_BYTES} bytes`);
+    }
+    const bytes = await handle.readFile();
+    const after = await handle.stat();
+    if (!sameFileStat(before, after) || bytes.length !== after.size) {
+      throw new Error("Theme Safe CSS changed while being loaded");
+    }
+    const { source, validation } = decodeAndValidateSafeCss(bytes);
+    return { path: cssPath, source, stat: after, validation };
+  } finally {
+    await handle.close();
+  }
+}
+
 export async function loadTheme(themeDir) {
   const realThemeDir = await fs.realpath(themeDir);
   const themePath = path.join(realThemeDir, "theme.json");
@@ -537,7 +576,11 @@ export async function loadTheme(themeDir) {
     palette: {},
   };
   if (paletteAccent) theme.palette.accent = paletteAccent;
-  const [themeStat, imageStat] = await Promise.all([fs.stat(themePath), fs.stat(realImagePath)]);
+  const [themeStat, imageStat, safeCss] = await Promise.all([
+    fs.stat(themePath),
+    fs.stat(realImagePath),
+    loadSafeCss(realThemeDir),
+  ]);
   if (!imageStat.isFile()) throw new Error("Theme image is not a file");
   if (imageStat.size < 1) throw new Error("Theme image cannot be empty");
   if (imageStat.size > MAX_ART_BYTES) {
@@ -556,14 +599,20 @@ export async function loadTheme(themeDir) {
     .update(themeText, "utf8")
     .update("\0")
     .update(imageBytes)
+    .update("\0")
+    .update(safeCss?.source ?? "")
     .digest("hex");
   return {
     theme,
     themePath,
     imagePath: realImagePath,
     imageBytes,
+    safeCss: safeCss?.source ?? "",
+    safeCssPath: safeCss?.path ?? null,
+    safeCssStatus: safeCss ? "validated" : "none",
     fingerprint,
-    sourceStamp: `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`,
+    sourceStamp: `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}:` +
+      (safeCss ? `${safeCss.stat.size}:${safeCss.stat.mtimeMs}` : "none"),
   };
 }
 
@@ -573,22 +622,23 @@ async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme 
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
   ]);
+  const combinedCss = loadedTheme.safeCss ? `${css}\n${loadedTheme.safeCss}\n` : css;
   const extension = path.extname(loadedTheme.imagePath).toLowerCase();
   const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
     : extension === ".webp" ? "image/webp" : "image/png";
   const artDataUrl = `data:${mime};base64,${loadedTheme.imageBytes.toString("base64")}`;
-  const styleRevision = createHash("sha256").update(css).digest("hex").slice(0, 20);
+  const styleRevision = createHash("sha256").update(combinedCss).digest("hex").slice(0, 20);
   loadedTheme.theme.artKey = createHash("sha256")
     .update(loadedTheme.imageBytes).digest("hex").slice(0, 20);
   const revision = createHash("sha256")
     .update(SKIN_VERSION)
-    .update(css)
+    .update(combinedCss)
     .update(template)
     .update(JSON.stringify(loadedTheme.theme))
     .digest("hex")
     .slice(0, 20);
   const payload = template
-    .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(css))
+    .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(combinedCss))
     .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
     .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(loadedTheme.theme))
     .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
@@ -609,11 +659,16 @@ async function fileExists(filePath) {
 }
 
 async function readThemeSourceStamp(loadedTheme) {
-  const [themeStat, imageStat] = await Promise.all([
+  const [themeStat, imageStat, cssStat] = await Promise.all([
     fs.stat(loadedTheme.themePath),
     fs.stat(loadedTheme.imagePath),
+    fs.stat(path.join(path.dirname(loadedTheme.themePath), "theme.css")).catch((error) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    }),
   ]);
-  return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}`;
+  return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}:` +
+    (cssStat ? `${cssStat.size}:${cssStat.mtimeMs}` : "none");
 }
 
 async function probeSession(session) {
@@ -927,6 +982,9 @@ async function removeFromSession(session) {
         root.style.removeProperty(property);
       }
     }
+    for (const node of document.querySelectorAll('[data-ds-part]')) {
+      node.removeAttribute('data-ds-part');
+    }
     const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
     if (sheets && 'adoptedStyleSheets' in document) {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets]
@@ -947,10 +1005,11 @@ async function verifyRemovedSession(session) {
       attribute.name.startsWith('data-dream-'));
     const hasVariables = [...root.style].some((property) =>
       property.startsWith('--dream-') || property.startsWith('--ds-'));
+    const hasParts = Boolean(document.querySelector('[data-ds-part]'));
     const sheets = window.__CODEX_DREAM_SKIN_STYLE_SHEETS__;
     const hasSheets = Boolean(sheets?.size && 'adoptedStyleSheets' in document &&
       [...document.adoptedStyleSheets].some((sheet) => sheets.has(sheet)));
-    return !hasAttributes && !hasVariables && !hasSheets &&
+    return !hasAttributes && !hasVariables && !hasParts && !hasSheets &&
       !document.getElementById('codex-dream-skin-style') &&
       !window.__CODEX_DREAM_SKIN_STATE__;
   })()`);
@@ -1500,6 +1559,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       appearance: loaded.theme.appearance,
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
+      safeCssStatus: loaded.safeCssStatus,
     }));
   } else if (options.mode === "begin-operation") await runBeginOperation(options);
   else if (options.mode === "finish-operation") await runFinishOperation(options);

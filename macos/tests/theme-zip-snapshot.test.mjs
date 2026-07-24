@@ -37,10 +37,14 @@ async function writePack(directory, id) {
     image: "background.jpg",
   })}\n`);
   await fs.writeFile(path.join(directory, "background.jpg"), `image-for-${id}\n`);
+  await fs.writeFile(
+    path.join(directory, "theme.css"),
+    '[data-ds-part="root"] { color: var(--ds-theme-color-text); }\n',
+  );
 }
 
 async function makeZip(source, archive) {
-  await run("/usr/bin/zip", ["-q", archive, "theme.json", "background.jpg"], { cwd: source });
+  await run("/usr/bin/zip", ["-q", archive, "theme.json", "theme.css", "background.jpg"], { cwd: source });
 }
 
 async function expectSnapshotRejected(source, destination, pattern) {

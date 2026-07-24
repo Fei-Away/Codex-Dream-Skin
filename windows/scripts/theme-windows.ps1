@@ -2,7 +2,7 @@
   . (Join-Path $PSScriptRoot 'config-utf8.ps1')
 }
 
-$script:DreamSkinMaxImageBytes = 16 * 1024 * 1024
+$script:DreamSkinMaxImageBytes = 10 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveBytes = 32 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveExpandedBytes = 64 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveEntries = 32
@@ -85,10 +85,32 @@ function Assert-DreamSkinImageFile {
   $length = (Get-Item -LiteralPath $fullPath -Force).Length
   if ($length -lt 1) { throw 'Theme image cannot be empty.' }
   if ($length -gt $script:DreamSkinMaxImageBytes) {
-    throw 'Theme image exceeds the 16 MB limit.'
+    throw 'Theme image exceeds the 10 MiB limit.'
   }
   if (-not $SkipImageMetadata) {
     Get-DreamSkinValidatedImageMetadata -Path $fullPath
+  }
+}
+
+function Assert-DreamSkinSafeCssFile {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  Assert-DreamSkinNoReparseComponents -Path $fullPath
+  if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+    throw "Theme Safe CSS does not exist: $fullPath"
+  }
+  if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue)) {
+    throw 'Node.js runtime validation is unavailable for Safe CSS checks.'
+  }
+  $node = Get-DreamSkinNodeRuntime
+  $validator = Join-Path $PSScriptRoot 'validate-safe-css-file.mjs'
+  if (-not (Test-Path -LiteralPath $validator -PathType Leaf)) {
+    throw 'Safe CSS validator is missing from the runtime engine.'
+  }
+  $output = @(& $node.Path $validator $fullPath 2>&1)
+  if ($LASTEXITCODE -ne 0) {
+    $detail = ($output -join "`n").Trim()
+    throw $(if ($detail) { $detail } else { 'Theme Safe CSS failed validation.' })
   }
 }
 
@@ -310,6 +332,7 @@ function Set-DreamSkinActiveTheme {
     [Parameter(Mandatory = $true)][string]$ImagePath,
     [AllowNull()][object]$Theme,
     [string]$Name,
+    [AllowNull()][string]$SafeCssPath,
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
   )
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
@@ -333,7 +356,16 @@ function Set-DreamSkinActiveTheme {
   $imageName = New-DreamSkinThemeImageName -Extension $extension
   $target = Join-Path $paths.Active $imageName
   $temporary = Join-Path $paths.Active ('.dream-tmp-' + [guid]::NewGuid().ToString('N') + $extension)
+  $temporaryCss = $null
   try {
+    if ($SafeCssPath) {
+      $safeCssSource = [System.IO.Path]::GetFullPath($SafeCssPath)
+      Assert-DreamSkinSafeCssFile -Path $safeCssSource
+      $temporaryCss = Join-Path $paths.Active ('.dream-tmp-' + [guid]::NewGuid().ToString('N') + '.css')
+      Assert-DreamSkinNoReparseComponents -Path $temporaryCss
+      Copy-Item -LiteralPath $safeCssSource -Destination $temporaryCss -Force
+      Assert-DreamSkinSafeCssFile -Path $temporaryCss
+    }
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinNoReparseComponents -Path $temporary
     Copy-Item -LiteralPath $source -Destination $temporary -Force
@@ -353,9 +385,19 @@ function Set-DreamSkinActiveTheme {
     if (-not $Theme.palette) {
       $Theme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
     }
+    $activeCss = Join-Path $paths.Active 'theme.css'
+    Assert-DreamSkinNoReparseComponents -Path $activeCss
+    if ($temporaryCss) {
+      Move-Item -LiteralPath $temporaryCss -Destination $activeCss -Force
+      $temporaryCss = $null
+      Assert-DreamSkinSafeCssFile -Path $activeCss
+    } else {
+      Remove-Item -LiteralPath $activeCss -Force -ErrorAction SilentlyContinue
+    }
     Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $Theme
   } finally {
     Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+    if ($temporaryCss) { Remove-Item -LiteralPath $temporaryCss -Force -ErrorAction SilentlyContinue }
   }
   $sameImage = $oldImage -and ([System.IO.Path]::GetFullPath($oldImage) -ieq [System.IO.Path]::GetFullPath($target))
   if ($oldImage -and -not $sameImage -and
@@ -398,6 +440,13 @@ function Save-DreamSkinCurrentTheme {
   $theme.name = $trimmed
   $theme.image = $imageName
   Write-DreamSkinTheme -ThemeDirectory $destination -Theme $theme
+  $activeCss = Join-Path $paths.Active 'theme.css'
+  if (Test-Path -LiteralPath $activeCss -PathType Leaf) {
+    Assert-DreamSkinSafeCssFile -Path $activeCss
+    $savedCss = Join-Path $destination 'theme.css'
+    Copy-Item -LiteralPath $activeCss -Destination $savedCss -Force
+    Assert-DreamSkinSafeCssFile -Path $savedCss
+  }
   return Read-DreamSkinTheme -ThemeDirectory $destination
 }
 
@@ -648,8 +697,12 @@ function Expand-DreamSkinThemeZipSecurely {
     if ($backgroundCount -ne 1) {
       throw 'Official theme ZIP must contain exactly one registered background file.'
     }
-  } elseif ($sourceFiles.Count -ne 2) {
-    throw 'A local simplified theme ZIP must contain exactly theme.json and one referenced image.'
+    if (@($sourceFiles | Where-Object { $_.Name -ceq 'theme.css' }).Count -ne 1) {
+      throw 'New official theme ZIP imports require theme.css and the safe-css capability.'
+    }
+  } elseif ($sourceFiles.Count -ne 3 -or
+    @($sourceFiles | Where-Object { $_.Name -ceq 'theme.css' }).Count -ne 1) {
+    throw 'A local simplified theme ZIP must contain exactly theme.json, theme.css, and one referenced image.'
   }
   return $sourceRoot
 }
@@ -704,7 +757,10 @@ function Import-DreamSkinThemeZip {
     }
     $sourceRoot = $validatedRoot
     $packageFormat = "$($packageInfo.format)"
-    $cssIgnored = [bool]$packageInfo.cssIgnored
+    $safeCssStatus = "$($packageInfo.safeCssStatus)"
+    if ($safeCssStatus -cne 'validated') {
+      throw 'New theme ZIP imports require locally validated Safe CSS.'
+    }
     $signatureIgnored = [bool]$packageInfo.signatureIgnored
 
     $themePath = Join-Path $sourceRoot 'theme.json'
@@ -740,7 +796,7 @@ function Import-DreamSkinThemeZip {
             Renamed = $false
             NameCollision = $false
             PackageFormat = $packageFormat
-            CssIgnored = $cssIgnored
+            SafeCssStatus = $safeCssStatus
             SignatureIgnored = $signatureIgnored
             Path = $savedDirectory.FullName
           }
@@ -799,7 +855,7 @@ function Import-DreamSkinThemeZip {
       Renamed = ($id -cne $requestedId)
       NameCollision = $existingNames.Contains($name)
       PackageFormat = $packageFormat
-      CssIgnored = $cssIgnored
+      SafeCssStatus = $safeCssStatus
       SignatureIgnored = $signatureIgnored
       Path = $destination
     }
@@ -852,7 +908,11 @@ function Use-DreamSkinSavedTheme {
   }
   $saved = Read-DreamSkinTheme -ThemeDirectory $directory
   $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme -StateRoot $StateRoot
+  $safeCssPath = Join-Path $directory 'theme.css'
+  if (-not (Test-Path -LiteralPath $safeCssPath -PathType Leaf)) { $safeCssPath = $null }
+  if ($safeCssPath) { Assert-DreamSkinSafeCssFile -Path $safeCssPath }
+  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme `
+    -SafeCssPath $safeCssPath -StateRoot $StateRoot
 }
 
 function Set-DreamSkinPaused {

@@ -57,10 +57,31 @@ function compileRuntime(source) {
   return source.replace(token, JSON.stringify(runtimeContract));
 }
 
+function compileSafeCssFileValidator(source) {
+  const canonicalImport = 'from "./safe-css-validator.mjs"';
+  const occurrences = source.split(canonicalImport).length - 1;
+  if (occurrences !== 1) {
+    throw new Error("runtime/validate-safe-css-file.mjs must import the canonical Safe CSS validator once");
+  }
+  return source.replace(canonicalImport, 'from "../assets/safe-css-validator.mjs"');
+}
+
 const sourceCss = await fs.readFile(path.join(projectRoot, "runtime", "dream-skin.css"), "utf8");
 const sourceRuntime = await fs.readFile(path.join(projectRoot, "runtime", "renderer-inject.js"), "utf8");
 const sourceThemePackageValidator = await fs.readFile(
   path.join(projectRoot, "runtime", "theme-package-validator.mjs"),
+  "utf8",
+);
+const sourceSafeCssValidator = await fs.readFile(
+  path.join(projectRoot, "runtime", "safe-css-validator.mjs"),
+  "utf8",
+);
+const sourceSafeCssPolicy = await fs.readFile(
+  path.join(projectRoot, "runtime", "safe-css-policy.json"),
+  "utf8",
+);
+const sourceSafeCssFileValidator = await fs.readFile(
+  path.join(projectRoot, "runtime", "validate-safe-css-file.mjs"),
   "utf8",
 );
 const outputs = [
@@ -84,6 +105,27 @@ const outputs = [
     paths: [
       "macos/assets/theme-package-validator.mjs",
       "windows/assets/theme-package-validator.mjs",
+    ],
+  },
+  {
+    content: sourceSafeCssValidator,
+    paths: [
+      "macos/assets/safe-css-validator.mjs",
+      "windows/assets/safe-css-validator.mjs",
+    ],
+  },
+  {
+    content: sourceSafeCssPolicy,
+    paths: [
+      "macos/assets/safe-css-policy.json",
+      "windows/assets/safe-css-policy.json",
+    ],
+  },
+  {
+    content: compileSafeCssFileValidator(sourceSafeCssFileValidator),
+    paths: [
+      "macos/scripts/validate-safe-css-file.mjs",
+      "windows/scripts/validate-safe-css-file.mjs",
     ],
   },
 ];

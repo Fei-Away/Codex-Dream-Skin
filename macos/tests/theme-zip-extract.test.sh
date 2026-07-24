@@ -27,19 +27,28 @@ make_theme_json() {
     > "$1"
 }
 
+make_safe_css() {
+  /usr/bin/printf '%s\n' \
+    '[data-ds-part="root"] { color: var(--ds-theme-color-text); }' \
+    > "$1"
+}
+
 /bin/mkdir -p "$TMP/root-pack" "$TMP/root-out"
 make_theme_json "$TMP/root-pack/theme.json"
+make_safe_css "$TMP/root-pack/theme.css"
 /usr/bin/printf 'fake-image-bytes\n' > "$TMP/root-pack/background.jpg"
 (
   cd "$TMP/root-pack"
-  /usr/bin/zip -q "$TMP/root.zip" theme.json background.jpg
+  /usr/bin/zip -q "$TMP/root.zip" theme.json theme.css background.jpg
 )
 "$EXTRACTOR" "$TMP/root.zip" "$TMP/root-out"
 /usr/bin/cmp -s "$TMP/root-pack/theme.json" "$TMP/root-out/theme.json"
+/usr/bin/cmp -s "$TMP/root-pack/theme.css" "$TMP/root-out/theme.css"
 /usr/bin/cmp -s "$TMP/root-pack/background.jpg" "$TMP/root-out/background.jpg"
 
 /bin/mkdir -p "$TMP/wrapped/theme-folder" "$TMP/wrapped-out"
 make_theme_json "$TMP/wrapped/theme-folder/theme.json"
+/bin/cp "$TMP/root-pack/theme.css" "$TMP/wrapped/theme-folder/theme.css"
 /bin/cp "$TMP/root-pack/background.jpg" "$TMP/wrapped/theme-folder/background.jpg"
 (
   cd "$TMP/wrapped"
@@ -50,14 +59,27 @@ make_theme_json "$TMP/wrapped/theme-folder/theme.json"
 
 /bin/mkdir -p "$TMP/official-pack" "$TMP/official-out"
 make_theme_json "$TMP/official-pack/theme.json"
+/bin/cp "$TMP/root-pack/theme.css" "$TMP/official-pack/theme.css"
 /bin/cp "$TMP/root-pack/background.jpg" "$TMP/official-pack/background.jpg"
 /usr/bin/printf '%s\n' '{"packageVersion":1}' > "$TMP/official-pack/manifest.json"
 (
   cd "$TMP/official-pack"
-  /usr/bin/zip -q "$TMP/official.zip" manifest.json theme.json background.jpg
+  /usr/bin/zip -q "$TMP/official.zip" manifest.json theme.json theme.css background.jpg
 )
 "$EXTRACTOR" "$TMP/official.zip" "$TMP/official-out"
 /usr/bin/cmp -s "$TMP/official-pack/manifest.json" "$TMP/official-out/manifest.json"
+
+(
+  cd "$TMP/official-pack"
+  /usr/bin/zip -q "$TMP/official-without-css.zip" manifest.json theme.json background.jpg
+)
+expect_rejected "$TMP/official-without-css.zip" official-without-css
+
+(
+  cd "$TMP/root-pack"
+  /usr/bin/zip -q "$TMP/simple-without-css.zip" theme.json background.jpg
+)
+expect_rejected "$TMP/simple-without-css.zip" simple-without-css
 
 /bin/cp "$TMP/root.zip" "$TMP/legacy.dreamskin"
 expect_rejected "$TMP/legacy.dreamskin" dreamskin-extension
@@ -100,7 +122,7 @@ expect_rejected "$TMP/expanded-limit.zip" expanded-size
 
 (
   cd "$TMP/root-pack"
-  /usr/bin/zip -P test-password -q "$TMP/encrypted.zip" theme.json background.jpg
+  /usr/bin/zip -P test-password -q "$TMP/encrypted.zip" theme.json theme.css background.jpg
 )
 encrypted_destination="$TMP/rejected-encrypted-content"
 /bin/mkdir -p "$encrypted_destination"
@@ -116,7 +138,7 @@ esac
 
 (
   cd "$TMP/root-pack"
-  /usr/bin/zip -0q "$TMP/damaged-crc.zip" theme.json background.jpg
+  /usr/bin/zip -0q "$TMP/damaged-crc.zip" theme.json theme.css background.jpg
 )
 LC_ALL=C LANG=C /usr/bin/perl -0777 -pi -e 's/fake-image-bytes/fake-Xmage-bytes/' "$TMP/damaged-crc.zip"
 expect_rejected "$TMP/damaged-crc.zip" damaged-crc

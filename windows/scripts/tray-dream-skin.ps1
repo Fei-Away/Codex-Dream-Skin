@@ -192,7 +192,9 @@ try {
             if ($imported.Renamed) { $message += " 新标识：$($imported.Id)。" }
             if ($imported.NameCollision) { $message += ' 主题库中已有同名主题。' }
           }
-          if ($imported.CssIgnored) { $message += ' 已保留 theme.css，但当前客户端不会执行自定义 CSS。' }
+          if ($imported.SafeCssStatus -ceq 'validated') {
+            $message += ' theme.css 已通过本机 Safe CSS 校验，切换到该主题时会一并生效。'
+          }
           if ($imported.SignatureIgnored) { $message += ' manifest.sig 是预留文件，当前版本已忽略。' }
           $notify.ShowBalloonTip(3200, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
         }

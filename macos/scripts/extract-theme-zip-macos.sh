@@ -197,9 +197,11 @@ if [ -f "$SOURCE_ROOT/manifest.json" ]; then
   done < <(/usr/bin/find "$SOURCE_ROOT" -xdev -mindepth 1 -maxdepth 1 -type f -print0)
   [ "$official_backgrounds" -eq 1 ] \
     || fail_extract "Official theme ZIP must contain exactly one background.webp, background.jpg, or background.png."
+  [ -f "$SOURCE_ROOT/theme.css" ] \
+    || fail_extract "New official theme ZIP imports require theme.css and the safe-css capability."
 else
-  [ "$source_file_count" -eq 2 ] \
-    || fail_extract "A local simplified theme ZIP must contain exactly theme.json and one referenced image."
+  [ "$source_file_count" -eq 3 ] && [ -f "$SOURCE_ROOT/theme.css" ] \
+    || fail_extract "A local simplified theme ZIP must contain exactly theme.json, theme.css, and one referenced image."
 fi
 
 while IFS= read -r -d '' source_file; do

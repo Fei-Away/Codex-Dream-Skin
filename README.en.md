@@ -131,15 +131,16 @@ Choose **Import Theme ZIP…** from the macOS menu bar app or Windows tray. Only
 ordinary `.zip` files are accepted; the legacy `.dreamskin` extension is not
 supported, and renaming the suffix is not a supported migration path. An
 official Studio pack contains `manifest.json`, `theme.json`, and exactly one
-`background.webp|jpg|png`, with optional `theme.css`, `LICENSE.txt`, and the
+`background.webp|jpg|png`, plus non-empty `theme.css`; `LICENSE.txt` and the
 reserved `manifest.sig`. Put these files at ZIP root or inside exactly one
 top-level theme folder. The importer verifies platform and minimum-client
 compatibility plus every declared payload file's byte length and SHA-256.
-`theme.css` is preserved but not executed by this client version;
-`manifest.sig` is not used for signature verification.
+`theme.css` must pass the local Safe CSS validator and can affect only the 12
+registered parts. It is revalidated on every import and apply. `manifest.sig`
+is not used for signature verification.
 
-For existing local workflows, the importer also accepts a simplified ZIP with
-exactly `theme.json` and its referenced image. That format has no official
+The local simplified ZIP must contain exactly non-empty `theme.json`, non-empty
+`theme.css`, and its referenced image. That format has no official
 manifest integrity or compatibility declaration and should come from a trusted
 source. Limits are 32 MiB per archive, 32 entries, and 64 MiB expanded. Import
 adds the pack to **Saved Themes** without changing the active theme. Identical
@@ -147,7 +148,7 @@ content is not duplicated, and a distinct pack with an existing ID is
 preserved under a new safe ID.
 
 For a manual fallback, extract the archive and move the complete directory
-containing `theme.json` and its image into the saved-theme folder:
+containing `theme.json`, `theme.css`, and its image into the saved-theme folder:
 
 - macOS: `~/Library/Application Support/CodexDreamSkinStudio/themes/`
 - Windows: `%LOCALAPPDATA%\CodexDreamSkin\themes\`

@@ -45,6 +45,12 @@ async function makeStage(name, id, extra = {}) {
       ...extra.theme,
     }, null, 2)}\n`,
   );
+  if (extra.safeCss !== false) {
+    await fs.writeFile(
+      path.join(stage, "theme.css"),
+      extra.safeCss ?? '[data-ds-part="root"] { color: var(--ds-theme-color-text); }\n',
+    );
+  }
   return stage;
 }
 
@@ -62,9 +68,12 @@ try {
     renamed: false,
     nameCollision: false,
     packageFormat: "simple",
-    cssIgnored: false,
+    safeCssStatus: "validated",
     signatureIgnored: false,
   });
+
+  const noCssStage = await makeStage("no-css", "no-css", { safeCss: false });
+  await assert.rejects(publish(noCssStage), /require non-empty theme\.css/);
   assert.equal(await fs.readFile(path.join(activeRoot, "last-known-good"), "utf8"), "unchanged\n");
 
   const duplicateStage = await makeStage("duplicate", "different-package-id");
