@@ -1,17 +1,24 @@
 . (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
 function Enter-DreamSkinOperationLock {
+  param(
+    [ValidateRange(0, 300000)]
+    [int]$TimeoutMilliseconds = 0
+  )
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Operation")
   $acquired = $false
   try {
-    $acquired = $mutex.WaitOne(0)
+    $acquired = $mutex.WaitOne($TimeoutMilliseconds)
   } catch [System.Threading.AbandonedMutexException] {
     $acquired = $true
   }
   if (-not $acquired) {
     $mutex.Dispose()
-    throw 'Another Codex Dream Skin install, start, restore, or verify operation is already running.'
+    if ($TimeoutMilliseconds -eq 0) {
+      throw 'Another Codex Dream Skin install, start, restore, or verify operation is already running.'
+    }
+    throw "Another Codex Dream Skin operation did not finish within $TimeoutMilliseconds ms."
   }
   return $mutex
 }
@@ -57,6 +64,7 @@ function Get-DreamSkinRuntimeEnginePaths {
     Scripts = $scripts
     Runtime = Join-Path $root 'runtime'
     Version = Join-Path $root 'VERSION'
+    CommunityApply = Join-Path $scripts 'apply-community-theme.ps1'
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
@@ -185,6 +193,7 @@ function Install-DreamSkinRuntimeEngine {
     'assets\theme.json',
     'presets\preset-gothic-void-crusade\background.jpg',
     'presets\preset-gothic-void-crusade\theme.json',
+    'scripts\apply-community-theme.ps1',
     'scripts\common-windows.ps1',
     'scripts\check-update.ps1',
     'scripts\config-utf8.ps1',

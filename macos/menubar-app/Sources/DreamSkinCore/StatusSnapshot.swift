@@ -8,7 +8,9 @@ public struct StatusSnapshot: Equatable, Sendable {
   public var injectorAlive: Bool
   public var cdpOK: Bool
   public var codexRunning: Bool
+  public var themeID: String
   public var themeName: String
+  public var appliedThemeID: String
   public var appliedThemeName: String
 
   public init(
@@ -19,7 +21,9 @@ public struct StatusSnapshot: Equatable, Sendable {
     injectorAlive: Bool = false,
     cdpOK: Bool = false,
     codexRunning: Bool = false,
+    themeID: String = "",
     themeName: String = "",
+    appliedThemeID: String = "",
     appliedThemeName: String = ""
   ) {
     self.session = session
@@ -29,7 +33,9 @@ public struct StatusSnapshot: Equatable, Sendable {
     self.injectorAlive = injectorAlive
     self.cdpOK = cdpOK
     self.codexRunning = codexRunning
+    self.themeID = themeID
     self.themeName = themeName
+    self.appliedThemeID = appliedThemeID
     self.appliedThemeName = appliedThemeName
   }
 
@@ -51,12 +57,28 @@ public struct StatusSnapshot: Equatable, Sendable {
     injectorAlive = value["injectorAlive"] as? Bool ?? false
     cdpOK = value["cdpOk"] as? Bool ?? false
     codexRunning = value["codexRunning"] as? Bool ?? false
+    themeID = value["themeId"] as? String ?? ""
     themeName = value["themeName"] as? String ?? ""
+    appliedThemeID = value["appliedThemeId"] as? String ?? ""
     appliedThemeName = value["appliedThemeName"] as? String ?? ""
   }
 
   public var busy: Bool {
     operation == "applying" || operation == "pausing"
+  }
+
+  public var isReadyForCommunityApply: Bool {
+    session == "active"
+      && operation.isEmpty
+      && injectorAlive
+      && cdpOK
+      && codexRunning
+      && !themeID.isEmpty
+      && themeID == appliedThemeID
+      && themeID.range(
+        of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#,
+        options: .regularExpression
+      ) != nil
   }
 
   public var title: String {

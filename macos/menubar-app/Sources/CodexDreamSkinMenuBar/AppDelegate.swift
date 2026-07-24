@@ -1,14 +1,21 @@
 import AppKit
+import CryptoKit
 import DreamSkinCore
 import ServiceManagement
 import UniformTypeIdentifiers
 
-private struct ThemeOption {
-  let id: String
-  let name: String
-}
-
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+  private enum CommunityRollbackRetention {
+    case preserved(URL)
+    case retainedInOperationRoot(URL)
+    case unavailable
+
+    var requiresOperationRoot: Bool {
+      if case .retainedInOperationRoot = self { return true }
+      return false
+    }
+  }
+
   private let fileManager = FileManager.default
   private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
   private let menu = NSMenu()
@@ -16,7 +23,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var statusRefreshRunning = false
   private var operationInFlight = false
   private var engineInstallInFlight = false
+  private var pendingCommunityVersionID: String?
+  private var communityBaselineThemeID = ""
+  private var communityStageMessage = ""
   private var refreshTimer: Timer?
+  private lazy var communityHTTP = BoundedCommunityHTTPClient(
+    userAgent: "CodexDreamSkin/\(appVersion)"
+  )
   private let requiredEngineRelativePaths = [
     "VERSION",
     "assets/dream-skin.css",
@@ -24,11 +37,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     "assets/renderer-inject.js",
     "assets/safe-css-policy.json",
     "assets/safe-css-validator.mjs",
+    "assets/selectors.json",
     "assets/theme-package-validator.mjs",
     "assets/theme.json",
     "presets/preset-gothic-void-crusade/background.jpg",
     "presets/preset-gothic-void-crusade/theme.json",
     "scripts/apply-from-menubar-macos.sh",
+    "scripts/apply-community-theme-macos.sh",
     "scripts/check-update-macos.sh",
     "scripts/common-macos.sh",
     "scripts/customize-theme-macos.sh",
@@ -42,11 +57,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     "scripts/pause-dream-skin-macos.sh",
     "scripts/publish-theme-import.mjs",
     "scripts/restore-dream-skin-macos.sh",
+    "scripts/snapshot-active-theme-macos.sh",
     "scripts/snapshot-theme-zip.mjs",
     "scripts/stage-theme.mjs",
     "scripts/start-dream-skin-macos.sh",
     "scripts/status-dream-skin-macos.sh",
     "scripts/switch-theme-macos.sh",
+    "scripts/theme-content-fingerprint.mjs",
+    "scripts/theme-switch-lock-macos.sh",
     "scripts/theme-config.mjs",
     "scripts/validate-safe-css-file.mjs",
     "scripts/verify-dream-skin-macos.sh",
@@ -88,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     NSApp.setActivationPolicy(.accessory)
     configureStatusItem()
     ensureUserDirectories()
+    cleanupStalePrivateOperationDirectories()
     migrateLegacySwiftBarIfNeeded()
     installBundledEngineIfNeeded(force: false)
     refreshStatus()
@@ -102,6 +121,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   func applicationWillTerminate(_ notification: Notification) {
     refreshTimer?.invalidate()
+    communityHTTP.invalidate()
+  }
+
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    guard !operationInFlight, !engineInstallInFlight, !snapshot.busy else {
+      showError(
+        title: "操作仍在进行",
+        message: "请等待当前下载、导入、应用或恢复完成后再退出，以免留下未完成的主题状态。"
+      )
+      return .terminateCancel
+    }
+    return .terminateNow
+  }
+
+  func application(_ application: NSApplication, open urls: [URL]) {
+    guard urls.count == 1,
+          let versionID = CommunityThemeContract.versionID(from: urls[0]) else {
+      showError(
+        title: "一键换肤链接无效",
+        message: "只接受 DreamSkin.cc 生成的主题版本链接；不会打开链接中的任意网址或文件。"
+      )
+      return
+    }
+    beginCommunityThemeApply(versionID: versionID)
   }
 
   func menuNeedsUpdate(_ menu: NSMenu) {
@@ -158,6 +201,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
   }
 
+  private func cleanupStalePrivateOperationDirectories() {
+    let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+    let allowedPrefixes = [".community-apply-", ".theme-switch.", ".theme-import-work."]
+    let rootPath = stateRootURL.standardizedFileURL.path + "/"
+    guard let entries = try? fileManager.contentsOfDirectory(
+      at: stateRootURL,
+      includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey],
+      options: []
+    ) else { return }
+
+    for entry in entries {
+      let name = entry.lastPathComponent
+      guard name != ".theme-switch.lock",
+            allowedPrefixes.contains(where: name.hasPrefix),
+            entry.standardizedFileURL.path.hasPrefix(rootPath),
+            let values = try? entry.resourceValues(
+              forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey]
+            ),
+            values.isDirectory == true,
+            values.isSymbolicLink != true,
+            let modified = values.contentModificationDate,
+            modified < cutoff else { continue }
+      if name.hasPrefix(".community-apply-"),
+         (try? CommunityRecovery.validatedRollbackSnapshot(
+           operationRoot: entry,
+           stateRoot: stateRootURL,
+           fileManager: fileManager
+         )) != nil {
+        continue
+      }
+      do {
+        try fileManager.removeItem(at: entry)
+      } catch {
+        NSLog("[DreamSkin] stale private operation cleanup failed for %@: %@", name, error.localizedDescription)
+      }
+    }
+  }
+
   private func rebuildMenu() {
     menu.removeAllItems()
     addDisabledItem(snapshot.title)
@@ -172,6 +253,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     addDisabledItem(snapshot.codexRunning ? "ChatGPT：已打开" : "ChatGPT：未打开")
     if !snapshot.operationMessage.isEmpty {
       addDisabledItem(cleanMenuText(snapshot.operationMessage))
+    }
+    if !communityStageMessage.isEmpty {
+      addDisabledItem(cleanMenuText(communityStageMessage))
     }
     addDisabledItem("版本：v\(appVersion)")
 
@@ -222,7 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       action: #selector(restoreAndUninstall),
       enabled: !busy
     )
-    addActionItem("退出", action: #selector(quit))
+    addActionItem("退出", action: #selector(quit), enabled: !busy)
   }
 
   @discardableResult
@@ -261,7 +345,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
           to: submenu
         )
         item.representedObject = theme.id
-        if theme.name == snapshot.themeName {
+        if theme.id == snapshot.themeID {
           item.state = .on
         }
       }
@@ -270,7 +354,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     menu.addItem(root)
   }
 
-  private func savedThemes() -> [ThemeOption] {
+  private func savedThemes() -> [SavedThemeOption] {
     let entries: [URL]
     do {
       entries = try fileManager.contentsOfDirectory(
@@ -292,7 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       (((try? themesURL.resourceValues(forKeys: [.canonicalPathKey]))?.canonicalPath)
         ?? themesURL.standardizedFileURL.path) + "/"
     var rejected: [String: Int] = [:]
-    let options: [ThemeOption] = entries.compactMap { directory in
+    let options: [SavedThemeOption] = entries.compactMap { directory in
       let id = directory.lastPathComponent
       guard id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#, options: .regularExpression) != nil else {
         rejected["name", default: 0] += 1
@@ -323,8 +407,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return nil
       }
       let rawName = value["name"] as? String ?? id
-      return ThemeOption(id: id, name: cleanMenuText(rawName))
-    }.sorted {
+      return SavedThemeOption(id: id, name: cleanMenuText(rawName))
+    }
+    let deduplicated = deduplicatedSavedThemes(options, currentThemeID: snapshot.themeID).sorted {
       $0.name.localizedStandardCompare($1.name) == .orderedAscending
     }
     // 空列表或有拒收时落一条统一日志：`log show --predicate 'process ==
@@ -335,7 +420,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         entries.count, options.count, themesURL.path, String(describing: rejected)
       )
     }
-    return options
+    return deduplicated
   }
 
   private func cleanMenuText(_ source: String) -> String {
@@ -412,19 +497,222 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     importThemeArchive(archiveURL)
   }
 
+  private func beginCommunityThemeApply(versionID: String) {
+    guard !operationInFlight, !snapshot.busy else {
+      showError(title: "暂时无法换肤", message: "Dream Skin 正在执行其他操作，请稍后再点一次。")
+      return
+    }
+    if engineInstallInFlight {
+      pendingCommunityVersionID = versionID
+      return
+    }
+    if engineNeedsInstall() {
+      pendingCommunityVersionID = versionID
+      installBundledEngineIfNeeded(force: false)
+      return
+    }
+    guard let metadataURL = CommunityThemeContract.metadataURL(for: versionID) else {
+      showError(title: "一键换肤链接无效", message: "主题版本标识不符合安全规则。")
+      return
+    }
+    guard let statusScript = installedScript(named: "status-dream-skin-macos.sh") else {
+      showError(title: "引擎尚未安装", message: "请先选择“安装 / 升级引擎”，再使用一键换肤。")
+      return
+    }
+
+    operationInFlight = true
+    updateCommunityStage("正在确认当前皮肤可安全回滚…")
+    ScriptRunner.run(script: statusScript, arguments: ["--json", "--deep"]) { [weak self] result in
+      guard let self else { return }
+      guard result.succeeded,
+            let current = StatusSnapshot(jsonData: Data(result.output.utf8)),
+            current.isReadyForCommunityApply else {
+        self.finishThemeOperation()
+        self.showError(
+          title: "当前皮肤还不能安全换肤",
+          message: "请先从菜单栏应用当前皮肤，确认状态为 Skin ON 且没有“待应用”主题，再回到网页重试。这样失败时才能恢复并验证点击前真正显示的主题。"
+        )
+        return
+      }
+      self.communityBaselineThemeID = current.themeID
+      self.fetchCommunityThemeMetadata(versionID: versionID, metadataURL: metadataURL)
+    }
+  }
+
+  private func fetchCommunityThemeMetadata(versionID: String, metadataURL: URL) {
+    updateCommunityStage("正在读取已审核主题信息…")
+    communityHTTP.get(
+      metadataURL,
+      accept: "application/json",
+      maximumBytes: 65_536
+    ) { [weak self] result in
+      DispatchQueue.main.async {
+        guard let self else { return }
+        guard case let .success(payload) = result,
+              self.mediaType(of: payload.response) == "application/json",
+              !payload.body.isEmpty else {
+          self.finishThemeOperation()
+          self.showError(
+            title: "无法读取主题信息",
+            message: "DreamSkin.cc 没有返回可验证的已审核主题，请稍后重试。"
+          )
+          return
+        }
+        do {
+          let decoded = try JSONDecoder().decode(CommunityThemeMetadata.self, from: payload.body)
+          let metadata = try decoded.validated(expectedVersionID: versionID)
+          self.confirmCommunityThemeApply(metadata)
+        } catch {
+          self.finishThemeOperation()
+          self.showError(
+            title: "主题信息未通过校验",
+            message: error.localizedDescription
+          )
+        }
+      }
+    }
+  }
+
+  private func confirmCommunityThemeApply(_ metadata: CommunityThemeMetadata) {
+    updateCommunityStage("等待确认：\(cleanMenuText(metadata.name))")
+    let size = ByteCountFormatter.string(fromByteCount: metadata.packageBytes, countStyle: .file)
+    let alert = NSAlert()
+    alert.messageText = "从 DreamSkin.cc 应用“\(cleanMenuText(metadata.name))”？"
+    alert.informativeText = """
+    作者：\(cleanMenuText(metadata.authorDisplayName))
+    版本：\(metadata.version) · \(size)
+    SHA-256：\(metadata.packageSha256)
+
+    客户端会从固定官方 API 下载，核对完整哈希，并重新执行 ZIP、清单与 Safe CSS 校验。导入和应用前不会运行主题中的任意命令。
+
+    如果 ChatGPT 当前没有安全调试连接，应用时会重启 ChatGPT；请先保存未发送的输入。
+    """
+    alert.addButton(withTitle: "下载并应用")
+    alert.addButton(withTitle: "取消")
+    activateForUserInteraction()
+    guard alert.runModal() == .alertFirstButtonReturn else {
+      finishThemeOperation()
+      return
+    }
+    downloadCommunityTheme(metadata)
+  }
+
+  private func downloadCommunityTheme(_ metadata: CommunityThemeMetadata) {
+    guard let downloadURL = CommunityThemeContract.downloadURL(for: metadata.id) else {
+      finishThemeOperation()
+      showError(title: "无法下载主题", message: "主题下载地址无法由版本标识安全构造。")
+      return
+    }
+    updateCommunityStage("正在下载主题包…")
+    communityHTTP.get(
+      downloadURL,
+      accept: "application/zip",
+      maximumBytes: Int(metadata.packageBytes)
+    ) { [weak self] result in
+      guard let self else { return }
+      var downloadRoot: URL?
+      do {
+        guard case let .success(payload) = result,
+              self.mediaType(of: payload.response) == "application/zip",
+              payload.response.expectedContentLength < 0
+                || payload.response.expectedContentLength == metadata.packageBytes,
+              payload.body.count == Int(metadata.packageBytes) else {
+          throw CommunityThemeContractError.invalidPackageIdentity
+        }
+
+        let root = self.stateRootURL.appendingPathComponent(
+          ".community-apply-\(UUID().uuidString)",
+          isDirectory: true
+        )
+        downloadRoot = root
+        try self.fileManager.createDirectory(
+          at: root,
+          withIntermediateDirectories: false,
+          attributes: [.posixPermissions: 0o700]
+        )
+        let archiveURL = root.appendingPathComponent("theme.zip")
+        guard self.fileManager.createFile(
+          atPath: archiveURL.path,
+          contents: payload.body,
+          attributes: [.posixPermissions: 0o600]
+        ) else {
+          throw CommunityThemeContractError.invalidPackageIdentity
+        }
+        try self.fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: archiveURL.path)
+        let actualHash = try self.sha256(of: archiveURL)
+        guard actualHash == metadata.packageSha256 else {
+          throw CommunityThemeContractError.invalidPackageIdentity
+        }
+        DispatchQueue.main.async {
+          self.updateCommunityStage("下载完成，正在执行严格导入校验…")
+          self.performThemeImport(
+            archiveURL,
+            cleanupRoot: root,
+            applyAfterImport: true,
+            communityMetadata: metadata
+          )
+        }
+      } catch {
+        if let downloadRoot {
+          try? self.fileManager.removeItem(at: downloadRoot)
+        }
+        DispatchQueue.main.async {
+          self.finishThemeOperation()
+          self.showError(
+            title: "主题包未通过下载校验",
+            message: "下载已丢弃，没有导入或应用任何内容。\n\n\(error.localizedDescription)"
+          )
+        }
+      }
+    }
+  }
+
+  private func mediaType(of response: HTTPURLResponse) -> String {
+    guard let value = response.value(forHTTPHeaderField: "Content-Type") else { return "" }
+    return value.split(separator: ";", maxSplits: 1)[0]
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+  }
+
+  private func sha256(of url: URL) throws -> String {
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    var digest = SHA256()
+    while true {
+      let data = try handle.read(upToCount: 1024 * 1024) ?? Data()
+      if data.isEmpty { break }
+      digest.update(data: data)
+    }
+    return digest.finalize().map { String(format: "%02x", $0) }.joined()
+  }
+
   private func importThemeArchive(_ archiveURL: URL) {
     guard !operationInFlight, !snapshot.busy else { return }
+    operationInFlight = true
+    rebuildMenu()
+    performThemeImport(archiveURL)
+  }
+
+  private func performThemeImport(
+    _ archiveURL: URL,
+    cleanupRoot: URL? = nil,
+    applyAfterImport: Bool = false,
+    communityMetadata: CommunityThemeMetadata? = nil
+  ) {
     guard let script = installedScript(named: "import-theme-zip-macos.sh") else {
+      finishThemeOperation(cleanupRoot: cleanupRoot)
       showError(title: "引擎尚未安装", message: "请先选择“安装 / 升级引擎”，再导入主题。")
       return
     }
-    operationInFlight = true
-    rebuildMenu()
-    ScriptRunner.run(script: script, arguments: ["--file", archiveURL.path]) { [weak self] result in
+    var importArguments = ["--file", archiveURL.path]
+    if let communityMetadata {
+      importArguments += [
+        "--expected-sha256", communityMetadata.packageSha256,
+        "--expected-bytes", String(communityMetadata.packageBytes)
+      ]
+    }
+    ScriptRunner.run(script: script, arguments: importArguments) { [weak self] result in
       guard let self else { return }
-      self.operationInFlight = false
-      self.refreshStatus()
-      self.rebuildMenu()
       guard result.succeeded,
             let data = result.output.data(using: .utf8),
             let object = try? JSONSerialization.jsonObject(with: data),
@@ -432,6 +720,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let status = value["status"] as? String,
             let rawName = value["name"] as? String,
             let rawID = value["id"] as? String else {
+        self.finishThemeOperation(cleanupRoot: cleanupRoot)
         self.showError(
           title: "导入主题失败",
           message: self.conciseOutput(result.output, fallback: "主题 ZIP 未通过安全或内容校验。")
@@ -442,6 +731,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       let id = self.cleanMenuText(rawID)
       let safeCssStatus = value["safeCssStatus"] as? String ?? "none"
       let signatureIgnored = value["signatureIgnored"] as? Bool ?? false
+      if applyAfterImport {
+        guard (status == "imported" || status == "duplicate"),
+              safeCssStatus == "validated",
+              let contentFingerprint = value["contentFingerprint"] as? String,
+              contentFingerprint.range(
+                of: #"^[0-9a-f]{64}$"#,
+                options: .regularExpression
+              ) != nil else {
+          self.finishThemeOperation(cleanupRoot: cleanupRoot)
+          self.showError(
+            title: "主题已下载，但没有应用",
+            message: "主题包没有完成严格 ZIP 与 Safe CSS 导入校验。"
+          )
+          return
+        }
+        self.captureActiveThemeThenApplyImported(
+          id: id,
+          name: name,
+          expectedContentFingerprint: contentFingerprint,
+          cleanupRoot: cleanupRoot,
+          metadata: communityMetadata
+        )
+        return
+      }
       if status == "duplicate" {
         var details = "“\(name)”与已保存主题完全相同，没有重复写入。"
         if safeCssStatus == "validated" {
@@ -450,6 +763,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if signatureIgnored {
           details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
         }
+        self.finishThemeOperation(cleanupRoot: cleanupRoot)
         self.showInfo(
           title: "主题已经存在",
           message: details
@@ -471,8 +785,120 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       if signatureIgnored {
         details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
       }
+      self.finishThemeOperation(cleanupRoot: cleanupRoot)
       self.showInfo(title: "主题导入完成", message: details)
     }
+  }
+
+  private func captureActiveThemeThenApplyImported(
+    id: String,
+    name: String,
+    expectedContentFingerprint: String,
+    cleanupRoot: URL?,
+    metadata: CommunityThemeMetadata?
+  ) {
+    guard CommunityThemeContract.isVersionID(metadata?.id ?? ""),
+          id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#, options: .regularExpression) != nil,
+          expectedContentFingerprint.range(
+            of: #"^[0-9a-f]{64}$"#,
+            options: .regularExpression
+          ) != nil,
+          let cleanupRoot,
+          !communityBaselineThemeID.isEmpty,
+          let transactionScript = installedScript(named: "apply-community-theme-macos.sh") else {
+      finishThemeOperation(cleanupRoot: cleanupRoot)
+      showError(
+        title: "主题已导入，但没有应用",
+        message: "客户端无法启动带回滚保护的一键换肤事务。当前主题没有改变。"
+      )
+      return
+    }
+    updateCommunityStage("正在保存当前主题、应用新主题并验证渲染…")
+    ScriptRunner.run(
+      script: transactionScript,
+      arguments: [
+        "--id", id,
+        "--expect-fingerprint", expectedContentFingerprint,
+        "--expect-active-id", communityBaselineThemeID,
+        "--transaction-root", cleanupRoot.path
+      ]
+    ) { [weak self] result in
+      guard let self else { return }
+      let rollbackRetention = !result.succeeded && result.exitCode != 20
+        ? self.preserveCommunityRollbackSnapshot(from: cleanupRoot)
+        : .unavailable
+      self.finishThemeOperation(
+        cleanupRoot: rollbackRetention.requiresOperationRoot ? nil : cleanupRoot
+      )
+      if result.succeeded {
+        self.showInfo(
+          title: "主题已应用",
+          message: "“\(name)”已通过下载、SHA-256、主题包、Safe CSS 和可见渲染校验，并已切换到客户端。"
+        )
+      } else if result.exitCode == 20 {
+        self.showError(
+          title: "新主题应用失败，原主题已恢复",
+          message: "换肤前的精确主题快照已重新应用，并通过可见渲染验证。\n\n\(self.conciseOutput(result.output, fallback: "新主题仍保存在主题库中。"))"
+        )
+      } else {
+        var details = self.conciseOutput(
+          result.output,
+          fallback: "请从已保存主题中重新选择一个主题。"
+        )
+        let title: String
+        switch rollbackRetention {
+        case let .preserved(recoveryURL):
+          title = "自动恢复未完成，原主题快照已保留"
+          details += "\n\n换肤前的精确主题快照已移入私有恢复目录：\n\(recoveryURL.path)\n该快照尚未通过恢复验证，请不要把“已保留”理解为已经恢复。"
+        case let .retainedInOperationRoot(snapshotURL):
+          title = "自动恢复未完成，快照仍在事务目录"
+          details += "\n\n客户端无法把快照提升到 recovery 目录，但已停止清理原事务目录，并检测到快照仍位于：\n\(snapshotURL.path)\n该快照尚未通过恢复验证，请不要继续切换主题。"
+        case .unavailable:
+          title = "主题已导入，但应用状态未确认"
+          details += "\n\n客户端没有确认到可保留的换肤前快照，不能承诺可自动恢复。请不要继续切换主题，并查看 Dream Skin 日志。"
+        }
+        self.showError(
+          title: title,
+          message: "当前可见主题状态未能确认。\n\n\(details)"
+        )
+      }
+    }
+  }
+
+  private func preserveCommunityRollbackSnapshot(from operationRoot: URL) -> CommunityRollbackRetention {
+    do {
+      return .preserved(
+        try CommunityRecovery.preserveRollbackSnapshot(
+          operationRoot: operationRoot,
+          stateRoot: stateRootURL,
+          fileManager: fileManager
+        )
+      )
+    } catch {
+      NSLog("[DreamSkin] rollback snapshot retention failed: %@", error.localizedDescription)
+      if let snapshot = try? CommunityRecovery.validatedRollbackSnapshot(
+        operationRoot: operationRoot,
+        stateRoot: stateRootURL,
+        fileManager: fileManager
+      ) {
+        return .retainedInOperationRoot(snapshot)
+      }
+      return .unavailable
+    }
+  }
+
+  private func finishThemeOperation(cleanupRoot: URL? = nil) {
+    if let cleanupRoot { try? fileManager.removeItem(at: cleanupRoot) }
+    communityBaselineThemeID = ""
+    communityStageMessage = ""
+    operationInFlight = false
+    refreshStatus()
+    rebuildMenu()
+  }
+
+  private func updateCommunityStage(_ message: String) {
+    communityStageMessage = message
+    rebuildMenu()
   }
 
   @objc private func switchSavedTheme(_ sender: NSMenuItem) {
@@ -653,6 +1079,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   @objc private func quit() {
+    guard !operationInFlight, !engineInstallInFlight, !snapshot.busy else {
+      showError(title: "操作仍在进行", message: "请等待当前操作完成后再退出。")
+      return
+    }
     NSApp.terminate(nil)
   }
 
@@ -684,13 +1114,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   private func installBundledEngineIfNeeded(force: Bool) {
     guard !engineInstallInFlight, !operationInFlight, !snapshot.busy else { return }
-    if !force && !engineNeedsInstall() { return }
+    if !force && !engineNeedsInstall() {
+      resumePendingCommunityApply()
+      return
+    }
     guard let bundledVersion = version(at: bundledEngineURL?.appendingPathComponent("VERSION")) else {
+      pendingCommunityVersionID = nil
       showError(title: "安装资源损坏", message: "App 内的版本信息无效，请重新下载。")
       return
     }
     if let installedVersion = version(at: installedEngineURL.appendingPathComponent("VERSION")),
        installedVersion > bundledVersion {
+      pendingCommunityVersionID = nil
       showError(
         title: "已安装更新版本",
         message: "本机引擎 v\(installedVersion) 比当前 App 的 v\(bundledVersion) 更新。请下载相同或更新版本的 DMG，不会执行降级。"
@@ -698,6 +1133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       return
     }
     guard let script = bundledScript(named: "install-dream-skin-macos.sh") else {
+      pendingCommunityVersionID = nil
       showError(title: "安装资源损坏", message: "App 内没有找到 Dream Skin 引擎。请重新下载。")
       return
     }
@@ -712,7 +1148,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       self.rebuildMenu()
       if result.succeeded {
         self.refreshStatus()
+        self.resumePendingCommunityApply()
       } else {
+        self.pendingCommunityVersionID = nil
         self.showError(
           title: "引擎安装未完成",
           message: self.conciseOutput(
@@ -721,6 +1159,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
           )
         )
       }
+    }
+  }
+
+  private func resumePendingCommunityApply() {
+    guard let versionID = pendingCommunityVersionID else { return }
+    pendingCommunityVersionID = nil
+    DispatchQueue.main.async { [weak self] in
+      self?.beginCommunityThemeApply(versionID: versionID)
     }
   }
 

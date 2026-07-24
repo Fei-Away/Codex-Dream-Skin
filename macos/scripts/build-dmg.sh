@@ -55,6 +55,8 @@ MOUNTED_APP="$MOUNT/Codex Dream Skin.app"
 /usr/bin/codesign --verify --deep --strict "$MOUNTED_APP"
 [ "$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$MOUNTED_APP/Contents/Info.plist")" = "$VERSION" ] \
   || { printf 'Mounted app version does not match VERSION.\n' >&2; exit 1; }
+[ "$(/usr/bin/plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.0 raw -o - "$MOUNTED_APP/Contents/Info.plist")" = "dreamskin" ] \
+  || { printf 'Mounted app does not register the dreamskin URL scheme.\n' >&2; exit 1; }
 [ "$(/usr/bin/tr -d '[:space:]' < "$MOUNTED_APP/Contents/Resources/engine/VERSION")" = "$VERSION" ] \
   || { printf 'Mounted engine version does not match VERSION.\n' >&2; exit 1; }
 [ -f "$MOUNTED_APP/Contents/Resources/LICENSE.txt" ] \
@@ -64,6 +66,17 @@ MOUNTED_APP="$MOUNT/Codex Dream Skin.app"
   || { printf 'Mounted app is missing the public release preset.\n' >&2; exit 1; }
 [ ! -e "$MOUNTED_APP/Contents/Resources/engine/presets/preset-arina-hashimoto" ] \
   || { printf 'Mounted app contains a rights-restricted preset.\n' >&2; exit 1; }
+MOUNTED_ENGINE="$MOUNTED_APP/Contents/Resources/engine"
+[ -f "$MOUNTED_ENGINE/assets/selectors.json" ] \
+  || { printf 'Mounted app is missing the selector contract.\n' >&2; exit 1; }
+for runtime_script in apply-community-theme-macos.sh snapshot-active-theme-macos.sh \
+  theme-switch-lock-macos.sh; do
+  [ -x "$MOUNTED_ENGINE/scripts/$runtime_script" ] \
+    || { printf 'Mounted runtime script is missing or not executable: %s\n' "$runtime_script" >&2; exit 1; }
+done
+[ -f "$MOUNTED_ENGINE/scripts/theme-content-fingerprint.mjs" ] \
+  && [ ! -x "$MOUNTED_ENGINE/scripts/theme-content-fingerprint.mjs" ] \
+  || { printf 'Mounted fingerprint helper has unsafe or missing permissions.\n' >&2; exit 1; }
 for excluded in build-client-release.sh build-dmg.sh build-menubar-app.sh build-release.sh \
   generate-app-icon.sh install-menubar-macos.sh prepare-standalone-docs.sh; do
   [ ! -e "$MOUNTED_APP/Contents/Resources/engine/scripts/$excluded" ] \

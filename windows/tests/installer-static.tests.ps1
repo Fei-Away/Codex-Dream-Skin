@@ -7,10 +7,11 @@ $installerRoot = Join-Path $windowsRoot 'installer'
 $definitionPath = Join-Path $installerRoot 'codex-dream-skin.iss'
 $builderPath = Join-Path $installerRoot 'build-release.ps1'
 $bootstrapPath = Join-Path $installerRoot 'setup-bootstrap.ps1'
+$communityApplyPath = Join-Path $windowsRoot 'scripts\apply-community-theme.ps1'
 $manifestPath = Join-Path $installerRoot 'node-runtime.json'
 $builderAst = $null
 
-foreach ($scriptPath in @($builderPath, $bootstrapPath)) {
+foreach ($scriptPath in @($builderPath, $bootstrapPath, $communityApplyPath)) {
   if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     throw "Required installer PowerShell does not exist: $scriptPath"
   }
@@ -52,6 +53,7 @@ if ($definition.Contains('ssPostInstall')) {
 foreach ($requiredDefinition in @(
   'PrivilegesRequired=lowest',
   'ArchitecturesAllowed=x64compatible',
+  'ChangesAssociations=yes',
   'OutputBaseFilename=CodexDreamSkin-Setup-v{#AppVersion}',
   'Source: "{#StageRoot}\payload\*"',
   'DestDir: "{app}\payload"',
@@ -71,11 +73,22 @@ foreach ($requiredDefinition in @(
   'if CurUninstallStep <> usUninstall then',
   "RunBootstrap(ExpandConstant('{app}\setup-bootstrap.ps1'), '-Uninstall', True, ExitCode)",
   "'Codex Dream Skin could not restore Codex (exit code ' +",
-  "IntToStr(ExitCode) + '). No installed files were removed.'"
+  "IntToStr(ExitCode) + '). No installed files were removed.'",
+  '[Registry]',
+  'Root: HKCU; Subkey: "Software\Classes\dreamskin"',
+  'ValueName: "URL Protocol"; ValueData: ""',
+  'Software\Classes\dreamskin\shell\open\command',
+  '{localappdata}\CodexDreamSkin\engine\scripts\apply-community-theme.ps1',
+  '""%1""'
 )) {
   if (-not $definition.Contains($requiredDefinition)) {
     throw "Inno Setup definition is missing a release safety contract: $requiredDefinition"
   }
+}
+if ($definition.Contains('Root: HKLM') -or
+  $definition.Contains('dreamskin://apply?url=') -or
+  [regex]::Matches($definition, '(?m)^Root: HKCU; Subkey: "Software\\Classes\\dreamskin').Count -ne 4) {
+  throw 'The dreamskin protocol must be a four-entry current-user registration with no arbitrary URL contract.'
 }
 
 $uninstallStepIndex = $definition.IndexOf(
@@ -132,6 +145,7 @@ foreach ($requiredBuilderContract in @(
   "'assets\safe-css-policy.json'",
   "'assets\safe-css-validator.mjs'",
   "'scripts\validate-safe-css-file.mjs'",
+  "'scripts\apply-community-theme.ps1'",
   "'LICENSE.txt'",
   "'NOTICE.md'",
   "Write-DreamSkinIcon -Path",
@@ -151,6 +165,7 @@ foreach ($requiredRepairContract in @(
   'assets\safe-css-policy.json',
   'assets\safe-css-validator.mjs',
   'scripts\validate-safe-css-file.mjs',
+  'scripts\apply-community-theme.ps1',
   'presets\preset-gothic-void-crusade\theme.json',
   'scripts\start-dream-skin.ps1',
   'scripts\check-update.ps1',
