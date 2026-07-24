@@ -33,7 +33,7 @@
 | Codex 配置 | `%USERPROFILE%\.codex\config.toml` |
 | 默认 CDP 端口 | 首选 `9335`，冲突时自动选空闲口（Mac 包默认从 `9341` 起） |
 
-Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` 包清单解析 AppUserModelId，并通过系统应用包激活接口完成。若新版 owl runtime 明确把 CDP 参数转换成 `codex://` 路径，调试启动会对同一个已验证 Store 包内的精确 `app\ChatGPT.exe` 做一次原始参数回退；ACL 拒绝即停止，不修改或接管 WindowsApps 权限。
+Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` 包清单解析 AppUserModelId，并通过系统应用包激活接口完成。若新版 owl runtime 明确把 CDP 参数转换成 `codex://` 路径，调试启动会对同一个已验证 Store 包内的精确 `app\ChatGPT.exe` 做一次原始参数回退；ACL 拒绝或参数保留后仍无可信监听都会停止并回滚，不修改或接管 WindowsApps 权限。Issue #235 已在 `26.715.10079.0` 与 `26.721.3404.0` 分别实机确认这两种失败，因此该回退只作安全诊断，不代表受影响 owl 版本已恢复兼容。
 
 ## 能力矩阵
 
