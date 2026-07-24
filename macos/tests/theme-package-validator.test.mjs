@@ -280,79 +280,84 @@ try {
   const extraField = await makeOfficial("extra-field", { extraManifestField: true });
   await expectRejected(extraField.source, "macos", /unsupported field unexpected/, "extra-field");
 
-  const importHome = path.join(tempRoot, "import-home");
-  const active = path.join(importHome, "Library", "Application Support", "CodexDreamSkinStudio", "theme");
-  await fs.mkdir(active, { recursive: true });
-  await fs.copyFile(path.join(base.source, "theme.json"), path.join(active, "theme.json"));
-  await fs.copyFile(path.join(base.source, "background.png"), path.join(active, "background.png"));
-  const activeBefore = await Promise.all([
-    fs.readFile(path.join(active, "theme.json")),
-    fs.readFile(path.join(active, "background.png")),
-  ]);
-  const oversizedArchive = path.join(tempRoot, "oversized-source.zip");
-  const oversizedHandle = await fs.open(oversizedArchive, "wx");
-  try {
-    await oversizedHandle.truncate((32 * 1024 * 1024) + 1);
-  } finally {
-    await oversizedHandle.close();
+  if (process.platform === "darwin") {
+    const importHome = path.join(tempRoot, "import-home");
+    const active = path.join(importHome, "Library", "Application Support", "CodexDreamSkinStudio", "theme");
+    await fs.mkdir(active, { recursive: true });
+    await fs.copyFile(path.join(base.source, "theme.json"), path.join(active, "theme.json"));
+    await fs.copyFile(path.join(base.source, "background.png"), path.join(active, "background.png"));
+    const activeBefore = await Promise.all([
+      fs.readFile(path.join(active, "theme.json")),
+      fs.readFile(path.join(active, "background.png")),
+    ]);
+    const oversizedArchive = path.join(tempRoot, "oversized-source.zip");
+    const oversizedHandle = await fs.open(oversizedArchive, "wx");
+    try {
+      await oversizedHandle.truncate((32 * 1024 * 1024) + 1);
+    } finally {
+      await oversizedHandle.close();
+    }
+    await assert.rejects(run(importer, ["--file", oversizedArchive], {
+      env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
+    }), /32 MB archive limit/);
+    const savedThemesRoot = path.join(
+      importHome,
+      "Library",
+      "Application Support",
+      "CodexDreamSkinStudio",
+      "themes",
+    );
+    assert.equal(await fs.access(savedThemesRoot).then(() => true, () => false), false);
+
+    const archive = path.join(tempRoot, "studio-export.zip");
+    await run("/usr/bin/zip", ["-q", archive, ...await fs.readdir(optional.source)], { cwd: optional.source });
+    const firstImport = await run(importer, ["--file", archive], {
+      env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
+    });
+    const firstResult = JSON.parse(firstImport.stdout);
+    assert.equal(firstResult.status, "imported");
+    assert.equal(firstResult.packageFormat, "official");
+    assert.equal(firstResult.cssIgnored, true);
+    assert.equal(firstResult.signatureIgnored, true);
+    const saved = path.join(savedThemesRoot, firstResult.id);
+    assert.deepEqual((await fs.readdir(saved)).sort(), ["LICENSE.txt", "background.png", "theme.css", "theme.json"]);
+    const secondImport = JSON.parse((await run(importer, ["--file", archive], {
+      env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
+    })).stdout);
+    assert.equal(secondImport.status, "duplicate");
+
+    const licenseVariant = await makeOfficial("official-license-variant", {
+      css: true,
+      license: true,
+      licenseText: "MIT\n",
+      signature: true,
+    });
+    const licenseArchive = path.join(tempRoot, "studio-license-variant.zip");
+    await run("/usr/bin/zip", ["-q", licenseArchive, ...await fs.readdir(licenseVariant.source)], {
+      cwd: licenseVariant.source,
+    });
+    const licenseImport = JSON.parse((await run(importer, ["--file", licenseArchive], {
+      env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
+    })).stdout);
+    assert.equal(licenseImport.status, "imported");
+    assert.equal(licenseImport.id, "studio.contract-theme-2");
+    assert.equal(await fs.readFile(path.join(
+      importHome,
+      "Library",
+      "Application Support",
+      "CodexDreamSkinStudio",
+      "themes",
+      licenseImport.id,
+      "LICENSE.txt",
+    ), "utf8"), "MIT\n");
+    assert.deepEqual(await fs.readFile(path.join(active, "theme.json")), activeBefore[0]);
+    assert.deepEqual(await fs.readFile(path.join(active, "background.png")), activeBefore[1]);
+
+    console.log("PASS: Studio manifest ZIPs validate on macOS/Windows and import without changing active theme.");
+  } else {
+    console.log("PASS: Studio manifest packages validate on both client platforms.");
+    console.log("SKIP: macOS shell importer integration requires macOS.");
   }
-  await assert.rejects(run(importer, ["--file", oversizedArchive], {
-    env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
-  }), /32 MB archive limit/);
-  const savedThemesRoot = path.join(
-    importHome,
-    "Library",
-    "Application Support",
-    "CodexDreamSkinStudio",
-    "themes",
-  );
-  assert.equal(await fs.access(savedThemesRoot).then(() => true, () => false), false);
-
-  const archive = path.join(tempRoot, "studio-export.zip");
-  await run("/usr/bin/zip", ["-q", archive, ...await fs.readdir(optional.source)], { cwd: optional.source });
-  const firstImport = await run(importer, ["--file", archive], {
-    env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
-  });
-  const firstResult = JSON.parse(firstImport.stdout);
-  assert.equal(firstResult.status, "imported");
-  assert.equal(firstResult.packageFormat, "official");
-  assert.equal(firstResult.cssIgnored, true);
-  assert.equal(firstResult.signatureIgnored, true);
-  const saved = path.join(savedThemesRoot, firstResult.id);
-  assert.deepEqual((await fs.readdir(saved)).sort(), ["LICENSE.txt", "background.png", "theme.css", "theme.json"]);
-  const secondImport = JSON.parse((await run(importer, ["--file", archive], {
-    env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
-  })).stdout);
-  assert.equal(secondImport.status, "duplicate");
-
-  const licenseVariant = await makeOfficial("official-license-variant", {
-    css: true,
-    license: true,
-    licenseText: "MIT\n",
-    signature: true,
-  });
-  const licenseArchive = path.join(tempRoot, "studio-license-variant.zip");
-  await run("/usr/bin/zip", ["-q", licenseArchive, ...await fs.readdir(licenseVariant.source)], {
-    cwd: licenseVariant.source,
-  });
-  const licenseImport = JSON.parse((await run(importer, ["--file", licenseArchive], {
-    env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
-  })).stdout);
-  assert.equal(licenseImport.status, "imported");
-  assert.equal(licenseImport.id, "studio.contract-theme-2");
-  assert.equal(await fs.readFile(path.join(
-    importHome,
-    "Library",
-    "Application Support",
-    "CodexDreamSkinStudio",
-    "themes",
-    licenseImport.id,
-    "LICENSE.txt",
-  ), "utf8"), "MIT\n");
-  assert.deepEqual(await fs.readFile(path.join(active, "theme.json")), activeBefore[0]);
-  assert.deepEqual(await fs.readFile(path.join(active, "background.png")), activeBefore[1]);
-
-  console.log("PASS: Studio manifest ZIPs validate on macOS/Windows and import without changing active theme.");
 } finally {
   await fs.rm(tempRoot, { recursive: true, force: true });
 }

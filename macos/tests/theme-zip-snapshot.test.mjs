@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { deflateRawSync } from "node:zlib";
 
@@ -9,7 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const macosRoot = path.resolve(here, "..");
 const snapshotter = path.join(macosRoot, "scripts", "snapshot-theme-zip.mjs");
 const extractor = path.join(macosRoot, "scripts", "extract-theme-zip-macos.sh");
-const tempRoot = await fs.mkdtemp(path.join("/tmp", "codex-dream-skin-zip-snapshot-"));
+let tempRoot;
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -78,7 +79,11 @@ function forgedExpandedZip(actualBytes, declaredBytes) {
   return Buffer.concat([local, name, compressed, central, name, end]);
 }
 
-try {
+await test("macOS ZIP snapshot and extraction boundaries", {
+  skip: process.platform !== "darwin" && "requires macOS archive tools",
+}, async () => {
+  tempRoot = await fs.mkdtemp(path.join("/tmp", "codex-dream-skin-zip-snapshot-"));
+  try {
   const selectedPack = path.join(tempRoot, "selected-pack");
   const replacementPack = path.join(tempRoot, "replacement-pack");
   const selectedArchive = path.join(tempRoot, "selected.zip");
@@ -132,6 +137,7 @@ try {
   assert.deepEqual(await fs.readdir(forgedDestination), []);
 
   console.log("PASS: macOS ZIP snapshots and actual expansion are bounded before staged writes.");
-} finally {
-  await fs.rm(tempRoot, { recursive: true, force: true });
-}
+  } finally {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  }
+});
