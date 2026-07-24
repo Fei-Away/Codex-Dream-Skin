@@ -715,8 +715,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       } else {
         self.showError(
           title: "引擎安装未完成",
-          message: "请先退出 ChatGPT，再从菜单选择“安装 / 升级引擎”。\n\n" +
-            self.conciseOutput(result.output, fallback: "安装脚本返回了错误。")
+          message: self.conciseOutput(
+            result.output,
+            fallback: "安装脚本返回了错误，请重试；如果问题持续，请查看 Dream Skin 日志。"
+          )
         )
       }
     }
