@@ -168,7 +168,11 @@ fi
 "$NODE" "$ROOT/tests/theme-import-publish.test.mjs"
 "$NODE" "$ROOT/tests/theme-zip-snapshot.test.mjs"
 "$NODE" "$ROOT/tests/bounded-community-http.test.mjs"
-"$ROOT/tests/theme-import-identity.test.sh"
+if [ "${CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS:-0}" = "1" ]; then
+  printf 'SKIP: community import identity integration requires an installed, signed ChatGPT runtime.\n'
+else
+  "$ROOT/tests/theme-import-identity.test.sh"
+fi
 "$ROOT/tests/community-apply-transaction.test.sh"
 "$ROOT/tests/theme-zip-extract.test.sh"
 "$NODE" "$ROOT/tests/theme-config.test.mjs"

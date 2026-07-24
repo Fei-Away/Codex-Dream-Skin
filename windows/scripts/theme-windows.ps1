@@ -678,6 +678,38 @@ function Get-DreamSkinThemeSemanticFingerprint {
   }
 }
 
+function ConvertTo-DreamSkinCanonicalJsonValue {
+  param([AllowNull()][object]$Value)
+  if ($null -eq $Value -or $Value -is [string] -or $Value -is [char] -or
+    $Value -is [System.ValueType]) {
+    return $Value
+  }
+  if ($Value -is [System.Collections.IDictionary]) {
+    $canonicalDictionary = [ordered]@{}
+    [string[]]$keys = @($Value.Keys | ForEach-Object { "$_" })
+    [System.Array]::Sort($keys, [System.StringComparer]::Ordinal)
+    foreach ($key in $keys) {
+      $canonicalDictionary[$key] = ConvertTo-DreamSkinCanonicalJsonValue -Value $Value[$key]
+    }
+    return [pscustomobject]$canonicalDictionary
+  }
+  if ($Value -is [System.Collections.IEnumerable]) {
+    $canonicalItems = @()
+    foreach ($item in $Value) {
+      $canonicalItems += ,(ConvertTo-DreamSkinCanonicalJsonValue -Value $item)
+    }
+    return ,$canonicalItems
+  }
+  $canonicalObject = [ordered]@{}
+  [string[]]$propertyNames = @($Value.PSObject.Properties | ForEach-Object Name)
+  [System.Array]::Sort($propertyNames, [System.StringComparer]::Ordinal)
+  foreach ($propertyName in $propertyNames) {
+    $canonicalObject[$propertyName] = ConvertTo-DreamSkinCanonicalJsonValue `
+      -Value $Value.PSObject.Properties[$propertyName].Value
+  }
+  return [pscustomobject]$canonicalObject
+}
+
 function Get-DreamSkinThemeRuntimeContentFingerprint {
   param([Parameter(Mandatory = $true)][string]$ThemeDirectory)
   $loaded = Read-DreamSkinTheme -ThemeDirectory $ThemeDirectory -SkipImageMetadata
@@ -696,8 +728,9 @@ function Get-DreamSkinThemeRuntimeContentFingerprint {
   if (-not $runtimeTheme.palette) {
     $runtimeTheme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
   }
+  $canonicalTheme = ConvertTo-DreamSkinCanonicalJsonValue -Value $runtimeTheme
   $themeBytes = [System.Text.Encoding]::UTF8.GetBytes(
-    ($runtimeTheme | ConvertTo-Json -Depth 8 -Compress)
+    ($canonicalTheme | ConvertTo-Json -Depth 8 -Compress)
   )
   $hasher = [System.Security.Cryptography.SHA256]::Create()
   try {

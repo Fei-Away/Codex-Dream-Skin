@@ -4,6 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import test from "node:test";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -14,9 +15,6 @@ const source = path.join(
   "menubar-app/Sources/CodexDreamSkinMenuBar/BoundedCommunityHTTPClient.swift",
 );
 const harness = path.join(here, "bounded-community-http.test.swift");
-const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "dreamskin-http-test-"));
-const binary = path.join(temporary, "bounded-community-http-test");
-
 function sdkPath() {
   const configured = process.env.DREAMSKIN_SDK;
   if (configured) return configured;
@@ -74,23 +72,29 @@ const server = http.createServer((request, response) => {
   }
 });
 
-try {
-  const arch = process.arch === "arm64" ? "arm64" : "x86_64";
-  execFileSync("/usr/bin/swiftc", [
-    "-sdk", sdkPath(),
-    "-target", `${arch}-apple-macosx13.0`,
-    source,
-    harness,
-    "-o", binary,
-  ], { stdio: "pipe" });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  const output = await run(binary, [`http://127.0.0.1:${address.port}`]);
-  process.stdout.write(output);
-} finally {
-  await new Promise((resolve) => server.close(resolve));
-  await fs.rm(temporary, { recursive: true, force: true });
-}
+test("bounded community HTTP client", {
+  skip: process.platform !== "darwin" && "requires the macOS Swift SDK",
+}, async () => {
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "dreamskin-http-test-"));
+  const binary = path.join(temporary, "bounded-community-http-test");
+  try {
+    const arch = process.arch === "arm64" ? "arm64" : "x86_64";
+    execFileSync("/usr/bin/swiftc", [
+      "-sdk", sdkPath(),
+      "-target", `${arch}-apple-macosx13.0`,
+      source,
+      harness,
+      "-o", binary,
+    ], { stdio: "pipe" });
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address();
+    const output = await run(binary, [`http://127.0.0.1:${address.port}`]);
+    process.stdout.write(output);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(temporary, { recursive: true, force: true });
+  }
+});
