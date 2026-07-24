@@ -63,6 +63,19 @@ fi
 /usr/bin/plutil -lint "$ROOT/menubar-app/Resources/Info.plist.template" >/dev/null
 /usr/bin/grep -F -q '<key>LSUIElement</key>' "$ROOT/menubar-app/Resources/Info.plist.template"
 /usr/bin/grep -F -q '<key>LSMinimumSystemVersion</key>' "$ROOT/menubar-app/Resources/Info.plist.template"
+/usr/bin/grep -F -q '<key>CFBundleURLSchemes</key>' "$ROOT/menubar-app/Resources/Info.plist.template"
+/usr/bin/grep -F -q '<string>dreamskin</string>' "$ROOT/menubar-app/Resources/Info.plist.template"
+/usr/bin/grep -F -q '"assets/selectors.json"' \
+  "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
+/usr/bin/grep -F -q 'CommunityRecovery.preserveRollbackSnapshot' \
+  "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
+/usr/bin/grep -F -q 'recovery/community-*/active-before' \
+  "$ROOT/scripts/switch-theme-macos.sh"
+/usr/bin/grep -F -q 'CFBundleURLTypes.0.CFBundleURLSchemes.0' "$ROOT/scripts/build-dmg.sh"
+for required_runtime in apply-community-theme-macos.sh snapshot-active-theme-macos.sh \
+  theme-content-fingerprint.mjs theme-switch-lock-macos.sh; do
+  /usr/bin/grep -F -q "$required_runtime" "$ROOT/scripts/build-dmg.sh"
+done
 UPDATE_JSON="$({
   CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$ROOT/tests/fixtures/latest-release.json" \
     "$ROOT/scripts/check-update-macos.sh" --json
@@ -154,6 +167,9 @@ fi
 "$NODE" "$ROOT/tests/theme-package-validator.test.mjs"
 "$NODE" "$ROOT/tests/theme-import-publish.test.mjs"
 "$NODE" "$ROOT/tests/theme-zip-snapshot.test.mjs"
+"$NODE" "$ROOT/tests/bounded-community-http.test.mjs"
+"$ROOT/tests/theme-import-identity.test.sh"
+"$ROOT/tests/community-apply-transaction.test.sh"
 "$ROOT/tests/theme-zip-extract.test.sh"
 "$NODE" "$ROOT/tests/theme-config.test.mjs"
 
@@ -313,14 +329,72 @@ run_signed_runtime_switch_test() {
     > "$switch_state/themes/preset-switch-fixture/theme.json"
   /usr/bin/printf '%s\n' '{"schemaVersion":1,"id":"old","name":"旧主题","image":"old.png"}' \
     > "$switch_state/theme/theme.json"
-  : > "$switch_state/theme/old.png"
-  /usr/bin/printf '%s\n' '[data-ds-part="root"] { color: #fff; }' \
+  /bin/cp "$ROOT/assets/portal-hero.png" "$switch_state/theme/old.png"
+  /usr/bin/printf '%s\n' '[data-ds-part="root"] { color: var(--ds-theme-color-text); }' \
     > "$switch_state/theme/theme.css"
+  /bin/mkdir "$switch_state/.community-apply-test"
+  SNAPSHOT_OUTPUT="$(/usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/snapshot-active-theme-macos.sh" \
+    --destination "$switch_state/.community-apply-test/active-before")"
+  SNAPSHOT_FINGERPRINT="$("$NODE" -e '
+    const value = JSON.parse(process.argv[1]);
+    if (!/^[0-9a-f]{64}$/.test(value.contentFingerprint ?? "")) process.exit(1);
+    process.stdout.write(value.contentFingerprint);
+  ' "$SNAPSHOT_OUTPUT")"
+  /usr/bin/cmp -s "$switch_state/theme/theme.json" \
+    "$switch_state/.community-apply-test/active-before/theme.json"
+  /usr/bin/cmp -s "$switch_state/theme/old.png" \
+    "$switch_state/.community-apply-test/active-before/old.png"
+  /usr/bin/cmp -s "$switch_state/theme/theme.css" \
+    "$switch_state/.community-apply-test/active-before/theme.css"
+  if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" \
+    --snapshot-dir "$switch_state/.community-apply-test/active-before" \
+    --expect-fingerprint "$SNAPSHOT_FINGERPRINT" --no-apply >/dev/null 2>&1; then
+    printf 'switch-theme unexpectedly allowed an unverified no-apply rollback.\n' >&2
+    exit 1
+  fi
   if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
     "$ROOT/scripts/switch-theme-macos.sh" --id '../escape' --no-apply >/dev/null 2>&1; then
     printf 'switch-theme unexpectedly accepted a path traversal theme id.\n' >&2
     exit 1
   fi
+  /bin/mkdir "$switch_state/.theme-switch.lock"
+  if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null 2>&1; then
+    printf 'switch-theme reclaimed a fresh ownerless lock during its initialization window.\n' >&2
+    exit 1
+  fi
+  /bin/rm -rf "$switch_state/.theme-switch.lock"
+  /bin/mkdir "$switch_state/.theme-switch.lock"
+  /usr/bin/printf '%s\n' "$$" > "$switch_state/.theme-switch.lock/owner"
+  if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null 2>&1; then
+    printf 'switch-theme ignored a live cross-process switch lock.\n' >&2
+    exit 1
+  fi
+  /bin/rm -rf "$switch_state/.theme-switch.lock"
+  LOCK_READY="$switch_state/lock-ready"
+  /usr/bin/env HOME="$switch_home" NODE="$NODE" /bin/bash -c '
+    . "$1/scripts/common-macos.sh"
+    . "$1/scripts/theme-switch-lock-macos.sh"
+    acquire_theme_switch_lock 123:1234567890123:1
+    : > "$2"
+    /bin/sleep 1
+    release_theme_switch_lock
+  ' _ "$ROOT" "$LOCK_READY" &
+  LOCK_HOLDER_PID="$!"
+  for _attempt in 1 2 3 4 5 6 7 8 9 10; do
+    [ -f "$LOCK_READY" ] && break
+    /bin/sleep 0.05
+  done
+  [ -f "$LOCK_READY" ] || { printf 'lock-holder fixture did not start.\n' >&2; exit 1; }
+  if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null 2>&1; then
+    printf 'two theme-switch processes entered the transaction concurrently.\n' >&2
+    exit 1
+  fi
+  wait "$LOCK_HOLDER_PID"
   /usr/bin/chflags uchg "$switch_state/theme/theme.css"
   if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
     "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null 2>&1; then
@@ -338,8 +412,31 @@ run_signed_runtime_switch_test() {
     exit 1
   fi
   /usr/bin/chflags nouchg "$switch_state/theme/theme.css"
+  FINGERPRINT_STAGE="$switch_state/fingerprint-stage"
+  /bin/mkdir "$FINGERPRINT_STAGE"
+  FINGERPRINT_OUTPUT="$("$NODE" "$ROOT/scripts/stage-theme.mjs" \
+    "$switch_state/themes/preset-switch-fixture" "$FINGERPRINT_STAGE")"
+  EXPECTED_FINGERPRINT="$("$NODE" -e '
+    const value = JSON.parse(process.argv[1]);
+    if (!/^[0-9a-f]{64}$/.test(value.contentFingerprint ?? "")) process.exit(1);
+    process.stdout.write(value.contentFingerprint);
+  ' "$FINGERPRINT_OUTPUT")"
+  /bin/rm -rf "$FINGERPRINT_STAGE"
+  if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply \
+    --expect-fingerprint 0000000000000000000000000000000000000000000000000000000000000000 \
+    >/dev/null 2>&1; then
+    printf 'switch-theme unexpectedly accepted a stale imported-package fingerprint.\n' >&2
+    exit 1
+  fi
+  "$NODE" -e '
+    const fs = require("fs");
+    const theme = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    if (theme.id !== "old") process.exit(1);
+  ' "$switch_state/theme/theme.json"
   /usr/bin/env HOME="$switch_home" NODE="$NODE" \
-    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null
+    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply \
+    --expect-fingerprint "$EXPECTED_FINGERPRINT" >/dev/null
   /usr/bin/cmp -s "$switch_state/theme/background.png" \
     "$switch_state/themes/preset-switch-fixture/background.png"
   [ ! -e "$switch_state/theme/old.png" ]

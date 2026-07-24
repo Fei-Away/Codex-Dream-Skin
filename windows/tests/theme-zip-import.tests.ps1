@@ -170,6 +170,30 @@ function Assert-TestImportRejected {
   }
 }
 
+function Assert-TestIdentityImportRejected {
+  param(
+    [Parameter(Mandatory = $true)][string]$Archive,
+    [Parameter(Mandatory = $true)][int64]$ExpectedBytes,
+    [Parameter(Mandatory = $true)][string]$ExpectedSha256,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  $savedBefore = @(Get-ChildItem -LiteralPath $paths.Saved -Directory -Force -ErrorAction Stop |
+    ForEach-Object Name | Sort-Object)
+  $rejected = $false
+  try {
+    $null = Import-DreamSkinThemeZip -ArchivePath $Archive -StateRoot $stateRoot `
+      -ExpectedArchiveBytes $ExpectedBytes -ExpectedArchiveSha256 $ExpectedSha256
+  } catch {
+    $rejected = $true
+  }
+  if (-not $rejected) { throw "Theme ZIP identity unexpectedly accepted $Label." }
+  $savedAfter = @(Get-ChildItem -LiteralPath $paths.Saved -Directory -Force -ErrorAction Stop |
+    ForEach-Object Name | Sort-Object)
+  if ((Compare-Object -ReferenceObject $savedBefore -DifferenceObject $savedAfter).Count -ne 0) {
+    throw "Rejected theme ZIP identity published saved-theme content for $Label."
+  }
+}
+
 function Assert-TestExpansionRejectedWithoutWrites {
   param([Parameter(Mandatory = $true)][string]$Archive, [Parameter(Mandatory = $true)][string]$Label)
   $destination = Join-Path $temporaryRoot ("rejected-expansion-" + [guid]::NewGuid().ToString('N'))
@@ -192,10 +216,16 @@ try {
   Write-TestOfficialThemePack -Directory $officialSource -Id 'studio.windows-contract' `
     -Name 'Studio Windows Contract' -IncludeOptionalFiles
   New-TestZipFromDirectory -Source $officialSource -Archive $officialArchive
-  $official = Import-DreamSkinThemeZip -ArchivePath $officialArchive -StateRoot $stateRoot
+  $officialArchiveBytes = (Get-Item -LiteralPath $officialArchive -Force).Length
+  $officialArchiveSha256 = (Get-FileHash -LiteralPath $officialArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+  $official = Import-DreamSkinThemeZip -ArchivePath $officialArchive -StateRoot $stateRoot `
+    -ExpectedArchiveBytes $officialArchiveBytes -ExpectedArchiveSha256 $officialArchiveSha256
+  $officialRuntimeFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
+    -ThemeDirectory $official.Path
   if ($official.Status -cne 'Imported' -or $official.Id -cne 'studio.windows-contract' -or
     $official.PackageFormat -cne 'official' -or $official.SafeCssStatus -cne 'validated' -or
-    -not $official.SignatureIgnored) {
+    -not $official.SignatureIgnored -or $official.ContentFingerprint -cnotmatch '^[a-f0-9]{64}$' -or
+    $official.ContentFingerprint -cne $officialRuntimeFingerprint) {
     throw 'Studio manifest ZIP did not import with its official id and warning metadata.'
   }
   foreach ($savedFile in @('theme.json', 'background.jpg', 'theme.css', 'LICENSE.txt')) {
@@ -208,10 +238,59 @@ try {
       throw "Saved theme retained package-only metadata: $ignoredFile"
     }
   }
-  $officialDuplicate = Import-DreamSkinThemeZip -ArchivePath $officialArchive -StateRoot $stateRoot
-  if ($officialDuplicate.Status -cne 'Duplicate' -or $officialDuplicate.Id -cne 'studio.windows-contract') {
+  $officialDuplicate = Import-DreamSkinThemeZip -ArchivePath $officialArchive -StateRoot $stateRoot `
+    -ExpectedArchiveBytes $officialArchiveBytes -ExpectedArchiveSha256 $officialArchiveSha256
+  if ($officialDuplicate.Status -cne 'Duplicate' -or
+    $officialDuplicate.Id -cne 'studio.windows-contract' -or
+    $officialDuplicate.ContentFingerprint -cne $official.ContentFingerprint) {
     throw 'Studio manifest ZIP duplicate was written twice.'
   }
+
+  $roundtripStateRoot = Join-Path $temporaryRoot 'runtime-fingerprint-roundtrip-state'
+  $roundtripPaths = Initialize-DreamSkinThemeStore -SkillRoot $Root `
+    -StateRoot $roundtripStateRoot
+  $officialSaved = Read-DreamSkinTheme -ThemeDirectory $official.Path
+  $officialTheme = $officialSaved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  $null = Set-DreamSkinActiveTheme -ImagePath $officialSaved.ImagePath `
+    -Theme $officialTheme -SafeCssPath (Join-Path $official.Path 'theme.css') `
+    -StateRoot $roundtripStateRoot
+  $roundtripFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
+    -ThemeDirectory $roundtripPaths.Active
+  if ($roundtripFingerprint -cne $official.ContentFingerprint) {
+    throw 'Active-theme image renaming changed the imported runtime content fingerprint.'
+  }
+
+  $replacementSource = Join-Path $temporaryRoot 'identity-replacement-source'
+  $replacementArchive = Join-Path $temporaryRoot 'identity-replacement.zip'
+  Write-TestOfficialThemePack -Directory $replacementSource -Id 'identity-replacement' `
+    -Name 'Identity Replacement'
+  New-TestZipFromDirectory -Source $replacementSource -Archive $replacementArchive
+  $replacedArchive = Join-Path $temporaryRoot 'replaced-after-approval.zip'
+  Copy-Item -LiteralPath $replacementArchive -Destination $replacedArchive -Force
+  Assert-TestIdentityImportRejected -Archive $replacedArchive `
+    -ExpectedBytes $officialArchiveBytes -ExpectedSha256 $officialArchiveSha256 `
+    -Label 'a different package at the approved path'
+
+  $partialArchive = Join-Path $temporaryRoot 'partial-approved-package.zip'
+  Copy-Item -LiteralPath $officialArchive -Destination $partialArchive -Force
+  $partialStream = [System.IO.File]::Open(
+    $partialArchive,
+    [System.IO.FileMode]::Open,
+    [System.IO.FileAccess]::Write,
+    [System.IO.FileShare]::None
+  )
+  try {
+    $partialStream.SetLength([Math]::Max(1, [int64]($officialArchiveBytes / 2)))
+  } finally {
+    $partialStream.Dispose()
+  }
+  Assert-TestIdentityImportRejected -Archive $partialArchive `
+    -ExpectedBytes $officialArchiveBytes -ExpectedSha256 $officialArchiveSha256 `
+    -Label 'a partially written approved package'
+
+  Assert-TestIdentityImportRejected -Archive $officialArchive `
+    -ExpectedBytes $officialArchiveBytes -ExpectedSha256 ('b' * 64) `
+    -Label 'an incorrect approved SHA-256'
 
   $officialWithoutCssSource = Join-Path $temporaryRoot 'official-without-css-source'
   $officialWithoutCssArchive = Join-Path $temporaryRoot 'official-without-css.zip'

@@ -4,7 +4,9 @@ param(
   [switch]$RestartExisting,
   [switch]$PromptRestart,
   [string]$ProfilePath,
-  [switch]$ForegroundInjector
+  [switch]$ForegroundInjector,
+  [ValidateRange(0, 300000)][int]$OperationLockTimeoutMilliseconds = 0,
+  [switch]$RequireUnpaused
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,7 +15,8 @@ $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
-$operationLock = Enter-DreamSkinOperationLock
+$operationLock = Enter-DreamSkinOperationLock `
+  -TimeoutMilliseconds $OperationLockTimeoutMilliseconds
 try {
   Assert-DreamSkinPort -Port $Port
   if ($ProfilePath) { $ProfilePath = [System.IO.Path]::GetFullPath($ProfilePath) }
@@ -29,6 +32,9 @@ try {
   $VerifyPath = Join-Path $StateRoot 'verify.log'
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot
   $pauseWasSet = Test-DreamSkinPaused -StateRoot $StateRoot
+  if ($RequireUnpaused -and $pauseWasSet) {
+    throw 'A newer pause request superseded this theme apply before renderer verification.'
+  }
 
   $previousState = Read-DreamSkinState -Path $StatePath
   if (-not $PortExplicit -and $null -ne $previousState -and $previousState.port) {

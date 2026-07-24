@@ -61,7 +61,7 @@ try {
 
   const firstStage = await makeStage("first", "theme-id");
   const first = await publish(firstStage);
-  assert.deepEqual(first, {
+  assert.deepEqual({ ...first, contentFingerprint: undefined }, {
     status: "imported",
     id: "theme-id",
     name: "Imported Theme",
@@ -70,7 +70,9 @@ try {
     packageFormat: "simple",
     safeCssStatus: "validated",
     signatureIgnored: false,
+    contentFingerprint: undefined,
   });
+  assert.match(first.contentFingerprint, /^[0-9a-f]{64}$/);
 
   const noCssStage = await makeStage("no-css", "no-css", { safeCss: false });
   await assert.rejects(publish(noCssStage), /require non-empty theme\.css/);
@@ -80,6 +82,7 @@ try {
   const duplicate = await publish(duplicateStage);
   assert.equal(duplicate.status, "duplicate");
   assert.equal(duplicate.id, "theme-id");
+  assert.equal(duplicate.contentFingerprint, first.contentFingerprint);
   assert.equal((await fs.readdir(themesRoot)).filter((name) => !name.startsWith(".")).length, 1);
 
   const collisionStage = await makeStage("collision", "theme-id", { displayName: "Second Theme" });
@@ -87,6 +90,8 @@ try {
   assert.equal(collision.status, "imported");
   assert.equal(collision.id, "theme-id-2");
   assert.equal(collision.renamed, true);
+  assert.match(collision.contentFingerprint, /^[0-9a-f]{64}$/);
+  assert.notEqual(collision.contentFingerprint, first.contentFingerprint);
   assert.equal(
     JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id-2", "theme.json"), "utf8")).id,
     "theme-id-2",

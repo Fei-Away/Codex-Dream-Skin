@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import path from "node:path";
 import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
+import { runtimeThemeContentFingerprint } from "./theme-content-fingerprint.mjs";
 
 const [sourceDirArg, stageDirArg] = process.argv.slice(2);
 if (!sourceDirArg || !stageDirArg) {
@@ -126,7 +127,10 @@ async function main() {
   await writeExclusive(path.join(stageRoot, theme.image), image.bytes);
   if (safeCss) await writeExclusive(path.join(stageRoot, "theme.css"), safeCss.bytes);
   await writeExclusive(path.join(stageRoot, "theme.json"), config.bytes);
-  process.stdout.write(theme.image);
+  process.stdout.write(JSON.stringify({
+    image: theme.image,
+    contentFingerprint: runtimeThemeContentFingerprint(theme, image.bytes, safeCss?.bytes ?? null),
+  }));
 }
 
 await main();

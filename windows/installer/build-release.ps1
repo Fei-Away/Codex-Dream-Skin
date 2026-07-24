@@ -400,6 +400,7 @@ try {
     'assets\codex-dream-skin.ico',
     'presets\preset-gothic-void-crusade\background.jpg',
     'presets\preset-gothic-void-crusade\theme.json',
+    'scripts\apply-community-theme.ps1',
     'scripts\check-update.ps1',
     'scripts\common-windows.ps1',
     'scripts\config-utf8.ps1',

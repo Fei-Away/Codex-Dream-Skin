@@ -6,6 +6,8 @@ set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-macos.sh"
 
 ARCHIVE=""
+EXPECTED_SHA256=""
+EXPECTED_BYTES=""
 WORK_ROOT=""
 
 cleanup_import() {
@@ -16,11 +18,24 @@ trap cleanup_import EXIT
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --file) ARCHIVE="${2:-}"; shift 2 ;;
+    --expected-sha256) EXPECTED_SHA256="${2:-}"; shift 2 ;;
+    --expected-bytes) EXPECTED_BYTES="${2:-}"; shift 2 ;;
     *) fail "Unknown argument: $1" ;;
   esac
 done
 
 [ -n "$ARCHIVE" ] || fail "Usage: import-theme-zip-macos.sh --file <theme.zip>"
+if { [ -n "$EXPECTED_SHA256" ] && [ -z "$EXPECTED_BYTES" ]; } \
+  || { [ -z "$EXPECTED_SHA256" ] && [ -n "$EXPECTED_BYTES" ]; }; then
+  fail "Expected package SHA-256 and byte count must be supplied together."
+fi
+if [ -n "$EXPECTED_SHA256" ]; then
+  case "$EXPECTED_SHA256" in *[!0-9a-f]*|'') fail "Expected package SHA-256 is invalid." ;; esac
+  [ "${#EXPECTED_SHA256}" -eq 64 ] || fail "Expected package SHA-256 is invalid."
+  case "$EXPECTED_BYTES" in ''|*[!0-9]*) fail "Expected package byte count is invalid." ;; esac
+  [ "$EXPECTED_BYTES" -gt 0 ] && [ "$EXPECTED_BYTES" -le 33554432 ] \
+    || fail "Expected package byte count is outside the import limit."
+fi
 archive_name="$(/usr/bin/basename "$ARCHIVE")"
 archive_lower="$(LC_ALL=C /usr/bin/printf '%s' "$archive_name" | /usr/bin/tr '[:upper:]' '[:lower:]')"
 case "$archive_lower" in
@@ -42,6 +57,14 @@ SNAPSHOTTER="$SCRIPT_DIR/snapshot-theme-zip.mjs"
 [ -f "$SNAPSHOTTER" ] || fail "Theme ZIP snapshot helper is missing from the installed engine."
 "$NODE" "$SNAPSHOTTER" "$ARCHIVE" "$ARCHIVE_SNAPSHOT" \
   || fail "Theme ZIP could not be copied safely for import."
+if [ -n "$EXPECTED_SHA256" ]; then
+  snapshot_bytes="$(/usr/bin/stat -f '%z' "$ARCHIVE_SNAPSHOT")"
+  [ "$snapshot_bytes" = "$EXPECTED_BYTES" ] \
+    || fail "The private import snapshot no longer matches the approved package byte count."
+  snapshot_sha256="$(LC_ALL=C /usr/bin/shasum -a 256 "$ARCHIVE_SNAPSHOT" | /usr/bin/awk '{print $1}')"
+  [ "$snapshot_sha256" = "$EXPECTED_SHA256" ] \
+    || fail "The private import snapshot no longer matches the approved package SHA-256."
+fi
 "$SCRIPT_DIR/extract-theme-zip-macos.sh" "$ARCHIVE_SNAPSHOT" "$EXTRACT_STAGE"
 
 THEMES_ROOT="$STATE_ROOT/themes"

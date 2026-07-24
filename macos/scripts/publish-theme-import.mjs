@@ -3,6 +3,7 @@ import { constants as fsConstants } from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
+import { runtimeThemeContentFingerprint } from "./theme-content-fingerprint.mjs";
 
 const [stageDirArg, themesRootArg] = process.argv.slice(2);
 if (!stageDirArg || !themesRootArg) {
@@ -100,7 +101,11 @@ async function readStoredTheme(directory) {
       readOptionalRegular(path.join(directory, "LICENSE.txt"), "Saved theme license", MAX_LICENSE_BYTES),
     ]);
     if (cssBytes) decodeAndValidateSafeCss(cssBytes);
-    return { theme, fingerprint: normalizedFingerprint(theme, imageBytes, cssBytes, licenseBytes) };
+    return {
+      theme,
+      fingerprint: normalizedFingerprint(theme, imageBytes, cssBytes, licenseBytes),
+      contentFingerprint: runtimeThemeContentFingerprint(theme, imageBytes, cssBytes),
+    };
   } catch {
     return null;
   }
@@ -197,6 +202,7 @@ async function main() {
           packageFormat,
           safeCssStatus,
           signatureIgnored: Boolean(signatureBytes),
+          contentFingerprint: stored.contentFingerprint,
         };
       }
     }
@@ -212,6 +218,7 @@ async function main() {
     const renamed = id !== (typeof sourceTheme.id === "string" ? sourceTheme.id.trim() : "");
     const theme = { ...sourceTheme, id };
     const name = displayName(theme);
+    const contentFingerprint = runtimeThemeContentFingerprint(theme, imageBytes, cssBytes);
     const destination = path.join(themesRoot, id);
     assertContained(themesRoot, destination, "Imported theme destination");
 
@@ -235,6 +242,7 @@ async function main() {
       packageFormat,
       safeCssStatus,
       signatureIgnored: Boolean(signatureBytes),
+      contentFingerprint,
     };
   } finally {
     if (temporary) await fs.rm(temporary, { recursive: true, force: true }).catch(() => {});
