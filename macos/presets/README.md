@@ -35,7 +35,7 @@ preset-<slug>/
 ```
 
 - 目录名与 `theme.json` 的 `id` **必须**都是 `preset-<slug>` 形式（`slug` 用小写英文 + 连字符）。播种只管理 `preset-*`，绝不会碰用户自己「换一张图」保存的 `custom-*` 主题。
-- `image` 字段只能是**本目录内**的文件名（不能是路径），格式 `png` / `jpg` / `jpeg` / `webp`，≤ 16 MB（建议 < 1 MB）。
+- `image` 字段只能是**本目录内**的文件名（不能是路径），格式 `png` / `jpg` / `jpeg` / `webp`，≤ 10 MB（建议 < 1 MB）。
 - `appearance` **必须如实声明背景图成立的模式**（这是规范，不是可选项）：
   - `"auto"`——仅限浅色、暗色外壳下都协调的图，且两种模式都实测过。皮肤跟随 Codex 客户端的浅暗设置切换外壳。
   - `"dark"` / `"light"`——单模专属图（如深色大教堂、纯白极简）。皮肤外壳固定为该模式，不随客户端切换。
@@ -76,7 +76,7 @@ preset-<slug>/
 
 ### art 元数据
 
-`art.focusX` / `art.focusY`（`0..1`，画面主体位置）、`art.safeArea`（`auto | left | right | center | none`，低信息留白侧）、`art.taskMode`（`auto | ambient | banner | off`，任务页呈现）。显式值优先于引擎自动分析；拿不准可先不填，实测后补。
+`art.focusX` / `art.focusY`（`0..1`，画面主体位置）、`art.safeArea`（`auto | left | right | center | none`，低信息留白侧）、`art.taskMode`（`auto | ambient | banner | full | off`，任务页呈现）。显式值优先于引擎自动分析；拿不准可先不填，实测后补。
 
 ## 素材红线（务必阅读）
 

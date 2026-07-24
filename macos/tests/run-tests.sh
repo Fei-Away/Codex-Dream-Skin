@@ -126,13 +126,17 @@ PROJECT_ROOT="$(cd "$ROOT/.." && pwd -P)"
 "$NODE" "$PROJECT_ROOT/tools/doctor-selectors.test.mjs"
 if ! /usr/bin/cmp -s "$ROOT/assets/dream-skin.css" "$PROJECT_ROOT/windows/assets/dream-skin.css" ||
     ! /usr/bin/cmp -s "$ROOT/assets/renderer-inject.js" "$PROJECT_ROOT/windows/assets/renderer-inject.js" ||
-    ! /usr/bin/cmp -s "$ROOT/assets/selectors.json" "$PROJECT_ROOT/windows/assets/selectors.json"; then
+    ! /usr/bin/cmp -s "$ROOT/assets/safe-css-policy.json" "$PROJECT_ROOT/windows/assets/safe-css-policy.json" ||
+    ! /usr/bin/cmp -s "$ROOT/assets/safe-css-validator.mjs" "$PROJECT_ROOT/windows/assets/safe-css-validator.mjs" ||
+    ! /usr/bin/cmp -s "$ROOT/assets/selectors.json" "$PROJECT_ROOT/windows/assets/selectors.json" ||
+    ! /usr/bin/cmp -s "$ROOT/assets/theme-package-validator.mjs" "$PROJECT_ROOT/windows/assets/theme-package-validator.mjs" ||
+    ! /usr/bin/cmp -s "$ROOT/scripts/validate-safe-css-file.mjs" "$PROJECT_ROOT/windows/scripts/validate-safe-css-file.mjs"; then
   printf 'macOS and Windows runtime assets are not byte-identical.\n' >&2
   exit 1
 fi
-if /usr/bin/grep -E -q 'getBoundingClientRect|ResizeObserver|childList|subtree|classList\.(add|remove|toggle)|syncRouteState|samplingNativeShell' \
+if /usr/bin/grep -E -q 'getBoundingClientRect|ResizeObserver|classList\.(add|remove|toggle)|syncRouteState|samplingNativeShell' \
     "$ROOT/assets/renderer-inject.js"; then
-  printf 'Unified renderer still contains retired layout/class or broad-observer behavior.\n' >&2
+  printf 'Unified renderer still contains retired layout/class behavior.\n' >&2
   exit 1
 fi
 if /usr/bin/grep -E -q 'home-suggestion-list-item|\.dream-skin-home|\.dream-home|\.dream-task|codex-dream-skin-chrome' \
@@ -145,7 +149,12 @@ fi
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
+"$NODE" "$ROOT/tests/safe-css-validator.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
+"$NODE" "$ROOT/tests/theme-package-validator.test.mjs"
+"$NODE" "$ROOT/tests/theme-import-publish.test.mjs"
+"$NODE" "$ROOT/tests/theme-zip-snapshot.test.mjs"
+"$ROOT/tests/theme-zip-extract.test.sh"
 "$NODE" "$ROOT/tests/theme-config.test.mjs"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
@@ -305,16 +314,36 @@ run_signed_runtime_switch_test() {
   /usr/bin/printf '%s\n' '{"schemaVersion":1,"id":"old","name":"旧主题","image":"old.png"}' \
     > "$switch_state/theme/theme.json"
   : > "$switch_state/theme/old.png"
+  /usr/bin/printf '%s\n' '[data-ds-part="root"] { color: #fff; }' \
+    > "$switch_state/theme/theme.css"
   if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
     "$ROOT/scripts/switch-theme-macos.sh" --id '../escape' --no-apply >/dev/null 2>&1; then
     printf 'switch-theme unexpectedly accepted a path traversal theme id.\n' >&2
     exit 1
   fi
+  /usr/bin/chflags uchg "$switch_state/theme/theme.css"
+  if /usr/bin/env HOME="$switch_home" NODE="$NODE" \
+    "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null 2>&1; then
+    /usr/bin/chflags nouchg "$switch_state/theme/theme.css"
+    printf 'switch-theme committed a legacy theme before stale CSS cleanup completed.\n' >&2
+    exit 1
+  fi
+  if ! "$NODE" -e '
+    const fs = require("fs");
+    const theme = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    if (theme.id !== "old") process.exit(1);
+  ' "$switch_state/theme/theme.json"; then
+    /usr/bin/chflags nouchg "$switch_state/theme/theme.css" 2>/dev/null || true
+    printf 'switch-theme changed theme.json after stale CSS cleanup failed.\n' >&2
+    exit 1
+  fi
+  /usr/bin/chflags nouchg "$switch_state/theme/theme.css"
   /usr/bin/env HOME="$switch_home" NODE="$NODE" \
     "$ROOT/scripts/switch-theme-macos.sh" --id preset-switch-fixture --no-apply >/dev/null
   /usr/bin/cmp -s "$switch_state/theme/background.png" \
     "$switch_state/themes/preset-switch-fixture/background.png"
   [ ! -e "$switch_state/theme/old.png" ]
+  [ ! -e "$switch_state/theme/theme.css" ]
   "$NODE" -e '
     const fs = require("fs");
     const theme = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));

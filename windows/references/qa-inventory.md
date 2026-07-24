@@ -24,7 +24,7 @@
 - Restart consent: an existing normal Codex window is never force-closed without explicit CLI authorization or shortcut confirmation.
 - Shortcut policy: installed launch, restore, tray, and tray-child commands use `RemoteSigned` without `Bypass`; Internet-zone markers are removed only from hash-verified managed PowerShell copies.
 - Config safety: Chinese project names, LF/CRLF choice, quoted target keys, table-header comments, and unrelated TOML sections survive install/selective restore; ambiguous target shapes fail unchanged, exact recovery keeps a copy of the replaced current file, and install refuses both registered and state-recorded old Codex processes.
-- Theme safety: empty/over-16 MB images, over-16384px/50MP dimensions, path escapes, symlinks/junctions, malformed JSON, and unsupported formats are rejected before payload construction.
+- Theme safety: empty/over-10 MB images, over-16384px/50MP dimensions, path escapes, symlinks/junctions, malformed JSON, unsafe CSS, and unsupported formats are rejected before payload construction.
 - Tray lifecycle: pause/resume reflects the clicked state, bundled Arina Hashimoto theme is present on first install, and complete restore terminates any separately launched tray before it can reapply the skin.
 
 ## Visual checks

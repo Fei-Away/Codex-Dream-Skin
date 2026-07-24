@@ -1,11 +1,12 @@
 // Canonical cross-platform renderer. Run tools/sync-runtime-assets.mjs after editing.
 ((cssText, artDataUrl, themeConfig) => {
-  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main.main-surface","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header.app-header-tint","tier":"L1","scope":"all","required":true},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
+  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main.main-surface","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header.app-header-tint","tier":"L1","scope":"all","required":true},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"composer-toolbar","selector":".composer-surface-chrome [class*=\"_footer_\"]","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"thread-surface","selector":".thread-scroll-container","tier":"L2","scope":"thread","required":false},{"key":"message","selector":"[data-message-author-role]","tier":"L2","scope":"thread","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
   const STYLE_REGISTRY_KEY = "__CODEX_DREAM_SKIN_STYLE_SHEETS__";
   const STYLE_ID = "codex-dream-skin-style";
   const SHELL_ATTR = "data-dream-shell";
+  const PART_ATTR = "data-ds-part";
   const ROOT_ATTRS = [
     "data-dream-skin", SHELL_ATTR,
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
@@ -31,6 +32,18 @@
     "--dream-skin-name", "--dream-skin-tagline", "--dream-skin-project-prefix",
     "--dream-skin-project-label", "--dream-skin-brand-subtitle", "--dream-skin-status",
     "--dream-skin-quote", "--dream-skin-art",
+    "--ds-theme-color-background", "--ds-theme-color-panel",
+    "--ds-theme-color-panel-alt", "--ds-theme-color-accent",
+    "--ds-theme-color-accent-alt", "--ds-theme-color-secondary",
+    "--ds-theme-color-highlight", "--ds-theme-color-text",
+    "--ds-theme-color-muted", "--ds-theme-color-line",
+    "--ds-theme-font-family", "--ds-theme-font-scale",
+    "--ds-theme-surface-radius", "--ds-theme-surface-opacity",
+    "--ds-theme-surface-blur", "--ds-theme-surface-border-alpha",
+    "--ds-theme-surface-shadow", "--ds-theme-image-focus-x",
+    "--ds-theme-image-focus-y", "--ds-theme-image-zoom",
+    "--ds-theme-image-dim", "--ds-theme-image-task-intensity",
+    "--ds-theme-density-scale", "--ds-theme-motion-level",
   ];
   const selectorByKey = new Map(SELECTOR_CONTRACT.selectors.map((entry) => [entry.key, entry]));
   const stableTestidSelector = (testid) => SELECTOR_CONTRACT.stableTestids?.includes(testid)
@@ -43,6 +56,7 @@
   let artAnalysis = typeof THEME.artKey === "string" ? analysisCache.get(THEME.artKey) ?? null : null;
   let analysisTimer = null;
   let rootObserver = null;
+  let partObserver = null;
   let bodyReadyHandler = null;
   let styleMode = null;
   let styleNode = null;
@@ -57,6 +71,8 @@
     attributeWrites: 0,
     styleWrites: 0,
     styleRepairs: 0,
+    partPasses: 0,
+    partWrites: 0,
     navigationEvents: 0,
     safetyPasses: 0,
     analysisRuns: 0,
@@ -100,9 +116,12 @@
 
   const parseRgb = (value) => {
     if (!value || value === "transparent") return null;
-    const hex = String(value).trim().match(/^#([0-9a-f]{6})$/i);
+    const hex = String(value).trim().match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
     if (hex) {
-      const number = Number.parseInt(hex[1], 16);
+      const rgbHex = hex[1].length <= 4
+        ? hex[1].slice(0, 3).split("").map((digit) => `${digit}${digit}`).join("")
+        : hex[1].slice(0, 6);
+      const number = Number.parseInt(rgbHex, 16);
       return { r: number >> 16, g: (number >> 8) & 255, b: number & 255 };
     }
     const m = String(value).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
@@ -114,7 +133,9 @@
 
   const rgbString = (value) => {
     const rgb = parseRgb(value);
-    return rgb ? `${Math.round(rgb.r)} ${Math.round(rgb.g)} ${Math.round(rgb.b)}` : null;
+    return rgb ? [rgb.r, rgb.g, rgb.b]
+      .map((channel) => Math.round(clamp(channel, 0, 255)))
+      .join(" ") : null;
   };
 
   const rgbToHex = ({ r, g, b }) => `#${[r, g, b]
@@ -220,7 +241,8 @@
     }
     if (typeof legacyPalette.accent === "string") explicit.add("accent");
     const adaptive = makeAdaptivePalette(artAnalysis?.accentRgb, shell);
-    const legacyLight = (THEME.appearance === undefined || THEME.appearance === "auto") && shell === "light";
+    const legacyLight = (THEME.appearance === undefined || THEME.appearance === "auto")
+      && THEME.colorMode !== "explicit" && shell === "light";
     const structural = new Set(["background", "panel", "panelAlt", "text", "muted"]);
     const pick = (name) => {
       const allowExplicit = explicit.has(name) && !(legacyLight && structural.has(name));
@@ -244,6 +266,33 @@
     for (const [name, value] of Object.entries(variables)) {
       if (typeof value === "string" && value) setStyleProperty(root, name, value);
     }
+    const publicColors = {
+      "--ds-theme-color-background": variables["--ds-bg"],
+      "--ds-theme-color-panel": variables["--ds-panel"],
+      "--ds-theme-color-panel-alt": variables["--ds-panel-2"],
+      "--ds-theme-color-accent": variables["--ds-green"],
+      "--ds-theme-color-accent-alt": variables["--ds-lime"],
+      "--ds-theme-color-secondary": variables["--ds-cyan"],
+      "--ds-theme-color-highlight": variables["--ds-purple"],
+      "--ds-theme-color-text": variables["--ds-text"],
+      "--ds-theme-color-muted": variables["--ds-muted"],
+      "--ds-theme-color-line": variables["--ds-line"],
+    };
+    for (const [name, value] of Object.entries(publicColors)) {
+      if (typeof value === "string" && value) setStyleProperty(root, name, value);
+    }
+    setStyleProperty(root, "--ds-theme-surface-radius", "12px");
+    setStyleProperty(root, "--ds-theme-surface-opacity", "1");
+    setStyleProperty(root, "--ds-theme-surface-blur", "0px");
+    setStyleProperty(root, "--ds-theme-font-family", "system");
+    setStyleProperty(root, "--ds-theme-font-scale", "1");
+    setStyleProperty(root, "--ds-theme-surface-border-alpha", "0.14");
+    setStyleProperty(root, "--ds-theme-surface-shadow", "soft");
+    setStyleProperty(root, "--ds-theme-image-zoom", "1");
+    setStyleProperty(root, "--ds-theme-image-dim", "0");
+    setStyleProperty(root, "--ds-theme-image-task-intensity", "0.35");
+    setStyleProperty(root, "--ds-theme-density-scale", "standard");
+    setStyleProperty(root, "--ds-theme-motion-level", "standard");
     const rgbVariables = {
       "--ds-bg-rgb": variables["--ds-bg"],
       "--ds-panel-rgb": variables["--ds-panel"],
@@ -300,6 +349,8 @@
     setStyleProperty(root, "--dream-skin-focus-x", focusXValue);
     setStyleProperty(root, "--dream-skin-focus-y", focusYValue);
     setStyleProperty(root, "--dream-skin-art-position", `${focusXValue} ${focusYValue}`);
+    setStyleProperty(root, "--ds-theme-image-focus-x", String(Number(focusX.toFixed(4))));
+    setStyleProperty(root, "--ds-theme-image-focus-y", String(Number(focusY.toFixed(4))));
   };
 
   const analyzeArt = () => new Promise((resolve) => {
@@ -517,6 +568,58 @@
     try { return Boolean(document.querySelector(selector)); } catch { return false; }
   };
 
+  const partNodes = new Set();
+  const queryAll = (selector) => {
+    if (!selector) return [];
+    try { return [...document.querySelectorAll(selector)]; } catch { return []; }
+  };
+  const selectorNodes = (key) => queryAll(selectorByKey.get(key)?.selector);
+  const addPart = (desired, part, nodes) => {
+    for (const node of nodes) {
+      if (node && typeof node.setAttribute === "function" && !desired.has(node)) {
+        desired.set(node, part);
+      }
+    }
+  };
+  const refreshParts = () => {
+    metrics.partPasses += 1;
+    const desired = new Map();
+    addPart(desired, "root", [document.documentElement]);
+    addPart(desired, "sidebar", selectorNodes("left-panel"));
+    addPart(desired, "main", selectorNodes("shell-main"));
+    addPart(desired, "header", selectorNodes("header-tint"));
+    addPart(desired, "home", selectorNodes("home-route"));
+    addPart(desired, "project-list", selectorNodes("project-selector"));
+    addPart(desired, "thread", selectorNodes("thread-surface"));
+    addPart(desired, "message", selectorNodes("message"));
+    addPart(desired, "composer", selectorNodes("composer-chrome"));
+    addPart(desired, "composer-toolbar", selectorNodes("composer-toolbar"));
+    addPart(desired, "dialog", selectorNodes("overlay-dialog"));
+    const homeHero = selectorNodes("home-icon")[0]?.parentElement;
+    addPart(desired, "home-hero", homeHero ? [homeHero] : []);
+
+    for (const node of partNodes) {
+      if (!desired.has(node)) {
+        node.removeAttribute?.(PART_ATTR);
+        metrics.partWrites += 1;
+      }
+    }
+    partNodes.clear();
+    for (const [node, part] of desired) {
+      if (node.getAttribute?.(PART_ATTR) !== part) {
+        node.setAttribute(PART_ATTR, part);
+        metrics.partWrites += 1;
+      }
+      partNodes.add(node);
+    }
+  };
+
+  const removeParts = () => {
+    for (const node of partNodes) node.removeAttribute?.(PART_ATTR);
+    partNodes.clear();
+    for (const node of queryAll(`[${PART_ATTR}]`)) node.removeAttribute?.(PART_ATTR);
+  };
+
   const scopeMatches = (scope, baseState, overlay) => {
     const active = new Set([baseState]);
     if (baseState !== "settings") active.add("all");
@@ -556,12 +659,13 @@
     return scope;
   };
 
-  const ensure = ({ root: rootPass = true, scope: scopePass = false } = {}) => {
+  const ensure = ({ root: rootPass = true, scope: scopePass = false, parts: partPass = false } = {}) => {
     if (window[DISABLED_KEY]) return;
     const root = document.documentElement;
     if (!root) return;
     metrics.ensureCalls += 1;
     if (rootPass) applyRootState(root);
+    if (partPass) refreshParts();
     if (scopePass) refreshScope();
   };
 
@@ -580,7 +684,9 @@
         root.style.removeProperty(property);
       }
     }
+    removeParts();
     state?.rootObserver?.disconnect();
+    state?.partObserver?.disconnect();
     if (bodyReadyHandler && typeof document.removeEventListener === "function") {
       document.removeEventListener("DOMContentLoaded", bodyReadyHandler);
     }
@@ -608,23 +714,26 @@
     return true;
   };
 
-  const scheduler = { timeout: null, root: false, scope: false };
+  const scheduler = { timeout: null, root: false, scope: false, parts: false };
   const flushScheduledEnsure = () => {
     if (scheduler.timeout) clearTimeout(scheduler.timeout);
     scheduler.timeout = null;
-    const pending = { root: scheduler.root, scope: scheduler.scope };
+    const pending = { root: scheduler.root, scope: scheduler.scope, parts: scheduler.parts };
     scheduler.root = false;
     scheduler.scope = false;
+    scheduler.parts = false;
     ensure(pending);
   };
-  const scheduleEnsure = ({ root = false, scope = false } = {}, delay = 64) => {
+  const scheduleEnsure = ({ root = false, scope = false, parts = false } = {}, delay = 64) => {
     scheduler.root ||= root;
     scheduler.scope ||= scope;
+    scheduler.parts ||= parts;
     if (scheduler.timeout) return;
     scheduler.timeout = setTimeout(flushScheduledEnsure, delay);
   };
   if (typeof MutationObserver === "function") {
     rootObserver = new MutationObserver(() => scheduleEnsure({ root: true }));
+    partObserver = new MutationObserver(() => scheduleEnsure({ parts: true }, 80));
   }
 
   let mediaQuery = null;
@@ -638,13 +747,14 @@
     ? window.navigation : null;
   const navigationHandler = navigationApi ? () => {
     metrics.navigationEvents += 1;
-    scheduleEnsure({ scope: true }, 180);
+    scheduleEnsure({ scope: true, parts: true }, 180);
   } : null;
 
   window[STATE_KEY] = {
     ensure,
     cleanup,
     rootObserver,
+    partObserver,
     timer: null,
     scheduler,
     mediaQuery,
@@ -668,26 +778,35 @@
     detectShellAppearance,
   };
   const firstEnsureStartedAt = now();
-  ensure({ root: true });
+  ensure({ root: true, parts: true });
   const initialScope = refreshScope();
   metrics.firstEnsureMs = Number((now() - firstEnsureStartedAt).toFixed(3));
 
-  if (rootObserver) {
-    const observeAttributes = (node) => {
-      if (!node) return;
-      rootObserver.observe(node, {
-        attributes: true,
-        attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode"],
-      });
+  const observeAttributes = (node) => {
+    if (!rootObserver || !node) return;
+    rootObserver.observe(node, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme", "data-appearance", "data-color-mode"],
+    });
+  };
+  const observePartTree = (node) => {
+    if (!partObserver || !node) return;
+    partObserver.observe(node, { childList: true, subtree: true });
+  };
+  observeAttributes(document.documentElement);
+  const observeBody = () => {
+    observeAttributes(document.body);
+    observePartTree(document.body);
+  };
+  if (document.body) observeBody();
+  else if (typeof document.addEventListener === "function") {
+    bodyReadyHandler = () => {
+      if (!window[DISABLED_KEY]) {
+        observeBody();
+        scheduleEnsure({ parts: true }, 0);
+      }
     };
-    observeAttributes(document.documentElement);
-    if (document.body) observeAttributes(document.body);
-    else if (typeof document.addEventListener === "function") {
-      bodyReadyHandler = () => {
-        if (!window[DISABLED_KEY]) observeAttributes(document.body);
-      };
-      document.addEventListener("DOMContentLoaded", bodyReadyHandler, { once: true });
-    }
+    document.addEventListener("DOMContentLoaded", bodyReadyHandler, { once: true });
   }
   const timer = setInterval(() => {
     metrics.safetyPasses += 1;
