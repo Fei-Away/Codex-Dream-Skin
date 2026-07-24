@@ -308,7 +308,7 @@ try {
 
   $linkArchive = Join-Path $temporaryRoot 'link.zip'
   $linkAttributes = [System.BitConverter]::ToInt32(
-    [System.BitConverter]::GetBytes([uint32]0xA1FF0000), 0
+    [System.BitConverter]::GetBytes([Convert]::ToUInt32('A1FF0000', 16)), 0
   )
   New-TestZipWithEntry -Archive $linkArchive -EntryName 'background.jpg' `
     -Content 'outside-target' -ExternalAttributes $linkAttributes
@@ -316,7 +316,7 @@ try {
 
   $reparseArchive = Join-Path $temporaryRoot 'reparse.zip'
   $reparseAttributes = [System.BitConverter]::ToInt32(
-    [System.BitConverter]::GetBytes([uint32]0x81A40400), 0
+    [System.BitConverter]::GetBytes([Convert]::ToUInt32('81A40400', 16)), 0
   )
   New-TestZipWithEntry -Archive $reparseArchive -EntryName 'background.jpg' `
     -Content 'reparse-target' -ExternalAttributes $reparseAttributes
