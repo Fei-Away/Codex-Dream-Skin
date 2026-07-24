@@ -1237,6 +1237,14 @@ try {
     -not $startSource.Contains('Start-Sleep -Seconds 3')) {
     throw 'Start lost the verification retry window; a single early-boot miss must not tear the startup down.'
   }
+  if (-not $startSource.Contains('direct Store executable fallback did not expose a verified loopback CDP endpoint') -or
+    -not $startSource.Contains('may disable CDP in this production runtime')) {
+    throw 'A direct launch that retains CDP arguments but exposes no listener no longer reports the owl runtime failure.'
+  }
+  if (-not $startSource.Contains('-PreserveProcessIds $debugLaunchBaselineProcessIds -AllowForce') -or
+    -not $startSource.Contains('reopening Codex without a debugging port')) {
+    throw 'The no-listener launch path no longer closes only new Codex processes and restores a normal launch.'
+  }
   if (-not $startSource.Contains('WaitForExit(15000)')) {
     throw 'Startup rollback no longer waits long enough for its own injector to exit; short waits leave duelling watchers.'
   }
