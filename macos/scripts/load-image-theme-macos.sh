@@ -10,16 +10,30 @@ IMAGE=""
 THEME_NAME=""
 FROM_LIBRARY=""
 APPLY_NOW="true"
+APPEARANCE="auto"
+SAFE_AREA="auto"
+TASK_MODE="auto"
+FOCUS_X=""
+FOCUS_Y=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --file) IMAGE="${2:-}"; shift 2 ;;
     --from-library) FROM_LIBRARY="${2:-}"; shift 2 ;;
     --name) THEME_NAME="${2:-}"; shift 2 ;;
+    --appearance) APPEARANCE="${2:-}"; shift 2 ;;
+    --safe-area) SAFE_AREA="${2:-}"; shift 2 ;;
+    --task-mode) TASK_MODE="${2:-}"; shift 2 ;;
+    --focus-x) FOCUS_X="${2:-}"; shift 2 ;;
+    --focus-y) FOCUS_Y="${2:-}"; shift 2 ;;
     --no-apply) APPLY_NOW="false"; shift ;;
     *) fail "Unknown argument: $1" ;;
   esac
 done
+
+case "$APPEARANCE" in auto|light|dark) ;; *) fail "Invalid appearance: $APPEARANCE" ;; esac
+case "$SAFE_AREA" in auto|left|right|center|none) ;; *) fail "Invalid safe area: $SAFE_AREA" ;; esac
+case "$TASK_MODE" in auto|ambient|banner|off) ;; *) fail "Invalid task mode: $TASK_MODE" ;; esac
 
 ensure_state_root
 IMAGES_DIR="$STATE_ROOT/images"
@@ -27,6 +41,11 @@ THEMES_ROOT="$STATE_ROOT/themes"
 /bin/mkdir -p "$IMAGES_DIR" "$THEMES_ROOT" "$THEME_DIR"
 
 if [ -n "$FROM_LIBRARY" ]; then
+  [ "$(/usr/bin/basename "$FROM_LIBRARY")" = "$FROM_LIBRARY" ] \
+    || fail "Library image must be a filename, not a path."
+  case "$FROM_LIBRARY" in
+    *$'\n'*|*$'\r'*|*'|'*|*'"'*|*'\'*) fail "Unsafe library image filename." ;;
+  esac
   IMAGE="$IMAGES_DIR/$FROM_LIBRARY"
 fi
 
@@ -45,14 +64,13 @@ if [ -z "$THEME_NAME" ]; then
   base="$(/usr/bin/basename "$IMAGE")"
   THEME_NAME="${base%.*}"
 fi
-THEME_NAME="$(printf '%s' "$THEME_NAME" | /usr/bin/tr -d '\n' | /usr/bin/cut -c1-80)"
 [ -n "$THEME_NAME" ] || THEME_NAME="我的主题"
 
 theme_id="img-$(/bin/date '+%Y%m%d%H%M%S')-$$"
 
 progress() {
   printf '%s\n' "$*" >&2
-  /usr/bin/osascript -e "display notification \"$*\" with title \"Codex Dream Skin\"" >/dev/null 2>&1 || true
+  notify_user "$*"
 }
 
 progress "Loading image..."
@@ -61,34 +79,45 @@ progress "Loading image..."
 ensure_node_runtime
 
 image_name="background.jpg"
-temporary="$THEME_DIR/.${image_name}.tmp.jpg"
+temporary="$THEME_DIR/.background.$$.tmp.jpg"
 prepared="$THEME_DIR/$image_name"
-/bin/rm -f "$THEME_DIR"/background.* "$THEME_DIR"/.*.tmp.jpg 2>/dev/null || true
+cleanup_temporary() { /bin/rm -f "$temporary"; }
+trap cleanup_temporary EXIT
 
 # Prefer copying already-JPEG; sips only when needed (large PNG conversion is the slow part)
 ext="$(printf '%s' "$IMAGE" | /usr/bin/tr '[:upper:]' '[:lower:]')"
 case "$ext" in
   *.jpg|*.jpeg)
-    /bin/cp -f "$IMAGE" "$prepared"
-    /bin/chmod 600 "$prepared"
+    /bin/cp -f "$IMAGE" "$temporary"
     ;;
   *)
     /usr/bin/sips -s format jpeg -s formatOptions 82 -Z 2400 "$IMAGE" --out "$temporary" >/dev/null \
       || fail "Could not convert image. Use PNG/JPEG/HEIC/TIFF/WebP."
     [ -s "$temporary" ] || fail "Converted image is empty."
-    PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$temporary")"
-    [ "$PREPARED_BYTES" -le 16777216 ] || fail "Prepared image larger than 16 MB."
-    /bin/mv -f "$temporary" "$prepared"
-    /bin/chmod 600 "$prepared"
     ;;
 esac
+[ -s "$temporary" ] || fail "Prepared image is empty."
+PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$temporary")"
+[ "$PREPARED_BYTES" -le 16777216 ] || fail "Prepared image larger than 16 MB."
+/bin/chmod 600 "$temporary"
+/bin/mv -f "$temporary" "$prepared"
 
-"$NODE" "$SCRIPT_DIR/write-theme.mjs" custom \
-  --output-dir "$THEME_DIR" --image "$image_name" \
-  --name "$THEME_NAME" \
-  --tagline "dynamic pure background" \
-  --quote "MAKE SOMETHING WONDERFUL" \
-  --accent "#E25563" --secondary "#F3A8AF" --highlight "#C93D4C" >/dev/null
+theme_args=(
+  custom
+  --output-dir "$THEME_DIR"
+  --image "$image_name"
+  --name "$THEME_NAME"
+  --tagline "Make something wonderful."
+  --quote "MAKE SOMETHING WONDERFUL"
+  --appearance "$APPEARANCE"
+  --safe-area "$SAFE_AREA"
+  --task-mode "$TASK_MODE"
+)
+[ -n "$FOCUS_X" ] && theme_args+=(--focus-x "$FOCUS_X")
+[ -n "$FOCUS_Y" ] && theme_args+=(--focus-y "$FOCUS_Y")
+"$NODE" "$SCRIPT_DIR/write-theme.mjs" "${theme_args[@]}" >/dev/null
+/usr/bin/find "$THEME_DIR" -maxdepth 1 -type f -name 'background.*' ! -name "$image_name" -delete
+trap - EXIT
 
 lib_dir="$THEMES_ROOT/$theme_id"
 /bin/mkdir -p "$lib_dir"
@@ -125,5 +154,5 @@ if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing; th
   exit 0
 fi
 
-/usr/bin/osascript -e 'display alert "Codex Dream Skin" message "Image saved but inject failed. Click Apply Skin."' >/dev/null 2>&1 || true
+alert_user "Image saved but inject failed. Click Apply Skin."
 exit 1

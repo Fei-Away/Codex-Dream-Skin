@@ -17,6 +17,17 @@
   非 OpenAI 官方产品。不修改 <code>.app</code> / <code>app.asar</code> / WindowsApps。
 </p>
 
+## 直接安装
+
+普通用户只需先安装并退出一次官方 Codex / ChatGPT，然后从
+[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载：
+
+- macOS：打开 `CodexDreamSkin-vX.Y.Z.dmg`，把 App 拖进 Applications。
+- Windows：双击 `CodexDreamSkin-Setup-vX.Y.Z.exe`，按安装向导完成。
+
+不需要 clone 源码、安装 Node.js 或手动运行 `.sh` / `.ps1`。首次未签名放行、更新和卸载步骤见
+[macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md)。
+
 ## 赞助商
 
 <p align="center">
@@ -41,58 +52,65 @@
   </sub>
 </p>
 
-## 效果预览
+## 实测精选预设
 
-一张图，一种心情。下面都是可落地的主题示意效果：
+### Gothic Void Crusade / 哥特虚空远征
+
+**特别感谢 [@seansong-ideogram](https://github.com/seansong-ideogram) 为社区设计并贡献这套精美、极具氛围感的原创哥特科幻作品。** 它是当前实测精选的第一套预设，也是 macOS 全新安装时默认启用的主题。
 
 <p align="center">
-  <img src="docs/images/gallery/skin-01.jpg" alt="粉系定制" width="900"><br>
-  <sub>粉系定制</sub>
+  <img src="docs/images/presets/gothic-void-crusade-preview.jpg" alt="哥特虚空远征主题实机效果" width="900"><br>
+  <sub>真实 Codex 首页注入效果（仅预览）</sub>
+</p>
+
+安装后可直接从 macOS 菜单栏的「已保存主题」切换。
+
+### 桥本有菜 / Arina Hashimoto
+
+下面这套「桥本有菜 / Arina Hashimoto」已经在真实 Codex 首页分别验证浅色和暗色外观。用户提供的源 PNG 为 `1672 × 941`，主题包在保持源图近 16:9 构图的前提下派生导出 `2560 × 1440` JPEG，并不代表增加了源图细节。截图中的侧栏、卡片、项目选择和输入框都是 Codex 原生控件。
+
+<p align="center">
+  <img src="docs/images/presets/arina-hashimoto-light.jpg" alt="桥本有菜主题浅色实机效果" width="900"><br>
+  <sub>浅色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
 </p>
 
 <p align="center">
-  <img src="docs/images/gallery/skin-02.jpg" alt="财神打工" width="900"><br>
-  <sub>财神打工版</sub>
+  <img src="docs/images/presets/arina-hashimoto-dark.jpg" alt="桥本有菜主题暗色实机效果" width="900"><br>
+  <sub>暗色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
 </p>
 
-<p align="center">
-  <img src="docs/images/gallery/skin-03.jpg" alt="红白科幻" width="900"><br>
-  <sub>红白科幻</sub>
-</p>
+这组人物素材留在源码仓库用于参考与权利核验，不进入公开 DMG / Setup.exe；公开安装包只预置已确认
+可分发的 Gothic Void Crusade。普通用户仍可从菜单里的「更换背景图」导入自己有权使用的纯背景，
+保存后继续一键切换。
 
-<p align="center">
-  <img src="docs/images/gallery/skin-04.jpg" alt="清透定制" width="900"><br>
-  <sub>清透定制</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-05.jpg" alt="灵感小宇宙" width="900"><br>
-  <sub>灵感小宇宙</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-06.jpg" alt="紫夜限定" width="900"><br>
-  <sub>紫夜限定</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-07.jpg" alt="初音未来" width="900"><br>
-  <sub>初音未来</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-08.jpg" alt="舞台黑金" width="900"><br>
-  <sub>舞台黑金</sub>
-</p>
+> 可下载的用户源图是 [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png)（`1672 × 941`）；源码参考预设使用 [`macos/presets/preset-arina-hashimoto/background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；未确认人物与素材权利前不得把它打进公开安装包。
 
 ## 它能做什么
 
 - **真·可交互**：侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去
-- **可换图**：换一张喜欢的图，就能变成你的主题
+- **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰
+- **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
+- **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
 - **可恢复**：一键还原官方外观
 - **相对安全**：本机回环 CDP 注入，不改官方二进制与签名
 
 ## 快速开始
+
+### 普通用户：下载安装包
+
+不需要 clone 仓库，也不需要安装 Node.js 或运行 `.sh` / `.ps1`。从
+[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载对应平台的最新安装包，
+按平台文档完成一次图形界面安装：
+
+| 平台 | 下载 | 安装说明 |
+|------|------|----------|
+| macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
+| Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
+
+安装后从菜单栏（macOS）或系统托盘（Windows）使用。更新时下载新安装包覆盖安装，主题和图片会保留；
+未签名的新下载文件在个别系统上仍可能再次出现一次安全提示，文档列出了放行方法。
+
+### 开发者：从源码运行
 
 仓库内按平台放了现成脚本（实现细节不同，效果都是「主题化 Codex」）：
 
@@ -104,8 +122,10 @@
 更细的说明：
 
 - Mac：[`macos/README.md`](./macos/README.md)
-- Windows：[`windows/SKILL.md`](./windows/SKILL.md)
+- Windows：[`windows/README.md`](./windows/README.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
+- 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
+- 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - 项目记录：[`docs/PROJECT.md`](./docs/PROJECT.md)
 
 ## 反馈与贡献
@@ -123,7 +143,7 @@
 
 - 见 [`macos/LICENSE`](./macos/LICENSE)（MIT）与 [`macos/NOTICE.md`](./macos/NOTICE.md)
 - 非 OpenAI 官方产品；Codex 及相关权利归其权利人
-- 效果图中的人物 / IP 形象仅作主题示意；商用或公开再分发请自行确认肖像权与商标授权
+- 随仓库预设及效果图中的人物 / IP 素材仅作主题示意；商用或公开再分发请自行确认肖像、素材与商标权利
 
 ---
 

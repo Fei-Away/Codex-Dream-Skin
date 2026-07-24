@@ -7,6 +7,20 @@ set -euo pipefail
 
 THEME_ID=""
 APPLY_NOW="true"
+OPERATION_TOKEN=""
+stage=""
+
+finish_switch() {
+  local code="$1"
+  [ -z "${stage:-}" ] || /bin/rm -rf "$stage"
+  if [ "$code" -ne 0 ] && [ -n "${OPERATION_TOKEN:-}" ]; then
+    write_operation_state failed "主题切换未完成，应用结果未确认" "$OPERATION_TOKEN" 2>/dev/null || true
+    finish_client_operation "${PORT:-9341}" error "主题切换未完成，应用结果未确认" \
+      "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
+  fi
+}
+trap 'finish_switch "$?"' EXIT
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --id) THEME_ID="${2:-}"; shift 2 ;;
@@ -16,26 +30,72 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$THEME_ID" ] || fail "Usage: switch-theme-macos.sh --id <theme-id>"
+case "$THEME_ID" in
+  *[!A-Za-z0-9_-]*|'') fail "Theme id may contain only letters, numbers, underscores, and hyphens." ;;
+esac
+[ "${#THEME_ID}" -le 80 ] || fail "Theme id is too long."
 
 ensure_state_root
 THEMES_ROOT="$STATE_ROOT/themes"
 SRC="$THEMES_ROOT/$THEME_ID"
 [ -d "$SRC" ] || fail "Theme not found: $THEME_ID"
 [ -f "$SRC/theme.json" ] || fail "theme.json missing in $THEME_ID"
+if [ "$APPLY_NOW" = "true" ]; then
+  OPERATION_TOKEN="$(new_operation_token)"
+  write_operation_state applying "正在切换主题" "$OPERATION_TOKEN" \
+    || fail "Could not publish the theme switch operation state."
+fi
+ensure_node_runtime
+themes_root_real="$(cd "$THEMES_ROOT" && pwd -P)"
+src_real="$(cd "$SRC" && pwd -P)"
+case "$src_real/" in "$themes_root_real/"*) ;; *) fail "Theme directory escapes the saved theme library." ;; esac
+
+PORT=9341
+if [ -f "$STATE_PATH" ]; then
+  saved="$(state_field port 2>/dev/null || true)"
+  [ -n "${saved:-}" ] && PORT="$saved"
+fi
+if [ -n "$OPERATION_TOKEN" ] && verified_cdp_endpoint "$PORT" 2>/dev/null; then
+  begin_client_operation "$PORT" switch 3000 "$OPERATION_TOKEN" >/dev/null 2>&1 || true
+fi
 
 progress() {
   printf '%s\n' "$*" >&2
-  /usr/bin/osascript -e "display notification \"$*\" with title \"Codex Dream Skin\"" >/dev/null 2>&1 || true
+  notify_user "$*"
 }
 
 progress "Switching..."
 
+stage="$(/usr/bin/mktemp -d "$STATE_ROOT/.theme-switch.XXXXXX")"
 /bin/mkdir -p "$THEME_DIR"
-/usr/bin/find "$THEME_DIR" -type f -maxdepth 1 -delete 2>/dev/null || true
-/bin/cp -f "$SRC/"* "$THEME_DIR/" 2>/dev/null || true
-/bin/chmod 600 "$THEME_DIR/"* 2>/dev/null || true
+/bin/chmod 700 "$stage"
+# Snapshot theme.json and its referenced image from stable, no-follow file
+# descriptors. This closes the validation/copy TOCTOU window: after this
+# command returns, edits or symlink swaps in themes/<id> cannot mix the pair
+# that will be published to the live theme directory.
+THEME_IMAGE="$("$NODE" "$SCRIPT_DIR/stage-theme.mjs" "$SRC" "$stage")" \
+  || fail "Theme pack changed or failed staging: $THEME_ID"
+# Validate the exact staged pair, not the mutable library directory. The
+# injector performs the full schema, path, dimensions, and image checks.
+"$NODE" "$INJECTOR" --check-payload --theme-dir "$stage" >/dev/null \
+  || fail "Theme pack failed validation: $THEME_ID"
+THEME_BYTES="$(/usr/bin/stat -f '%z' "$stage/$THEME_IMAGE")"
+[ "$THEME_BYTES" -gt 0 ] && [ "$THEME_BYTES" -le 16777216 ] \
+  || fail "Theme image must be non-empty and no larger than 16 MB."
+/bin/chmod 600 "$stage/"*
+for entry in "$stage/"*; do
+  [ -f "$entry" ] || continue
+  [ "$(/usr/bin/basename "$entry")" = "theme.json" ] && continue
+  /bin/mv -f "$entry" "$THEME_DIR/"
+done
+# theme.json is the commit marker: the watcher never observes a config that
+# references a partially copied image.
+/bin/mv -f "$stage/theme.json" "$THEME_DIR/theme.json"
+/usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
+  ! -name 'theme.json' ! -name "$THEME_IMAGE" -delete
+/bin/rm -rf "$stage"
+stage=""
 
-ensure_node_runtime
 THEME_NAME="$("$NODE" -e 'try{const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(t.name||"")}catch{}' "$THEME_DIR/theme.json" 2>/dev/null || true)"
 [ -n "$THEME_NAME" ] || THEME_NAME="$THEME_ID"
 
@@ -44,14 +104,8 @@ if [ "$APPLY_NOW" != "true" ]; then
   exit 0
 fi
 
-PORT=9341
-if [ -f "$STATE_PATH" ]; then
-  saved="$(state_field port 2>/dev/null || true)"
-  [ -n "${saved:-}" ] && PORT="$saved"
-fi
-
 # Hot path: CDP already open → seconds, not tens of seconds
-if hot_reapply_theme "$PORT" 8000; then
+if hot_reapply_theme "$PORT" 8000 "$OPERATION_TOKEN"; then
   progress "Done: ${THEME_NAME}"
   exit 0
 fi
@@ -63,5 +117,5 @@ if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing; th
   exit 0
 fi
 
-/usr/bin/osascript -e 'display alert "Codex Dream Skin" message "Theme switched but inject failed. Click Apply Skin."' >/dev/null 2>&1 || true
+alert_user "Theme switched but inject failed. Click Apply Skin."
 exit 1

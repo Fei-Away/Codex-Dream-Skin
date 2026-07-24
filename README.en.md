@@ -17,6 +17,19 @@
   Unofficial. Does not modify <code>.app</code> / <code>app.asar</code> / WindowsApps.
 </p>
 
+## Install directly
+
+Ordinary users first install and quit the official Codex / ChatGPT app once,
+then download from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases):
+
+- macOS: open `CodexDreamSkin-vX.Y.Z.dmg` and drag the app to Applications.
+- Windows: run `CodexDreamSkin-Setup-vX.Y.Z.exe` and follow the wizard.
+
+No source checkout, Node.js install, `.sh`, or `.ps1` command is required. See
+the [macOS guide](./docs/install-macos.md) or
+[Windows guide](./docs/install-windows.md) for unsigned first-run approval,
+updates, and uninstall steps.
+
 ## Sponsors
 
 <p align="center">
@@ -42,58 +55,76 @@
   </sub>
 </p>
 
-## Gallery
+## Tested featured presets
 
-One image, one mood. Real theme previews you can ship:
+### Gothic Void Crusade / 哥特虚空远征
+
+**Special thanks to [@seansong-ideogram](https://github.com/seansong-ideogram) for designing and contributing this striking, atmospheric original gothic science-fiction work to the community.** It leads the tested featured presets and is the default theme for fresh macOS installs.
 
 <p align="center">
-  <img src="docs/images/gallery/skin-01.jpg" alt="Pink Custom" width="900"><br>
-  <sub>Pink Custom</sub>
+  <img src="docs/images/presets/gothic-void-crusade-preview.jpg" alt="Gothic Void Crusade theme running in Codex" width="900"><br>
+  <sub>Real injected Codex home screen (preview only)</sub>
+</p>
+
+After installing on macOS, switch directly from **Saved Themes** in the menu bar.
+
+### Arina Hashimoto / 桥本有菜
+
+“Arina Hashimoto / 桥本有菜” has been verified on the real Codex home screen in
+both light and dark appearances. The user-provided source PNG is `1672 × 941`;
+the preset's `2560 × 1440` JPEG is a standardized derived export that preserves
+the source's near-16:9 composition and does not add source detail. The sidebar,
+cards, project picker, and composer
+shown below are native Codex controls.
+
+<p align="center">
+  <img src="docs/images/presets/arina-hashimoto-light.jpg" alt="Arina Hashimoto theme tested in light appearance" width="900"><br>
+  <sub>Light · real injected screenshot; unsent input hidden during capture (preview only)</sub>
 </p>
 
 <p align="center">
-  <img src="docs/images/gallery/skin-02.jpg" alt="God of Wealth" width="900"><br>
-  <sub>God of Wealth</sub>
+  <img src="docs/images/presets/arina-hashimoto-dark.jpg" alt="Arina Hashimoto theme tested in dark appearance" width="900"><br>
+  <sub>Dark · real injected screenshot; unsent input hidden during capture (preview only)</sub>
 </p>
 
-<p align="center">
-  <img src="docs/images/gallery/skin-03.jpg" alt="Red-White Sci-Fi" width="900"><br>
-  <sub>Red-White Sci-Fi</sub>
-</p>
+This portrait material remains in the source repository for reference and
+rights review; it is excluded from public DMG and Setup.exe assets. Public
+installers seed only the redistributable Gothic Void Crusade preset. Users can
+still choose **Change Background** to import UI-free artwork they are entitled
+to use and save it for one-click switching.
 
-<p align="center">
-  <img src="docs/images/gallery/skin-04.jpg" alt="Clear Custom" width="900"><br>
-  <sub>Clear Custom</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-05.jpg" alt="Inspiration" width="900"><br>
-  <sub>Inspiration</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-06.jpg" alt="Purple Night" width="900"><br>
-  <sub>Purple Night</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-07.jpg" alt="Hatsune Miku" width="900"><br>
-  <sub>Hatsune Miku</sub>
-</p>
-
-<p align="center">
-  <img src="docs/images/gallery/skin-08.jpg" alt="Stage Black-Gold" width="900"><br>
-  <sub>Stage Black-Gold</sub>
-</p>
+> The downloadable user source is [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png) (`1672 × 941`); the source-only reference preset uses the normalized derived [`background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg) (`2560 × 1440`). Do not import either screenshot above: they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; do not put it in a public installer without confirmed likeness and asset rights.
 
 ## What it does
 
 - **Real UI** — Sidebar, cards, project picker, and input stay native. Not a fake full-window screenshot.
-- **Swappable art** — Drop in an image you like and it becomes your theme.
+- **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable.
+- **Swappable art** — Drop in a UI-free image you like and it becomes your theme.
+- **Saved themes** — Switch local themes from the macOS menu bar or Windows system tray.
 - **Restorable** — One-click restore to the stock look.
 - **Safer path** — Local-loopback CDP inject only. No official binary or signature changes.
 
 ## Quick start
+
+### For users: download an installer
+
+You do not need to clone the repository, install Node.js, or run `.sh` / `.ps1`
+files. Download the latest package for your platform from
+[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases), then
+follow the graphical first-run guide:
+
+| Platform | Download | Install guide |
+|------|------|----------|
+| macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
+| Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
+
+After installation, use the menu bar (macOS) or system tray (Windows). Updates
+are manual: download the new package and install over the existing one; themes
+and images are preserved. Because the public packages are unsigned, a new
+download may show a one-time OS security warning; the guides explain the safe
+GUI approval path.
+
+### For developers: run from source
 
 Platform scripts are ready — different plumbing, same goal: theme Codex.
 
@@ -105,8 +136,10 @@ Platform scripts are ready — different plumbing, same goal: theme Codex.
 More detail:
 
 - Mac: [`macos/README.md`](./macos/README.md)
-- Windows: [`windows/SKILL.md`](./windows/SKILL.md)
+- Windows: [`windows/README.md`](./windows/README.en.md)
 - Paths: [`docs/platforms.md`](./docs/platforms.md)
+- Copy-ready reference prompt guide: [`docs/reference-background-prompt-guide.en.md`](./docs/reference-background-prompt-guide.en.md)
+- Eight concept prompt breakdowns: [`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
 - Project notes: [`docs/PROJECT.md`](./docs/PROJECT.md)
 
 ## Feedback & contributions
@@ -124,7 +157,7 @@ More detail:
 
 - See [`macos/LICENSE`](./macos/LICENSE) (MIT) and [`macos/NOTICE.md`](./macos/NOTICE.md)
 - Unofficial; Codex and related rights belong to their owners.
-- People / IP art in previews is illustrative only — clear rights before commercial redistribution.
+- People / IP material in bundled presets and previews is illustrative only — clear likeness, asset, and trademark rights before commercial redistribution.
 
 ---
 

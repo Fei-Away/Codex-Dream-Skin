@@ -1,0 +1,55 @@
+{
+  "schema": "codex-dream-skin-selectors/1",
+  "description": "双端统一选择器契约（初稿）。scope 与 required 均来自 2026-07-21 双端 DOM 快照实测，非猜测。doctor / CI 应逐条 querySelector 并按 tier 判级：L1 缺失=皮肤主行为受损，L2 缺失=精修静默降级。",
+  "verifiedAgainst": {
+    "date": "2026-07-21",
+    "chromium": "150.0.7871.124",
+    "codexVersionMac": "26.715.61943",
+    "codexVersionWindows": "版本号未记录；bundle hash 与 mac 不同（ModelPickerTrigger mac=1fm6a win=1w4ob），确认存在版本错位",
+    "fixtures": [
+      "runtime/dom-fixtures/codex-dom-fixture-darwin-watch.json (15 状态)",
+      "runtime/dom-fixtures/codex-dom-fixture-win32-watch.json (7 状态)"
+    ],
+    "verdict": "双端 DOM 同源：锚点语义、状态作用域、testid、模块命名一致；差异均可归因于版本错位或用户配置，非平台分叉"
+  },
+  "appearanceSignal": {
+    "dark": "html.electron-dark",
+    "light": "html.electron-light",
+    "warning": "html.electron-opaque 随窗口聚焦/毛玻璃状态闪动，与明暗无关，禁止用作外观信号"
+  },
+  "scopeVocabulary": {
+    "all": "除设置页外的全部路由（home / thread / detail）及其上的 menu / dialog 覆盖层",
+    "home": "首页（建议卡屏）。注意首页渐进渲染：home-icon 先出现，utility bar 可晚 1~2 秒",
+    "thread": "会话/任务页（含 markdown 内容）",
+    "settings": "设置页。mac 26.715.61943 实测设置页替换整个 shell（main/侧栏/header 全部消失）；win 实测设置页保留 shell。皮肤不得假设二者其一，锚点缺失时降为 L0",
+    "overlay": "菜单 / 弹窗 / popper 浮层",
+    "config": "依赖用户配置才出现（如未配置项目则无项目选择器）"
+  },
+  "selectors": [
+    { "key": "shell-main", "selector": "main.main-surface", "tier": "L1", "scope": "all", "required": true, "notes": "全局主表面。mac 设置页缺失（win 存在），缺失时整页仅 L0" },
+    { "key": "left-panel", "selector": "aside.app-shell-left-panel", "tier": "L1", "scope": "all", "required": true, "notes": "左侧栏；收起/重建时会移除节点，勿在其消失时清皮" },
+    { "key": "header-tint", "selector": "header.app-header-tint", "tier": "L1", "scope": "all", "required": true, "notes": "顶栏；皮肤不得覆盖其 position/z-index（既有回归约束）" },
+    { "key": "home-icon", "selector": "[data-testid=\"home-icon\"]", "tier": "L1", "scope": "home", "required": true, "notes": "首页判定信号，双端一致" },
+    { "key": "home-route", "selector": "[role=\"main\"]:has([data-testid=\"home-icon\"])", "tier": "L1", "scope": "home", "required": true, "notes": "首页容器。实测 [role=main] 仅存在于首页——它不是通用路由锚点，thread 页没有" },
+    { "key": "home-route-css", "selector": "[role=\"main\"]", "tier": "L1", "scope": "home", "required": true, "notes": "home-route 的 CSS 可组合别名：不含 :has()。CSS 禁止 :has() 嵌套，home-route 原选择器一旦写进 :has()/:not(:has()) 整条规则会被解析器丢弃（v1.3.1 全窗口首页与任务页氛围背景因此失效）。依据与 home-route 相同的实测：[role=main] 仅存在于首页；该锚点缺失时 CSS 路由门控整体失效，故必须按 L1 必需项监控" },
+    { "key": "composer-chrome", "selector": ".composer-surface-chrome", "tier": "L2", "scope": "home+thread", "required": false, "notes": "输入框壳。win 实测存在无 composer 的 detail 路由，不可当全局锚点" },
+    { "key": "home-utility", "selector": "[class*=\"_homeUtilityBar_\"]", "tier": "L2", "scope": "home", "required": false, "notes": "CSS Modules 前缀匹配；模块名跨端稳定、hash 随版本变，禁止匹配完整 hash" },
+    { "key": "game-source", "selector": "[data-feature=\"game-source\"]", "tier": "L2", "scope": "home", "required": false },
+    { "key": "home-suggestions", "selector": ".group\\/home-suggestions", "tier": "L2", "scope": "home", "required": false },
+    { "key": "project-selector", "selector": ".group\\/project-selector", "tier": "L2", "scope": "home config", "required": false, "notes": "依赖用户项目配置；win 快照未出现（该机可能未配置项目），不算平台差异" },
+    { "key": "markdown", "selector": "[class*=\"_markdown\"]", "tier": "L2", "scope": "thread", "required": false, "notes": "会话内容块，单页可达 100+ 个，样式规则注意性能" },
+    { "key": "appearance-radio", "selector": "input[name=\"appearance-theme\"]", "tier": "L2", "scope": "settings", "required": false, "notes": "外观三选一；theme-preview testid 同屏出现" },
+    { "key": "overlay-menu", "selector": "[role=\"menu\"]", "tier": "L2", "scope": "overlay", "required": false },
+    { "key": "overlay-dialog", "selector": "[role=\"dialog\"]", "tier": "L2", "scope": "overlay", "required": false },
+    { "key": "overlay-popper", "selector": "[data-radix-popper-content-wrapper]", "tier": "L2", "scope": "overlay", "required": false }
+  ],
+  "removed": [
+    { "key": "suggestion-item", "selector": ".group\\/home-suggestion-list-item", "reason": "双端全部 22 个实测状态命中 0 次——当前 Codex 版本已无此类；CSS 中引用它的规则为化石，待清理" }
+  ],
+  "stableTestids": ["app-shell-header-context-menu-surface", "home-icon", "theme-preview"],
+  "notes": [
+    "锚点优先级：data-testid > role/语义标签 > 稳定类名 > CSS Modules 前缀；禁止精确 hash 与纯结构路径",
+    "首页渐进渲染：L2 home 锚点必须容忍晚到，找不到 = 暂不精修，不得阻断 L0/L1",
+    "跨端适配 = 版本管理：同版本双端 DOM 同源；升级 Codex 后先跑 doctor 对本清单，再决定是否改适配"
+  ]
+}

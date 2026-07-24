@@ -1,7 +1,11 @@
 #!/bin/bash
 
 set -euo pipefail
+export LC_ALL=C
+export LANG=C
+export LC_CTYPE=C
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+VERSION="$(/usr/bin/tr -d '[:space:]' < "$ROOT/VERSION")"
 OUTPUT="${1:-$HOME/Desktop/Codex 主题编辑器.zip}"
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-client.XXXXXX)"
 CLIENT_ROOT="$TMP/Codex 主题编辑器"
@@ -15,7 +19,27 @@ trap '/bin/rm -rf "$TMP"' EXIT
   --exclude '.DS_Store' \
   --exclude 'release/' \
   --exclude 'runtime/' \
+  --exclude 'presets/preset-arina-hashimoto/' \
   "$ROOT/" "$ENGINE/"
+
+# Keep the customer ZIP self-contained: bundle prompt docs and referenced
+# images, then translate repository paths for the hidden standalone engine.
+"$ROOT/scripts/prepare-standalone-docs.sh" "$ENGINE"
+STANDALONE_README="$ENGINE/README.md"
+if [ -f "$STANDALONE_README" ]; then
+  temporary="${STANDALONE_README}.standalone"
+  /usr/bin/sed \
+    -e 's#\.\./docs/#docs/#g' \
+    -e 's#\.\./windows/#https://github.com/Fei-Away/Codex-Dream-Skin/tree/main/windows/#g' \
+    "$STANDALONE_README" > "$temporary"
+  /bin/mv "$temporary" "$STANDALONE_README"
+fi
+PRESET_README="$ENGINE/presets/README.md"
+if [ -f "$PRESET_README" ]; then
+  temporary="${PRESET_README}.standalone"
+  /usr/bin/sed -e 's#\.\./\.\./docs/#../docs/#g' "$PRESET_README" > "$temporary"
+  /bin/mv "$temporary" "$PRESET_README"
+fi
 
 /usr/bin/printf '%s\n' \
   '#!/bin/bash' \
@@ -25,7 +49,7 @@ trap '/bin/rm -rf "$TMP"' EXIT
   > "$CLIENT_ROOT/安装 Codex 主题编辑器.command"
 
 /usr/bin/printf '%s\n' \
-  'Codex 主题编辑器 1.1.2' \
+  "Codex 主题编辑器 $VERSION" \
   '' \
   '推荐方式：把这个完整 ZIP、你喜欢的图片和“给 Codex 的部署提示词.md”一起发给自己的 Codex。' \
   '' \
@@ -37,8 +61,13 @@ trap '/bin/rm -rf "$TMP"' EXIT
 /bin/cp "$ROOT/CLIENT_DEPLOY_PROMPT.md" "$CLIENT_ROOT/给 Codex 的部署提示词.md"
 /bin/chmod 755 "$CLIENT_ROOT/安装 Codex 主题编辑器.command"
 /bin/chmod 755 "$ENGINE"/*.command "$ENGINE"/scripts/*.sh "$ENGINE"/tests/*.sh
-/usr/bin/xattr -cr "$CLIENT_ROOT"
 /usr/bin/find "$CLIENT_ROOT" -type f \( -name '.DS_Store' -o -name '._*' \) -delete
+[ ! -e "$ENGINE/presets/preset-arina-hashimoto" ] \
+  || { printf 'Restricted Arina preset entered the standalone ZIP.\n' >&2; exit 1; }
+if /usr/bin/find "$CLIENT_ROOT" -type f -name 'arina-hashimoto-*' -print -quit | /usr/bin/grep -q .; then
+  printf 'Restricted Arina documentation asset entered the standalone ZIP.\n' >&2
+  exit 1
+fi
 /bin/mkdir -p "$(dirname "$OUTPUT")"
 /bin/rm -f "$OUTPUT"
 COPYFILE_DISABLE=1 /usr/bin/ditto -c -k --keepParent --norsrc --noextattr "$CLIENT_ROOT" "$OUTPUT"

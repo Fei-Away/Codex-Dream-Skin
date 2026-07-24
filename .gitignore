@@ -7,4 +7,16 @@
 README.preview.html
 docs/readme-preview.html
 release/
-runtime/
+# Keep the large captured DOM/screenshot fixtures local, but version the
+# canonical renderer sources that generate both platform assets.
+runtime/*
+!runtime/
+!runtime/dream-skin.css
+!runtime/renderer-inject.js
+
+# local agent context
+AGENTS.md
+TASK_PROGRESS.md
+修复记录*.md
+docs/architecture-cdp-and-cross-platform-grok45.md
+docs/unified-skin-runtime-plan.md
