@@ -26,6 +26,16 @@ this MIT-licensed project. It is the redistributable default artwork included in
 the public macOS and Windows installers. Its name and artwork do not imply
 OpenAI/Codex affiliation or endorsement.
 
+## Cyan Virtual Diva
+
+`presets/preset-cyan-virtual-diva/background.jpg` is maintainer-supplied
+original artwork depicting a fictional adult virtual singer. It was created
+for this project without an identifiable real-person likeness, named
+third-party character, or official OpenAI/Codex artwork. The maintainer grants
+permission to redistribute the image and its theme metadata as part of Codex
+Dream Skin source archives and public installers. The preset does not imply
+OpenAI/Codex affiliation or endorsement.
+
 ## Arina Hashimoto reference material
 
 The following user/maintainer-supplied files are excluded from the MIT software license:

@@ -89,6 +89,14 @@ if ! /usr/bin/grep -F -q "presets/preset-arina-hashimoto/" \
   printf 'Standalone release builders must explicitly exclude the restricted Arina preset.\n' >&2
   exit 1
 fi
+for public_release_script in build-menubar-app.sh build-dmg.sh; do
+  if ! /usr/bin/grep -F -q "preset-cyan-virtual-diva" \
+    "$ROOT/scripts/$public_release_script"; then
+    printf 'Public release script must include the Cyan Virtual Diva preset: %s\n' \
+      "$public_release_script" >&2
+    exit 1
+  fi
+done
 if ! /usr/bin/grep -F -q 'DEPLOY_PREVIOUS' "$ROOT/scripts/install-dream-skin-macos.sh" ||
    ! /usr/bin/grep -F -q 'rollback_deployed_project' "$ROOT/scripts/install-dream-skin-macos.sh"; then
   printf 'The macOS outer installer must roll back a failed engine deployment.\n' >&2
@@ -281,10 +289,12 @@ fi
   [ -f "$themes/preset-gothic-void-crusade/background.jpg" ] || exit 1
   [ -f "$themes/preset-arina-hashimoto/theme.json" ] || exit 1
   [ -f "$themes/preset-arina-hashimoto/background.jpg" ] || exit 1
+  [ -f "$themes/preset-cyan-virtual-diva/theme.json" ] || exit 1
+  [ -f "$themes/preset-cyan-virtual-diva/background.jpg" ] || exit 1
   [ -f "$themes/custom-keepme/theme.json" ] || exit 1
   for id in $retired; do [ ! -e "$themes/$id" ] || exit 1; done
   seeded="$(/usr/bin/find "$themes" -maxdepth 1 -type d -name "preset-*" | /usr/bin/wc -l | /usr/bin/tr -d " ")"
-  [ "$seeded" -eq 2 ] || exit 1
+  [ "$seeded" -eq 3 ] || exit 1
 ' _ "$ROOT"
 
 run_signed_runtime_switch_test() {

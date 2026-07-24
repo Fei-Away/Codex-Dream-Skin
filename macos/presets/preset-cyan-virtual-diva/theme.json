@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-cyan-virtual-diva",
+  "name": "青蓝虚拟歌姬",
+  "brandSubtitle": "CYAN WAVE STAGE",
+  "tagline": "让灵感沿着光与节拍流动。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "◉  选择项目",
+  "statusText": "CYAN WAVE ONLINE",
+  "quote": "BUILD IN YOUR OWN FREQUENCY",
+  "image": "background.jpg",
+  "appearance": "light",
+  "art": {
+    "focusX": 0.79,
+    "focusY": 0.44,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "background": "#eef8fc",
+    "panel": "#f6fcff",
+    "panelAlt": "#dff4f8",
+    "accent": "#1abbd0",
+    "accentAlt": "#54dce2",
+    "secondary": "#155b8e",
+    "highlight": "#786ee8",
+    "text": "#153b55",
+    "muted": "#5b7788",
+    "line": "rgba(28, 164, 196, .24)"
+  }
+}
