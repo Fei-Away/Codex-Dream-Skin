@@ -107,6 +107,12 @@ if [ -z "$INSTALL_GUARD_LINE" ] || [ -z "$INSTALL_DEPLOY_LINE" ] ||
   printf 'The Codex-running guard must run before deploy_project copies any engine bytes.\n' >&2
   exit 1
 fi
+if /usr/bin/grep -F -q \
+  'message: "请先退出 ChatGPT，再从菜单选择“安装 / 升级引擎”。' \
+  "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"; then
+  printf 'The menu bar must not attribute every engine-install failure to ChatGPT still running.\n' >&2
+  exit 1
+fi
 if ! /usr/bin/grep -F -q '# CodexDreamSkinStudio launcher' \
    "$ROOT/scripts/restore-dream-skin-macos.sh"; then
   printf 'macOS uninstall must remove only launchers owned by Dream Skin.\n' >&2
@@ -140,6 +146,7 @@ fi
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
+"$NODE" "$ROOT/tests/theme-config.test.mjs"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do
@@ -910,12 +917,6 @@ MULTILINE_CONFIG="$TMP/config-multiline.toml"
   > "$MULTILINE_CONFIG"
 assert_theme_config_install_rejected multiline "$MULTILINE_CONFIG" \
   "$TMP/config-multiline-backup.json"
-
-MULTILINE_ARRAY_CONFIG="$TMP/config-multiline-array.toml"
-/usr/bin/printf '%s\n' '[desktop]' 'rows = [' '  ["one", "two"],' ']' \
-  'appearanceTheme = "system"' > "$MULTILINE_ARRAY_CONFIG"
-assert_theme_config_install_rejected multiline-array "$MULTILINE_ARRAY_CONFIG" \
-  "$TMP/config-multiline-array-backup.json"
 
 CRLF_CONFIG="$TMP/config-crlf.toml"
 CRLF_BACKUP="$TMP/config-crlf-backup.json"
