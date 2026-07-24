@@ -88,11 +88,32 @@ Next, use the generated screenshot to check horizontal overflow and text contras
 Open `Codex Dream Skin - Tray` to:
 
 - Import a PNG, JPEG, or WebP background.
+- Import an ordinary `.zip` theme pack into Saved Themes (`.dreamskin` is not supported).
 - Save the active theme and switch through saved themes.
 - Pause or resume the skin.
 - Reapply the theme or fully restore Codex.
 
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
+
+An official Studio ZIP contains `manifest.json`, `theme.json`, and exactly one
+`background.webp|jpg|png`, with optional `theme.css`, `LICENSE.txt`, and the
+reserved `manifest.sig`. Place them at archive root or inside exactly one
+top-level theme folder. A local simplified ZIP may contain exactly `theme.json`
+and its referenced image; because it lacks manifest integrity and compatibility
+data, use that format only for trusted content. Limits are 32 MiB compressed,
+32 entries, and 64 MiB expanded. Traversal, links/reparse entries, nested
+archives, and unregistered files are rejected. Official packs also verify the
+platform, minimum client version, and each payload's declared byte length and
+SHA-256. `theme.css` is preserved but not executed, while `manifest.sig` is
+reserved and not used for signature verification. Import only adds to Saved
+Themes; it does not change the active theme. Identical content is not
+duplicated, while a different pack using an existing ID receives a new safe ID.
+
+For the manual fallback, choose **Open Themes Folder** and move in the complete
+extracted directory whose immediate children are `theme.json` and its image:
+`%LOCALAPPDATA%\CodexDreamSkin\themes\`. Reopen the tray menu afterward; do not
+add another wrapper directory. Manual placement bypasses archive checks, so use
+trusted content only.
 
 ## Restore and remove shortcuts
 

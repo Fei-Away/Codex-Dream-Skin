@@ -6,6 +6,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { readImageMetadata } from "./image-metadata.mjs";
+import {
+  normalizeThemeColor,
+  normalizeThemeText,
+} from "../assets/theme-package-validator.mjs";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
@@ -447,7 +451,7 @@ function assertContainedPath(rootPath, candidatePath, label) {
   throw new Error(`${label} must stay inside its theme directory`);
 }
 
-async function loadTheme(themeDir) {
+export async function loadTheme(themeDir) {
   const requestedRoot = themeDir ?? path.join(root, "assets");
   const configPath = path.join(requestedRoot, "theme.json");
   let assetsRoot;
@@ -481,20 +485,6 @@ async function loadTheme(themeDir) {
     throw new Error(`${configPath} has an invalid image field`);
   }
   if (path.basename(raw.image) !== raw.image) throw new Error("Theme image must stay inside its theme directory");
-  const text = (value, fallback, max, name) => {
-    if (value === undefined) return fallback;
-    if (typeof value !== "string" || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) {
-      throw new Error(`${configPath} has an invalid ${name} field`);
-    }
-    return value.trim() ? Array.from(value.trim()).slice(0, max).join("") : fallback;
-  };
-  const color = (value, fallback) => {
-    if (typeof value !== "string") return fallback;
-    const normalized = value.trim();
-    return /^#[0-9a-f]{6}$/i.test(normalized) || /^rgba?\([0-9., %]+\)$/i.test(normalized)
-      ? normalized
-      : fallback;
-  };
   const choice = (value, name, choices) => {
     if (value === undefined) return undefined;
     if (typeof value !== "string" || !choices.includes(value)) {
@@ -524,32 +514,32 @@ async function loadTheme(themeDir) {
     focusX: unit(rawArt.focusX, "art.focusX"),
     focusY: unit(rawArt.focusY, "art.focusY"),
     safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"]),
-    taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "off"]),
+    taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "full", "off"]),
   };
   const theme = {
     schemaVersion: 1,
-    id: text(raw.id, "custom", 80, "id"),
-    name: text(raw.name, "ChatGPT Dream Skin", 80, "name"),
-    brandSubtitle: text(raw.brandSubtitle, "CODEX DREAM SKIN", 80, "brandSubtitle"),
-    tagline: text(raw.tagline, "Make something wonderful.", 160, "tagline"),
-    projectPrefix: text(raw.projectPrefix, "选择项目 · ", 80, "projectPrefix"),
-    projectLabel: text(raw.projectLabel, "◉  选择项目", 80, "projectLabel"),
-    statusText: text(raw.statusText, "DREAM SKIN ONLINE", 80, "statusText"),
-    quote: text(raw.quote, "MAKE SOMETHING WONDERFUL", 80, "quote"),
+    id: normalizeThemeText(raw.id, "custom", 80, "id", configPath),
+    name: normalizeThemeText(raw.name, "Codex Dream Skin", 80, "name", configPath),
+    brandSubtitle: normalizeThemeText(raw.brandSubtitle, "CODEX DREAM SKIN", 120, "brandSubtitle", configPath),
+    tagline: normalizeThemeText(raw.tagline, "Make something wonderful.", 120, "tagline", configPath),
+    projectPrefix: normalizeThemeText(raw.projectPrefix, "选择项目 · ", 120, "projectPrefix", configPath),
+    projectLabel: normalizeThemeText(raw.projectLabel, "◉  选择项目", 120, "projectLabel", configPath),
+    statusText: normalizeThemeText(raw.statusText, "DREAM SKIN ONLINE", 120, "statusText", configPath),
+    quote: normalizeThemeText(raw.quote, "MAKE SOMETHING WONDERFUL", 120, "quote", configPath),
     image: raw.image,
     colorMode: rawColors ? "explicit" : "auto",
     explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
     colors: {
-      background: color(rawColors?.background, "#071116"),
-      panel: color(rawColors?.panel, "#0b1a20"),
-      panelAlt: color(rawColors?.panelAlt, "#10272c"),
-      accent: color(rawColors?.accent, "#7cff46"),
-      accentAlt: color(rawColors?.accentAlt, "#b8ff3d"),
-      secondary: color(rawColors?.secondary, "#36d7e8"),
-      highlight: color(rawColors?.highlight, "#642a8c"),
-      text: color(rawColors?.text, "#e9fff1"),
-      muted: color(rawColors?.muted, "#9ebdb3"),
-      line: color(rawColors?.line, "rgba(124, 255, 70, .28)"),
+      background: normalizeThemeColor(rawColors?.background, "#071116"),
+      panel: normalizeThemeColor(rawColors?.panel, "#0b1a20"),
+      panelAlt: normalizeThemeColor(rawColors?.panelAlt, "#10272c"),
+      accent: normalizeThemeColor(rawColors?.accent, "#7cff46"),
+      accentAlt: normalizeThemeColor(rawColors?.accentAlt, "#b8ff3d"),
+      secondary: normalizeThemeColor(rawColors?.secondary, "#36d7e8"),
+      highlight: normalizeThemeColor(rawColors?.highlight, "#642a8c"),
+      text: normalizeThemeColor(rawColors?.text, "#e9fff1"),
+      muted: normalizeThemeColor(rawColors?.muted, "#9ebdb3"),
+      line: normalizeThemeColor(rawColors?.line, "rgba(124, 255, 70, .28)"),
     },
   };
   if (appearance !== undefined) theme.appearance = appearance;

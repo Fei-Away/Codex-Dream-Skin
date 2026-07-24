@@ -101,6 +101,7 @@ to use and save it for one-click switching.
 - **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable.
 - **Swappable art** — Drop in a UI-free image you like and it becomes your theme.
 - **Saved themes** — Switch local themes from the macOS menu bar or Windows system tray.
+- **Theme ZIP import** — Pick an ordinary `.zip` on either platform and add a validated pack to the local library.
 - **Restorable** — One-click restore to the stock look.
 - **Safer path** — Local-loopback CDP inject only. No official binary or signature changes.
 
@@ -123,6 +124,39 @@ are manual: download the new package and install over the existing one; themes
 and images are preserved. Because the public packages are unsigned, a new
 download may show a one-time OS security warning; the guides explain the safe
 GUI approval path.
+
+### Import a downloaded theme
+
+Choose **Import Theme ZIP…** from the macOS menu bar app or Windows tray. Only
+ordinary `.zip` files are accepted; the legacy `.dreamskin` extension is not
+supported, and renaming the suffix is not a supported migration path. An
+official Studio pack contains `manifest.json`, `theme.json`, and exactly one
+`background.webp|jpg|png`, with optional `theme.css`, `LICENSE.txt`, and the
+reserved `manifest.sig`. Put these files at ZIP root or inside exactly one
+top-level theme folder. The importer verifies platform and minimum-client
+compatibility plus every declared payload file's byte length and SHA-256.
+`theme.css` is preserved but not executed by this client version;
+`manifest.sig` is not used for signature verification.
+
+For existing local workflows, the importer also accepts a simplified ZIP with
+exactly `theme.json` and its referenced image. That format has no official
+manifest integrity or compatibility declaration and should come from a trusted
+source. Limits are 32 MiB per archive, 32 entries, and 64 MiB expanded. Import
+adds the pack to **Saved Themes** without changing the active theme. Identical
+content is not duplicated, and a distinct pack with an existing ID is
+preserved under a new safe ID.
+
+For a manual fallback, extract the archive and move the complete directory
+containing `theme.json` and its image into the saved-theme folder:
+
+- macOS: `~/Library/Application Support/CodexDreamSkinStudio/themes/`
+- Windows: `%LOCALAPPDATA%\CodexDreamSkin\themes\`
+
+Both controls include **Open Themes Folder**. Reopen the menu/tray after moving
+the directory. Do not add another wrapper level, links, nested archives, or an
+image-only folder without `theme.json`. Manual placement bypasses the ZIP
+importer's archive checks, so use trusted content only. Both controls also link
+directly to the DreamSkin.cc Gallery and online Studio.
 
 ### For developers: run from source
 

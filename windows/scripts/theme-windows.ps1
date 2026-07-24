@@ -3,6 +3,9 @@
 }
 
 $script:DreamSkinMaxImageBytes = 16 * 1024 * 1024
+$script:DreamSkinMaxThemeArchiveBytes = 32 * 1024 * 1024
+$script:DreamSkinMaxThemeArchiveExpandedBytes = 64 * 1024 * 1024
+$script:DreamSkinMaxThemeArchiveEntries = 32
 
 function Assert-DreamSkinNoReparseComponents {
   param([Parameter(Mandatory = $true)][string]$Path)
@@ -396,6 +399,420 @@ function Save-DreamSkinCurrentTheme {
   $theme.image = $imageName
   Write-DreamSkinTheme -ThemeDirectory $destination -Theme $theme
   return Read-DreamSkinTheme -ThemeDirectory $destination
+}
+
+function Get-DreamSkinThemeSemanticFingerprint {
+  param([Parameter(Mandatory = $true)][string]$ThemeDirectory)
+  $loaded = Read-DreamSkinTheme -ThemeDirectory $ThemeDirectory -SkipImageMetadata
+  $semanticTheme = $loaded.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  $semanticTheme.PSObject.Properties.Remove('id')
+  $themeJson = $semanticTheme | ConvertTo-Json -Depth 8 -Compress
+  $themeBytes = [System.Text.Encoding]::UTF8.GetBytes($themeJson)
+  $themeHasher = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $themeHash = ([System.BitConverter]::ToString($themeHasher.ComputeHash($themeBytes))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $themeHasher.Dispose()
+  }
+  $imageHash = (Get-FileHash -LiteralPath $loaded.ImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  $combined = $themeHash + "`0" + $imageHash
+  $cssPath = Join-Path $loaded.Directory 'theme.css'
+  if (Test-Path -LiteralPath $cssPath -PathType Leaf) {
+    Assert-DreamSkinNoReparseComponents -Path $cssPath
+    if ((Get-Item -LiteralPath $cssPath -Force).Length -gt 256KB) {
+      throw 'Saved theme CSS exceeds the 256 KB limit.'
+    }
+    $combined += "`0theme.css`0" + (Get-FileHash -LiteralPath $cssPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  $licensePath = Join-Path $loaded.Directory 'LICENSE.txt'
+  if (Test-Path -LiteralPath $licensePath -PathType Leaf) {
+    Assert-DreamSkinNoReparseComponents -Path $licensePath
+    if ((Get-Item -LiteralPath $licensePath -Force).Length -gt 64KB) {
+      throw 'Saved theme license exceeds the 64 KB limit.'
+    }
+    $combined += "`0LICENSE.txt`0" + (Get-FileHash -LiteralPath $licensePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  $combinedBytes = [System.Text.Encoding]::UTF8.GetBytes($combined)
+  $combinedHasher = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return ([System.BitConverter]::ToString($combinedHasher.ComputeHash($combinedBytes))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $combinedHasher.Dispose()
+  }
+}
+
+function Test-DreamSkinNestedArchiveName {
+  param([Parameter(Mandatory = $true)][string]$Name)
+  return $Name -match '(?i)\.(?:zip|dreamskin|7z|rar|tar|tgz|gz|bz2|xz)$'
+}
+
+function Test-DreamSkinWindowsReservedPathStem {
+  param([Parameter(Mandatory = $true)][string]$Name)
+  $stem = ($Name -split '\.', 2)[0]
+  return $stem -match '^(?i:CON|PRN|AUX|NUL|COM[1-9\u00B9\u00B2\u00B3]|LPT[1-9\u00B9\u00B2\u00B3])$'
+}
+
+function Assert-DreamSkinZipPathComponent {
+  param([Parameter(Mandatory = $true)][string]$Component)
+  if (-not $Component -or $Component -in @('.', '..') -or
+    $Component -match '[\u0000-\u001f<>:"|?*]' -or
+    $Component.EndsWith(' ') -or $Component.EndsWith('.')) {
+    throw "Theme ZIP contains an unsafe Windows path component: $Component"
+  }
+  if (Test-DreamSkinWindowsReservedPathStem -Name $Component) {
+    throw "Theme ZIP contains a reserved Windows path component: $Component"
+  }
+}
+
+function Expand-DreamSkinThemeZipSecurely {
+  param(
+    [Parameter(Mandatory = $true)][string]$ArchivePath,
+    [Parameter(Mandatory = $true)][string]$DestinationRoot
+  )
+  $archiveFullPath = [System.IO.Path]::GetFullPath($ArchivePath)
+  if (-not [System.IO.Path]::GetExtension($archiveFullPath).Equals('.zip', [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Only ordinary .zip theme packages are supported; .dreamskin files are not accepted.'
+  }
+  if (-not (Test-Path -LiteralPath $archiveFullPath -PathType Leaf)) {
+    throw "Theme ZIP does not exist: $archiveFullPath"
+  }
+  $archiveLength = (Get-Item -LiteralPath $archiveFullPath -Force).Length
+  if ($archiveLength -lt 1) { throw 'Theme ZIP cannot be empty.' }
+  if ($archiveLength -gt $script:DreamSkinMaxThemeArchiveBytes) {
+    throw 'Theme ZIP exceeds the 32 MB archive limit.'
+  }
+
+  $destinationFullPath = [System.IO.Path]::GetFullPath($DestinationRoot)
+  Assert-DreamSkinNoReparseComponents -Path $destinationFullPath
+  if (-not (Test-Path -LiteralPath $destinationFullPath -PathType Container)) {
+    throw "Theme ZIP extraction directory does not exist: $destinationFullPath"
+  }
+  if (@(Get-ChildItem -LiteralPath $destinationFullPath -Force -ErrorAction Stop).Count -ne 0) {
+    throw 'Theme ZIP extraction directory must be empty.'
+  }
+
+  Add-Type -AssemblyName System.IO.Compression -ErrorAction Stop
+  Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+  $archiveStream = $null
+  $archive = $null
+  $expandedBytes = [int64]0
+  $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  try {
+    $archiveStream = [System.IO.File]::Open(
+      $archiveFullPath,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,
+      [System.IO.FileShare]::Read
+    )
+    $openedArchiveLength = [int64]$archiveStream.Length
+    if ($openedArchiveLength -lt 1) { throw 'Theme ZIP cannot be empty.' }
+    if ($openedArchiveLength -gt $script:DreamSkinMaxThemeArchiveBytes) {
+      throw 'Theme ZIP exceeds the 32 MB archive limit.'
+    }
+    $archive = [System.IO.Compression.ZipArchive]::new(
+      $archiveStream,
+      [System.IO.Compression.ZipArchiveMode]::Read,
+      $false
+    )
+    $entries = @($archive.Entries)
+    if ($entries.Count -lt 1) { throw 'Theme ZIP contains no entries.' }
+    if ($entries.Count -gt $script:DreamSkinMaxThemeArchiveEntries) {
+      throw 'Theme ZIP exceeds the 32-entry limit.'
+    }
+
+    foreach ($entry in $entries) {
+      $rawName = "$($entry.FullName)"
+      if (-not $rawName -or $rawName -match '[\u0000-\u001f]') {
+        throw 'Theme ZIP contains an empty or control-character entry name.'
+      }
+      $normalized = $rawName.Replace('\', '/').Normalize([System.Text.NormalizationForm]::FormC)
+      if ($normalized.StartsWith('/') -or $normalized -match '^[A-Za-z]:') {
+        throw "Theme ZIP contains an absolute path: $rawName"
+      }
+      $isDirectory = $normalized.EndsWith('/')
+      $trimmed = $normalized.TrimEnd('/')
+      $components = @($trimmed -split '/')
+      if ($components.Count -lt 1) { throw "Theme ZIP contains an invalid path: $rawName" }
+      foreach ($component in $components) { Assert-DreamSkinZipPathComponent -Component $component }
+      $entryKey = $trimmed
+      if (-not $seen.Add($entryKey)) { throw "Theme ZIP contains a duplicate path: $rawName" }
+
+      $metadataEntry = $components -contains '__MACOSX' -or
+        $components[$components.Count - 1].Equals('.DS_Store', [System.StringComparison]::OrdinalIgnoreCase)
+      $external = [System.BitConverter]::ToUInt32(
+        [System.BitConverter]::GetBytes([int]$entry.ExternalAttributes), 0
+      )
+      $unixType = (($external -shr 16) -band 0xF000)
+      if ($unixType -eq 0xA000) { throw "Theme ZIP contains a symbolic link: $rawName" }
+      if (($external -band [uint32][System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Theme ZIP contains a Windows reparse entry: $rawName"
+      }
+      if ($unixType -notin @(0, 0x4000, 0x8000)) {
+        throw "Theme ZIP contains an unsupported filesystem entry: $rawName"
+      }
+      if (($isDirectory -and $unixType -eq 0x8000) -or
+        (-not $isDirectory -and $unixType -eq 0x4000)) {
+        throw "Theme ZIP entry type does not match its path: $rawName"
+      }
+
+      $entryLength = [int64]$entry.Length
+      if ($entryLength -lt 0) { throw "Theme ZIP contains an invalid entry size: $rawName" }
+      $expandedBytes += $entryLength
+      if ($expandedBytes -gt $script:DreamSkinMaxThemeArchiveExpandedBytes) {
+        throw 'Theme ZIP exceeds the 64 MB expanded-size limit.'
+      }
+      if ($metadataEntry) { continue }
+      if (-not $isDirectory -and (Test-DreamSkinNestedArchiveName -Name $components[$components.Count - 1])) {
+        throw 'Nested compressed archives are not allowed inside a theme ZIP.'
+      }
+
+      $relativeWindowsPath = $trimmed.Replace('/', '\')
+      $destination = [System.IO.Path]::GetFullPath((Join-Path $destinationFullPath $relativeWindowsPath))
+      $rootPrefix = $destinationFullPath.TrimEnd('\') + '\'
+      if (-not $destination.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Theme ZIP entry escaped its extraction directory: $rawName"
+      }
+      if ($isDirectory) {
+        New-Item -ItemType Directory -Path $destination -Force | Out-Null
+        Assert-DreamSkinNoReparseComponents -Path $destination
+        continue
+      }
+
+      $parent = [System.IO.Path]::GetDirectoryName($destination)
+      New-Item -ItemType Directory -Path $parent -Force | Out-Null
+      Assert-DreamSkinNoReparseComponents -Path $parent
+      $input = $null
+      $output = $null
+      try {
+        $input = $entry.Open()
+        $output = [System.IO.File]::Open(
+          $destination,
+          [System.IO.FileMode]::CreateNew,
+          [System.IO.FileAccess]::Write,
+          [System.IO.FileShare]::None
+        )
+        $buffer = New-Object byte[] 65536
+        $written = [int64]0
+        while (($read = $input.Read($buffer, 0, $buffer.Length)) -gt 0) {
+          $written += $read
+          if ($written -gt $entryLength -or $written -gt $script:DreamSkinMaxThemeArchiveExpandedBytes) {
+            throw "Theme ZIP entry expanded beyond its declared safe size: $rawName"
+          }
+          $output.Write($buffer, 0, $read)
+        }
+        if ($written -ne $entryLength) { throw "Theme ZIP entry size changed while extracting: $rawName" }
+      } finally {
+        if ($null -ne $output) { $output.Dispose() }
+        if ($null -ne $input) { $input.Dispose() }
+      }
+      Assert-DreamSkinNoReparseComponents -Path $destination
+    }
+  } catch {
+    throw "Theme ZIP extraction failed: $($_.Exception.Message)"
+  } finally {
+    if ($null -ne $archive) { $archive.Dispose() }
+    if ($null -ne $archiveStream) { $archiveStream.Dispose() }
+  }
+
+  $topItems = @(Get-ChildItem -LiteralPath $destinationFullPath -Force -ErrorAction Stop)
+  $rootThemePath = Join-Path $destinationFullPath 'theme.json'
+  if (Test-Path -LiteralPath $rootThemePath -PathType Leaf) {
+    $sourceRoot = $destinationFullPath
+  } elseif ($topItems.Count -eq 1 -and $topItems[0].PSIsContainer -and
+    (Test-Path -LiteralPath (Join-Path $topItems[0].FullName 'theme.json') -PathType Leaf)) {
+    $sourceRoot = $topItems[0].FullName
+  } else {
+    throw 'Place theme.json and its image at ZIP root or inside one top-level theme folder.'
+  }
+  Assert-DreamSkinNoReparseComponents -Path $sourceRoot
+  $sourceItems = @(Get-ChildItem -LiteralPath $sourceRoot -Force -ErrorAction Stop)
+  if (@($sourceItems | Where-Object { $_.PSIsContainer }).Count -ne 0) {
+    throw 'Theme ZIP content must be a flat set of files.'
+  }
+  $sourceFiles = @($sourceItems | Where-Object { -not $_.PSIsContainer })
+  $hasManifest = @($sourceFiles | Where-Object { $_.Name -ceq 'manifest.json' }).Count -eq 1
+  if ($hasManifest) {
+    $officialNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($name in @(
+      'manifest.json', 'manifest.sig', 'theme.json', 'theme.css', 'LICENSE.txt',
+      'background.webp', 'background.jpg', 'background.png'
+    )) { $null = $officialNames.Add($name) }
+    foreach ($sourceFile in $sourceFiles) {
+      if (-not $officialNames.Contains($sourceFile.Name)) {
+        throw "Official theme ZIP contains an unregistered file: $($sourceFile.Name)"
+      }
+    }
+    $backgroundCount = @($sourceFiles | Where-Object {
+      $_.Name -cin @('background.webp', 'background.jpg', 'background.png')
+    }).Count
+    if ($backgroundCount -ne 1) {
+      throw 'Official theme ZIP must contain exactly one registered background file.'
+    }
+  } elseif ($sourceFiles.Count -ne 2) {
+    throw 'A local simplified theme ZIP must contain exactly theme.json and one referenced image.'
+  }
+  return $sourceRoot
+}
+
+function Import-DreamSkinThemeZip {
+  param(
+    [Parameter(Mandatory = $true)][string]$ArchivePath,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  foreach ($directory in @($paths.Root, $paths.Saved)) {
+    Ensure-DreamSkinManagedDirectory -Path $directory -Root $paths.Root
+  }
+  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.ThemeImport")
+  $acquired = $false
+  $workRoot = Join-Path $paths.Root ('.theme-import-work-' + [guid]::NewGuid().ToString('N'))
+  $publishStage = $null
+  try {
+    try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
+    if (-not $acquired) { throw 'Another theme import is still running; try again shortly.' }
+    Ensure-DreamSkinManagedDirectory -Path $workRoot -Root $paths.Root
+    $extractRoot = Join-Path $workRoot 'extracted'
+    Ensure-DreamSkinManagedDirectory -Path $extractRoot -Root $paths.Root
+    $sourceRoot = Expand-DreamSkinThemeZipSecurely -ArchivePath $ArchivePath -DestinationRoot $extractRoot
+
+    if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue)) {
+      throw 'Node.js runtime validation is unavailable for theme ZIP checks.'
+    }
+    $node = Get-DreamSkinNodeRuntime
+    $engineRoot = Split-Path -Parent $PSScriptRoot
+    $packageValidator = Join-Path $engineRoot 'assets\theme-package-validator.mjs'
+    $versionPath = Join-Path $engineRoot 'VERSION'
+    if (-not (Test-Path -LiteralPath $packageValidator -PathType Leaf) -or
+      -not (Test-Path -LiteralPath $versionPath -PathType Leaf)) {
+      throw 'Theme package validator or client version is missing from the runtime engine.'
+    }
+    $validatedRoot = Join-Path $workRoot 'validated'
+    Ensure-DreamSkinManagedDirectory -Path $validatedRoot -Root $paths.Root
+    $clientVersion = (Read-DreamSkinUtf8File -Path $versionPath).Trim()
+    $packageOutput = @(& $node.Path $packageValidator '--source' $sourceRoot '--stage' $validatedRoot `
+      '--platform' 'windows' '--client-version' $clientVersion 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+      $detail = ($packageOutput -join "`n").Trim()
+      throw $(if ($detail) { $detail } else { 'Theme ZIP failed package validation.' })
+    }
+    try { $packageInfo = ($packageOutput -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch {
+      throw 'Theme package validator returned invalid output.'
+    }
+    if ($packageInfo.format -notin @('official', 'simple')) {
+      throw 'Theme package validator returned an unsupported package format.'
+    }
+    $sourceRoot = $validatedRoot
+    $packageFormat = "$($packageInfo.format)"
+    $cssIgnored = [bool]$packageInfo.cssIgnored
+    $signatureIgnored = [bool]$packageInfo.signatureIgnored
+
+    $themePath = Join-Path $sourceRoot 'theme.json'
+    if ((Get-Item -LiteralPath $themePath -Force).Length -gt 1MB) {
+      throw 'Theme metadata exceeds the 1 MB limit.'
+    }
+    $source = Read-DreamSkinTheme -ThemeDirectory $sourceRoot
+    if ($source.Theme.schemaVersion -ne 1) { throw 'Theme ZIP must use theme schemaVersion 1.' }
+    $imageField = "$($source.Theme.image)"
+    if ([System.IO.Path]::GetFileName($imageField) -cne $imageField) {
+      throw 'Theme ZIP image must be beside theme.json.'
+    }
+
+    $injector = Join-Path $PSScriptRoot 'injector.mjs'
+    $payloadCheck = @(& $node.Path $injector '--check-payload' '--theme-dir' $sourceRoot 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Theme ZIP failed theme.json or image payload validation.'
+    }
+
+    $fingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $sourceRoot
+    $existingNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($savedDirectory in Get-ChildItem -LiteralPath $paths.Saved -Directory -Force -ErrorAction SilentlyContinue) {
+      if ($savedDirectory.Name.StartsWith('.')) { continue }
+      try {
+        $saved = Read-DreamSkinTheme -ThemeDirectory $savedDirectory.FullName -SkipImageMetadata
+        $savedName = if ($saved.Theme.name) { "$($saved.Theme.name)" } else { $savedDirectory.Name }
+        $null = $existingNames.Add($savedName)
+        if ((Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $savedDirectory.FullName) -ceq $fingerprint) {
+          return [pscustomobject]@{
+            Status = 'Duplicate'
+            Id = $savedDirectory.Name
+            Name = $savedName
+            Renamed = $false
+            NameCollision = $false
+            PackageFormat = $packageFormat
+            CssIgnored = $cssIgnored
+            SignatureIgnored = $signatureIgnored
+            Path = $savedDirectory.FullName
+          }
+        }
+      } catch {}
+    }
+
+    $requestedId = "$($source.Theme.id)".Trim()
+    $baseId = if ($requestedId -cmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' -and
+      -not $requestedId.EndsWith('.') -and
+      -not (Test-DreamSkinWindowsReservedPathStem -Name $requestedId)) {
+      $requestedId
+    } else {
+      'import-' + $fingerprint.Substring(0, 12)
+    }
+    $id = $baseId
+    $suffix = 2
+    while (Test-Path -LiteralPath (Join-Path $paths.Saved $id)) {
+      $marker = "-$suffix"
+      $id = $baseId.Substring(0, [Math]::Min($baseId.Length, 80 - $marker.Length)) + $marker
+      $suffix += 1
+    }
+
+    $publishStage = Join-Path $paths.Saved ('.theme-import-' + [guid]::NewGuid().ToString('N'))
+    Ensure-DreamSkinManagedDirectory -Path $publishStage -Root $paths.Root
+    $imageName = [System.IO.Path]::GetFileName($source.ImagePath)
+    $stagedImage = Join-Path $publishStage $imageName
+    Assert-DreamSkinNoReparseComponents -Path $stagedImage
+    Copy-Item -LiteralPath $source.ImagePath -Destination $stagedImage -Force
+    Assert-DreamSkinImageFile -Path $stagedImage
+    $theme = $source.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $theme.id = $id
+    $theme.image = $imageName
+    Write-DreamSkinTheme -ThemeDirectory $publishStage -Theme $theme
+    foreach ($auxiliaryName in @('theme.css', 'LICENSE.txt')) {
+      $auxiliarySource = Join-Path $sourceRoot $auxiliaryName
+      if (Test-Path -LiteralPath $auxiliarySource -PathType Leaf) {
+        Assert-DreamSkinNoReparseComponents -Path $auxiliarySource
+        $auxiliaryDestination = Join-Path $publishStage $auxiliaryName
+        Copy-Item -LiteralPath $auxiliarySource -Destination $auxiliaryDestination -Force
+        Assert-DreamSkinNoReparseComponents -Path $auxiliaryDestination
+      }
+    }
+    $null = Read-DreamSkinTheme -ThemeDirectory $publishStage
+    $stagedPayloadCheck = @(& $node.Path $injector '--check-payload' '--theme-dir' $publishStage 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw 'Imported theme failed final payload validation.' }
+
+    $destination = Join-Path $paths.Saved $id
+    [System.IO.Directory]::Move($publishStage, $destination)
+    $publishStage = $null
+    $name = if ($theme.name) { "$($theme.name)" } else { $id }
+    return [pscustomobject]@{
+      Status = 'Imported'
+      Id = $id
+      Name = $name
+      Renamed = ($id -cne $requestedId)
+      NameCollision = $existingNames.Contains($name)
+      PackageFormat = $packageFormat
+      CssIgnored = $cssIgnored
+      SignatureIgnored = $signatureIgnored
+      Path = $destination
+    }
+  } finally {
+    if ($publishStage -and (Test-Path -LiteralPath $publishStage)) {
+      Remove-Item -LiteralPath $publishStage -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $workRoot) {
+      Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
+    $mutex.Dispose()
+  }
 }
 
 function Get-DreamSkinSavedThemes {

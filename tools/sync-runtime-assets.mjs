@@ -59,6 +59,10 @@ function compileRuntime(source) {
 
 const sourceCss = await fs.readFile(path.join(projectRoot, "runtime", "dream-skin.css"), "utf8");
 const sourceRuntime = await fs.readFile(path.join(projectRoot, "runtime", "renderer-inject.js"), "utf8");
+const sourceThemePackageValidator = await fs.readFile(
+  path.join(projectRoot, "runtime", "theme-package-validator.mjs"),
+  "utf8",
+);
 const outputs = [
   {
     // The injector runs from a packaged platform tree, so stage the same
@@ -74,6 +78,13 @@ const outputs = [
   {
     content: compileRuntime(sourceRuntime),
     paths: ["macos/assets/renderer-inject.js", "windows/assets/renderer-inject.js"],
+  },
+  {
+    content: sourceThemePackageValidator,
+    paths: [
+      "macos/assets/theme-package-validator.mjs",
+      "windows/assets/theme-package-validator.mjs",
+    ],
   },
 ];
 

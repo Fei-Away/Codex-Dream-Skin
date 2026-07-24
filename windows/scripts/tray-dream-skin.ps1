@@ -177,6 +177,29 @@ try {
         $dialog.Dispose()
       }
     }
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '导入主题 ZIP…' -Action {
+      $dialog = [System.Windows.Forms.OpenFileDialog]::new()
+      $dialog.Title = '选择 Codex Dream Skin 主题 ZIP'
+      $dialog.Filter = 'Dream Skin theme ZIP|*.zip'
+      $dialog.Multiselect = $false
+      try {
+        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+          $imported = Import-DreamSkinThemeZip -ArchivePath $dialog.FileName -StateRoot $StateRoot
+          if ($imported.Status -ceq 'Duplicate') {
+            $message = "主题已存在：$($imported.Name)。没有重复写入。"
+          } else {
+            $message = "已导入：$($imported.Name)。当前主题没有改变。"
+            if ($imported.Renamed) { $message += " 新标识：$($imported.Id)。" }
+            if ($imported.NameCollision) { $message += ' 主题库中已有同名主题。' }
+          }
+          if ($imported.CssIgnored) { $message += ' 已保留 theme.css，但当前客户端不会执行自定义 CSS。' }
+          if ($imported.SignatureIgnored) { $message += ' manifest.sig 是预留文件，当前版本已忽略。' }
+          $notify.ShowBalloonTip(3200, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
+        }
+      } finally {
+        $dialog.Dispose()
+      }
+    }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Action {
       $name = [Microsoft.VisualBasic.Interaction]::InputBox('输入主题名称：', '保存 Codex Dream Skin 主题', '')
       if ($name.Trim()) {
@@ -205,6 +228,10 @@ try {
     }
     [void]$menu.Items.Add($savedMenu)
 
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开主题文件夹' -Action {
+      $themeDirectoryToken = ConvertTo-DreamSkinProcessArgument -Value $paths.Saved
+      Start-Process -FilePath explorer.exe -ArgumentList $themeDirectoryToken | Out-Null
+    }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开图片文件夹' -Action {
       $imageDirectoryToken = ConvertTo-DreamSkinProcessArgument -Value $paths.Images
       Start-Process -FilePath explorer.exe -ArgumentList $imageDirectoryToken | Out-Null
@@ -212,6 +239,12 @@ try {
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '检查更新…' -Action {
       Start-DreamSkinPowerShell -Script $checkUpdateScript -Arguments @('-Interactive')
+    }
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '主题库 Gallery' -Action {
+      Start-Process -FilePath 'https://dreamskin.cc/gallery' | Out-Null
+    }
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '在线 Studio' -Action {
+      Start-Process -FilePath 'https://dreamskin.cc/studio' | Out-Null
     }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开 DreamSkin.cc' -Action {
       Start-Process -FilePath 'https://dreamskin.cc' | Out-Null

@@ -113,6 +113,34 @@ upgrade, but they are not copied into newly downloaded public packages.
 
 To contribute a preset, see [`presets/README.md`](./presets/README.md).
 
+## Import a theme ZIP
+
+The native menu-bar app has **导入主题 ZIP…**. It accepts ordinary `.zip`
+files only; `.dreamskin` is deliberately unsupported. An official Studio pack
+contains `manifest.json`, `theme.json`, and exactly one
+`background.webp|jpg|png`, with optional `theme.css`, `LICENSE.txt`, and the
+reserved `manifest.sig`. Put them at archive root or inside one top-level theme
+folder. A local simplified pack may contain exactly `theme.json` and its
+referenced image; because it lacks manifest integrity and compatibility data,
+use that format only for trusted local content.
+
+The importer allows at most 32 MiB compressed, 32 entries, and 64 MiB expanded.
+It rejects links, traversal, nested archives, unregistered payload files, and
+anything that fails theme/image validation. Official packs also verify the
+platform, minimum client version, and each manifest payload's byte length and
+SHA-256. `theme.css` is preserved but not executed; `manifest.sig` is reserved
+and not used for signature verification; `LICENSE.txt` is preserved.
+
+An import only adds to **已保存的主题**. It never replaces or applies the
+active/last-known-good copy. Reimporting identical content reports a duplicate;
+a different pack using an existing ID is saved under a new safe ID.
+
+Manual fallback: choose **打开主题文件夹**, or open
+`~/Library/Application Support/CodexDreamSkinStudio/themes/`, then move in the
+complete extracted directory whose immediate children are `theme.json` and the
+referenced image. Reopen the menu afterward. Do not add another wrapper folder;
+manual placement bypasses archive checks, so use trusted content only.
+
 ## Image guidelines
 
 - PNG / JPEG / HEIC / TIFF / WebP (macOS readable)
@@ -156,10 +184,11 @@ Theme metadata is optional. The defaults are deliberately adaptive:
 - `art.safeArea`: `auto`, `left`, `right`, `center`, or `none`. Automatic mode
   finds the lower-information side so native home content does not cover the
   subject. Use `none` when the artwork should fill the composition evenly.
-- `art.taskMode`: `auto`, `ambient`, `banner`, or `off`. Ultra-wide art
+- `art.taskMode`: `auto`, `ambient`, `banner`, `full`, or `off`. Ultra-wide art
   automatically uses a full-width task banner with a vertical fade; standard
-  art uses a quieter ambient layer. `off` removes the task-page artwork while
-  leaving the rest of the theme active.
+  art uses a quieter ambient layer. `full` keeps the artwork at normal strength
+  with only the baseline readability veil; `off` removes the task-page artwork
+  while leaving the rest of the theme active.
 
 The image-derived palette is used unless a theme explicitly supplies color
 fields. Explicit art metadata (`focusX`, `focusY`, `safeArea`, `taskMode`) has

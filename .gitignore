@@ -13,6 +13,7 @@ runtime/*
 !runtime/
 !runtime/dream-skin.css
 !runtime/renderer-inject.js
+!runtime/theme-package-validator.mjs
 
 # local agent context
 AGENTS.md

@@ -160,7 +160,7 @@ if [ -d "$THEMES_ROOT" ]; then
     [ -d "$dir" ] || continue
     [ -f "$dir/theme.json" ] || continue
     tid="$(/usr/bin/basename "$dir")"
-    case "$tid" in *[!A-Za-z0-9_-]*|'') continue ;; esac
+    case "$tid" in ''|.*|*[!A-Za-z0-9._-]*) continue ;; esac
     [ "${#tid}" -le 80 ] || continue
     tname="$(/usr/bin/plutil -extract name raw -o - "$dir/theme.json" 2>/dev/null)"
     [ -n "$tname" ] || tname="$tid"

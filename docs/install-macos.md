@@ -22,12 +22,24 @@
 
 ## 日常使用
 
-菜单栏图标提供启动、暂停、恢复、换图和已保存主题等操作。主题状态和用户图片保存在：
+菜单栏图标提供启动、暂停、恢复、换图、导入主题 ZIP 和已保存主题等操作。主题状态和用户图片保存在：
 
 `~/Library/Application Support/CodexDreamSkinStudio`
 
 引擎本身位于 `~/.codex/codex-dream-skin-studio`。它通过本机回环 CDP 工作，不修改官方 `.app`、
 `app.asar` 或代码签名。
+
+下载到 `.zip` 主题包后，选择“导入主题 ZIP…”。只接受普通 `.zip`，不接受 `.dreamskin`。正式 Studio
+包包含 `manifest.json`、`theme.json`、恰好一张 `background.webp|jpg|png`，并可选带 `theme.css`、
+`LICENSE.txt`、`manifest.sig`；这些文件可直接位于根目录或只包一层主题目录。导入器会核对平台、最低
+客户端版本以及清单中每个负载文件的大小和 SHA-256。`theme.css` 会保留但当前不会执行，预留签名
+当前不验证。也兼容仅含 `theme.json` 与其引用图片的本地两文件简化包，但该格式应只用于可信内容。
+导入只加入主题库，不会自动应用。ZIP 最大 32 MiB、最多 32 个条目、解压后最多 64 MiB；链接、路径
+穿越、嵌套压缩包及不符合主题/图片约束的内容会在写入前被拒绝。
+
+手动方式：从菜单选择“打开主题文件夹”，把已经解压且直接包含 `theme.json` 与背景图的完整目录放入
+`~/Library/Application Support/CodexDreamSkinStudio/themes/`，再重新打开菜单。不要只移动图片，
+也不要让目录里再套一层主题目录。手动目录不经过 ZIP 导入器的归档校验，请只移动可信内容。
 
 ## 手动更新
 

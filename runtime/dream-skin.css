@@ -42,6 +42,9 @@
     rgb(var(--ds-bg-rgb) / .18) 32%,
     rgb(var(--ds-bg-rgb) / .76) 68%,
     rgb(var(--ds-bg-rgb) / 1) 100%);
+  --ds-task-full-veil: linear-gradient(
+    rgb(var(--ds-bg-rgb) / .10),
+    rgb(var(--ds-bg-rgb) / .10));
   --ds-immersive-edge: rgb(var(--ds-bg-rgb) / .40);
   --ds-immersive-mid: rgb(var(--ds-bg-rgb) / .26);
   --ds-immersive-far: rgb(var(--ds-bg-rgb) / .16);
@@ -89,6 +92,9 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
     rgb(var(--ds-bg-rgb) / .22) 34%,
     rgb(var(--ds-bg-rgb) / .78) 70%,
     rgb(var(--ds-bg-rgb) / 1) 100%);
+  --ds-task-full-veil: linear-gradient(
+    rgb(var(--ds-panel-rgb) / .10),
+    rgb(var(--ds-panel-rgb) / .10));
   --ds-immersive-edge: rgb(var(--ds-panel-rgb) / .44);
   --ds-immersive-mid: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-far: rgb(var(--ds-panel-rgb) / .14);
@@ -318,6 +324,19 @@ html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-
   background-size: 100% 100%, 100% 100%, cover;
 }
 
+/* Studio's full mode keeps the task artwork at normal strength with only the
+   baseline readability veil. Ambient mode deliberately uses the heavier task
+   fade/shade below, while off removes the artwork entirely. */
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))::before {
+  inset: 0;
+  height: auto;
+  background-image: var(--ds-task-full-veil), var(--dream-skin-art);
+  background-position: center, var(--ds-art-position);
+  background-size: 100% 100%, cover;
+  opacity: 1;
+}
+
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
   __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))::before {
   inset: 0;
@@ -330,6 +349,46 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
   background-size: cover !important;
   background-repeat: no-repeat !important;
   background-attachment: fixed !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)) body {
+  background-image: var(--dream-skin-art) !important;
+  background-position: var(--ds-art-position) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_LEFT_PANEL__ {
+  background: linear-gradient(90deg,
+    var(--ds-immersive-sidebar),
+    var(--ds-immersive-edge) 100%) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_LEFT_PANEL__::after {
+  background: transparent !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) {
+  background: linear-gradient(90deg,
+    var(--ds-immersive-edge),
+    var(--ds-immersive-mid) 64%,
+    var(--ds-immersive-far)) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))::before {
+  content: none;
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))

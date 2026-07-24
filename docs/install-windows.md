@@ -34,11 +34,23 @@ Node.js 或执行 PowerShell 脚本。
 
 ## 日常使用
 
-使用“Codex Dream Skin”快捷方式启动，使用托盘菜单换图、保存主题、暂停或恢复。主题和运行状态
+使用“Codex Dream Skin”快捷方式启动，使用托盘菜单换图、导入主题 ZIP、保存主题、暂停或恢复。主题和运行状态
 保存在 `%LOCALAPPDATA%\CodexDreamSkin`，安装目录可以更新而不会删除这些数据。
 
 安装后的快捷方式使用受限的 `RemoteSigned` 策略；普通用户不需要打开 PowerShell，也不需要手动
 运行 `.ps1` 文件。
+
+下载到 `.zip` 主题包后，选择“导入主题 ZIP…”。只接受普通 `.zip`，不接受 `.dreamskin`。正式 Studio
+包包含 `manifest.json`、`theme.json`、恰好一张 `background.webp|jpg|png`，并可选带 `theme.css`、
+`LICENSE.txt`、`manifest.sig`；这些文件可直接位于根目录或只包一层主题目录。导入器会核对平台、最低
+客户端版本以及清单中每个负载文件的大小和 SHA-256。`theme.css` 会保留但当前不会执行，预留签名
+当前不验证。也兼容仅含 `theme.json` 与其引用图片的本地两文件简化包，但该格式应只用于可信内容。
+导入只加入主题库，不会自动应用。ZIP 最大 32 MiB、最多 32 个条目、解压后最多 64 MiB；路径穿越、
+链接/reparse、嵌套压缩包、Windows 保留路径及不符合主题/图片约束的内容会在写入前被拒绝。
+
+手动方式：从托盘选择“打开主题文件夹”，把已经解压且直接包含 `theme.json` 与背景图的完整目录放入
+`%LOCALAPPDATA%\CodexDreamSkin\themes\`，再重新打开托盘菜单。不要只移动图片，也不要让目录里再套
+一层主题目录。手动目录不经过 ZIP 导入器的归档校验，请只移动可信内容。
 
 ## 手动更新
 

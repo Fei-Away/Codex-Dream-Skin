@@ -76,7 +76,7 @@ preset-<slug>/
 
 ### art 元数据
 
-`art.focusX` / `art.focusY`（`0..1`，画面主体位置）、`art.safeArea`（`auto | left | right | center | none`，低信息留白侧）、`art.taskMode`（`auto | ambient | banner | off`，任务页呈现）。显式值优先于引擎自动分析；拿不准可先不填，实测后补。
+`art.focusX` / `art.focusY`（`0..1`，画面主体位置）、`art.safeArea`（`auto | left | right | center | none`，低信息留白侧）、`art.taskMode`（`auto | ambient | banner | full | off`，任务页呈现）。显式值优先于引擎自动分析；拿不准可先不填，实测后补。
 
 ## 素材红线（务必阅读）
 

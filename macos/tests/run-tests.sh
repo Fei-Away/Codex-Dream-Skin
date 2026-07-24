@@ -140,6 +140,10 @@ fi
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
+"$NODE" "$ROOT/tests/theme-package-validator.test.mjs"
+"$NODE" "$ROOT/tests/theme-import-publish.test.mjs"
+"$NODE" "$ROOT/tests/theme-zip-snapshot.test.mjs"
+"$ROOT/tests/theme-zip-extract.test.sh"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do
