@@ -113,11 +113,15 @@ if ! /usr/bin/grep -F -q 'INSTALL_ROOT.broken' "$ROOT/scripts/install-dream-skin
 fi
 INSTALL_GUARD_LINE="$(/usr/bin/grep -n 'codex_is_running && fail "Close Codex before installation' \
   "$ROOT/scripts/install-dream-skin-macos.sh" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+INSTALL_DISCOVER_LINE="$(/usr/bin/grep -n '^discover_codex_app$' \
+  "$ROOT/scripts/install-dream-skin-macos.sh" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
 INSTALL_DEPLOY_LINE="$(/usr/bin/grep -n '^  deploy_project$' \
   "$ROOT/scripts/install-dream-skin-macos.sh" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
-if [ -z "$INSTALL_GUARD_LINE" ] || [ -z "$INSTALL_DEPLOY_LINE" ] ||
+if [ -z "$INSTALL_DISCOVER_LINE" ] || [ -z "$INSTALL_GUARD_LINE" ] ||
+   [ -z "$INSTALL_DEPLOY_LINE" ] ||
+   [ "$INSTALL_DISCOVER_LINE" -ge "$INSTALL_GUARD_LINE" ] ||
    [ "$INSTALL_GUARD_LINE" -ge "$INSTALL_DEPLOY_LINE" ]; then
-  printf 'The Codex-running guard must run before deploy_project copies any engine bytes.\n' >&2
+  printf 'App discovery and the Codex-running guard must run in order before deploy_project.\n' >&2
   exit 1
 fi
 if /usr/bin/grep -F -q \
@@ -175,6 +179,7 @@ else
 fi
 "$ROOT/tests/community-apply-transaction.test.sh"
 "$ROOT/tests/theme-zip-extract.test.sh"
+"$ROOT/tests/installer-preflight.test.sh"
 "$NODE" "$ROOT/tests/theme-config.test.mjs"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.

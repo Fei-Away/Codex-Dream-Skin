@@ -67,6 +67,7 @@ rollback_deployed_project() {
 
 DEPLOY_PREVIOUS=""
 
+discover_codex_app
 if [ "$IN_PLACE" = "false" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
   # Run the cheap precondition before any engine bytes move: aborting after
   # the copy forces a rollback of a perfectly good previous engine, and an
@@ -87,7 +88,6 @@ if [ "$IN_PLACE" = "false" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
   fi
 fi
 
-discover_codex_app
 require_macos_runtime
 ensure_state_root
 codex_is_running && fail "Close Codex before installation so config.toml cannot be rewritten while the app is saving it."
