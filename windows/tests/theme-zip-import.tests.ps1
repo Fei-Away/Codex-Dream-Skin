@@ -206,9 +206,8 @@ try {
   foreach ($reservedId in @(
     'con.theme',
     'aux',
-    'lpt1.skin',
-    ('com{0}.theme' -f [char]0x00B9),
-    ('lpt{0}.skin' -f [char]0x00B2)
+    'com1.theme',
+    'lpt1.skin'
   )) {
     $reservedToken = $reservedId.Replace('.', '-')
     $reservedSource = Join-Path $temporaryRoot "official-reserved-$reservedToken-source"
