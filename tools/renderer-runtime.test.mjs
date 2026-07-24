@@ -202,6 +202,9 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
   assert.match(css, /content:\s*var\(--dream-skin-status/);
   assert.match(css, /content:\s*var\(--dream-skin-quote/);
+  assert.match(css, /--ds-task-full-veil/);
+  assert.match(css, /data-dream-task-mode="full"/);
+  assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   // Every home/project selector must stay behind the root skin gate.  A
   // marker-class-to-:has() conversion must never leave native layout rules
   // active after pause/restore.
@@ -224,6 +227,63 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(state.metrics.layoutReads, 0, "Runtime must not perform layout reads");
   assert.equal(home.rootClasses.writes.length, 0, "Runtime must not write classes");
   assert.ok(home.observers.every((observer) => !observer.options?.childList && !observer.options?.subtree));
+
+  const full = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);
+  assert.equal(full.attrs.get("data-dream-task-mode"), "full");
+  assert.equal(full.attrs.get("data-dream-art-task-mode"), "full");
+
+  const explicitColors = {
+    background: "#abc",
+    panel: "#abcd",
+    panelAlt: "#11223344",
+    accent: "#010203",
+    accentAlt: "rgba(4, 5, 6, .5)",
+    secondary: "rgb(999, 2, 3)",
+    highlight: "#abcdef",
+    text: "#000",
+    muted: "#fff8",
+    line: "rgba(7, 8, 9, .25)",
+  };
+  const explicitLight = makeFixture({ nativeAppearance: "light" });
+  vm.runInNewContext(explicitLight.payloadFor({
+    appearance: "auto",
+    colorMode: "explicit",
+    explicitColorKeys: Object.keys(explicitColors),
+    colors: explicitColors,
+  }), explicitLight.context);
+  const renderedColors = {
+    background: "--ds-bg",
+    panel: "--ds-panel",
+    panelAlt: "--ds-panel-2",
+    accent: "--ds-green",
+    accentAlt: "--ds-lime",
+    secondary: "--ds-cyan",
+    highlight: "--ds-purple",
+    text: "--ds-text",
+    muted: "--ds-muted",
+    line: "--ds-line",
+  };
+  for (const [key, variable] of Object.entries(renderedColors)) {
+    assert.equal(explicitLight.rootStyle.values.get(variable), explicitColors[key],
+      `Light auto appearance must preserve explicit ${key}`);
+  }
+  const renderedRgb = {
+    "--ds-bg-rgb": "170 187 204",
+    "--ds-panel-rgb": "170 187 204",
+    "--ds-panel-2-rgb": "17 34 51",
+    "--ds-accent-rgb": "1 2 3",
+    "--ds-accent-alt-rgb": "4 5 6",
+    "--ds-secondary-rgb": "255 2 3",
+    "--ds-highlight-rgb": "171 205 239",
+    "--ds-text-rgb": "0 0 0",
+    "--ds-muted-rgb": "255 255 255",
+    "--ds-line-rgb": "7 8 9",
+  };
+  for (const [variable, expected] of Object.entries(renderedRgb)) {
+    assert.equal(explicitLight.rootStyle.values.get(variable), expected,
+      `${variable} must support official hex forms and clamp RGB channels`);
+  }
 
   const observer = home.observers[0];
   observer.callback([]);

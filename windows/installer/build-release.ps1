@@ -393,6 +393,7 @@ try {
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
     'assets\selectors.json',
+    'assets\theme-package-validator.mjs',
     'assets\theme.json',
     'assets\codex-dream-skin.ico',
     'presets\preset-gothic-void-crusade\background.jpg',

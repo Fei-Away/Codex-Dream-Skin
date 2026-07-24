@@ -81,11 +81,24 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-d
 打开 `Codex Dream Skin - Tray` 后可以：
 
 - 更换 PNG、JPEG 或 WebP 背景图。
+- 导入普通 `.zip` 主题包到“已保存主题”（不支持 `.dreamskin`）。
 - 保存当前主题并从「已保存主题」切换。
 - 暂停或继续显示皮肤。
 - 重新应用主题，或完整恢复 Codex。
 
 导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。图片上限为 16 MB；宽或高不能超过 16384 像素，总像素不能超过 5000 万。
+
+正式 Studio ZIP 应包含 `manifest.json`、`theme.json`、恰好一张 `background.webp|jpg|png`，并可选
+带 `theme.css`、`LICENSE.txt`、`manifest.sig`；文件直接位于根目录或只包一层主题目录。也接受仅含
+`theme.json` 与其引用图片的本地两文件简化包，但该格式应只用于可信内容。压缩文件上限 32 MiB、最多
+32 个条目、解压后最多 64 MiB；路径穿越、链接/reparse、嵌套压缩包和未注册文件会被拒绝。正式包还会
+核对平台、最低客户端版本及清单中每个负载文件的大小与 SHA-256。`theme.css` 会保留但当前不会执行；
+预留签名当前不验证。导入只加入主题库，不会改动当前主题；重复内容不会再次写入，同 ID 的不同包会
+保存为新的安全 ID。
+
+也可从托盘选择“打开主题文件夹”，手动把已解压、且直接包含 `theme.json` 与背景图的完整目录移动到
+`%LOCALAPPDATA%\CodexDreamSkin\themes\`。重新打开托盘菜单后即可看到；不要再套一层目录。手动目录
+不会经过 ZIP 导入器的归档校验，请只移动可信内容。
 
 ## 恢复与卸载快捷方式
 

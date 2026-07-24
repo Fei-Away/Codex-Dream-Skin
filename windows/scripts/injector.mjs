@@ -3,6 +3,10 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readImageMetadata } from "./image-metadata.mjs";
+import {
+  normalizeThemeColor,
+  normalizeThemeText,
+} from "../assets/theme-package-validator.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
@@ -432,7 +436,7 @@ async function connectBrowserIdentityAnchor(port, expectedBrowserId) {
 const THEME_CHOICES = {
   appearance: new Set(["auto", "light", "dark"]),
   safeArea: new Set(["auto", "left", "right", "center", "none"]),
-  taskMode: new Set(["auto", "ambient", "banner", "off"]),
+  taskMode: new Set(["auto", "ambient", "banner", "full", "off"]),
 };
 
 function normalizedUnit(value, name) {
@@ -458,7 +462,7 @@ function normalizedText(value, name, fallback, maxLength = 120) {
   return value;
 }
 
-async function loadTheme(themeDir) {
+export async function loadTheme(themeDir) {
   const realThemeDir = await fs.realpath(themeDir);
   const themePath = path.join(realThemeDir, "theme.json");
   const themeText = await fs.readFile(themePath, "utf8");
@@ -491,46 +495,32 @@ async function loadTheme(themeDir) {
     "background", "panel", "panelAlt", "accent", "accentAlt", "secondary",
     "highlight", "text", "muted", "line",
   ];
-  const color = (value, fallback) => {
-    if (typeof value !== "string") return fallback;
-    const normalized = value.trim();
-    return /^#[0-9a-f]{6}$/i.test(normalized) || /^rgba?\([0-9., %]+\)$/i.test(normalized)
-      ? normalized : fallback;
-  };
-  const themeField = (value, fallback, max, name) => {
-    if (value === undefined) return fallback;
-    if (typeof value !== "string" || value.length > max ||
-      /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) {
-      throw new Error(`${themePath} has an invalid ${name} field`);
-    }
-    return value.trim() || fallback;
-  };
   const paletteAccent = typeof palette.accent === "string" && palette.accent.trim()
     ? palette.accent.trim() : "";
   if (paletteAccent && !/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(paletteAccent)) {
     throw new Error("palette.accent is not a supported CSS color");
   }
   const colors = {
-    background: color(rawColors?.background, "#071116"),
-    panel: color(rawColors?.panel, "#0b1a20"),
-    panelAlt: color(rawColors?.panelAlt, "#10272c"),
-    accent: color(rawColors?.accent, color(paletteAccent, "#7cff46")),
-    accentAlt: color(rawColors?.accentAlt, "#b8ff3d"),
-    secondary: color(rawColors?.secondary, "#36d7e8"),
-    highlight: color(rawColors?.highlight, "#642a8c"),
-    text: color(rawColors?.text, "#e9fff1"),
-    muted: color(rawColors?.muted, "#9ebdb3"),
-    line: color(rawColors?.line, "rgba(124, 255, 70, .28)"),
+    background: normalizeThemeColor(rawColors?.background, "#071116"),
+    panel: normalizeThemeColor(rawColors?.panel, "#0b1a20"),
+    panelAlt: normalizeThemeColor(rawColors?.panelAlt, "#10272c"),
+    accent: normalizeThemeColor(rawColors?.accent, normalizeThemeColor(paletteAccent, "#7cff46")),
+    accentAlt: normalizeThemeColor(rawColors?.accentAlt, "#b8ff3d"),
+    secondary: normalizeThemeColor(rawColors?.secondary, "#36d7e8"),
+    highlight: normalizeThemeColor(rawColors?.highlight, "#642a8c"),
+    text: normalizeThemeColor(rawColors?.text, "#e9fff1"),
+    muted: normalizeThemeColor(rawColors?.muted, "#9ebdb3"),
+    line: normalizeThemeColor(rawColors?.line, "rgba(124, 255, 70, .28)"),
   };
   const theme = {
-    id: normalizedText(raw.id, "id", "custom", 80),
-    name: normalizedText(raw.name, "name", "Codex Dream Skin", 120),
-    brandSubtitle: themeField(raw.brandSubtitle, "CODEX DREAM SKIN", 80, "brandSubtitle"),
-    tagline: themeField(raw.tagline, "Make something wonderful.", 160, "tagline"),
-    projectPrefix: themeField(raw.projectPrefix, "选择项目 · ", 80, "projectPrefix"),
-    projectLabel: themeField(raw.projectLabel, "◉  选择项目", 80, "projectLabel"),
-    statusText: themeField(raw.statusText, "DREAM SKIN ONLINE", 80, "statusText"),
-    quote: themeField(raw.quote, "MAKE SOMETHING WONDERFUL", 80, "quote"),
+    id: normalizeThemeText(raw.id, "custom", 80, "id", themePath),
+    name: normalizeThemeText(raw.name, "Codex Dream Skin", 80, "name", themePath),
+    brandSubtitle: normalizeThemeText(raw.brandSubtitle, "CODEX DREAM SKIN", 120, "brandSubtitle", themePath),
+    tagline: normalizeThemeText(raw.tagline, "Make something wonderful.", 120, "tagline", themePath),
+    projectPrefix: normalizeThemeText(raw.projectPrefix, "选择项目 · ", 120, "projectPrefix", themePath),
+    projectLabel: normalizeThemeText(raw.projectLabel, "◉  选择项目", 120, "projectLabel", themePath),
+    statusText: normalizeThemeText(raw.statusText, "DREAM SKIN ONLINE", 120, "statusText", themePath),
+    quote: normalizeThemeText(raw.quote, "MAKE SOMETHING WONDERFUL", 120, "quote", themePath),
     image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
     art: {

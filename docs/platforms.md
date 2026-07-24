@@ -47,6 +47,8 @@ Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Cod
 | 实机 verify / 截图 | ✅ | ✅ |
 | 用户选图定制 | ✅ | ✅（系统托盘「更换背景图」） |
 | 本地主题保存 / 切换 | ✅（菜单栏） | ✅（系统托盘） |
+| 普通 `.zip` 主题导入 | ✅（菜单栏） | ✅（系统托盘） |
+| Gallery / 在线 Studio 入口 | ✅（菜单栏） | ✅（系统托盘） |
 | 官方签名校验 | ✅ | Store 签名类型 + 包身份 |
 | 客户部署提示词 | ✅ | ❌（可用 Mac 文案改写） |
 | 旧版离线 ZIP | ✅ `build-client-release.sh` | 不再建议手动压缩源码 |
@@ -70,7 +72,7 @@ Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Cod
 - `appearance`：`auto | light | dark`。`auto` 跟随 Codex/ChatGPT 与系统外观；`light` / `dark` 为显式覆盖。图像亮度只参与配色和构图，不会反向覆盖用户选择的外观。
 - `art.focusX` / `art.focusY`：`0..1` 的归一化焦点坐标（左/上为 `0`，右/下为 `1`）。用于控制背景定位，超出范围的值会被拒绝或限制。
 - `art.safeArea`：`auto | left | right | center | none`。`auto` 根据左右信息量推断适合放置原生首页内容的一侧；其余值显式指定安全区，`none` 表示不保留安全区。
-- `art.taskMode`：`auto | ambient | banner | off`。`auto` 对超宽图使用横幅/纵向渐隐，对普通比例图使用低噪环境背景；`off` 在任务页关闭背景图。
+- `art.taskMode`：`auto | ambient | banner | full | off`。`auto` 对超宽图使用横幅/纵向渐隐，对普通比例图使用低噪环境背景；`full` 保留完整画面并仅叠加基础可读性遮罩；`off` 在任务页关闭背景图。
 
 显式的 `appearance` 优先于 Codex/ChatGPT 外观；焦点、安全区和任务模式的显式值优先于图像分析。首页保留更完整的主视觉和原生控件，任务页默认降低背景干扰以保证代码、消息和输入框可读。
 
@@ -79,6 +81,14 @@ Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Cod
 - macOS 的选图脚本会把这些字段写入主题库，可通过 `--appearance`、`--focus-x`、`--focus-y`、`--safe-area`、`--task-mode` 设置。
 - Windows 安装会把运行所需的 `assets/`、`presets/`、`scripts/` 与可选内置运行时原子复制到 `%LOCALAPPDATA%\CodexDreamSkin\engine`，所有快捷方式均指向该受管副本，因此安装后可移动或删除源码目录。源码安装会保留「桥本有菜」与 Gothic Void Crusade 两个本地参考主题；公开 Setup.exe 只使用已确认可分发的 Gothic Void Crusade 作为首次默认和可切换主题。系统托盘支持更换背景、保存当前主题、从「已保存主题」切换、暂停和恢复；图片与 `theme.json` 保存在主题仓库中，不写进 Codex 的 `config.toml`。安装会保留用户已有的 `appearanceTheme`；仅在识别到旧版精确托管的浅色三元组时按备份迁移。
 - Windows 渲染器仍支持在注入前用 `window.__CODEX_DREAM_SKIN_CONFIG__` 提供内存级可选覆盖（形状同上，颜色覆盖使用 `palette.accent`），但普通用户应优先使用持久化主题仓库与托盘。
+
+### 主题 ZIP 与手动目录
+
+- 两端只接受普通 `.zip`，明确不兼容 `.dreamskin` 后缀。正式 Studio 包包含 `manifest.json`、`theme.json`、恰好一张 `background.webp|jpg|png`，并可选带 `theme.css`、`LICENSE.txt`、`manifest.sig`；文件位于 ZIP 根目录或唯一一层顶级主题目录。仅供本机可信工作流使用的简化格式必须恰好包含 `theme.json` 与其引用图片。
+- 导入前限制为 32 MiB 压缩文件、32 个条目和 64 MiB 解压总量，并拒绝路径穿越、链接/reparse、嵌套压缩包、未注册负载以及未通过主题/图片校验的内容。正式包还会核对平台、最低客户端版本及清单中每个负载文件的大小与 SHA-256。
+- `theme.css` 会随主题保留但当前不执行，并在导入结果中提示；`manifest.sig` 是预留文件，当前不验证签名也不写入主题库。`LICENSE.txt` 随主题保留。
+- 导入目标始终是 saved themes；不会自动覆盖或应用 active / last-known-good。完全相同的内容返回重复结果，同 ID 的不同主题自动保存到新的安全目录。
+- 手动解压时，把直接包含 `theme.json` 与背景图的完整目录放到 macOS `~/Library/Application Support/CodexDreamSkinStudio/themes/` 或 Windows `%LOCALAPPDATA%\CodexDreamSkin\themes\`。两端控制菜单均提供“打开主题文件夹”；该路径绕过归档校验，只应用于可信内容。
 
 ## 预设与图片类型
 

@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     "assets/dream-skin.css",
     "assets/portal-hero.png",
     "assets/renderer-inject.js",
+    "assets/theme-package-validator.mjs",
     "assets/theme.json",
     "presets/preset-gothic-void-crusade/background.jpg",
     "presets/preset-gothic-void-crusade/theme.json",
@@ -30,12 +31,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     "scripts/common-macos.sh",
     "scripts/customize-theme-macos.sh",
     "scripts/doctor-macos.sh",
+    "scripts/extract-theme-zip-macos.sh",
     "scripts/image-metadata.mjs",
+    "scripts/import-theme-zip-macos.sh",
     "scripts/injector.mjs",
     "scripts/install-dream-skin-macos.sh",
     "scripts/load-image-theme-macos.sh",
     "scripts/pause-dream-skin-macos.sh",
+    "scripts/publish-theme-import.mjs",
     "scripts/restore-dream-skin-macos.sh",
+    "scripts/snapshot-theme-zip.mjs",
     "scripts/stage-theme.mjs",
     "scripts/start-dream-skin-macos.sh",
     "scripts/status-dream-skin-macos.sh",
@@ -192,11 +197,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
     addActionItem("换一张背景图…", action: #selector(chooseBackgroundImage), enabled: !busy)
+    addActionItem("导入主题 ZIP…", action: #selector(chooseThemeArchive), enabled: !busy)
     addSavedThemesMenu(enabled: !busy)
+    addActionItem("打开主题文件夹", action: #selector(openThemesFolder))
     addActionItem("打开图片文件夹", action: #selector(openImagesFolder))
 
     menu.addItem(.separator())
     addActionItem("检查更新…", action: #selector(checkForUpdates), enabled: !operationInFlight)
+    addActionItem("主题库 Gallery", action: #selector(openThemeGallery))
+    addActionItem("在线 Studio", action: #selector(openOnlineStudio))
     addActionItem("打开 DreamSkin.cc", action: #selector(openDreamSkinWebsite))
     let loginItem = addActionItem("登录时启动", action: #selector(toggleLoginItem))
     loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -282,7 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var rejected: [String: Int] = [:]
     let options: [ThemeOption] = entries.compactMap { directory in
       let id = directory.lastPathComponent
-      guard id.range(of: #"^[A-Za-z0-9_-]{1,80}$"#, options: .regularExpression) != nil else {
+      guard id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#, options: .regularExpression) != nil else {
         rejected["name", default: 0] += 1
         return nil
       }
@@ -387,9 +396,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
   }
 
+  @objc private func chooseThemeArchive() {
+    let panel = NSOpenPanel()
+    panel.title = "选择 Dream Skin 主题 ZIP"
+    panel.prompt = "导入"
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowsMultipleSelection = false
+    panel.allowedContentTypes = [.zip]
+    activateForUserInteraction()
+    guard panel.runModal() == .OK, let archiveURL = panel.url else { return }
+    importThemeArchive(archiveURL)
+  }
+
+  private func importThemeArchive(_ archiveURL: URL) {
+    guard !operationInFlight, !snapshot.busy else { return }
+    guard let script = installedScript(named: "import-theme-zip-macos.sh") else {
+      showError(title: "引擎尚未安装", message: "请先选择“安装 / 升级引擎”，再导入主题。")
+      return
+    }
+    operationInFlight = true
+    rebuildMenu()
+    ScriptRunner.run(script: script, arguments: ["--file", archiveURL.path]) { [weak self] result in
+      guard let self else { return }
+      self.operationInFlight = false
+      self.refreshStatus()
+      self.rebuildMenu()
+      guard result.succeeded,
+            let data = result.output.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let value = object as? [String: Any],
+            let status = value["status"] as? String,
+            let rawName = value["name"] as? String,
+            let rawID = value["id"] as? String else {
+        self.showError(
+          title: "导入主题失败",
+          message: self.conciseOutput(result.output, fallback: "主题 ZIP 未通过安全或内容校验。")
+        )
+        return
+      }
+      let name = self.cleanMenuText(rawName)
+      let id = self.cleanMenuText(rawID)
+      let cssIgnored = value["cssIgnored"] as? Bool ?? false
+      let signatureIgnored = value["signatureIgnored"] as? Bool ?? false
+      if status == "duplicate" {
+        var details = "“\(name)”与已保存主题完全相同，没有重复写入。"
+        if cssIgnored {
+          details += "\n包内 theme.css 已校验；当前客户端不会执行自定义 CSS。"
+        }
+        if signatureIgnored {
+          details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
+        }
+        self.showInfo(
+          title: "主题已经存在",
+          message: details
+        )
+        return
+      }
+      let renamed = value["renamed"] as? Bool ?? false
+      let nameCollision = value["nameCollision"] as? Bool ?? false
+      var details = "已把“\(name)”加入“已保存的主题”，当前正在使用的主题没有改变。"
+      if renamed {
+        details += "\n为避免覆盖同 ID 主题，已使用新标识：\(id)。"
+      }
+      if nameCollision {
+        details += "\n主题库中已有同名主题，可在菜单中按需要选择。"
+      }
+      if cssIgnored {
+        details += "\n已保留 theme.css，但当前客户端不会执行自定义 CSS。"
+      }
+      if signatureIgnored {
+        details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
+      }
+      self.showInfo(title: "主题导入完成", message: details)
+    }
+  }
+
   @objc private func switchSavedTheme(_ sender: NSMenuItem) {
     guard let id = sender.representedObject as? String,
-          id.range(of: #"^[A-Za-z0-9_-]{1,80}$"#, options: .regularExpression) != nil else {
+          id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#, options: .regularExpression) != nil else {
       showError(title: "主题无效", message: "主题标识不符合安全规则。")
       return
     }
@@ -403,6 +488,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   @objc private func openImagesFolder() {
     ensureUserDirectories()
     NSWorkspace.shared.open(imagesURL)
+  }
+
+  @objc private func openThemesFolder() {
+    ensureUserDirectories()
+    NSWorkspace.shared.open(themesURL)
   }
 
   @objc private func openCodex() {
@@ -422,6 +512,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   @objc private func openDreamSkinWebsite() {
     guard let url = URL(string: "https://dreamskin.cc") else { return }
+    NSWorkspace.shared.open(url)
+  }
+
+  @objc private func openThemeGallery() {
+    guard let url = URL(string: "https://dreamskin.cc/gallery") else { return }
+    NSWorkspace.shared.open(url)
+  }
+
+  @objc private func openOnlineStudio() {
+    guard let url = URL(string: "https://dreamskin.cc/studio") else { return }
     NSWorkspace.shared.open(url)
   }
 

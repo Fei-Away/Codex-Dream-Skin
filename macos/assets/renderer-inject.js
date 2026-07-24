@@ -100,9 +100,12 @@
 
   const parseRgb = (value) => {
     if (!value || value === "transparent") return null;
-    const hex = String(value).trim().match(/^#([0-9a-f]{6})$/i);
+    const hex = String(value).trim().match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
     if (hex) {
-      const number = Number.parseInt(hex[1], 16);
+      const rgbHex = hex[1].length <= 4
+        ? hex[1].slice(0, 3).split("").map((digit) => `${digit}${digit}`).join("")
+        : hex[1].slice(0, 6);
+      const number = Number.parseInt(rgbHex, 16);
       return { r: number >> 16, g: (number >> 8) & 255, b: number & 255 };
     }
     const m = String(value).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
@@ -114,7 +117,9 @@
 
   const rgbString = (value) => {
     const rgb = parseRgb(value);
-    return rgb ? `${Math.round(rgb.r)} ${Math.round(rgb.g)} ${Math.round(rgb.b)}` : null;
+    return rgb ? [rgb.r, rgb.g, rgb.b]
+      .map((channel) => Math.round(clamp(channel, 0, 255)))
+      .join(" ") : null;
   };
 
   const rgbToHex = ({ r, g, b }) => `#${[r, g, b]
@@ -220,7 +225,8 @@
     }
     if (typeof legacyPalette.accent === "string") explicit.add("accent");
     const adaptive = makeAdaptivePalette(artAnalysis?.accentRgb, shell);
-    const legacyLight = (THEME.appearance === undefined || THEME.appearance === "auto") && shell === "light";
+    const legacyLight = (THEME.appearance === undefined || THEME.appearance === "auto")
+      && THEME.colorMode !== "explicit" && shell === "light";
     const structural = new Set(["background", "panel", "panelAlt", "text", "muted"]);
     const pick = (name) => {
       const allowExplicit = explicit.has(name) && !(legacyLight && structural.has(name));

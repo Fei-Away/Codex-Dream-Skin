@@ -1288,6 +1288,7 @@ try {
     }
   }
   $node = Get-DreamSkinNodeRuntime
+  & (Join-Path $PSScriptRoot 'theme-zip-import.tests.ps1') -Root $Root
   $projectRoot = Split-Path -Parent $Root
   $syncToolPath = Join-Path $projectRoot 'tools\sync-runtime-assets.mjs'
   $syncToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($syncToolPath, '--check')
@@ -1309,6 +1310,10 @@ try {
     '[System.IO.FileAttributes]::ReparsePoint',
     'Ensure-DreamSkinManagedDirectory',
     'Get-DreamSkinValidatedImageMetadata',
+    '[System.IO.Compression.ZipArchive]',
+    'Only ordinary .zip theme packages are supported',
+    'Theme ZIP exceeds the 64 MB expanded-size limit',
+    'theme-package-validator.mjs',
     '16384px / 50MP safety limit',
     'Assert-DreamSkinImageFile -Path $temporary',
     'Assert-DreamSkinImageFile -Path $imageArchive'
