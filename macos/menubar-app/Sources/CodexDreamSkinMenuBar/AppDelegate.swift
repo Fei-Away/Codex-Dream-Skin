@@ -813,6 +813,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       )
       return
     }
+    reactivateCodexBeforeTransaction()
     updateCommunityStage("正在保存当前主题、应用新主题并验证渲染…")
     ScriptRunner.run(
       script: transactionScript,
@@ -1281,6 +1282,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   private func activateForUserInteraction() {
     NSApp.activate(ignoringOtherApps: true)
+  }
+
+  /// DreamSkin is an LSUIElement with no Dock icon or regular window, so
+  /// macOS does not automatically return focus to Codex once this app's own
+  /// alert closes. Without this, `document.visibilityState` in the Codex
+  /// renderer stays "hidden" for the confirm dialog's caller, so the
+  /// rollback-snapshot verification in captureActiveThemeThenApplyImported
+  /// spuriously fails and cancels every community apply even though the
+  /// visible theme content is correct.
+  private func reactivateCodexBeforeTransaction() {
+    NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex")
+      .first?.activate(options: [.activateIgnoringOtherApps])
   }
 
   private func showInfo(title: String, message: String) {
