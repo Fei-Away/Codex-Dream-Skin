@@ -196,15 +196,29 @@ export function classifyNativeWindowError(error) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   const cdpCode = Number(error?.cdpCode);
   const withoutCode = message.replace(/\s*\(-?\d+\)\s*$/, "").trim();
-  const unsupported = cdpCode === -32601
+  const domainUnsupported = cdpCode === -32601
     || /\(-32601\)\s*$/.test(message)
     || /^method(?: ['"]Browser\.getWindowForTarget['"])? not found$/i.test(withoutCode)
     || /^['"]?Browser\.getWindowForTarget['"]? (?:wasn't|was not) found$/i.test(withoutCode);
+  // Codex 26.721.x (Chrome/150) returns "Browser window not found" (-32000)
+  // for the app's real, focused, on-screen window -- verified live via CDP:
+  // the error stays identical before and after actually activating the
+  // window, while documentVisibility correctly flips hidden -> visible. The
+  // domain is implemented but this build never resolves a window for our
+  // target, so -32000 is exactly as uninformative here as -32601 elsewhere;
+  // treat it the same way and lean on documentVisible (still required by
+  // windowPass) as the real visibility signal. See #256.
+  const windowNotFound = cdpCode === -32000
+    || /\(-32000\)\s*$/.test(message)
+    || /^browser window not found$/i.test(withoutCode);
+  const unsupported = domainUnsupported || windowNotFound;
   return {
     status: unsupported ? "unsupported" : "not-ready",
     windowId: null,
     bounds: null,
-    reason: unsupported ? "browser-window-domain-unsupported" : "native-window-unavailable",
+    reason: domainUnsupported ? "browser-window-domain-unsupported"
+      : windowNotFound ? "browser-window-not-found"
+      : "native-window-unavailable",
   };
 }
 

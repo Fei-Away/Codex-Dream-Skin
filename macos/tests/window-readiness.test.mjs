@@ -84,12 +84,26 @@ assert.equal(
   "A hidden renderer must not verify even when CDP still reports window bounds.",
 );
 
-const windowMissing = classifyNativeWindowError(new Error("window not found (-32000)"));
-assert.equal(windowMissing.status, "not-ready");
-assert.equal(assessRendererVerification(baseRenderer, windowMissing, exactPayload).pass, false);
+// Codex 26.721.x (Chrome/150) returns -32000 "Browser window not found" for
+// the app's real, focused, on-screen window (confirmed live via CDP: the
+// error is identical before and after actually activating the window, while
+// documentVisibility correctly flips hidden -> visible). -32000 is treated
+// like the unsupported-domain case: fall back to documentVisible, which
+// stays a hard requirement below. See #256.
+const windowNotFound = classifyNativeWindowError(new Error("window not found (-32000)"));
+assert.equal(windowNotFound.status, "unsupported");
+assert.equal(assessRendererVerification(baseRenderer, windowNotFound, exactPayload).pass, true);
 assert.equal(
   classifyNativeWindowError(new Error("Method target window not found (-32000)")).status,
-  "not-ready",
+  "unsupported",
+);
+const windowNotFoundByCode = new Error("Browser window not found");
+windowNotFoundByCode.cdpCode = -32000;
+assert.equal(classifyNativeWindowError(windowNotFoundByCode).status, "unsupported");
+assert.equal(
+  assessRendererVerification(hiddenRenderer, windowNotFound, exactPayload).pass,
+  false,
+  "Even when Browser.getWindowForTarget is unusable (-32000), a hidden document must still fail verification.",
 );
 
 const unsupported = classifyNativeWindowError(new Error("'Browser.getWindowForTarget' wasn't found (-32601)"));
