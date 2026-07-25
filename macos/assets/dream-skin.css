@@ -636,6 +636,47 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > di
   padding-bottom: 0 !important;
 }
 
+/* Codex 26.721+: home-route's first child now only wraps the (usually empty)
+   native .home-banners slot; the real content column moved out to become
+   this wrapper's sibling instead of its descendant. The two rules above
+   still assume the old nesting and force this now-mostly-empty wrapper to
+   100% height / 440px, which pushes the real sibling content off-screen
+   (see #244). Override with higher specificity only when that new slot is
+   present, so pre-26.721 layouts are untouched. */
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) {
+  min-height: 0 !important;
+  padding-top: 0 !important;
+}
+
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners {
+  flex: 0 1 auto !important;
+  min-height: 0 !important;
+}
+
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child {
+  height: auto !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child::before {
+  content: none !important;
+}
+
+/* Codex 26.721+: this chain (3-6 first-child levels deep) targets the old
+   compact hero-art card that used to live inside div:first-child's second
+   level. That level is now the empty .home-banners slot (see #244), so on
+   the new DOM these rules currently match nothing and the compact hero card
+   is dormant rather than misrendered. Left as-is pending a real fixture of
+   the new nested shape; the critical content-invisible bug is the block
+   above this one. */
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child {
   position: relative !important;
   isolation: isolate;

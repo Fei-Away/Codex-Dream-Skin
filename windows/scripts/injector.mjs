@@ -1111,6 +1111,24 @@ export async function verifySession(
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
     const fallback = runtime?.styleMode === 'style' &&
       document.getElementById('codex-dream-skin-style') === runtime.styleNode;
+    // Codex 26.721+ moved the real home content out of home.firstElementChild's
+    // descendant chain: that wrapper now only holds the (usually empty) native
+    // .home-banners slot, and the actual content became its sibling instead
+    // (see #244). Prefer a sibling of the banner-holding wrapper when present;
+    // fall back to the pre-26.721 first-child chain (deepest visible node)
+    // otherwise, so older Codex builds keep working unchanged.
+    const homeChildren = home?.children ? Array.from(home.children) : [];
+    const bannerHolder = homeChildren.find((el) => el.querySelector(${selectorLiteral("home-banners")}));
+    const siblingCandidates = homeChildren.filter((el) => el !== bannerHolder).map(box);
+    const heroChain = [];
+    for (let node = home?.firstElementChild ?? null; node && heroChain.length < 3;
+      node = node.firstElementChild) heroChain.push(node);
+    const boxableChain = heroChain.filter((node) => typeof node?.getBoundingClientRect === "function");
+    const chainCandidates = boxableChain.map(box);
+    const hero = siblingCandidates.find((item) => item?.visible && item.width >= 280 && item.height >= 120)
+      ?? chainCandidates.findLast((item) => item?.visible)
+      ?? siblingCandidates.find((item) => item?.visible)
+      ?? box(boxableChain[boxableChain.length - 1]);
     const result = {
       installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
       version: runtime?.version ?? null,
@@ -1127,7 +1145,7 @@ export async function verifySession(
       suggestionsPresent: Boolean(suggestions),
       homeSurface: box(home),
       settingsAnchor: box(settingsAnchor),
-      hero: box(home?.firstElementChild?.firstElementChild?.firstElementChild),
+      hero,
       cards,
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
