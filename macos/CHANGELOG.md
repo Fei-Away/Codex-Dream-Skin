@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.4 — 2026-07-25
+
+### 修复
+
+- 修复 Codex 26.721.x（Chrome/150）上应用/校验主题永远报 `Injection verification failed` / `Initial theme verification failed` 的问题（#256）：原生窗口就绪检查调用的 CDP `Browser.getWindowForTarget` 在这个 build 上对真实、聚焦、可见的窗口也返回 `-32000 Browser window not found`。旧代码只把 `-32601`（方法不存在）当作"该信号不可用"降级信任 `documentVisible`，其余错误一律判定 not-ready，导致这个版本永远验证失败。已在真实 Codex 26.721.41059 会话上用 CDP 直连复现并验证：切换窗口前后台时 `documentVisibility` 正确地在 hidden/visible 间变化，但 `Browser.getWindowForTarget` 两次返回一模一样的 `-32000`，证明该调用在此 build 上本身失效。现在 `-32000` 与 `-32601` 同样降级为不可用信号，继续以本就是硬性要求的 `documentVisible` 作为真实可见性依据。
+
 ## 1.5.3 — 2026-07-25
 
 ### 修复
