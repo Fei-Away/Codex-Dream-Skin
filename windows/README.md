@@ -83,6 +83,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-d
 - 更换 PNG、JPEG 或 WebP 背景图。
 - 导入普通 `.zip` 主题包到“已保存主题”（不支持 `.dreamskin`）。
 - 保存当前主题并从「已保存主题」切换。
+- 打开带缩略图的主题选择器；单击卡片会应用主题，非当前主题可删除。
+- 开启 15、30、60、120 或 240 分钟自动轮换，或随时关闭。
 - 暂停或继续显示皮肤。
 - 重新应用主题，或完整恢复 Codex。
 

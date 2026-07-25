@@ -1,5 +1,8 @@
 ﻿[CmdletBinding()]
-param([int]$Port = 9335)
+param(
+  [int]$Port = 9335,
+  [switch]$AutoApply
+)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -16,6 +19,7 @@ $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
 $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
 $restoreScript = Join-Path $PSScriptRoot 'restore-dream-skin.ps1'
 $checkUpdateScript = Join-Path $PSScriptRoot 'check-update.ps1'
+$themePickerScript = Join-Path $PSScriptRoot 'theme-picker.ps1'
 $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'Codex Dream Skin.lnk'
 
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -23,6 +27,7 @@ $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
 $acquired = $false
 $notify = $null
 $trayIcon = $null
+$rotationTimer = $null
 try {
   try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
   if (-not $acquired) { exit 0 }
@@ -106,7 +111,7 @@ try {
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($startupShortcut)
     $shortcut.TargetPath = $powershell
-    $shortcut.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$PSScriptRoot\tray-dream-skin.ps1`""
+    $shortcut.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$PSScriptRoot\tray-dream-skin.ps1`" -Port $Port -AutoApply"
     $shortcut.WorkingDirectory = $SkillRoot
     $shortcut.Description = 'Start Codex Dream Skin in the notification area'
     $shortcut.Save()
@@ -233,6 +238,9 @@ try {
         $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已保存：$($saved.Theme.name)", [System.Windows.Forms.ToolTipIcon]::Info)
       }
     }
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开主题选择器…' -Action {
+      Start-DreamSkinPowerShell -Script $themePickerScript -Arguments @('-Port', "$Port")
+    }
 
     $savedMenu = [System.Windows.Forms.ToolStripMenuItem]::new('已保存主题')
     $savedThemes = @(Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata)
@@ -255,6 +263,47 @@ try {
       }
     }
     [void]$menu.Items.Add($savedMenu)
+
+    $rotation = Get-DreamSkinThemeRotationSettings -StateRoot $StateRoot
+    $rotationText = if ($rotation.Enabled) {
+      "自动轮换主题：每 $($rotation.IntervalMinutes) 分钟"
+    } else {
+      '自动轮换主题：关闭'
+    }
+    $rotationMenu = [System.Windows.Forms.ToolStripMenuItem]::new($rotationText)
+    foreach ($minutes in @(15, 30, 60, 120, 240)) {
+      $intervalAction = {
+        $null = Invoke-DreamSkinTrayThemeOperation -Action {
+          Set-DreamSkinThemeRotationSettings -Enabled $true -IntervalMinutes $minutes -StateRoot $StateRoot
+        }
+        $notify.ShowBalloonTip(
+          1800,
+          'Codex Dream Skin',
+          "自动轮换已开启：每 $minutes 分钟",
+          [System.Windows.Forms.ToolTipIcon]::Info
+        )
+      }.GetNewClosure()
+      $intervalItem = Add-DreamSkinTrayItem -Items $rotationMenu.DropDownItems `
+        -Text "每 $minutes 分钟" -Action $intervalAction
+      $intervalItem.Checked = $rotation.Enabled -and $rotation.IntervalMinutes -eq $minutes
+    }
+    [void]$rotationMenu.DropDownItems.Add([System.Windows.Forms.ToolStripSeparator]::new())
+    $null = Add-DreamSkinTrayItem -Items $rotationMenu.DropDownItems -Text '立即轮换一次' -Action {
+      $rotated = Invoke-DreamSkinTrayThemeOperation -Action {
+        Invoke-DreamSkinThemeRotation -Force -StateRoot $StateRoot
+      }
+      $message = if ($null -eq $rotated) { '没有可轮换的已保存主题。' } else { "已应用：$($rotated.Theme.name)" }
+      $notify.ShowBalloonTip(1800, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
+    }
+    $null = Add-DreamSkinTrayItem -Items $rotationMenu.DropDownItems `
+      -Text '关闭自动轮换' -Enabled $rotation.Enabled -Action {
+        $null = Invoke-DreamSkinTrayThemeOperation -Action {
+          Set-DreamSkinThemeRotationSettings -Enabled $false `
+            -IntervalMinutes $rotation.IntervalMinutes -StateRoot $StateRoot
+        }
+        $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '自动轮换已关闭。', [System.Windows.Forms.ToolTipIcon]::Info)
+      }
+    [void]$menu.Items.Add($rotationMenu)
 
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开主题文件夹' -Action {
       $themeDirectoryToken = ConvertTo-DreamSkinProcessArgument -Value $paths.Saved
@@ -305,8 +354,27 @@ try {
       Show-DreamSkinTrayError -Message $_.Exception.Message
     }
   })
+  if ($AutoApply) {
+    try {
+      Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+    } catch {
+      Write-Warning "Dream Skin auto-apply failed: $($_.Exception.Message)"
+    }
+  }
+  $rotationTimer = [System.Windows.Forms.Timer]::new()
+  $rotationTimer.Interval = 30000
+  $rotationTimer.add_Tick({
+    try { $null = Invoke-DreamSkinThemeRotation -StateRoot $StateRoot } catch {
+      Write-Warning "Dream Skin theme rotation failed: $($_.Exception.Message)"
+    }
+  })
+  $rotationTimer.Start()
   [System.Windows.Forms.Application]::Run()
 } finally {
+  if ($null -ne $rotationTimer) {
+    $rotationTimer.Stop()
+    $rotationTimer.Dispose()
+  }
   if ($null -ne $notify) { $notify.Dispose() }
   if ($null -ne $trayIcon) { $trayIcon.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }

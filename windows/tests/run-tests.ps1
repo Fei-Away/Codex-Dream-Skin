@@ -194,6 +194,7 @@ try {
     '$startScript = $engine.Start',
     '$restoreScript = $engine.Restore',
     '$trayScript = $engine.Tray',
+    '$themePickerScript = $engine.ThemePicker',
     '$shortcut.WorkingDirectory = $engine.Root',
     '$restore.WorkingDirectory = $engine.Root',
     '$tray.WorkingDirectory = $engine.Root'
@@ -221,7 +222,8 @@ try {
   if (-not (Test-Path -LiteralPath $engine.CommunityApply -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
+    -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.ThemePicker -PathType Leaf)) {
     throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
   }
   Remove-Item -LiteralPath $invalidRuntimeRoot, $runtimeStateRoot -Recurse -Force
@@ -1006,6 +1008,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\install-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\restore-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\start-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-picker.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-windows.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\tray-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\validate-safe-css-file.mjs') -Destination $releaseFixtureScripts -Force
@@ -1041,6 +1044,50 @@ try {
     throw 'Saved theme creation or discovery failed.'
   }
   $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot
+  $currentDeleteRejected = $false
+  try { $null = Remove-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot } catch {
+    $currentDeleteRejected = $true
+  }
+  if (-not $currentDeleteRejected) { throw 'The current saved theme could be deleted.' }
+  $deletableTheme = Save-DreamSkinCurrentTheme -Name '待删除主题' -StateRoot $themeStateRoot
+  $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot
+  $deletedTheme = Remove-DreamSkinSavedTheme -ThemeDirectory $deletableTheme.Directory -StateRoot $themeStateRoot
+  if ($deletedTheme.Id -cne "$($deletableTheme.Theme.id)" -or
+    (Test-Path -LiteralPath $deletableTheme.Directory)) {
+    throw 'A non-current saved theme was not deleted safely.'
+  }
+  $rotationDefaults = Get-DreamSkinThemeRotationSettings -StateRoot $themeStateRoot
+  if ($rotationDefaults.Enabled -or $rotationDefaults.IntervalMinutes -ne 30 -or
+    $rotationDefaults.LastRotatedAt -or $rotationDefaults.LastThemeId) {
+    throw 'Theme rotation defaults are not disabled with a 30-minute interval.'
+  }
+  $rotationStart = [datetime]::Parse('2026-07-20T12:00:00Z').ToUniversalTime()
+  $rotationEnabled = Set-DreamSkinThemeRotationSettings -Enabled $true -IntervalMinutes 15 `
+    -Now $rotationStart -StateRoot $themeStateRoot
+  if (-not $rotationEnabled.Enabled -or $rotationEnabled.IntervalMinutes -ne 15 -or
+    -not $rotationEnabled.LastRotatedAt) {
+    throw 'Theme rotation settings were not enabled and persisted.'
+  }
+  $notDueRotation = Invoke-DreamSkinThemeRotation -Now $rotationStart.AddMinutes(14) `
+    -StateRoot $themeStateRoot
+  if ($null -ne $notDueRotation) {
+    throw 'Theme rotation switched before its configured interval elapsed.'
+  }
+  $dueRotation = Invoke-DreamSkinThemeRotation -Now $rotationStart.AddMinutes(16) `
+    -StateRoot $themeStateRoot
+  $rotationProgress = Get-DreamSkinThemeRotationSettings -StateRoot $themeStateRoot
+  if ($null -eq $dueRotation -or $rotationProgress.LastThemeId -cne $dueRotation.Theme.id -or
+    -not $rotationProgress.LastRotatedAt) {
+    throw 'Due theme rotation did not select the next theme and persist its progress.'
+  }
+  $rotationDisabled = Set-DreamSkinThemeRotationSettings -Enabled $false -IntervalMinutes 15 `
+    -StateRoot $themeStateRoot
+  $disabledTick = Invoke-DreamSkinThemeRotation -Now $rotationStart.AddHours(2) `
+    -StateRoot $themeStateRoot
+  if ($rotationDisabled.Enabled -or $null -ne $disabledTick -or
+    (Get-DreamSkinThemeRotationSettings -StateRoot $themeStateRoot).Enabled) {
+    throw 'Disabled theme rotation still changed the active theme.'
+  }
 
   $outsideTheme = Join-Path $temporaryRoot 'outside-theme'
   New-Item -ItemType Directory -Path $outsideTheme | Out-Null
@@ -1135,7 +1182,17 @@ try {
     throw 'macOS and Windows selector contract assets are not byte-identical.'
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '继续显示皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @(
+    'System.Windows.Forms.NotifyIcon',
+    '暂停皮肤',
+    '继续显示皮肤',
+    '更换背景图',
+    '打开主题选择器',
+    '已保存主题',
+    '自动轮换主题',
+    'Invoke-DreamSkinThemeRotation',
+    '完全恢复 Codex'
+  )) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
   if (-not $traySource.Contains('Invoke-DreamSkinLiveRemove') -or
@@ -1182,9 +1239,21 @@ try {
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
   }
-  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动')) {
+  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动', '-AutoApply')) {
     if (-not $traySource.Contains($requiredReleaseAction)) {
       throw "Tray release action is missing: $requiredReleaseAction"
+    }
+  }
+  $pickerSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-picker.ps1')
+  foreach ($requiredPickerAction in @(
+    'Use-DreamSkinSavedTheme',
+    'Remove-DreamSkinSavedTheme',
+    '删除主题',
+    '✓',
+    'Start-DreamSkinPickerPowerShell'
+  )) {
+    if (-not $pickerSource.Contains($requiredPickerAction)) {
+      throw "Theme picker action is missing: $requiredPickerAction"
     }
   }
   $trayTokens = $null

@@ -311,6 +311,7 @@ function Get-DreamSkinThemePaths {
     Saved = Join-Path $fullRoot 'themes'
     Images = Join-Path $fullRoot 'images'
     PauseFile = Join-Path $fullRoot 'paused'
+    Rotation = Join-Path $fullRoot 'rotation.json'
     State = Join-Path $fullRoot 'state.json'
   }
 }
@@ -1227,6 +1228,183 @@ function Use-DreamSkinSavedTheme {
   if ($safeCssPath) { Assert-DreamSkinSafeCssFile -Path $safeCssPath }
   return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme `
     -SafeCssPath $safeCssPath -StateRoot $StateRoot
+}
+
+function Remove-DreamSkinSavedTheme {
+  param(
+    [Parameter(Mandatory = $true)][string]$ThemeDirectory,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
+  Ensure-DreamSkinManagedDirectory -Path $paths.Saved -Root $paths.Root
+  $directory = [System.IO.Path]::GetFullPath($ThemeDirectory).TrimEnd('\')
+  $savedRoot = [System.IO.Path]::GetFullPath($paths.Saved).TrimEnd('\')
+  $parent = [System.IO.Path]::GetDirectoryName($directory)
+  if (-not $parent -or
+    -not $parent.Equals($savedRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+    -not (Test-DreamSkinThemePathWithin -Path $directory -Root $savedRoot)) {
+    throw 'Only a direct child of the Dream Skin themes folder can be deleted.'
+  }
+
+  $saved = Read-DreamSkinTheme -ThemeDirectory $directory -SkipImageMetadata
+  $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata
+  if ("$($saved.Theme.id)" -ceq "$($active.Theme.id)") {
+    throw 'The current theme cannot be deleted. Apply another theme first.'
+  }
+
+  Assert-DreamSkinNoReparseComponents -Path $directory
+  Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction Stop
+  return [pscustomobject]@{
+    Id = "$($saved.Theme.id)"
+    Name = if ($saved.Theme.name) { "$($saved.Theme.name)" } else { [System.IO.Path]::GetFileName($directory) }
+    Path = $directory
+  }
+}
+
+function New-DreamSkinDefaultThemeRotationSettings {
+  return [pscustomobject]@{
+    SchemaVersion = 1
+    Enabled = $false
+    IntervalMinutes = 30
+    LastRotatedAt = ''
+    LastThemeId = ''
+  }
+}
+
+function Get-DreamSkinThemeRotationSettings {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
+  if (-not (Test-Path -LiteralPath $paths.Rotation -PathType Leaf)) {
+    return New-DreamSkinDefaultThemeRotationSettings
+  }
+  Assert-DreamSkinNoReparseComponents -Path $paths.Rotation
+  try {
+    $stored = (Read-DreamSkinUtf8File -Path $paths.Rotation) | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "Theme rotation settings are invalid JSON: $($paths.Rotation)"
+  }
+  if ($null -eq $stored -or $stored -is [string] -or $stored -is [array] -or
+    $stored.enabled -isnot [bool]) {
+    throw 'Theme rotation settings must be an object with a boolean enabled value.'
+  }
+  $intervalMinutes = 0
+  if (-not [int]::TryParse("$($stored.intervalMinutes)", [ref]$intervalMinutes) -or
+    $intervalMinutes -notin @(15, 30, 60, 120, 240)) {
+    throw 'Theme rotation interval must be 15, 30, 60, 120, or 240 minutes.'
+  }
+  $lastRotatedAt = if ($stored.lastRotatedAt -is [datetime]) {
+    ([datetime]$stored.lastRotatedAt).ToUniversalTime().ToString('o')
+  } elseif ($stored.lastRotatedAt) {
+    "$($stored.lastRotatedAt)"
+  } else {
+    ''
+  }
+  if ($lastRotatedAt) {
+    $parsedTimestamp = [datetime]::MinValue
+    if (-not [datetime]::TryParse(
+        $lastRotatedAt,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::RoundtripKind,
+        [ref]$parsedTimestamp
+      )) {
+      throw 'Theme rotation lastRotatedAt must be an ISO-8601 timestamp.'
+    }
+  }
+  return [pscustomobject]@{
+    SchemaVersion = 1
+    Enabled = [bool]$stored.enabled
+    IntervalMinutes = $intervalMinutes
+    LastRotatedAt = $lastRotatedAt
+    LastThemeId = if ($stored.lastThemeId) { "$($stored.lastThemeId)" } else { '' }
+  }
+}
+
+function Write-DreamSkinThemeRotationSettings {
+  param(
+    [Parameter(Mandatory = $true)][bool]$Enabled,
+    [Parameter(Mandatory = $true)][ValidateSet(15, 30, 60, 120, 240)][int]$IntervalMinutes,
+    [string]$LastRotatedAt = '',
+    [string]$LastThemeId = '',
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
+  Assert-DreamSkinNoReparseComponents -Path $paths.Rotation
+  $document = [ordered]@{
+    schemaVersion = 1
+    enabled = $Enabled
+    intervalMinutes = $IntervalMinutes
+    lastRotatedAt = $LastRotatedAt
+    lastThemeId = $LastThemeId
+  }
+  Write-DreamSkinUtf8FileAtomically -Path $paths.Rotation `
+    -Content (($document | ConvertTo-Json -Depth 4) + "`r`n")
+  return Get-DreamSkinThemeRotationSettings -StateRoot $StateRoot
+}
+
+function Set-DreamSkinThemeRotationSettings {
+  param(
+    [Parameter(Mandatory = $true)][bool]$Enabled,
+    [ValidateSet(15, 30, 60, 120, 240)][int]$IntervalMinutes = 30,
+    [datetime]$Now = (Get-Date),
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $current = Get-DreamSkinThemeRotationSettings -StateRoot $StateRoot
+  $lastRotatedAt = $current.LastRotatedAt
+  if ($Enabled) { $lastRotatedAt = $Now.ToUniversalTime().ToString('o') }
+  return Write-DreamSkinThemeRotationSettings -Enabled $Enabled `
+    -IntervalMinutes $IntervalMinutes -LastRotatedAt $lastRotatedAt `
+    -LastThemeId $current.LastThemeId -StateRoot $StateRoot
+}
+
+function Get-DreamSkinNextRotationTheme {
+  param(
+    [string]$ActiveThemeId,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $themes = @(Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata)
+  if ($themes.Count -eq 0) { return $null }
+  if ($themes.Count -eq 1) {
+    if ($themes[0].Id -eq $ActiveThemeId) { return $null }
+    return $themes[0]
+  }
+  $activeIndex = -1
+  for ($index = 0; $index -lt $themes.Count; $index++) {
+    if ($themes[$index].Id -eq $ActiveThemeId) { $activeIndex = $index; break }
+  }
+  if ($activeIndex -lt 0) { return $themes[0] }
+  return $themes[($activeIndex + 1) % $themes.Count]
+}
+
+function Invoke-DreamSkinThemeRotation {
+  param(
+    [switch]$Force,
+    [datetime]$Now = (Get-Date),
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  if (Test-DreamSkinPaused -StateRoot $StateRoot) { return $null }
+  $settings = Get-DreamSkinThemeRotationSettings -StateRoot $StateRoot
+  if (-not $Force -and -not $settings.Enabled) { return $null }
+  $nowUtc = $Now.ToUniversalTime()
+  if (-not $Force -and $settings.LastRotatedAt) {
+    $lastRotatedAt = [datetime]::Parse(
+      $settings.LastRotatedAt,
+      [System.Globalization.CultureInfo]::InvariantCulture,
+      [System.Globalization.DateTimeStyles]::RoundtripKind
+    ).ToUniversalTime()
+    if (($nowUtc - $lastRotatedAt).TotalMinutes -lt $settings.IntervalMinutes) { return $null }
+  }
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata
+  $nextTheme = Get-DreamSkinNextRotationTheme -ActiveThemeId "$($active.Theme.id)" -StateRoot $StateRoot
+  if ($null -eq $nextTheme) { return $null }
+  $applied = Use-DreamSkinSavedTheme -ThemeDirectory $nextTheme.Path -StateRoot $StateRoot
+  $null = Write-DreamSkinThemeRotationSettings -Enabled $settings.Enabled `
+    -IntervalMinutes $settings.IntervalMinutes -LastRotatedAt $nowUtc.ToString('o') `
+    -LastThemeId "$($applied.Theme.id)" -StateRoot $StateRoot
+  return $applied
 }
 
 function Set-DreamSkinPaused {

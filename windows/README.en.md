@@ -90,6 +90,8 @@ Open `Codex Dream Skin - Tray` to:
 - Import a PNG, JPEG, or WebP background.
 - Import an ordinary `.zip` theme pack into Saved Themes (`.dreamskin` is not supported).
 - Save the active theme and switch through saved themes.
+- Open a thumbnail theme picker. Clicking a card applies that theme, and non-active themes can be deleted.
+- Rotate saved themes every 15, 30, 60, 120, or 240 minutes, or turn rotation off at any time.
 - Pause or resume the skin.
 - Reapply the theme or fully restore Codex.
 
