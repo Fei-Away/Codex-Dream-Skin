@@ -43,6 +43,9 @@ const SKIN_VERSION = "1.5.0";
 const MAX_ART_BYTES = 10 * 1024 * 1024;
 const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
+const MIN_RENDERER_VIEWPORT_WIDTH = 320;
+const MIN_RENDERER_VIEWPORT_HEIGHT = 240;
+const VISIBLE_WINDOW_STATES = new Set(["normal", "maximized", "fullscreen"]);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
@@ -708,6 +711,56 @@ async function connectTarget(target, port) {
   return new CdpSession(target, port).open();
 }
 
+function unavailableNativeWindow(error) {
+  const detail = String(error?.message ?? "");
+  return {
+    pass: false,
+    bound: false,
+    reason: /\(-32601\)$/.test(detail)
+      ? "browser-window-api-unavailable"
+      : "target-window-unavailable",
+  };
+}
+
+export async function inspectTargetWindow(session, targetId) {
+  if (typeof targetId !== "string" || !BROWSER_ID_PATTERN.test(targetId)) {
+    return { pass: false, bound: false, reason: "invalid-target-id" };
+  }
+
+  let binding;
+  try {
+    binding = await session.send("Browser.getWindowForTarget", { targetId });
+  } catch (error) {
+    return unavailableNativeWindow(error);
+  }
+  if (!Number.isInteger(binding?.windowId) || binding.windowId <= 0) {
+    return { pass: false, bound: false, reason: "invalid-window-binding" };
+  }
+
+  let latest;
+  try {
+    latest = await session.send("Browser.getWindowBounds", { windowId: binding.windowId });
+  } catch (error) {
+    return unavailableNativeWindow(error);
+  }
+  const bounds = { ...(binding.bounds ?? {}), ...(latest?.bounds ?? {}) };
+  const state = typeof bounds.windowState === "string" ? bounds.windowState : null;
+  const width = Number.isFinite(bounds.width) ? Number(bounds.width) : null;
+  const height = Number.isFinite(bounds.height) ? Number(bounds.height) : null;
+  const statePass = VISIBLE_WINDOW_STATES.has(state);
+  const boundsPass = width !== null && height !== null &&
+    width >= MIN_RENDERER_VIEWPORT_WIDTH && height >= MIN_RENDERER_VIEWPORT_HEIGHT;
+  return {
+    pass: statePass && boundsPass,
+    bound: true,
+    windowId: binding.windowId,
+    state,
+    width,
+    height,
+    reason: !statePass ? "window-not-visible" : !boundsPass ? "window-bounds-too-small" : null,
+  };
+}
+
 async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
@@ -1015,14 +1068,42 @@ async function verifyRemovedSession(session) {
   })()`);
 }
 
-async function verifySession(session, expectedThemeId = null, expectedRevision = null) {
+export async function verifySession(
+  session,
+  targetId,
+  expectedThemeId = null,
+  expectedRevision = null,
+) {
+  const nativeWindow = await inspectTargetWindow(session, targetId);
   return session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
-      return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+      const style = getComputedStyle(node);
+      const opacity = Number.parseFloat(style.opacity);
+      const right = Number.isFinite(r.right) ? r.right : r.x + r.width;
+      const bottom = Number.isFinite(r.bottom) ? r.bottom : r.y + r.height;
+      let cssVisible = r.width > 0 && r.height > 0 && style.display !== 'none' &&
+        style.visibility !== 'hidden' && style.visibility !== 'collapse' &&
+        style.contentVisibility !== 'hidden' && (!Number.isFinite(opacity) || opacity > 0);
+      try {
+        if (typeof node.checkVisibility === 'function') {
+          cssVisible = cssVisible && node.checkVisibility({
+            checkOpacity: true,
+            checkVisibilityCSS: true,
+          });
+        }
+      } catch {}
+      const intersectsViewport = right > 0 && bottom > 0 && r.x < innerWidth && r.y < innerHeight;
+      return {
+        x: Math.round(r.x), y: Math.round(r.y),
+        width: Math.round(r.width), height: Math.round(r.height),
+        visible: Boolean(node.isConnected !== false && cssVisible && intersectsViewport),
+      };
     };
     const home = document.querySelector(${selectorLiteral("home-route")});
+    const settingsAnchor = document.querySelector(${selectorLiteral("appearance-radio")}) ||
+      document.querySelector(${stableTestidLiteral("theme-preview")});
     const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
     const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
@@ -1044,41 +1125,60 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       ).length,
       homePresent: Boolean(home),
       suggestionsPresent: Boolean(suggestions),
+      homeSurface: box(home),
+      settingsAnchor: box(settingsAnchor),
       hero: box(home?.firstElementChild?.firstElementChild?.firstElementChild),
       cards,
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
+      nativeWindow: ${JSON.stringify(nativeWindow)},
+      documentVisibility: document.visibilityState ?? null,
+      documentHidden: document.hidden === true,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    const structurePass = result.scope?.level === 'L0' ||
-      (Boolean(result.shell) && Boolean(result.sidebar));
+    const l0AnchorPass = Boolean(result.settingsAnchor?.visible || result.homeSurface?.visible);
+    const structurePass = result.scope?.level === 'L0'
+      ? l0AnchorPass
+      : result.scope?.level === 'L1' && Boolean(result.shell?.visible && result.sidebar?.visible);
+    const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;
+    const viewportPass = result.viewport.width >= ${MIN_RENDERER_VIEWPORT_WIDTH} &&
+      result.viewport.height >= ${MIN_RENDERER_VIEWPORT_HEIGHT};
+    const windowPass = result.nativeWindow?.pass === true;
     const expectedThemeId = ${JSON.stringify(expectedThemeId)};
     const expectedRevision = ${JSON.stringify(expectedRevision)};
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
       (!expectedRevision || result.revision === expectedRevision);
     result.expectedThemeId = expectedThemeId;
     result.expectedRevision = expectedRevision;
+    result.readiness = { windowPass, documentPass, viewportPass, structurePass };
     result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.businessClassPollution === 0 && structurePass &&
+      result.stylePresent && result.businessClassPollution === 0 && windowPass &&
+      documentPass && viewportPass && structurePass &&
       payloadPass &&
-      (!result.homePresent || (Boolean(result.hero) &&
+      (!result.homePresent || (Boolean(result.homeSurface?.visible && result.hero?.visible) &&
         (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
     return result;
   })()`);
 }
 
-async function waitForVerifiedSession(session, timeoutMs, expectedThemeId = null, expectedRevision = null) {
+async function waitForVerifiedSession(
+  session,
+  targetId,
+  timeoutMs,
+  expectedThemeId = null,
+  expectedRevision = null,
+) {
   const deadline = Date.now() + timeoutMs;
   let lastResult;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      lastResult = await verifySession(session, expectedThemeId, expectedRevision);
+      lastResult = await verifySession(session, targetId, expectedThemeId, expectedRevision);
       lastError = null;
       if (lastResult.pass) return lastResult;
     } catch (error) {
@@ -1207,11 +1307,12 @@ async function runOneShot(options) {
           : (options.reload || options.mode === "once" || options.mode === "verify")
             ? await waitForVerifiedSession(
               session,
+              target.id,
               options.timeoutMs,
               loadedPayload?.theme.id ?? null,
               loadedPayload?.revision ?? null,
             )
-            : await verifySession(session);
+            : await verifySession(session, target.id);
         results.push({ targetId: target.id, markers: probe.markers, result: verified });
         if (operationToken) {
           const passed = options.mode === "remove" ? verified === true : verified?.pass;
