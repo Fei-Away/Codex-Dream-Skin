@@ -51,6 +51,9 @@ const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
 const OPERATION_UI_STATES = new Set(["success", "error", "cancelled"]);
+const MIN_RENDERER_WIDTH = 320;
+const MIN_RENDERER_HEIGHT = 240;
+const MAX_RENDERER_DIMENSION = 65536;
 const OPERATION_UI_CSS = `
   :host {
     all: initial;
@@ -160,6 +163,100 @@ const OPERATION_UI_CSS = `
 `;
 let staticPayloadAssets = null;
 let operationSequence = 0;
+
+function hasReasonableDimensions(width, height) {
+  return Number.isFinite(width) && Number.isFinite(height)
+    && width >= MIN_RENDERER_WIDTH && height >= MIN_RENDERER_HEIGHT
+    && width <= MAX_RENDERER_DIMENSION && height <= MAX_RENDERER_DIMENSION;
+}
+
+export function classifyNativeWindowResponse(response) {
+  const windowId = Number(response?.windowId);
+  const bounds = response?.bounds && typeof response.bounds === "object"
+    ? {
+        width: Number(response.bounds.width),
+        height: Number(response.bounds.height),
+        windowState: typeof response.bounds.windowState === "string"
+          ? response.bounds.windowState : null,
+      }
+    : null;
+  const stateReady = bounds
+    && ["normal", "maximized", "fullscreen"].includes(bounds.windowState);
+  const ready = Number.isSafeInteger(windowId) && windowId > 0 && stateReady
+    && hasReasonableDimensions(bounds.width, bounds.height);
+  return {
+    status: ready ? "ready" : "not-ready",
+    windowId: Number.isSafeInteger(windowId) && windowId > 0 ? windowId : null,
+    bounds,
+    reason: ready ? null : "native-window-not-visible",
+  };
+}
+
+export function classifyNativeWindowError(error) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const cdpCode = Number(error?.cdpCode);
+  const withoutCode = message.replace(/\s*\(-?\d+\)\s*$/, "").trim();
+  const unsupported = cdpCode === -32601
+    || /\(-32601\)\s*$/.test(message)
+    || /^method(?: ['"]Browser\.getWindowForTarget['"])? not found$/i.test(withoutCode)
+    || /^['"]?Browser\.getWindowForTarget['"]? (?:wasn't|was not) found$/i.test(withoutCode);
+  return {
+    status: unsupported ? "unsupported" : "not-ready",
+    windowId: null,
+    bounds: null,
+    reason: unsupported ? "browser-window-domain-unsupported" : "native-window-unavailable",
+  };
+}
+
+export function assessRendererVerification(renderer, nativeWindow, expected) {
+  const result = renderer && typeof renderer === "object" ? { ...renderer } : {};
+  const viewportWidth = Number(result.viewport?.width);
+  const viewportHeight = Number(result.viewport?.height);
+  const viewportPass = hasReasonableDimensions(viewportWidth, viewportHeight);
+  const documentVisible = result.documentVisibility === "visible";
+  const settingsRoute = result.scope?.baseState === "settings";
+  const structurePass = settingsRoute
+    ? Boolean(result.settings?.visible)
+    : Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible);
+  const nativeWindowPass = nativeWindow?.status === "ready";
+  const fallbackWindowPass = nativeWindow?.status === "unsupported";
+  const windowPass = documentVisible && viewportPass
+    && (nativeWindowPass || fallbackWindowPass);
+  const basePass = result.installed && result.version === expected.skinVersion
+    && result.stylePresent && result.businessClassPollution === 0
+    && structurePass && windowPass && !result.documentOverflow?.x;
+  const payloadPass = (!expected.expectedThemeId || result.themeId === expected.expectedThemeId)
+    && (!expected.expectedRevision || result.revision === expected.expectedRevision);
+  const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
+    ? result.suggestionLabels.filter((item) => item?.visible) : [];
+  const homePass = !result.homeRoute || (
+    result.homePresent && result.hero?.visible && result.hero.width >= 280
+    && result.hero.height >= 120 && (result.visibleCardCount === 0 || (
+      visibleSuggestionLabels.length >= result.visibleCardCount
+      && result.suggestionLabelColorsMatch
+    ))
+  );
+
+  result.nativeWindow = nativeWindow;
+  result.checks = {
+    documentVisible,
+    fallbackWindowPass,
+    nativeWindowPass,
+    payloadPass,
+    structurePass,
+    viewportPass,
+    windowPass,
+  };
+  result.pass = Boolean(basePass && homePass && payloadPass);
+  result.expectedThemeId = expected.expectedThemeId;
+  result.expectedRevision = expected.expectedRevision;
+  result.softNotes = {
+    projectButtonOptional: !result.projectButton?.visible,
+    composerOptionalOnNonTaskRoutes: !result.composer?.visible,
+    suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
+  };
+  return result;
+}
 
 function parseArgs(argv) {
   const options = {
@@ -300,8 +397,11 @@ class CdpSession {
       if (!waiter) return;
       clearTimeout(waiter.timeout);
       this.pending.delete(message.id);
-      if (message.error) waiter.reject(new Error(`${message.error.message} (${message.error.code})`));
-      else waiter.resolve(message.result);
+      if (message.error) {
+        const error = new Error(`${message.error.message} (${message.error.code})`);
+        error.cdpCode = message.error.code;
+        waiter.reject(error);
+      } else waiter.resolve(message.result);
       return;
     }
     for (const listener of this.listeners.get(message.method) ?? []) {
@@ -918,8 +1018,21 @@ async function verifyRemovedSession(session) {
   })()`);
 }
 
+export async function inspectNativeWindow(session) {
+  try {
+    const response = await session.send(
+      "Browser.getWindowForTarget",
+      { targetId: session.target.id },
+      1500,
+    );
+    return classifyNativeWindowResponse(response);
+  } catch (error) {
+    return classifyNativeWindowError(error);
+  }
+}
+
 async function verifySession(session, expectedThemeId = null, expectedRevision = null) {
-  return session.evaluate(`(() => {
+  const renderer = await session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
@@ -959,6 +1072,12 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
     const composer = box(document.querySelector(${selectorLiteral("composer-chrome")}));
     const sidebar = box(document.querySelector(${selectorLiteral("left-panel")}));
+    const settingsBoxes = [
+      box(document.querySelector(${selectorLiteral("appearance-radio")})),
+      box(document.querySelector(${stableTestidLiteral("theme-preview")})),
+    ];
+    const settings = settingsBoxes.find((item) => item?.visible) ??
+      settingsBoxes.find(Boolean) ?? null;
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
     const adopted = runtime?.styleMode === 'adopted' &&
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
@@ -966,6 +1085,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       document.getElementById('codex-dream-skin-style') === runtime.styleNode;
     const result = {
       installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
+      documentVisibility: document.visibilityState,
       version: runtime?.version ?? null,
       themeId: runtime?.themeId ?? null,
       revision: runtime?.revision ?? null,
@@ -986,39 +1106,21 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       shell,
       composer,
       sidebar,
+      settings,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    const structurePass = result.scope?.level === 'L0' ||
-      (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible));
-    const basePass = result.installed && result.version === ${JSON.stringify(SKIN_VERSION)} &&
-      result.stylePresent && result.businessClassPollution === 0 && structurePass &&
-      !result.documentOverflow.x;
-    const expectedThemeId = ${JSON.stringify(expectedThemeId)};
-    const expectedRevision = ${JSON.stringify(expectedRevision)};
-    const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
-      (!expectedRevision || result.revision === expectedRevision);
-    // Project selector markup varies across Codex builds — soft requirement.
-    const homePass = !result.homeRoute || (
-      result.homePresent && result.hero?.visible && result.hero.width >= 280 &&
-      result.hero.height >= 120 && (result.visibleCardCount === 0 || (
-        visibleSuggestionLabels.length >= result.visibleCardCount &&
-        result.suggestionLabelColorsMatch
-      ))
-    );
-    result.pass = Boolean(basePass && homePass && payloadPass);
-    result.expectedThemeId = expectedThemeId;
-    result.expectedRevision = expectedRevision;
-    result.softNotes = {
-      projectButtonOptional: !result.projectButton?.visible,
-      composerOptionalOnNonTaskRoutes: !result.composer?.visible,
-      suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
-    };
     return result;
   })()`);
+  const nativeWindow = await inspectNativeWindow(session);
+  return assessRendererVerification(renderer, nativeWindow, {
+    skinVersion: SKIN_VERSION,
+    expectedThemeId,
+    expectedRevision,
+  });
 }
 
 async function waitForVerifiedSession(session, timeoutMs, expectedThemeId = null, expectedRevision = null) {
