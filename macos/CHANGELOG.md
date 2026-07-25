@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.5 — 2026-07-25
+
+### 修复
+
+- 修复一键换肤（`dreamskin://apply?version=...`）每次都在切换前被回滚校验取消的问题：DreamSkin 是 `LSUIElement`（仅菜单栏、无 Dock 图标、无常规窗口），自身的确认弹窗关闭后 macOS 不会自动把焦点还给 Codex，导致 Codex 渲染进程里的 `document.visibilityState` 一直卡在 `hidden`，`captureActiveThemeThenApplyImported` 的回滚快照校验（12 秒超时、约 24 次重试）在整个窗口期内持续判定"当前可见状态未能确认"而安全取消，主题内容其实完全正确。已在生产环境用真实上传/审核/`dreamskin://` 深链/真实 v1.5.4 客户端复现 5 次，且用同一份被保留下来的回滚快照直接手动重跑 `injector.mjs --verify`——一旦手动把 Codex 切回前台，同一份快照立即校验通过，证明问题从不在快照内容本身。现在事务脚本启动前会显式重新激活 Codex（`NSRunningApplication.activate`），与已有的 `activateForUserInteraction()` 模式对称。
+
 ## 1.5.4 — 2026-07-25
 
 ### 修复
