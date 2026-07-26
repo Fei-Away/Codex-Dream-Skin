@@ -430,7 +430,10 @@ function Assert-DreamSkinTrustedNodeImage {
     throw "The Node.js runtime is not validly signed: $Path ($($signature.Status))."
   }
   $subject = "$($signature.SignerCertificate.Subject)"
-  if ($subject -notmatch '(?i)O=(OpenJS Foundation|Node\.js Foundation|Microsoft Corporation)') {
+  # Publisher names observed on official Node.js builds. The subject is echoed
+  # in the failure so an unexpected-but-legitimate publisher can be identified
+  # and added deliberately, rather than the check being loosened blindly.
+  if ($subject -notmatch '(?i)O=("?)(OpenJS Foundation|Node\.js Foundation|Microsoft Corporation|GitHub, Inc\.)') {
     throw "The Node.js runtime is signed by an unexpected publisher: $subject"
   }
 }
@@ -464,19 +467,29 @@ function Get-DreamSkinNodeRuntime {
   param([int]$MinimumMajor = 22)
 
   # The runtime that runs Safe CSS validation, theme-package validation, image
-  # metadata limits and the injector is pinned to the engine's own bundled
-  # copy, which install-dream-skin.ps1 stages and the engine manifest
-  # hash-verifies. Neither an environment variable nor PATH may redirect it:
-  # anyone able to write HKCU\Environment (no admin needed) could otherwise
-  # point every validator at their own node.exe and bypass all of them at once.
-  # macOS pins the same way -- see require_signed_node_runtime in
-  # macos/scripts/common-macos.sh.
+  # metadata limits and the injector must not be redirectable: anyone able to
+  # write HKCU\Environment (no admin needed) could otherwise point every
+  # validator at their own node.exe and bypass all of them at once. So there is
+  # no environment-variable override -- macOS pins the same way, see
+  # require_signed_node_runtime in macos/scripts/common-macos.sh.
+  #
+  # An installed engine always ships runtime\node\node.exe and must use it. The
+  # repository source tree has no bundled copy (the installer downloads it), so
+  # running the suite from source falls back to PATH -- but that candidate goes
+  # through the exact same Authenticode gate, so a hostile node.exe on PATH is
+  # rejected before it is ever executed.
   $runtimeRoot = Split-Path -Parent $PSScriptRoot
   $bundledNode = Join-Path $runtimeRoot 'runtime\node\node.exe'
-  if (-not (Test-Path -LiteralPath $bundledNode -PathType Leaf)) {
-    throw "The bundled Node.js runtime is missing: $bundledNode. Reinstall Codex Dream Skin to restore it."
+  if (Test-Path -LiteralPath $bundledNode -PathType Leaf) {
+    return Get-DreamSkinValidatedNodeRuntime -Path $bundledNode -MinimumMajor $MinimumMajor
   }
-  return Get-DreamSkinValidatedNodeRuntime -Path $bundledNode -MinimumMajor $MinimumMajor
+
+  $command = Get-Command node.exe -ErrorAction SilentlyContinue
+  if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
+  if (-not $command) {
+    throw "The bundled Node.js runtime is missing ($bundledNode) and Node.js $MinimumMajor or newer was not found in PATH."
+  }
+  return Get-DreamSkinValidatedNodeRuntime -Path $command.Source -MinimumMajor $MinimumMajor
 }
 
 function ConvertTo-DreamSkinCodexInstall {

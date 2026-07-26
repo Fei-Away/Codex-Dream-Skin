@@ -191,8 +191,17 @@ try {
   if ($commonSource.Contains('$env:CODEX_DREAM_SKIN_NODE')) {
     throw 'The Node.js runtime path must not be overridable through an environment variable.'
   }
-  if ($commonSource -match "Get-Command node(\.exe)? -ErrorAction SilentlyContinue") {
-    throw 'The Node.js runtime must not fall back to whatever node.exe PATH resolves to.'
+  # A bundled runtime, when present, wins over PATH. The source tree has no
+  # bundled copy, so PATH stays reachable for the suite -- but every candidate,
+  # bundled or not, is funnelled through the same signature gate below.
+  $bundledIndex = $commonSource.IndexOf(
+    'Get-DreamSkinValidatedNodeRuntime -Path $bundledNode', [System.StringComparison]::Ordinal
+  )
+  $pathFallbackIndex = $commonSource.IndexOf(
+    'Get-Command node.exe -ErrorAction SilentlyContinue', [System.StringComparison]::Ordinal
+  )
+  if ($bundledIndex -lt 0 -or $pathFallbackIndex -le $bundledIndex) {
+    throw 'The bundled Node.js runtime must be preferred over whatever PATH resolves to.'
   }
   # Authenticity must be proven before the binary runs; `node -p` is execution.
   $trustIndex = $commonSource.IndexOf(
