@@ -22,6 +22,7 @@ function sdkPath() {
   if (existsSync(known)) return known;
   return execFileSync("/usr/bin/xcrun", ["--sdk", "macosx", "--show-sdk-path"], {
     encoding: "utf8",
+    timeout: 60_000,
   }).trim();
 }
 
@@ -79,13 +80,15 @@ test("bounded community HTTP client", {
   const binary = path.join(temporary, "bounded-community-http-test");
   try {
     const arch = process.arch === "arm64" ? "arm64" : "x86_64";
+    // No timeout here means a contended CI runner can hang the whole suite
+    // instead of failing it, and this test now gates tag creation.
     execFileSync("/usr/bin/swiftc", [
       "-sdk", sdkPath(),
       "-target", `${arch}-apple-macosx13.0`,
       source,
       harness,
       "-o", binary,
-    ], { stdio: "pipe" });
+    ], { stdio: "pipe", timeout: 180_000 });
     await new Promise((resolve, reject) => {
       server.once("error", reject);
       server.listen(0, "127.0.0.1", resolve);
