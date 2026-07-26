@@ -12,6 +12,7 @@ release/
 runtime/*
 !runtime/
 !runtime/dream-skin.css
+!runtime/image-metadata.mjs
 !runtime/renderer-inject.js
 !runtime/safe-css-policy.json
 !runtime/safe-css-validator.mjs
