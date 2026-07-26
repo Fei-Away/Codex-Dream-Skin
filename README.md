@@ -14,8 +14,33 @@
 </p>
 
 <p align="center">
+  官方主题库：<a href="https://dreamskin.cc"><strong>DreamSkin.cc</strong></a> ·
+  <a href="https://dreamskin.cc/gallery">主题库 Gallery</a> ·
+  <a href="https://dreamskin.cc/studio">在线 Studio</a>
+</p>
+
+<p align="center">
   非 OpenAI 官方产品。不修改 <code>.app</code> / <code>app.asar</code> / WindowsApps。
 </p>
+
+## 🤝 独家赞助
+
+<table>
+<tr>
+<td width="180">
+<a href="https://passion8.cc/sign-up?aff=ZgLT"><img src="docs/images/sponsor-passion8.png" alt="Passion8" width="150"></a>
+</td>
+<td>
+感谢 Passion8 独家赞助本项目！Passion8 是一家面向开发者的 AI API 中转服务商，为个人开发者与团队提供稳定、低成本的主流大模型接入。<br><br>
+<strong>满血 AI · 触手可及</strong>：OpenAI、Claude 全系列原版模型，无降智、无套壳；使用前沿 AI 模型仅需官方价格的一小部分，充值 1:1，<strong>1$ = 1¥</strong>。保留原有官方 SDK，只把 Base URL 换成 Passion8，Claude Code、Codex、Grok 以及任意 OpenAI 兼容客户端都能直接跑——一行配置，代码不用改。
+<strong>全球节点加速</strong>：Cloudflare 全球边缘 + 多线路 BBR 加速，低延迟、高可用、稳定如一；7×24 稳定中转，99.9% SLA，首 Token 目标 1 秒内。
+<strong>安全可靠</strong>：独立 API Key、密钥加密存储、全链路 HTTPS，隐私优先。<br><br>
+Passion8 为本项目用户准备了专属福利：通过<a href="https://passion8.cc/sign-up?aff=ZgLT">此链接</a>注册，首次充值自动赠送 10% 额度，无需申请，30 分钟内到账。有问题联系 <a href="mailto:support@passion8.cc">support@passion8.cc</a>。
+</td>
+</tr>
+</table>
+
+<sub>换肤与 API 配置互相独立，本项目不会自动改写你的模型供应商设置。</sub>
 
 ## 直接安装
 
@@ -28,29 +53,64 @@
 不需要 clone 源码、安装 Node.js 或手动运行 `.sh` / `.ps1`。首次未签名放行、更新和卸载步骤见
 [macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md)。
 
-## 赞助商
+## 主题库与社区
 
 <p align="center">
-  <a href="https://passion8.cc/register?aff=TuPe">
-    <img src="docs/images/sponsor-passion8.png" alt="Passion8" height="72">
+  <a href="https://dreamskin.cc">
+    <img src="docs/images/dreamskin-mark.svg" alt="DreamSkin.cc" width="140">
   </a>
 </p>
 
 <p align="center">
-  <strong>更智能的连接 · 更热爱的创造</strong><br>
-  <sub>热爱驱动 · 无限可能 · Connect AI · Power Creation</sub>
+  <strong>DreamSkin.cc</strong> · 本项目的官方主题库与创作平台<br>
+  <sub>Make your workspace <em>yours.</em></sub>
 </p>
 
 <p align="center">
-  感谢 <a href="https://passion8.cc/register?aff=TuPe"><strong>passion8.cc</strong></a> 赞助本项目。<br>
-  满血 AI 中转：官方模型直连，无降智、无套壳；一行配置接入 Codex / Claude Code / Grok。
+  <a href="https://dreamskin.cc/gallery"><strong>浏览主题库 →</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://dreamskin.cc/studio"><strong>在线 Studio →</strong></a>
 </p>
 
+- [**主题库 Gallery**](https://dreamskin.cc/gallery)：浏览社区已审核的主题，支持最新 / 热门排序和创作者榜单。
+  每套主题都能先在网页里的桌面模拟器中试穿，再决定装不装。
+
 <p align="center">
-  <sub>
-    换肤与 API 配置互相独立，本项目不会自动改写你的模型供应商设置。
-  </sub>
+  <a href="https://dreamskin.cc/gallery">
+    <img src="docs/images/site-tryon-zh.webp" alt="在 DreamSkin.cc 的桌面模拟器里试穿社区主题「晨雾山水」" width="900">
+  </a><br>
+  <sub>社区主题「晨雾山水」的在线试穿 · 首页/任务页、宽窄窗口、侧栏展开收起都能当场切，满意了再一键换肤或下载主题包</sub>
 </p>
+
+- [**在线 Studio**](https://dreamskin.cc/studio)：在浏览器里换背景图、调主题色、写 Safe CSS，导出 `.zip` 主题包，
+  也可以直接投稿到主题库（需登录，经人工审核后公开）。
+
+<p align="center">
+  <a href="https://dreamskin.cc/studio">
+    <img src="docs/images/site-studio-zh.webp" alt="在 DreamSkin.cc 在线 Studio 里编辑社区主题「月下松岚」" width="900">
+  </a><br>
+  <sub>在线 Studio · 左侧实时预览，右侧调背景图、外观焦点与配色；主题库里任意一套主题都能一键载入继续改</sub>
+</p>
+
+macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studio」入口，可以直接打开。
+
+### 一键换肤
+
+在 DreamSkin.cc 上看到喜欢的主题，点「一键换肤」就能让本机客户端直接装上，不用先下载再手动导入。
+需要 v1.5.0 或更新的客户端（建议 v1.5.5 及以上）。
+
+流程与安全边界：
+
+- 网页通过 `dreamskin://apply?version=ver_...` 唤起本机 App。链接只能携带一个主题版本 ID，**不能**携带
+  任意 URL、文件路径或命令，也不存在静默应用参数。
+- App 只向固定的官方 API 取包，并拒绝重定向。
+- 换肤前弹出原生确认框，并核对该版本的审核状态、一键兼容标记、版本号、包大小、实际下载字节数和 SHA-256。
+- 通过后复用与手动导入完全相同的 ZIP、manifest、图片与 Safe CSS 校验。
+- 只有真实渲染进程确认新主题已生效才算成功。启动或渲染失败会自动尝试恢复换肤前的主题，恢复结果
+  同样要经过可见性验证；无法确认时会明确报告状态未确认，而不是假装已恢复。
+
+只有完整满足当前主题包契约（背景图 + `theme.json` + 非空 `theme.css` + 声明 `safe-css` 能力）的主题
+才会显示一键换肤按钮；不满足的走下面的手动导入。
 
 ## 实测精选预设
 
@@ -91,6 +151,7 @@
 - **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰
 - **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
 - **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
+- **一键换肤**：在 [DreamSkin.cc](https://dreamskin.cc) 上点一下，客户端核对来源与校验和后直接装上
 - **可导入主题包**：两端都可直接选择普通 `.zip`，安全校验后加入本地主题库
 - **可恢复**：一键还原官方外观
 - **相对安全**：本机回环 CDP 注入，不改官方二进制与签名
@@ -113,6 +174,9 @@
 
 ### 导入下载的主题
 
+从 DreamSkin.cc 装主题优先用[一键换肤](#一键换肤)。下面是手动导入 `.zip` 的兜底路径，也适用于任何
+其他来源的主题包。
+
 在 macOS 菜单栏选择“导入主题 ZIP…”，或在 Windows 托盘选择同名菜单。只支持普通 `.zip`，
 不支持 `.dreamskin` 后缀，也不要仅改后缀伪装。正式 Studio 主题包包含 `manifest.json`、
 `theme.json`、非空 `theme.css` 和恰好一张 `background.webp|jpg|png`；还可包含 `LICENSE.txt` 和预留的
@@ -132,8 +196,7 @@
 
 菜单里有“打开主题文件夹”快捷入口。移动后重新打开菜单/托盘即可；不要再套一层目录，也不要放链接、
 嵌套压缩包或缺少三件套的文件夹。手动目录不会经过 ZIP 导入器的归档校验，请只使用可信内容。升级前
-已经保存且没有 CSS 的 legacy 主题仍可切换，但不会注入额外 CSS。两端菜单也可直接打开 DreamSkin.cc
-的“主题库 Gallery”和“在线 Studio”。
+已经保存且没有 CSS 的 legacy 主题仍可切换，但不会注入额外 CSS。
 
 ### 开发者：从源码运行
 
