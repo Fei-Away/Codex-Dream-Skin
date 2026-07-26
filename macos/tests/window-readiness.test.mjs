@@ -42,6 +42,14 @@ const baseRenderer = {
   scope: { level: "L1", baseState: "thread" },
   shell: { visible: true, width: 900, height: 740 },
   sidebar: { visible: true, width: 280, height: 740 },
+  threadSurface: {
+    visible: true,
+    width: 900,
+    height: 700,
+    overflowX: "hidden",
+    overflowY: "auto",
+    pointerEvents: "auto",
+  },
   settings: null,
   homeRoute: false,
   homePresent: false,
@@ -55,6 +63,20 @@ const baseRenderer = {
 
 assert.equal(readyNativeWindow.status, "ready");
 assert.equal(assessRendererVerification(baseRenderer, readyNativeWindow, exactPayload).pass, true);
+const brokenThreadScroll = {
+  ...baseRenderer,
+  threadSurface: { ...baseRenderer.threadSurface, overflowY: "visible" },
+};
+assert.equal(
+  assessRendererVerification(brokenThreadScroll, readyNativeWindow, exactPayload).pass,
+  false,
+  "A skin that replaces the native task scroller with visible overflow must fail verification.",
+);
+assert.equal(
+  assessRendererVerification(brokenThreadScroll, readyNativeWindow, exactPayload)
+    .checks.threadScrollPass,
+  false,
+);
 
 const windowCalls = [];
 assert.equal((await inspectNativeWindow({

@@ -311,11 +311,9 @@
     }
     setStyleProperty(root, "--dream-skin-name", cssString(THEME.name || "Codex Dream Skin"));
     setStyleProperty(root, "--dream-skin-tagline", cssString(THEME.tagline || "Make something wonderful."));
-    setStyleProperty(root, "--dream-skin-quote", cssString(THEME.quote || "MAKE SOMETHING WONDERFUL"));
-    setStyleProperty(root, "--dream-skin-brand-subtitle", cssString(
-      THEME.brandSubtitle || "CODEX DREAM SKIN",
-    ));
-    setStyleProperty(root, "--dream-skin-status", cssString(THEME.statusText || "DREAM SKIN ONLINE"));
+    // Header and lower-chrome slogans were retired because they compete with
+    // native toolbar controls and the composer. Keep the old property names in
+    // THEME_VARIABLES so reinjection removes values left by earlier versions.
     setStyleProperty(root, "--dream-skin-project-prefix", cssString(THEME.projectPrefix || "选择项目 · "));
     setStyleProperty(root, "--dream-skin-project-label", cssString(THEME.projectLabel || "◉  选择项目"));
   };

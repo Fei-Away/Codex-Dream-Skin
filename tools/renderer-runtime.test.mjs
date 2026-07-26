@@ -3,6 +3,25 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 
+function contrastRatio(firstHex, secondHex) {
+  const luminance = (hex) => {
+    const channels = hex.match(/[0-9a-f]{2}/gi).map((value) => Number.parseInt(value, 16) / 255);
+    const linear = channels.map((value) => (
+      value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    ));
+    return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+  };
+  const first = luminance(firstHex);
+  const second = luminance(secondHex);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+function hexVariable(block, name) {
+  const match = block.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, "i"));
+  assert.ok(match, `Expected ${name} to be a six-digit hex color.`);
+  return match[1];
+}
+
 function styleDeclaration() {
   const values = new Map();
   return {
@@ -236,6 +255,26 @@ export async function runRendererRuntimeTest(assetRoot) {
   const template = await fs.readFile(path.join(assetRoot, "renderer-inject.js"), "utf8");
   const css = await fs.readFile(path.join(assetRoot, "dream-skin.css"), "utf8");
   fixture.template = template;
+  const darkThemeBlock = css.match(/:root\[data-dream-skin="active"\]\s*\{([\s\S]*?)\n\}/)?.[1];
+  const lightThemeBlock = css.match(/html\[data-dream-skin="active"\]\[data-dream-shell="light"\]\s*\{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(darkThemeBlock, "Expected the active dark-shell semantic token block.");
+  assert.ok(lightThemeBlock, "Expected the active light-shell semantic token block.");
+  for (const role of ["danger", "success", "warning", "info"]) {
+    assert.ok(
+      contrastRatio(
+        hexVariable(darkThemeBlock, `--ds-${role}-foreground`),
+        hexVariable(darkThemeBlock, `--ds-${role}-surface`),
+      ) >= 4.5,
+      `Dark-shell ${role} alerts must meet WCAG AA text contrast.`,
+    );
+    assert.ok(
+      contrastRatio(
+        hexVariable(lightThemeBlock, `--ds-${role}-foreground`),
+        hexVariable(lightThemeBlock, `--ds-${role}-surface`),
+      ) >= 4.5,
+      `Light-shell ${role} alerts must meet WCAG AA text contrast.`,
+    );
+  }
 
   assert.match(template, /adoptedStyleSheets/);
   assert.match(template, /CSSStyleSheet/);
@@ -258,12 +297,108 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
   assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
-  assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
-  assert.match(css, /content:\s*var\(--dream-skin-status/);
-  assert.match(css, /content:\s*var\(--dream-skin-quote/);
+  assert.doesNotMatch(css,
+    /\[aria-label="(?:隐藏边栏|Hide sidebar|返回|Back|前进|Forward)"\]/,
+    "Theme CSS must not resize or reposition native titlebar controls.");
+  assert.match(css,
+    /header\.app-header-tint::before,[\s\S]*?header\.app-header-tint::after,[\s\S]*?main\.main-surface:has\(\[role="main"\]\)::after\s*\{[\s\S]*?content:\s*none\s*!important[\s\S]*?display:\s*none\s*!important/,
+    "Task chrome and home composer areas must not carry positioned theme slogans.");
+  assert.doesNotMatch(css,
+    /content:\s*var\(--dream-skin-(?:chrome-mark|status|quote)/,
+    "Retired theme slogans must not be painted into native chrome.");
   assert.match(css, /--ds-task-full-veil/);
   assert.match(css, /data-dream-task-mode="full"/);
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
+  assert.match(css,
+    /data-dream-shell="light"\]\s*\{[\s\S]*?--vscode-foreground:\s*var\(--ds-text\)[\s\S]*?--color-background-panel:\s*var\(--ds-panel\)[\s\S]*?--color-token-bg-fog:\s*var\(--ds-panel-2\)[\s\S]*?--color-token-main-surface-primary:\s*var\(--ds-panel\)[\s\S]*?--color-token-conversation-body:\s*var\(--ds-muted\)[\s\S]*?--color-token-conversation-summary-trailing:\s*var\(--ds-muted\)[\s\S]*?--color-token-input-background:\s*var\(--ds-input\)[\s\S]*?--color-token-input-foreground:\s*var\(--ds-text\)[\s\S]*?--color-token-input-placeholder-foreground:\s*var\(--ds-muted\)[\s\S]*?--color-token-border:\s*var\(--ds-border\)/,
+    "A light skin must bridge native dark-shell text, panel, task-card, conversation, input and border tokens.");
+  assert.match(css,
+    /\[class~="bg-token-main-surface-primary"\]:has\(form\[id\^="automation-side-panel-form"\]\)\s*\{[\s\S]*?--color-background-panel:\s*var\(--ds-input\)[\s\S]*?--color-token-main-surface-primary:\s*var\(--ds-panel\)[\s\S]*?--color-token-foreground:\s*var\(--ds-text\)[\s\S]*?--color-token-input-foreground:\s*var\(--ds-text\)[\s\S]*?--color-token-input-placeholder-foreground:\s*var\(--ds-muted\)[\s\S]*?--color-token-border:\s*var\(--ds-border\)/,
+    "Scheduled-task side panels must not retain electron-dark cards or pale input text under a light skin.");
+  assert.match(css,
+    /\.loading-shimmer-pure-text\s*\{[\s\S]*?color:\s*var\(--ds-muted\)\s*!important[\s\S]*?-webkit-text-fill-color:\s*var\(--ds-muted\)\s*!important[\s\S]*?\.loading-shimmer-pure-text\s+\*\s*\{[\s\S]*?color:\s*var\(--ds-accent\)\s*!important[\s\S]*?-webkit-text-fill-color:\s*var\(--ds-accent\)\s*!important/,
+    "Active conversation summaries must keep readable theme-colored shimmer text.");
+  assert.match(css,
+    /\[aria-current="page"\]\s*\{[\s\S]*?background:\s*var\(--ds-selected\)[\s\S]*?border:\s*1px solid var\(--ds-accent\)[\s\S]*?box-shadow:[\s\S]*?inset 3px 0 rgb\(var\(--ds-accent-rgb\)/,
+    "Selected sidebar rows must use a readable surface plus a solid accent indicator.");
+  assert.match(css,
+    /\[class~="bg-token-main-surface-primary\/70"\]\s*\{[\s\S]*?background:\s*var\(--ds-selected\)[\s\S]*?color:\s*var\(--ds-text\)/,
+    "Native sidebar task cards must not retain the host dark surface under a light skin.");
+  assert.doesNotMatch(css, /aside\.app-shell-left-panel\s+nav\s*>\s*div(?::first-child|:nth-child)/,
+    "Primary navigation must keep native flow instead of brittle split-card geometry.");
+  assert.match(css,
+    /aside\.app-shell-left-panel[\s\S]*?nav section:has\(\[role="list"\]\)\s*\{[\s\S]*?margin-inline:\s*8px\s*!important[\s\S]*?border:\s*1px solid var\(--ds-zone-border\)[\s\S]*?background:\s*var\(--ds-zone-surface-raised\)/,
+    "Semantic sidebar lists must own distinct raised section surfaces.");
+  assert.match(css,
+    /aside\.app-shell-left-panel > \[role="separator"\]::before\s*\{[\s\S]*?left:\s*8px\s*!important[\s\S]*?width:\s*1px\s*!important[\s\S]*?pointer-events:\s*none\s*!important/,
+    "The native resize target must expose a clear non-interactive visual boundary.");
+  assert.match(css,
+    /--titlebar-safe-left:[\s\S]*?--titlebar-safe-right:[\s\S]*?--ambient-start:\s*52%[\s\S]*?--ambient-feather:\s*clamp\(240px,\s*24vw,\s*320px\)[\s\S]*?--ds-canvas:\s*var\(--ds-bg\)[\s\S]*?--ds-content-reading-plane:\s*rgb\(var\(--ds-panel-rgb\)\s*\/\s*\.975\)[\s\S]*?--reading-veil:\s*linear-gradient\([\s\S]*?--message-surface:\s*rgb\(var\(--ds-panel-rgb\)\s*\/\s*\.94\)[\s\S]*?--ds-popover:\s*rgb\(var\(--ds-panel-rgb\)\s*\/\s*\.988\)[\s\S]*?--ds-input:\s*rgb\(var\(--ds-panel-rgb\)\s*\/\s*\.985\)[\s\S]*?--composer-surface:\s*rgb\(var\(--ds-panel-rgb\)\s*\/\s*\.92\)[\s\S]*?--ds-selected:[\s\S]*?--ds-hover:[\s\S]*?--ds-pressed:[\s\S]*?--ds-focus:[\s\S]*?--ds-danger:[\s\S]*?--ds-danger-surface:[\s\S]*?--ds-danger-foreground:[\s\S]*?--ds-danger-border:[\s\S]*?--ds-success:[\s\S]*?--ds-success-surface:[\s\S]*?--ds-success-foreground:[\s\S]*?--ds-success-border:[\s\S]*?--ds-warning-surface:[\s\S]*?--ds-warning-foreground:[\s\S]*?--ds-warning-border:[\s\S]*?--ds-info-surface:[\s\S]*?--ds-info-foreground:[\s\S]*?--ds-info-border:[\s\S]*?--ds-zone-surface:[\s\S]*?--ds-zone-surface-raised:[\s\S]*?--ds-zone-border:[\s\S]*?--ds-zone-divider:/,
+    "The renderer must expose a complete semantic token layer for surfaces, states and status colors.");
+  assert.match(css,
+    /--vscode-inputValidation-errorBackground:\s*var\(--ds-danger-surface\)[\s\S]*?--vscode-inputValidation-errorForeground:\s*var\(--ds-danger-foreground\)[\s\S]*?--vscode-inputValidation-errorBorder:\s*var\(--ds-danger-border\)[\s\S]*?--color-token-input-validation-error-background:\s*var\(--ds-danger-surface\)[\s\S]*?--color-token-input-validation-error-foreground:\s*var\(--ds-danger-foreground\)[\s\S]*?--color-token-input-validation-error-border:\s*var\(--ds-danger-border\)/,
+    "Native validation tokens must resolve to the skin's semantic error palette.");
+  assert.match(css,
+    /\[role="alert"\]\.alert-root\[class~="bg-token-dropdown-background"\]\s*\{[\s\S]*?--ds-alert-surface:\s*var\(--ds-info-surface\)[\s\S]*?\[role="alert"\]\.alert-root\[class~="bg-token-input-validation-info-background"\]\s*\{[\s\S]*?--ds-alert-surface:\s*var\(--ds-success-surface\)[\s\S]*?\[role="alert"\]\.alert-root\[class~="bg-token-input-validation-warning-background"\]\s*\{[\s\S]*?--ds-alert-surface:\s*var\(--ds-warning-surface\)[\s\S]*?\[role="alert"\]\.alert-root\[class~="bg-token-input-validation-error-background"\]\s*\{[\s\S]*?--ds-alert-surface:\s*var\(--ds-danger-surface\)/,
+    "Every native toast level must resolve to its own semantic alert palette.");
+  assert.match(css,
+    /\[role="alert"\]\.alert-root\s*\{[\s\S]*?background-color:\s*var\(--ds-alert-surface,\s*var\(--ds-popover\)\)\s*!important[\s\S]*?border-color:\s*var\(--ds-alert-border,\s*var\(--ds-border\)\)\s*!important[\s\S]*?color:\s*var\(--ds-alert-foreground,\s*var\(--ds-text\)\)\s*!important[\s\S]*?--color-token-text-secondary:\s*var\(--ds-alert-foreground,\s*var\(--ds-text\)\)/,
+    "Native alerts must carry readable semantic surface, border and inherited foreground roles.");
+  assert.match(css,
+    /\[role="alert"\]\.alert-root > button\[aria-label\]\s*\{[\s\S]*?color:\s*var\(--ds-alert-foreground,\s*var\(--ds-text\)\)\s*!important[\s\S]*?opacity:\s*\.76\s*!important/,
+    "Alert close controls must remain visibly distinct without changing their native hit target.");
+  assert.doesNotMatch(css,
+    /--ds-art-clear-rail|padding-inline-(?:start|end):\s*var\(--ds-art-clear-rail\)/,
+    "Artwork must adapt to the application without reserving or shrinking native content geometry.");
+  assert.doesNotMatch(css,
+    /data-dream-art-safe(?:-area)?="(?:left|right)"[^{]*\{[^}]*--ds-art-position:/,
+    "Safe-side atmosphere metadata must not override the theme's explicit artwork focus point.");
+  assert.match(css,
+    /@media \(max-width:\s*1120px\)[\s\S]*?--ambient-start:\s*52%/,
+    "Narrow windows must preserve the same comfortable full-width reading transition.");
+  assert.match(css,
+    /main\.main-surface:not\(:has\(\[role="main"\]\)\)\s+article\s*\{[\s\S]*?background:\s*var\(--message-surface\)[\s\S]*?backdrop-filter:\s*blur\(14px\)\s+saturate\(108%\)/,
+    "Task messages must remain legible glass surfaces instead of hiding the artwork.");
+  assert.match(css,
+    /body\s*\{[\s\S]*?background-image:\s*var\(--dream-skin-art\)\s*!important[\s\S]*?main\.main-surface:not\(:has\(\[role="main"\]\)\)\s*\{[\s\S]*?overflow:\s*visible\s*!important[\s\S]*?background:\s*var\(--reading-veil\)\s*!important[\s\S]*?\.thread-scroll-container\s*\{[\s\S]*?background:\s*transparent\s*!important/,
+    "Wide ambient tasks must use one body artwork layer plus one main-canvas reading veil.");
+  const threadSurfaceBlocks = [...css.matchAll(
+    /([^{}]*\.thread-scroll-container[^{}]*)\{([^{}]*)\}/g,
+  )];
+  assert.ok(threadSurfaceBlocks.length > 0,
+    "The renderer CSS fixture must include the native thread surface.");
+  for (const [, selector, declarations] of threadSurfaceBlocks) {
+    assert.doesNotMatch(
+      declarations,
+      /(?:^|\n)\s*(?:overflow(?:-[xy])?|clip-path|(?:-webkit-)?mask(?:-image)?)\s*:/,
+      `The skin must not override native scrolling or clipping on ${selector.trim()}.`,
+    );
+  }
+  assert.doesNotMatch(css, /calc\(100%\s*-\s*(?:420|240)px\)/,
+    "Single-canvas atmosphere must not use viewport-specific right-column breakpoints.");
+  assert.match(css,
+    /main\.main-surface:not\(:has\(\[role="main"\]\)\)::after\s*\{[\s\S]*?content:\s*none\s*!important[\s\S]*?display:\s*none\s*!important/,
+    "Wide ambient task routes must not create an independently bounded artwork window.");
+  assert.doesNotMatch(css, /--ds-task-art-window|mask-image:(?!\s*none)/,
+    "The task atmosphere must not rely on a second mask with its own edge.");
+  assert.match(css,
+    /header\.app-header-tint\s*\{[\s\S]*?background:\s*var\(--composer-surface\)\s*!important[\s\S]*?border:\s*0\s*!important[\s\S]*?box-shadow:\s*none\s*!important/,
+    "Theme chrome must not draw a full-width divider below the native toolbar.");
+  assert.match(css,
+    /composer-surface-chrome::before\s*\{[\s\S]*?content:\s*""\s*!important[\s\S]*?border:\s*1px solid var\(--ds-border\)[\s\S]*?pointer-events:\s*none\s*!important[\s\S]*?composer-surface-chrome:focus-within\s*\{[\s\S]*?outline:\s*2px solid var\(--ds-focus\)[\s\S]*?outline-offset:\s*2px/,
+    "The composer must expose a stable one-pixel boundary layer and a two-pixel focus ring.");
+  assert.match(css,
+    /composer-surface-chrome\s*\{[\s\S]{0,260}?isolation:\s*isolate\s*!important[\s\S]{0,120}?z-index:\s*4\s*!important[\s\S]{0,260}?overflow:\s*visible\s*!important[\s\S]{0,260}?clip-path:\s*none\s*!important[\s\S]{0,260}?mask-image:\s*none\s*!important[\s\S]{0,260}?background-clip:\s*padding-box\s*!important[\s\S]{0,260}?background:\s*var\(--composer-surface\)\s*!important[\s\S]{0,180}?backdrop-filter:\s*blur\(20px\)\s+saturate\(108%\)\s*!important/,
+    "The composer must remain an independent, complete surface above atmospheric layers.");
+  assert.doesNotMatch(css,
+    /composer-surface-chrome\s*\{[\s\S]{0,240}?border:\s*0\s*!important/,
+    "No composer variant may remove the input boundary.");
+  assert.match(css,
+    /data-dream-shell="light"\][\s\S]*?composer-surface-chrome p\.placeholder::after\s*\{[\s\S]*?color:\s*var\(--ds-text-secondary\)\s*!important[\s\S]*?opacity:\s*1\s*!important/,
+    "Light-shell composer placeholders must keep opaque secondary-text contrast.");
+  assert.match(css,
+    /:is\(\[role="menu"\],\s*\[role="dialog"\]\)[\s\S]*?background:\s*var\(--ds-popover\)[\s\S]*?border:\s*1px solid var\(--ds-border\)/,
+    "Menus and dialogs must use an independent elevated popover surface.");
   // Every home/project selector must stay behind the root skin gate.  A
   // marker-class-to-:has() conversion must never leave native layout rules
   // active after pause/restore.
@@ -281,8 +416,9 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(home.document.adoptedStyleSheets.length, 1);
   assert.equal(state.scope.baseState, "home");
   assert.equal(state.scope.level, "L1");
-  assert.equal(home.rootStyle.values.get("--dream-skin-brand-subtitle"), '"CODEX DREAM SKIN"');
-  assert.equal(home.rootStyle.values.get("--dream-skin-status"), '"DREAM SKIN ONLINE"');
+  assert.equal(home.rootStyle.values.get("--dream-skin-brand-subtitle"), undefined);
+  assert.equal(home.rootStyle.values.get("--dream-skin-status"), undefined);
+  assert.equal(home.rootStyle.values.get("--dream-skin-quote"), undefined);
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-radius"), "12px");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-opacity"), "1");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-blur"), "0px");

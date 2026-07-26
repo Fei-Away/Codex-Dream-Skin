@@ -42,7 +42,7 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.5";
+const SKIN_VERSION = "1.5.6";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 10 * 1024 * 1024;
@@ -232,13 +232,18 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   const structurePass = settingsRoute
     ? Boolean(result.settings?.visible)
     : Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible);
+  const threadScrollPass = !result.threadSurface || (
+    result.threadSurface.visible
+    && ["auto", "scroll", "overlay"].includes(result.threadSurface.overflowY)
+    && result.threadSurface.pointerEvents !== "none"
+  );
   const nativeWindowPass = nativeWindow?.status === "ready";
   const fallbackWindowPass = nativeWindow?.status === "unsupported";
   const windowPass = documentVisible && viewportPass
     && (nativeWindowPass || fallbackWindowPass);
   const basePass = result.installed && result.version === expected.skinVersion
     && result.stylePresent && result.businessClassPollution === 0
-    && structurePass && windowPass && !result.documentOverflow?.x;
+    && structurePass && threadScrollPass && windowPass && !result.documentOverflow?.x;
   const payloadPass = (!expected.expectedThemeId || result.themeId === expected.expectedThemeId)
     && (!expected.expectedRevision || result.revision === expected.expectedRevision);
   const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
@@ -258,6 +263,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     nativeWindowPass,
     payloadPass,
     structurePass,
+    threadScrollPass,
     viewportPass,
     windowPass,
   };
@@ -1103,6 +1109,14 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
     const composer = box(document.querySelector(${selectorLiteral("composer-chrome")}));
     const sidebar = box(document.querySelector(${selectorLiteral("left-panel")}));
+    const threadSurfaceNode = document.querySelector(${selectorLiteral("thread-surface")});
+    const threadSurfaceStyle = threadSurfaceNode ? getComputedStyle(threadSurfaceNode) : null;
+    const threadSurface = threadSurfaceNode ? {
+      ...box(threadSurfaceNode),
+      overflowX: threadSurfaceStyle.overflowX,
+      overflowY: threadSurfaceStyle.overflowY,
+      pointerEvents: threadSurfaceStyle.pointerEvents,
+    } : null;
     const settingsBoxes = [
       box(document.querySelector(${selectorLiteral("appearance-radio")})),
       box(document.querySelector(${stableTestidLiteral("theme-preview")})),
@@ -1137,6 +1151,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       shell,
       composer,
       sidebar,
+      threadSurface,
       settings,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {

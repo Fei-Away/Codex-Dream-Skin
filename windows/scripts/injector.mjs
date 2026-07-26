@@ -39,7 +39,7 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.5";
+const SKIN_VERSION = "1.5.6";
 const MAX_ART_BYTES = 10 * 1024 * 1024;
 const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
@@ -1129,6 +1129,14 @@ export async function verifySession(
       ?? chainCandidates.findLast((item) => item?.visible)
       ?? siblingCandidates.find((item) => item?.visible)
       ?? box(boxableChain[boxableChain.length - 1]);
+    const threadSurfaceNode = document.querySelector(${selectorLiteral("thread-surface")});
+    const threadSurfaceStyle = threadSurfaceNode ? getComputedStyle(threadSurfaceNode) : null;
+    const threadSurface = threadSurfaceNode ? {
+      ...box(threadSurfaceNode),
+      overflowX: threadSurfaceStyle.overflowX,
+      overflowY: threadSurfaceStyle.overflowY,
+      pointerEvents: threadSurfaceStyle.pointerEvents,
+    } : null;
     const result = {
       installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
       version: runtime?.version ?? null,
@@ -1150,6 +1158,7 @@ export async function verifySession(
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
+      threadSurface,
       nativeWindow: ${JSON.stringify(nativeWindow)},
       documentVisibility: document.visibilityState ?? null,
       documentHidden: document.hidden === true,
@@ -1166,6 +1175,11 @@ export async function verifySession(
     const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;
     const viewportPass = result.viewport.width >= ${MIN_RENDERER_VIEWPORT_WIDTH} &&
       result.viewport.height >= ${MIN_RENDERER_VIEWPORT_HEIGHT};
+    const threadScrollPass = !result.threadSurface || (
+      result.threadSurface.visible &&
+      ['auto', 'scroll', 'overlay'].includes(result.threadSurface.overflowY) &&
+      result.threadSurface.pointerEvents !== 'none'
+    );
     const windowPass = result.nativeWindow?.pass === true;
     const expectedThemeId = ${JSON.stringify(expectedThemeId)};
     const expectedRevision = ${JSON.stringify(expectedRevision)};
@@ -1173,10 +1187,16 @@ export async function verifySession(
       (!expectedRevision || result.revision === expectedRevision);
     result.expectedThemeId = expectedThemeId;
     result.expectedRevision = expectedRevision;
-    result.readiness = { windowPass, documentPass, viewportPass, structurePass };
+    result.readiness = {
+      windowPass,
+      documentPass,
+      viewportPass,
+      structurePass,
+      threadScrollPass,
+    };
     result.pass = result.installed && result.version === result.expectedVersion &&
       result.stylePresent && result.businessClassPollution === 0 && windowPass &&
-      documentPass && viewportPass && structurePass &&
+      documentPass && viewportPass && structurePass && threadScrollPass &&
       payloadPass &&
       (!result.homePresent || (Boolean(result.homeSurface?.visible && result.hero?.visible) &&
         (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
