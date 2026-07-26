@@ -175,15 +175,34 @@ try {
     throw 'Runtime scripts are not unblocked only after staged byte-content verification.'
   }
   foreach ($requiredNodeBehavior in @(
-    '$env:CODEX_DREAM_SKIN_NODE',
     'runtime\node\node.exe',
     'runtime\node\LICENSE',
     '$sourceHasBundledRuntime',
-    'Get-DreamSkinValidatedNodeRuntime'
+    'Get-DreamSkinValidatedNodeRuntime',
+    'Assert-DreamSkinTrustedNodeImage'
   )) {
     if (-not $commonSource.Contains($requiredNodeBehavior)) {
       throw "Bundled Node.js discovery is missing: $requiredNodeBehavior"
     }
+  }
+  # The Node runtime executes every validator we own (Safe CSS, theme package,
+  # image metadata, injector), so its path must not be redirectable by anyone
+  # who can write HKCU\Environment without admin rights.
+  if ($commonSource.Contains('$env:CODEX_DREAM_SKIN_NODE')) {
+    throw 'The Node.js runtime path must not be overridable through an environment variable.'
+  }
+  if ($commonSource -match "Get-Command node(\.exe)? -ErrorAction SilentlyContinue") {
+    throw 'The Node.js runtime must not fall back to whatever node.exe PATH resolves to.'
+  }
+  # Authenticity must be proven before the binary runs; `node -p` is execution.
+  $trustIndex = $commonSource.IndexOf(
+    'Assert-DreamSkinTrustedNodeImage -Path $candidate', [System.StringComparison]::Ordinal
+  )
+  $probeIndex = $commonSource.IndexOf(
+    "Invoke-DreamSkinNative -FilePath `$candidate", [System.StringComparison]::Ordinal
+  )
+  if ($trustIndex -lt 0 -or $probeIndex -le $trustIndex) {
+    throw 'The Node.js runtime is executed before its signature is verified.'
   }
   $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
   $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
