@@ -356,7 +356,7 @@ try {
   })
   if ($AutoApply) {
     try {
-      Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+      Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port")
     } catch {
       Write-Warning "Dream Skin auto-apply failed: $($_.Exception.Message)"
     }

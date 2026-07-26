@@ -1244,6 +1244,9 @@ try {
       throw "Tray release action is missing: $requiredReleaseAction"
     }
   }
+  if ([regex]::IsMatch($traySource, '(?s)if \(\$AutoApply\) \{.*?-PromptRestart.*?\n  \}')) {
+    throw 'Tray auto-apply must not request a Codex restart while the tray is starting.'
+  }
   $pickerSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-picker.ps1')
   foreach ($requiredPickerAction in @(
     'Use-DreamSkinSavedTheme',
