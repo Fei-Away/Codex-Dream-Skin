@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" aria-label="DreamSkin">
+  <defs>
+    <clipPath id="dsc">
+      <rect x="2" y="2" width="28" height="28" rx="9"/>
+    </clipPath>
+  </defs>
+  <rect x="2" y="2" width="28" height="28" rx="9" fill="#fdfdfc" stroke="#17181c" stroke-opacity=".14"/>
+  <g clip-path="url(#dsc)">
+    <path d="M2 30 30 2v28Z" fill="#17181c"/>
+  </g>
+  <circle cx="23" cy="9" r="2.5" fill="#2de1c2"/>
+</svg>
