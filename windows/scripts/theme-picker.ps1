@@ -38,9 +38,9 @@ try {
   function Start-DreamSkinPickerPowerShell {
     param([Parameter(Mandatory = $true)][string]$Script, [string[]]$Arguments = @())
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
-    $argumentLine = '-NoProfile -ExecutionPolicy RemoteSigned -File ' + $scriptToken
+    $argumentLine = '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
-    Start-Process -FilePath $powershell -ArgumentList $argumentLine | Out-Null
+    Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
   }
 
   function Test-DreamSkinPickerWatcherRunning {

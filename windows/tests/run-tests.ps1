@@ -197,7 +197,10 @@ try {
     '$themePickerScript = $engine.ThemePicker',
     '$shortcut.WorkingDirectory = $engine.Root',
     '$restore.WorkingDirectory = $engine.Root',
-    '$tray.WorkingDirectory = $engine.Root'
+    '$tray.WorkingDirectory = $engine.Root',
+    '$shortcut.WindowStyle = 7',
+    '$restore.WindowStyle = 7',
+    '$tray.WindowStyle = 7'
   )) {
     if (-not $installSource.Contains($requiredShortcutBinding)) {
       throw "Installer shortcut still depends on its source checkout: $requiredShortcutBinding"
@@ -1253,7 +1256,8 @@ try {
     'Remove-DreamSkinSavedTheme',
     '删除主题',
     '✓',
-    'Start-DreamSkinPickerPowerShell'
+    'Start-DreamSkinPickerPowerShell',
+    'Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden'
   )) {
     if (-not $pickerSource.Contains($requiredPickerAction)) {
       throw "Theme picker action is missing: $requiredPickerAction"
