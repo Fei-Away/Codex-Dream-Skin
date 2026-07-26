@@ -258,9 +258,36 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
   assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
-  assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
-  assert.match(css, /content:\s*var\(--dream-skin-status/);
-  assert.match(css, /content:\s*var\(--dream-skin-quote/);
+  assert.doesNotMatch(css,
+    /content:\s*var\(--dream-skin-(?:chrome-mark|brand-subtitle|status|quote)/,
+    "Theme slogans must not be painted over native chrome.");
+  assert.doesNotMatch(template,
+    /setStyleProperty\(root,\s*"--dream-skin-(?:brand-subtitle|status|quote)"/,
+    "Retired chrome slogans must not be populated by the renderer.");
+  assert.match(css,
+    /--ambient-start:\s*52%[\s\S]*?--ambient-feather:\s*clamp\(240px,\s*24vw,\s*320px\)[\s\S]*?--composer-surface:[\s\S]*?--reading-veil:\s*linear-gradient/);
+  assert.match(css,
+    /data-dream-task-mode="ambient"[\s\S]*?main\.main-surface:not\(:has\(\[role="main"\]\)\)\s*\{[\s\S]*?overflow:\s*visible\s*!important[\s\S]*?clip-path:\s*none\s*!important[\s\S]*?mask-image:\s*none\s*!important[\s\S]*?background:\s*var\(--reading-veil\)\s*!important/,
+    "Wide ambient tasks must feather one body artwork layer through a continuous main canvas.");
+  assert.match(css,
+    /header\.app-header-tint\s*\{[\s\S]*?background:\s*var\(--composer-surface\)\s*!important[\s\S]*?border:\s*0\s*!important[\s\S]*?box-shadow:\s*none\s*!important/,
+    "The theme must not draw a divider across the native toolbar.");
+  assert.match(css,
+    /composer-surface-chrome\s*\{[\s\S]{0,260}?isolation:\s*isolate\s*!important[\s\S]{0,180}?overflow:\s*visible\s*!important[\s\S]{0,220}?clip-path:\s*none\s*!important[\s\S]{0,220}?mask-image:\s*none\s*!important[\s\S]{0,220}?background:\s*var\(--composer-surface\)\s*!important/,
+    "The composer must stay one complete surface above atmospheric layers.");
+  assert.match(css,
+    /composer-surface-chrome::before\s*\{[\s\S]*?border:\s*1px solid var\(--ds-line\)[\s\S]*?pointer-events:\s*none\s*!important/,
+    "The composer boundary must remain complete without intercepting input.");
+  const threadSurfaceBlocks = [...css.matchAll(
+    /([^{}]*\.thread-scroll-container[^{}]*)\{([^{}]*)\}/g,
+  )];
+  for (const [, selector, declarations] of threadSurfaceBlocks) {
+    assert.doesNotMatch(
+      declarations,
+      /(?:^|\n)\s*(?:overflow(?:-[xy])?|clip-path|(?:-webkit-)?mask(?:-image)?)\s*:/,
+      `The skin must not override native scrolling or clipping on ${selector.trim()}.`,
+    );
+  }
   assert.match(css, /--ds-task-full-veil/);
   assert.match(css, /data-dream-task-mode="full"/);
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
@@ -281,8 +308,9 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(home.document.adoptedStyleSheets.length, 1);
   assert.equal(state.scope.baseState, "home");
   assert.equal(state.scope.level, "L1");
-  assert.equal(home.rootStyle.values.get("--dream-skin-brand-subtitle"), '"CODEX DREAM SKIN"');
-  assert.equal(home.rootStyle.values.get("--dream-skin-status"), '"DREAM SKIN ONLINE"');
+  assert.equal(home.rootStyle.values.has("--dream-skin-brand-subtitle"), false);
+  assert.equal(home.rootStyle.values.has("--dream-skin-status"), false);
+  assert.equal(home.rootStyle.values.has("--dream-skin-quote"), false);
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-radius"), "12px");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-opacity"), "1");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-blur"), "0px");

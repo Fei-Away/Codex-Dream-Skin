@@ -59,6 +59,16 @@
   --ds-task-immersive-edge: rgb(var(--ds-bg-rgb) / .82);
   --ds-task-immersive-mid: rgb(var(--ds-bg-rgb) / .74);
   --ds-task-immersive-far: rgb(var(--ds-bg-rgb) / .60);
+  /* Wide task routes remain one continuous canvas: artwork stays on the body,
+     while this veil feathers the reading plane into the atmospheric edge. */
+  --ambient-start: 52%;
+  --ambient-feather: clamp(240px, 24vw, 320px);
+  --composer-surface: rgb(var(--ds-panel-rgb) / .94);
+  --reading-veil: linear-gradient(90deg,
+    rgb(var(--ds-panel-rgb) / .96) 0%,
+    rgb(var(--ds-panel-rgb) / .96) var(--ambient-start),
+    rgb(var(--ds-panel-rgb) / .12) calc(var(--ambient-start) + var(--ambient-feather)),
+    rgb(var(--ds-panel-rgb) / .06) 100%);
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"] {
@@ -411,10 +421,11 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) {
-  background: linear-gradient(90deg,
-    var(--ds-task-immersive-edge),
-    var(--ds-task-immersive-mid) 64%,
-    var(--ds-task-immersive-far)) !important;
+  overflow: visible !important;
+  clip-path: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  background: var(--reading-veil) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -427,13 +438,12 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_COMPOSER_CHROME__ {
-  background: var(--ds-immersive-composer-solid) !important;
-  border: 0 !important;
+  background: var(--composer-surface) !important;
+  border: 1px solid var(--ds-line) !important;
   box-shadow:
     0 10px 30px rgb(var(--ds-bg-rgb) / .20),
-    inset 0 0 0 1px var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
-  backdrop-filter: none !important;
+  backdrop-filter: blur(18px) saturate(108%) !important;
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
@@ -532,70 +542,24 @@ html[data-dream-skin="active"][data-dream-shell="light"] __DREAM_SELECTOR_HOME_R
 }
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_SHELL_MAIN__ > __DREAM_SELECTOR_HEADER_TINT__ {
-  /* Preserve Codex's native fixed header geometry and side-panel controls. */
-  background: rgb(var(--ds-panel-rgb) / .90) !important;
-  border-bottom: 1px solid var(--ds-line) !important;
-  backdrop-filter: blur(14px) saturate(108%) !important;
+  /* Preserve the native flex layout, baselines and hit targets without
+     drawing a theme divider across the titlebar. */
+  background: var(--composer-surface) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
-/* Decorative chrome lives on the native shell; no injected positioning host is needed. */
+/* Native titlebar controls own the complete toolbar grid and hit targets.
+   Theme identity stays in the artwork and palette, never positioned labels. */
 html[data-dream-skin="active"]
-  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) > __DREAM_SELECTOR_HEADER_TINT__::before {
-  content: var(--dream-skin-name, "Codex Dream Skin") " · "
-    var(--dream-skin-brand-subtitle, "CODEX DREAM SKIN");
-  position: absolute;
-  left: 22px;
-  top: 4px;
-  z-index: 2;
-  max-width: min(42%, 360px);
-  overflow: hidden;
-  color: var(--ds-accent);
-  font: 800 11px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  letter-spacing: .03em;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 12px rgb(var(--ds-bg-rgb) / .32);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) > __DREAM_SELECTOR_HEADER_TINT__::before,
 html[data-dream-skin="active"]
-  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) > __DREAM_SELECTOR_HEADER_TINT__::after {
-  content: var(--dream-skin-status, "DREAM SKIN ONLINE");
-  position: absolute;
-  right: 84px;
-  top: 13px;
-  z-index: 2;
-  max-width: 28%;
-  overflow: hidden;
-  color: var(--ds-muted);
-  font: 700 9px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  letter-spacing: .08em;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 10px rgb(var(--ds-bg-rgb) / .32);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) > __DREAM_SELECTOR_HEADER_TINT__::after,
 html[data-dream-skin="active"]
   __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)::after {
-  content: var(--dream-skin-quote, "MAKE SOMETHING WONDERFUL");
-  position: absolute;
-  right: 28px;
-  bottom: 72px;
-  z-index: 2;
-  pointer-events: none;
-  color: rgb(var(--ds-accent-rgb) / .74);
-  font: italic 14px/1.2 "Segoe Print", "Comic Sans MS", cursive;
-  letter-spacing: 0;
-  text-shadow: 0 0 13px rgb(var(--ds-accent-rgb) / .30);
-  transform: rotate(-3deg);
-}
-
-html[data-dream-skin="active"][data-dream-shell="light"]
-  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) > __DREAM_SELECTOR_HEADER_TINT__::before,
-html[data-dream-skin="active"][data-dream-shell="light"]
-  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) > __DREAM_SELECTOR_HEADER_TINT__::after {
-  text-shadow: none;
+  content: none !important;
+  display: none !important;
 }
 
 /* Windows keeps this native bar outside main; macOS simply has no match. */
@@ -889,15 +853,32 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HO
 html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:last-child { align-items: center !important; text-align: center !important; }
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
+  position: relative !important;
+  isolation: isolate !important;
+  z-index: 4 !important;
   overflow: visible !important;
-  border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
+  clip-path: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  background-clip: padding-box !important;
+  border: 1px solid var(--ds-line) !important;
   border-radius: 22px !important;
-  background: rgb(var(--ds-panel-rgb) / .94) !important;
+  background: var(--composer-surface) !important;
   box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
-  backdrop-filter: blur(16px) saturate(108%) !important;
+  backdrop-filter: blur(18px) saturate(108%) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__::before { content: none !important; }
+/* Keep a complete one-pixel boundary even when the native cascade zeroes the
+   composer's own border width. This layer never participates in input. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2 !important;
+  border: 1px solid var(--ds-line) !important;
+  border-radius: inherit !important;
+  pointer-events: none !important;
+}
 
 /* A wide image can carry the home screen too. The native hero remains live,
    but the artwork is painted once on the window instead of repeated in a card. */
@@ -980,13 +961,12 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
-  background: var(--ds-immersive-composer-solid) !important;
-  border: 0 !important;
+  background: var(--composer-surface) !important;
+  border: 1px solid var(--ds-line) !important;
   box-shadow:
     0 10px 30px rgb(var(--ds-bg-rgb) / .20),
-    inset 0 0 0 1px var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
-  backdrop-filter: none !important;
+  backdrop-filter: blur(18px) saturate(108%) !important;
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
