@@ -51,6 +51,9 @@ const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
 const OPERATION_UI_STATES = new Set(["success", "error", "cancelled"]);
+const DISCOVERY_RETRY_INITIAL_MS = 250;
+const DISCOVERY_RETRY_MAX_MS = 30000;
+const DISCOVERY_ERROR_LOG_INTERVAL_MS = 30000;
 const MIN_RENDERER_WIDTH = 320;
 const MIN_RENDERER_HEIGHT = 240;
 const MAX_RENDERER_DIMENSION = 65536;
@@ -164,6 +167,73 @@ const OPERATION_UI_CSS = `
 let staticPayloadAssets = null;
 let operationSequence = 0;
 
+export function processIsAlive(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 1 || pid > 2147483647) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
+export function nextDiscoveryDelay(currentDelayMs) {
+  return Math.min(
+    DISCOVERY_RETRY_MAX_MS,
+    Math.max(DISCOVERY_RETRY_INITIAL_MS, Math.round(currentDelayMs * 2)),
+  );
+}
+
+export function createLogThrottle(intervalMs, now = Date.now) {
+  const lastLogAt = new Map();
+  return (key) => {
+    const currentTime = now();
+    const previousTime = lastLogAt.get(key);
+    if (previousTime !== undefined && currentTime - previousTime < intervalMs) return false;
+    lastLogAt.set(key, currentTime);
+    return true;
+  };
+}
+
+function abortableSleep(delayMs, signal) {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve(false);
+      return;
+    }
+    let timer;
+    const finish = (completed) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      resolve(completed);
+    };
+    const onAbort = () => finish(false);
+    timer = setTimeout(() => finish(true), delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export async function waitForWatchRetry(delayMs, {
+  hostPid,
+  signal = null,
+  isAlive = processIsAlive,
+  pollIntervalMs = 500,
+} = {}) {
+  const deadline = Date.now() + delayMs;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) return "stopped";
+    if (!isAlive(hostPid)) return "host-exited";
+    const remainingMs = deadline - Date.now();
+    const completed = await abortableSleep(
+      Math.min(remainingMs, Math.max(1, pollIntervalMs)),
+      signal,
+    );
+    if (!completed) return "stopped";
+  }
+  if (!isAlive(hostPid)) return "host-exited";
+  return signal?.aborted ? "stopped" : "elapsed";
+}
+
 function hasReasonableDimensions(width, height) {
   return Number.isFinite(width) && Number.isFinite(height)
     && width >= MIN_RENDERER_WIDTH && height >= MIN_RENDERER_HEIGHT
@@ -272,7 +342,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   return result;
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     port: 9341,
     mode: "watch",
@@ -286,6 +356,7 @@ function parseArgs(argv) {
     operationUiState: null,
     operationMessage: null,
     operationToken: null,
+    hostPid: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -306,6 +377,7 @@ function parseArgs(argv) {
     else if (arg === "--operation-ui-state") options.operationUiState = argv[++i];
     else if (arg === "--operation-message") options.operationMessage = argv[++i];
     else if (arg === "--operation-token") options.operationToken = argv[++i];
+    else if (arg === "--host-pid") options.hostPid = Number(argv[++i]);
     else if (arg === "--reload") options.reload = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -314,6 +386,10 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 250 || options.timeoutMs > 120000) {
     throw new Error(`Invalid timeout: ${options.timeoutMs}`);
+  }
+  if (options.mode === "watch"
+    && (!Number.isSafeInteger(options.hostPid) || options.hostPid <= 1 || options.hostPid > 2147483647)) {
+    throw new Error(`Invalid or missing watcher host PID: ${options.hostPid}`);
   }
   if (options.operationToken !== null && !/^\d{1,12}:\d{13}:\d{1,8}$/.test(options.operationToken)) {
     throw new Error("Invalid operation token");
@@ -1505,8 +1581,9 @@ async function runWatch(options) {
   let stopping = false;
   let reloadTimer = null;
   let reloadChain = Promise.resolve();
-  let discoveryDelayMs = 100;
-  let lastListErrorAt = 0;
+  let discoveryDelayMs = DISCOVERY_RETRY_INITIAL_MS;
+  const shouldLogListError = createLogThrottle(DISCOVERY_ERROR_LOG_INTERVAL_MS);
+  const retryController = new AbortController();
   let operationSignalChain = Promise.resolve();
   let activeOperation = null;
   let pauseRecovery = null;
@@ -1534,6 +1611,7 @@ async function runWatch(options) {
   });
   const stop = () => {
     stopping = true;
+    retryController.abort();
     wakeControlLoop();
   };
   process.on("SIGINT", stop);
@@ -1796,6 +1874,10 @@ async function runWatch(options) {
 
   try {
     while (!stopping) {
+      if (!processIsAlive(options.hostPid)) {
+        console.log(`[dream-skin] host process ${options.hostPid} exited; stopping watcher`);
+        break;
+      }
       if (activeOperation && !isFreshBusyOperation(activeOperation)) {
         const expiredOperation = activeOperation;
         activeOperation = null;
@@ -1822,14 +1904,21 @@ async function runWatch(options) {
       let targets = [];
       try {
         targets = await listAppTargets(options.port);
-        discoveryDelayMs = 100;
+        discoveryDelayMs = DISCOVERY_RETRY_INITIAL_MS;
       } catch (error) {
-        if (Date.now() - lastListErrorAt >= 2000) {
+        if (shouldLogListError(error.message)) {
           console.error(`[dream-skin] ${new Date().toISOString()} ${error.message}`);
-          lastListErrorAt = Date.now();
         }
-        await new Promise((resolve) => setTimeout(resolve, discoveryDelayMs));
-        discoveryDelayMs = Math.min(500, Math.round(discoveryDelayMs * 1.6));
+        const retryResult = await waitForWatchRetry(discoveryDelayMs, {
+          hostPid: options.hostPid,
+          signal: retryController.signal,
+        });
+        if (retryResult === "stopped") break;
+        if (retryResult === "host-exited") {
+          console.log(`[dream-skin] host process ${options.hostPid} exited; stopping watcher`);
+          break;
+        }
+        discoveryDelayMs = nextDiscoveryDelay(discoveryDelayMs);
         continue;
       }
 
@@ -2011,6 +2100,8 @@ async function runWatch(options) {
       await new Promise((resolve) => setTimeout(resolve, pollDelay));
     }
   } finally {
+    process.off("SIGINT", stop);
+    process.off("SIGTERM", stop);
     if (reloadTimer) clearTimeout(reloadTimer);
     closePayloadWatchers();
     closeOperationWatcher();

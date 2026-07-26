@@ -248,6 +248,7 @@ launch_injector_daemon() {
 wait_for_cdp() { return 0; }
 process_started_at() { /usr/bin/printf 'test-start-time\\n'; }
 codex_main_pids() { /usr/bin/printf '4242\\n'; }
+wait_for_codex_main_pid() { codex_main_pids | /usr/bin/head -n 1; }
 write_state() { /usr/bin/printf '{}\\n' > "$STATE_PATH"; }
 mark_state_stale() { /usr/bin/printf 'stale\\n' > "$STALE_MARKER"; }
 mark_state_active() { /usr/bin/printf 'active\\n' > "$ACTIVE_MARKER"; }

@@ -165,6 +165,7 @@ fi
 "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
 "$NODE" "$ROOT/tests/image-metadata.test.mjs"
 "$NODE" "$ROOT/tests/injector-bootstrap.test.mjs"
+"$NODE" "$ROOT/tests/injector-watcher-lifecycle.test.mjs"
 "$NODE" "$ROOT/tests/window-readiness.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
 "$NODE" "$ROOT/tests/safe-css-validator.test.mjs"
@@ -662,7 +663,8 @@ STATUS_PID=""
 # The common stop path must reject a real watcher running on 19341 when the
 # saved state claims 1934, even though nodePath/injectorPath/start-time all
 # match. This exercises the signal gate directly (status has its own matcher).
-"$NODE" "$ROOT/scripts/injector.mjs" --watch --port 19341 --theme-dir "$ROOT/presets/preset-gothic-void-crusade" \
+"$NODE" "$ROOT/scripts/injector.mjs" --watch --port 19341 \
+  --theme-dir "$ROOT/presets/preset-gothic-void-crusade" --host-pid "$$" \
   >"$TMP/near-prefix-injector.out" 2>&1 &
 WATCH_PID="$!"
 /bin/sleep 0.2

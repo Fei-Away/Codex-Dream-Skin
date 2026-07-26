@@ -87,9 +87,10 @@ injector_identity_matches() {
   [ -n "$actual_start" ] && [ "$actual_start" = "$expected_start" ]
 }
 
-# Codex process: cheap name match only.  26.707 renamed Codex.app to
-# ChatGPT.app, while older installs still expose the former process name.
-if /usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 || /usr/bin/pgrep -x Codex >/dev/null 2>&1; then
+# Query LaunchServices by the stable bundle ID. Current macOS builds can expose
+# "ChatGPT" through ps while remaining invisible to pgrep's process-name lookup.
+if /usr/bin/lsappinfo find bundleID=com.openai.codex 2>/dev/null \
+  | /usr/bin/grep -q '^ASN:'; then
   CODEX_RUNNING="true"
 fi
 
