@@ -99,7 +99,7 @@ jobs:
             printf 'Injector renderer probes must not read the page title or URL back to the host.\n' >&2
             exit 1
           fi
-          for injector in macos/scripts/injector.mjs; do
+          for injector in macos/scripts/injector.mjs windows/scripts/injector.mjs; do
             if grep -n -E '\.replace\("__DREAM_SKIN_[A-Z0-9_]+_JSON__", [^(]' \
               "$injector" >/dev/null; then
               printf '%s: payload placeholders must use function replacements so a theme name containing $ cannot corrupt the payload.\n' \
