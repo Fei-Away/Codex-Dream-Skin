@@ -175,15 +175,43 @@ try {
     throw 'Runtime scripts are not unblocked only after staged byte-content verification.'
   }
   foreach ($requiredNodeBehavior in @(
-    '$env:CODEX_DREAM_SKIN_NODE',
     'runtime\node\node.exe',
     'runtime\node\LICENSE',
     '$sourceHasBundledRuntime',
-    'Get-DreamSkinValidatedNodeRuntime'
+    'Get-DreamSkinValidatedNodeRuntime',
+    'Assert-DreamSkinTrustedNodeImage'
   )) {
     if (-not $commonSource.Contains($requiredNodeBehavior)) {
       throw "Bundled Node.js discovery is missing: $requiredNodeBehavior"
     }
+  }
+  # The Node runtime executes every validator we own (Safe CSS, theme package,
+  # image metadata, injector), so its path must not be redirectable by anyone
+  # who can write HKCU\Environment without admin rights.
+  if ($commonSource.Contains('$env:CODEX_DREAM_SKIN_NODE')) {
+    throw 'The Node.js runtime path must not be overridable through an environment variable.'
+  }
+  # A bundled runtime, when present, wins over PATH. The source tree has no
+  # bundled copy, so PATH stays reachable for the suite -- but every candidate,
+  # bundled or not, is funnelled through the same signature gate below.
+  $bundledIndex = $commonSource.IndexOf(
+    'Get-DreamSkinValidatedNodeRuntime -Path $bundledNode', [System.StringComparison]::Ordinal
+  )
+  $pathFallbackIndex = $commonSource.IndexOf(
+    'Get-Command node.exe -ErrorAction SilentlyContinue', [System.StringComparison]::Ordinal
+  )
+  if ($bundledIndex -lt 0 -or $pathFallbackIndex -le $bundledIndex) {
+    throw 'The bundled Node.js runtime must be preferred over whatever PATH resolves to.'
+  }
+  # Authenticity must be proven before the binary runs; `node -p` is execution.
+  $trustIndex = $commonSource.IndexOf(
+    'Assert-DreamSkinTrustedNodeImage -Path $candidate', [System.StringComparison]::Ordinal
+  )
+  $probeIndex = $commonSource.IndexOf(
+    "Invoke-DreamSkinNative -FilePath `$candidate", [System.StringComparison]::Ordinal
+  )
+  if ($trustIndex -lt 0 -or $probeIndex -le $trustIndex) {
+    throw 'The Node.js runtime is executed before its signature is verified.'
   }
   $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
   $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
