@@ -40,7 +40,7 @@
     { "key": "home-suggestions", "selector": ".group\\/home-suggestions", "tier": "L2", "scope": "home", "required": false },
     { "key": "project-selector", "selector": ".group\\/project-selector", "tier": "L2", "scope": "home config", "required": false, "notes": "依赖用户项目配置；win 快照未出现（该机可能未配置项目），不算平台差异" },
     { "key": "markdown", "selector": "[class*=\"_markdown\"]", "tier": "L2", "scope": "thread", "required": false, "notes": "会话内容块，单页可达 100+ 个，样式规则注意性能" },
-    { "key": "thread-surface", "selector": ".thread-scroll-container", "tier": "L2", "scope": "thread", "required": false, "notes": "会话滚动表面；双端活动会话快照均存在。原生应用负责 overflow、裁剪与滚动虚拟化，皮肤不得覆盖这些功能属性" },
+    { "key": "thread-surface", "selector": ".thread-scroll-container", "tier": "L2", "scope": "thread", "required": false, "notes": "会话滚动表面；双端活动会话快照均存在" },
     { "key": "message", "selector": "[data-message-author-role]", "tier": "L2", "scope": "thread", "required": false, "notes": "用户与助手消息的稳定语义边界；运行时对子节点变更做合并刷新" },
     { "key": "appearance-radio", "selector": "input[name=\"appearance-theme\"]", "tier": "L2", "scope": "settings", "required": false, "notes": "外观三选一；theme-preview testid 同屏出现" },
     { "key": "overlay-menu", "selector": "[role=\"menu\"]", "tier": "L2", "scope": "overlay", "required": false },

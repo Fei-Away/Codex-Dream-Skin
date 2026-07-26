@@ -59,70 +59,6 @@
   --ds-task-immersive-edge: rgb(var(--ds-bg-rgb) / .82);
   --ds-task-immersive-mid: rgb(var(--ds-bg-rgb) / .74);
   --ds-task-immersive-far: rgb(var(--ds-bg-rgb) / .60);
-  /* One-canvas layout contract. Native window chrome and content geometry
-     remain authoritative; artwork must adapt to the product, never reserve
-     layout space at the expense of typing or reading comfort. */
-  --titlebar-safe-left: max(env(safe-area-inset-left), 0px);
-  --titlebar-safe-right: max(env(safe-area-inset-right), 0px);
-  --ambient-start: 52%;
-  --ambient-feather: clamp(240px, 24vw, 320px);
-  /* Semantic design tokens. Theme packages provide the primitive palette;
-     native components consume these roles so material, state and accessibility
-     decisions stay consistent instead of scattering alpha values. */
-  --ds-canvas: var(--ds-bg);
-  --ds-sidebar: rgb(var(--ds-panel-rgb) / .975);
-  --ds-content-reading-plane: rgb(var(--ds-panel-rgb) / .975);
-  --ds-content-reading-plane-soft: rgb(var(--ds-panel-rgb) / .92);
-  --ds-content-reading-plane-far: rgb(var(--ds-panel-rgb) / .83);
-  --reading-veil: linear-gradient(90deg,
-    var(--ds-content-reading-plane) 0%,
-    var(--ds-content-reading-plane) var(--ambient-start),
-    rgb(var(--ds-panel-rgb) / .06) calc(var(--ambient-start) + var(--ambient-feather)),
-    rgb(var(--ds-panel-rgb) / .06) 100%);
-  --ds-surface: var(--ds-panel);
-  --message-surface: rgb(var(--ds-panel-rgb) / .94);
-  --ds-elevated-surface: var(--ds-panel);
-  --ds-popover: rgb(var(--ds-panel-rgb) / .988);
-  --ds-input: rgb(var(--ds-panel-rgb) / .985);
-  --composer-surface: rgb(var(--ds-panel-rgb) / .92);
-  --ds-input-disabled: rgb(var(--ds-panel-2-rgb) / .96);
-  --ds-selected: rgb(var(--ds-panel-2-rgb) / .98);
-  --ds-hover: rgb(var(--ds-panel-2-rgb) / .72);
-  --ds-pressed: rgb(var(--ds-panel-2-rgb) / .92);
-  --ds-focus: var(--ds-accent);
-  --ds-border: var(--ds-line);
-  --ds-text-primary: var(--ds-text);
-  --ds-text-secondary: var(--ds-muted);
-  --ds-text-muted: rgb(var(--ds-muted-rgb) / .88);
-  --ds-danger: #ff9a8f;
-  --ds-danger-surface: #4b1f22;
-  --ds-danger-foreground: #fff0ed;
-  --ds-danger-border: #d87970;
-  --ds-success: #80c79b;
-  --ds-success-surface: #203d2d;
-  --ds-success-foreground: #e6f4e9;
-  --ds-success-border: #72a782;
-  --ds-warning-surface: #4c351c;
-  --ds-warning-foreground: #fff0cf;
-  --ds-warning-border: #cf984b;
-  --ds-info-surface: #223842;
-  --ds-info-foreground: #edf7fa;
-  --ds-info-border: #7899a6;
-  --ds-zone-surface: color-mix(in srgb, var(--ds-panel) 88%, var(--ds-panel-2) 12%);
-  --ds-zone-surface-raised: color-mix(in srgb, var(--ds-panel) 82%, var(--ds-panel-2) 18%);
-  --ds-zone-border: rgb(var(--ds-muted-rgb) / .32);
-  --ds-zone-divider: rgb(var(--ds-muted-rgb) / .18);
-  --ds-zone-shadow:
-    0 7px 18px rgb(var(--ds-bg-rgb) / .09),
-    inset 0 1px rgb(var(--ds-panel-rgb) / .82);
-  --ds-shadow-surface: 0 8px 22px rgb(var(--ds-bg-rgb) / .12);
-  --ds-shadow-elevated:
-    0 16px 38px rgb(var(--ds-bg-rgb) / .20),
-    0 2px 8px rgb(var(--ds-bg-rgb) / .12);
-  --ds-motion-fast: 120ms;
-  --ds-motion-standard: 160ms;
-  --ds-motion-reveal: 210ms;
-  --ds-ease-out: cubic-bezier(.22, 1, .36, 1);
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"] {
@@ -171,24 +107,6 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
   --ds-task-immersive-edge: rgb(var(--ds-panel-rgb) / .86);
   --ds-task-immersive-mid: rgb(var(--ds-panel-rgb) / .78);
   --ds-task-immersive-far: rgb(var(--ds-panel-rgb) / .66);
-  --ds-danger: #9c3d3a;
-  --ds-danger-surface: #f8e6e3;
-  --ds-danger-foreground: #6f2523;
-  --ds-danger-border: #b85650;
-  --ds-success: #45624d;
-  --ds-success-surface: #e4efe5;
-  --ds-success-foreground: #28543a;
-  --ds-success-border: #5f856b;
-  --ds-warning-surface: #f8edd7;
-  --ds-warning-foreground: #674515;
-  --ds-warning-border: #aa7a32;
-  --ds-info-surface: #e8eef1;
-  --ds-info-foreground: #284754;
-  --ds-info-border: #6f8b97;
-  --ds-shadow-surface: 0 8px 22px rgb(var(--ds-bg-rgb) / .10);
-  --ds-shadow-elevated:
-    0 18px 42px rgb(var(--ds-bg-rgb) / .16),
-    0 2px 8px rgb(var(--ds-bg-rgb) / .08);
 }
 
 /* Native token surfaces (dropdown/popover) resolve from Codex's own
@@ -197,131 +115,6 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
    skin variables so those surfaces inherit the theme in both shells. */
 html[data-dream-skin="active"] {
   --color-token-dropdown-background: var(--ds-panel);
-  --vscode-inputValidation-errorBackground: var(--ds-danger-surface);
-  --vscode-inputValidation-errorForeground: var(--ds-danger-foreground);
-  --vscode-inputValidation-errorBorder: var(--ds-danger-border);
-  --color-token-input-validation-error-background: var(--ds-danger-surface);
-  --color-token-input-validation-error-foreground: var(--ds-danger-foreground);
-  --color-token-input-validation-error-border: var(--ds-danger-border);
-  --color-token-error-foreground: var(--ds-danger-foreground);
-  --color-token-editor-error-foreground: var(--ds-danger-foreground);
-}
-
-/* Codex can remain electron-dark while a theme explicitly requests a light
-   shell. Bridge the native token family to the active skin so task cards,
-   inputs, secondary copy and icons do not keep dark-mode values on a light
-   wallpaper. This is component-scoped token remapping, never whole-page
-   opacity. */
-html[data-dream-skin="active"][data-dream-shell="light"] {
-  --vscode-foreground: var(--ds-text);
-  --vscode-descriptionForeground: var(--ds-muted);
-  --vscode-disabledForeground: rgb(var(--ds-muted-rgb) / .78);
-  --color-background-panel: var(--ds-panel);
-  --color-token-bg-fog: var(--ds-panel-2);
-  --color-token-bg-secondary: var(--ds-panel-2);
-  --color-token-main-surface-primary: var(--ds-panel);
-  --color-token-main-surface-secondary: var(--ds-panel-2);
-  --color-token-foreground: var(--ds-text);
-  --color-token-text-primary: var(--ds-text);
-  --color-token-text-secondary: rgb(var(--ds-muted-rgb) / .96);
-  --color-token-text-tertiary: rgb(var(--ds-muted-rgb) / .88);
-  --color-token-conversation-body: var(--ds-muted);
-  --color-token-conversation-summary-leading: var(--ds-muted);
-  --color-token-conversation-summary-trailing: var(--ds-muted);
-  --color-token-muted-foreground: rgb(var(--ds-muted-rgb) / .92);
-  --color-token-description-foreground: var(--ds-muted);
-  --color-token-list-hover-background: var(--ds-hover);
-  --color-token-input-background: var(--ds-input);
-  --color-token-input-foreground: var(--ds-text);
-  --color-token-input-placeholder-foreground: var(--ds-muted);
-  --color-token-border: var(--ds-border);
-  --color-token-border-default: var(--ds-border);
-}
-
-/* The scheduled-task detail side panel uses a separate inline panel surface
-   variable and input token family. Reinforce the light-shell bridge at its
-   native form boundary so the prompt, detail and schedule cards cannot retain
-   electron-dark surfaces or pale input copy. */
-html[data-dream-skin="active"][data-dream-shell="light"]
-  [class~="bg-token-main-surface-primary"]:has(form[id^="automation-side-panel-form"]) {
-  color: var(--ds-text);
-  --color-background-panel: var(--ds-input);
-  --color-token-bg-fog: var(--ds-panel-2);
-  --color-token-bg-secondary: var(--ds-panel-2);
-  --color-token-main-surface-primary: var(--ds-panel);
-  --color-token-main-surface-secondary: var(--ds-panel-2);
-  --color-token-foreground: var(--ds-text);
-  --color-token-text-primary: var(--ds-text);
-  --color-token-text-secondary: var(--ds-muted);
-  --color-token-description-foreground: var(--ds-muted);
-  --color-token-input-background: var(--ds-input);
-  --color-token-input-foreground: var(--ds-text);
-  --color-token-input-placeholder-foreground: var(--ds-muted);
-  --color-token-border: var(--ds-border);
-  --color-token-border-default: var(--ds-border);
-}
-
-/* Native toasts use one generic foreground token across four different
-   surfaces. Resolve the actual host state classes into independent semantic
-   palettes before styling the shared alert component. */
-html[data-dream-skin="active"]
-  [role="alert"].alert-root[class~="bg-token-dropdown-background"] {
-  --ds-alert-surface: var(--ds-info-surface);
-  --ds-alert-foreground: var(--ds-info-foreground);
-  --ds-alert-border: var(--ds-info-border);
-}
-
-html[data-dream-skin="active"]
-  [role="alert"].alert-root[class~="bg-token-input-validation-info-background"] {
-  --ds-alert-surface: var(--ds-success-surface);
-  --ds-alert-foreground: var(--ds-success-foreground);
-  --ds-alert-border: var(--ds-success-border);
-}
-
-html[data-dream-skin="active"]
-  [role="alert"].alert-root[class~="bg-token-input-validation-warning-background"] {
-  --ds-alert-surface: var(--ds-warning-surface);
-  --ds-alert-foreground: var(--ds-warning-foreground);
-  --ds-alert-border: var(--ds-warning-border);
-}
-
-html[data-dream-skin="active"]
-  [role="alert"].alert-root[class~="bg-token-input-validation-error-background"] {
-  --ds-alert-surface: var(--ds-danger-surface);
-  --ds-alert-foreground: var(--ds-danger-foreground);
-  --ds-alert-border: var(--ds-danger-border);
-}
-
-html[data-dream-skin="active"] [role="alert"].alert-root {
-  background-color: var(--ds-alert-surface, var(--ds-popover)) !important;
-  border-color: var(--ds-alert-border, var(--ds-border)) !important;
-  color: var(--ds-alert-foreground, var(--ds-text)) !important;
-  --color-token-foreground: var(--ds-alert-foreground, var(--ds-text));
-  --color-token-text-primary: var(--ds-alert-foreground, var(--ds-text));
-  --color-token-text-secondary: var(--ds-alert-foreground, var(--ds-text));
-  --color-token-muted-foreground: var(--ds-alert-foreground, var(--ds-text));
-}
-
-html[data-dream-skin="active"] [role="alert"].alert-root > button[aria-label] {
-  color: var(--ds-alert-foreground, var(--ds-text)) !important;
-  opacity: .76 !important;
-}
-
-html[data-dream-skin="active"] [role="alert"].alert-root > button[aria-label]:is(:hover, :focus-visible) {
-  opacity: 1 !important;
-}
-
-/* Active tool/agent summaries render duplicated shimmer text with hard-coded
-   alpha and a white sweep. Keep the base label readable and tint only its
-   moving overlay with the skin accent; no ancestor opacity is changed. */
-html[data-dream-skin="active"][data-dream-shell="light"] .loading-shimmer-pure-text {
-  color: var(--ds-muted) !important;
-  -webkit-text-fill-color: var(--ds-muted) !important;
-}
-
-html[data-dream-skin="active"][data-dream-shell="light"] .loading-shimmer-pure-text * {
-  color: var(--ds-accent) !important;
-  -webkit-text-fill-color: var(--ds-accent) !important;
 }
 
 html[data-dream-skin="active"] [class~="bg-token-dropdown-background"] {
@@ -337,10 +130,12 @@ html[data-dream-skin="active"] [class~="bg-token-dropdown-background"] {
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="left"], [data-dream-art-safe-area="left"]) {
   --ds-safe-side: left;
+  --ds-art-position: 100% var(--ds-focus-y);
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="right"], [data-dream-art-safe-area="right"]) {
   --ds-safe-side: right;
+  --ds-art-position: 0% var(--ds-focus-y);
   --ds-hero-scrim: linear-gradient(270deg,
     rgb(var(--ds-bg-rgb) / .90) 0%,
     rgb(var(--ds-bg-rgb) / .76) 50%,
@@ -423,9 +218,9 @@ html[data-dream-skin="active"] body::before {
 html[data-dream-skin="active"] aside.app-shell-left-panel {
   background:
     linear-gradient(180deg,
-      var(--ds-sidebar),
-      rgb(var(--ds-bg-rgb) / .975)) !important;
-  border: 1px solid var(--ds-border) !important;
+      rgb(var(--ds-panel-rgb) / .98),
+      rgb(var(--ds-bg-rgb) / .96)) !important;
+  border: 1px solid var(--ds-line) !important;
   border-left: 0 !important;
   border-radius: 0 16px 16px 0 !important;
   box-shadow: 10px 0 30px rgb(var(--ds-bg-rgb) / .22) !important;
@@ -435,53 +230,12 @@ html[data-dream-skin="active"] aside.app-shell-left-panel {
 
 html[data-dream-skin="active"] aside.app-shell-left-panel nav { background: transparent !important; }
 
-/* Recent and other semantic lists may read as quiet raised sections. The
-   primary navigation stays on the native flat canvas: wrapping its split
-   fixed/scrolling DOM in a faux card creates the broken right edge called out
-   in the screenshot and relies on brittle nth-child geometry. */
-html[data-dream-skin="active"] aside.app-shell-left-panel
-  nav section:has([role="list"]) {
-  box-sizing: border-box !important;
-  margin-inline: 8px !important;
-  padding: 7px 6px 8px !important;
-  border: 1px solid var(--ds-zone-border) !important;
-  border-radius: 14px !important;
-  background: var(--ds-zone-surface-raised) !important;
-  box-shadow: var(--ds-zone-shadow) !important;
-}
-
-html[data-dream-skin="active"] aside.app-shell-left-panel
-  nav section:has([role="list"]) > div > div:first-child {
-  margin-bottom: 3px !important;
-  padding-bottom: 5px !important;
-  border-bottom: 1px solid var(--ds-zone-divider) !important;
-}
-
-/* Use the existing 16px native resize target as the visual boundary. The line
-   is non-interactive and never narrows or covers the resizer hit area. */
-html[data-dream-skin="active"] aside.app-shell-left-panel > [role="separator"]::before {
-  content: "" !important;
-  position: absolute !important;
-  top: 0 !important;
-  bottom: 0 !important;
-  left: 8px !important;
-  width: 1px !important;
-  background: var(--ds-zone-border) !important;
-  box-shadow: 4px 0 14px rgb(var(--ds-bg-rgb) / .08) !important;
-  pointer-events: none !important;
-}
-
-html[data-dream-skin="active"] aside.app-shell-left-panel > [role="separator"]:hover::before {
-  background: rgb(var(--ds-accent-rgb) / .52) !important;
-}
-
 html[data-dream-skin="active"] aside.app-shell-left-panel button,
 html[data-dream-skin="active"] aside.app-shell-left-panel a {
   color: var(--ds-text) !important;
-  transition: background-color var(--ds-motion-standard) var(--ds-ease-out),
-    border-color var(--ds-motion-standard) var(--ds-ease-out),
-    color var(--ds-motion-fast) var(--ds-ease-out),
-    box-shadow var(--ds-motion-standard) var(--ds-ease-out) !important;
+  transition: background-color .18s cubic-bezier(.22, 1, .36, 1),
+    border-color .18s cubic-bezier(.22, 1, .36, 1),
+    color .18s cubic-bezier(.22, 1, .36, 1) !important;
 }
 
 html[data-dream-skin="active"] aside.app-shell-left-panel [class*="text-token-foreground"] {
@@ -497,9 +251,8 @@ html[data-dream-skin="active"] aside.app-shell-left-panel svg {
 }
 
 html[data-dream-skin="active"] aside.app-shell-left-panel button:hover,
-html[data-dream-skin="active"] aside.app-shell-left-panel a:hover,
-html[data-dream-skin="active"] aside.app-shell-left-panel [role="button"]:hover {
-  background: var(--ds-hover) !important;
+html[data-dream-skin="active"] aside.app-shell-left-panel a:hover {
+  background: rgb(var(--ds-accent-rgb) / .09) !important;
   color: var(--ds-text) !important;
   transform: none !important;
 }
@@ -526,40 +279,14 @@ html[data-dream-skin="active"] aside.app-shell-left-panel button[aria-label^="åˆ
 
 html[data-dream-skin="active"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
 html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] {
-  background: var(--ds-selected) !important;
-  border: 1px solid var(--ds-accent) !important;
-  border-radius: 9px 9px 10px 10px !important;
-  box-shadow:
-    0 4px 14px rgb(var(--ds-bg-rgb) / .14),
-    inset 3px 0 rgb(var(--ds-accent-rgb) / .82) !important;
-  color: var(--ds-text) !important;
-}
-
-html[data-dream-skin="active"] aside.app-shell-left-panel [role="button"]:active,
-html[data-dream-skin="active"] aside.app-shell-left-panel button:active,
-html[data-dream-skin="active"] aside.app-shell-left-panel a:active {
-  background: var(--ds-pressed) !important;
-}
-
-html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] [class*="text-token"],
-html[data-dream-skin="active"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"] [class*="text-token"] {
+  background: rgb(var(--ds-accent-rgb) / .12) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .22) !important;
+  box-shadow: 0 4px 16px rgb(var(--ds-bg-rgb) / .12) !important;
   color: var(--ds-text) !important;
 }
 
 html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] svg {
   color: var(--ds-accent) !important;
-}
-
-/* Onboarding and task suggestion cards are native sidebar surfaces, not
-   dialogs. When Codex itself is dark they otherwise remain charcoal beneath a
-   light skin. Keep them opaque enough for copy while preserving a soft lift. */
-html[data-dream-skin="active"][data-dream-shell="light"] aside.app-shell-left-panel
-  [class~="bg-token-main-surface-primary/70"] {
-  background: var(--ds-selected) !important;
-  border: 1px solid var(--ds-border) !important;
-  box-shadow: var(--ds-shadow-surface) !important;
-  color: var(--ds-text) !important;
-  backdrop-filter: blur(14px) saturate(104%) !important;
 }
 
 html[data-dream-skin="active"] main.main-surface {
@@ -684,11 +411,10 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
   main.main-surface:not(:has([role="main"])) {
-  overflow: visible !important;
-  clip-path: none !important;
-  -webkit-mask-image: none !important;
-  mask-image: none !important;
-  background: var(--reading-veil) !important;
+  background: linear-gradient(90deg,
+    var(--ds-task-immersive-edge),
+    var(--ds-task-immersive-mid) 64%,
+    var(--ds-task-immersive-far)) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -699,29 +425,21 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
   content: none;
 }
 
-/* The artwork is painted once on the fixed body layer. Do not create a second
-   right-side image window: its own width, mask and vertical bounds form a
-   visible page seam and can bisect the sticky composer region. */
-html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]
-  main.main-surface:not(:has([role="main"]))::after {
-  content: none !important;
-  display: none !important;
-}
-
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
   .composer-surface-chrome {
-  background: var(--composer-surface) !important;
-  border: 1px solid var(--ds-border) !important;
+  background: var(--ds-immersive-composer-solid) !important;
+  border: 0 !important;
   box-shadow:
-    var(--ds-shadow-surface),
+    0 10px 30px rgb(var(--ds-bg-rgb) / .20),
+    inset 0 0 0 1px var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
-  backdrop-filter: blur(14px) saturate(102%) !important;
+  backdrop-filter: none !important;
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
   main.main-surface > header.app-header-tint {
-  background: var(--composer-surface) !important;
-  border: 0 !important;
+  background: transparent !important;
+  border-bottom: 0 !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
 }
@@ -736,7 +454,9 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 
 html[data-dream-skin="active"][data-dream-shell="light"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]
   main.main-surface:not(:has([role="main"])) [class*="_markdown"] {
-  text-shadow: none;
+  text-shadow:
+    0 1px 2px rgb(var(--ds-panel-rgb) / .92),
+    0 0 10px rgb(var(--ds-panel-rgb) / .72);
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
@@ -773,26 +493,6 @@ html[data-dream-skin="active"] main.main-surface:not(:has([role="main"])) [role=
     0 0 10px rgb(var(--ds-bg-rgb) / .46);
 }
 
-/* Non-immersive task routes keep a conservative reading surface. Wide ambient
-   routes clear this local layer below because their veil already lives on the
-   complete main canvas, including the composer zone. */
-html[data-dream-skin="active"]
-  main.main-surface:not(:has([role="main"]))
-  .thread-scroll-container {
-  background:
-    linear-gradient(90deg,
-      var(--ds-content-reading-plane) 0%,
-      var(--ds-content-reading-plane) var(--ambient-start),
-      var(--ds-content-reading-plane-far) 100%) !important;
-  backdrop-filter: none !important;
-}
-
-html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]
-  main.main-surface:not(:has([role="main"]))
-  .thread-scroll-container {
-  background: transparent !important;
-}
-
 html[data-dream-skin="active"][data-dream-shell="light"] main.main-surface:not(:has([role="main"])) [role="main"] {
   text-shadow: none;
 }
@@ -810,19 +510,19 @@ html[data-dream-skin="active"] main.main-surface
 
 html[data-dream-skin="active"] main.main-surface
   div[class~="bg-token-main-surface-primary"][class~="border-l"] {
-  background: var(--ds-content-reading-plane) !important;
+  background: rgb(var(--ds-panel-rgb) / .62) !important;
   backdrop-filter: blur(10px) saturate(106%) !important;
 }
 
 html[data-dream-skin="active"] main.main-surface:not(:has([role="main"])) article {
   border: 1px solid rgb(var(--ds-muted-rgb) / .12);
-  background: var(--message-surface);
+  background: rgb(var(--ds-panel-rgb) / .44);
   box-shadow: 0 8px 24px rgb(var(--ds-bg-rgb) / .10);
-  backdrop-filter: blur(14px) saturate(108%);
+  backdrop-filter: blur(7px) saturate(105%);
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"] main.main-surface:not(:has([role="main"])) article {
-  background: var(--message-surface);
+  background: rgb(var(--ds-panel-rgb) / .72);
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"]
@@ -832,25 +532,70 @@ html[data-dream-skin="active"][data-dream-shell="light"] [role="main"]:has([data
 }
 
 html[data-dream-skin="active"] main.main-surface > header.app-header-tint {
-  /* Preserve the native flex layout, baselines and hit targets. A solid surface
-     is enough; a theme border/shadow becomes a full-width false divider. */
-  background: var(--composer-surface) !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
+  /* Preserve Codex's native fixed header geometry and side-panel controls. */
+  background: rgb(var(--ds-panel-rgb) / .90) !important;
+  border-bottom: 1px solid var(--ds-line) !important;
+  backdrop-filter: blur(14px) saturate(108%) !important;
 }
 
-/* Native titlebar controls own the complete toolbar grid and hit targets.
-   Theme identity comes from the artwork and palette, so task chrome carries no
-   absolute-positioned labels and the home composer has no floating quote. */
+/* Decorative chrome lives on the native shell; no injected positioning host is needed. */
 html[data-dream-skin="active"]
-  main.main-surface:not(:has([role="main"])) > header.app-header-tint::before,
+  main.main-surface:not(:has([role="main"])) > header.app-header-tint::before {
+  content: var(--dream-skin-name, "Codex Dream Skin") " Â· "
+    var(--dream-skin-brand-subtitle, "CODEX DREAM SKIN");
+  position: absolute;
+  left: 22px;
+  top: 4px;
+  z-index: 2;
+  max-width: min(42%, 360px);
+  overflow: hidden;
+  color: var(--ds-accent);
+  font: 800 11px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: .03em;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 12px rgb(var(--ds-bg-rgb) / .32);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 html[data-dream-skin="active"]
-  main.main-surface:not(:has([role="main"])) > header.app-header-tint::after,
+  main.main-surface:not(:has([role="main"])) > header.app-header-tint::after {
+  content: var(--dream-skin-status, "DREAM SKIN ONLINE");
+  position: absolute;
+  right: 84px;
+  top: 13px;
+  z-index: 2;
+  max-width: 28%;
+  overflow: hidden;
+  color: var(--ds-muted);
+  font: 700 9px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: .08em;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 10px rgb(var(--ds-bg-rgb) / .32);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 html[data-dream-skin="active"]
   main.main-surface:has([role="main"])::after {
-  content: none !important;
-  display: none !important;
+  content: var(--dream-skin-quote, "MAKE SOMETHING WONDERFUL");
+  position: absolute;
+  right: 28px;
+  bottom: 72px;
+  z-index: 2;
+  pointer-events: none;
+  color: rgb(var(--ds-accent-rgb) / .74);
+  font: italic 14px/1.2 "Segoe Print", "Comic Sans MS", cursive;
+  letter-spacing: 0;
+  text-shadow: 0 0 13px rgb(var(--ds-accent-rgb) / .30);
+  transform: rotate(-3deg);
+}
+
+html[data-dream-skin="active"][data-dream-shell="light"]
+  main.main-surface:not(:has([role="main"])) > header.app-header-tint::before,
+html[data-dream-skin="active"][data-dream-shell="light"]
+  main.main-surface:not(:has([role="main"])) > header.app-header-tint::after {
+  text-shadow: none;
 }
 
 /* Windows keeps this native bar outside main; macOS simply has no match. */
@@ -1144,81 +889,15 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:last-child { align-items: center !important; text-align: center !important; }
 
 html[data-dream-skin="active"] .composer-surface-chrome {
-  position: relative !important;
-  isolation: isolate !important;
-  z-index: 4 !important;
   overflow: visible !important;
-  clip-path: none !important;
-  -webkit-mask-image: none !important;
-  mask-image: none !important;
-  background-clip: padding-box !important;
-  border: 1px solid var(--ds-border) !important;
-  border-width: 1px !important;
-  border-style: solid !important;
-  border-color: var(--ds-border) !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
   border-radius: 22px !important;
-  background: var(--composer-surface) !important;
-  box-shadow: var(--ds-shadow-surface) !important;
-  backdrop-filter: blur(20px) saturate(108%) !important;
-  transition:
-    border-color var(--ds-motion-standard) var(--ds-ease-out),
-    box-shadow var(--ds-motion-standard) var(--ds-ease-out),
-    background-color var(--ds-motion-standard) var(--ds-ease-out) !important;
+  background: rgb(var(--ds-panel-rgb) / .94) !important;
+  box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
+  backdrop-filter: blur(16px) saturate(108%) !important;
 }
 
-/* Current Codex builds force the native composer border width to zero from a
-   higher-priority cascade layer. Draw the semantic 1px boundary separately so
-   it remains stable without changing content opacity or input geometry. */
-html[data-dream-skin="active"] .composer-surface-chrome::before {
-  content: "" !important;
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 2 !important;
-  border: 1px solid var(--ds-border) !important;
-  border-radius: inherit !important;
-  pointer-events: none !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:hover {
-  border-color: var(--ds-accent) !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:hover::before {
-  border-color: var(--ds-accent) !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:focus-within {
-  border-color: var(--ds-focus) !important;
-  outline: 2px solid var(--ds-focus) !important;
-  outline-offset: 2px !important;
-  box-shadow: var(--ds-shadow-elevated) !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:focus-within::before {
-  border-color: var(--ds-focus) !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:has(:disabled),
-html[data-dream-skin="active"] .composer-surface-chrome[aria-disabled="true"] {
-  color: var(--ds-text-muted) !important;
-  background: var(--ds-input-disabled) !important;
-  border-color: var(--ds-border) !important;
-  box-shadow: none !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:has(:disabled)::before,
-html[data-dream-skin="active"] .composer-surface-chrome[aria-disabled="true"]::before {
-  border-color: var(--ds-border) !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:has([aria-invalid="true"]) {
-  border-color: var(--ds-danger) !important;
-  outline-color: var(--ds-danger) !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome:has([aria-invalid="true"])::before {
-  border-color: var(--ds-danger) !important;
-}
+html[data-dream-skin="active"] .composer-surface-chrome::before { content: none !important; }
 
 /* A wide image can carry the home screen too. The native hero remains live,
    but the artwork is painted once on the window instead of repeated in a card. */
@@ -1301,12 +980,13 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] .composer-surface-chrome {
-  background: var(--composer-surface) !important;
-  border: 1px solid var(--ds-border) !important;
+  background: var(--ds-immersive-composer-solid) !important;
+  border: 0 !important;
   box-shadow:
-    var(--ds-shadow-surface),
+    0 10px 30px rgb(var(--ds-bg-rgb) / .20),
+    inset 0 0 0 1px var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
-  backdrop-filter: blur(20px) saturate(108%) !important;
+  backdrop-filter: none !important;
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
@@ -1315,12 +995,12 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
     0 10px 28px rgb(var(--ds-bg-rgb) / .14),
     inset 0 0 0 1px var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-panel-rgb) / .72) !important;
-  backdrop-filter: blur(18px) saturate(108%) !important;
+  backdrop-filter: blur(8px) saturate(102%) !important;
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"]
   .composer-surface-chrome p.placeholder::after {
-  color: var(--ds-text-secondary) !important;
+  color: rgb(var(--ds-muted-rgb) / .78) !important;
   opacity: 1 !important;
 }
 
@@ -1333,7 +1013,7 @@ html[data-dream-skin="active"] [class*="_homeUtilityBar_"] {
   margin-inline: 0 !important;
   padding-inline: 18px !important;
   border-radius: 22px 22px 0 0 !important;
-  background: var(--composer-surface) !important;
+  background: rgb(var(--ds-panel-rgb) / .94) !important;
   box-shadow:
     inset 1px 0 rgb(var(--ds-muted-rgb) / .18),
     inset -1px 0 rgb(var(--ds-muted-rgb) / .18),
@@ -1343,7 +1023,7 @@ html[data-dream-skin="active"] [class*="_homeUtilityBar_"] {
 
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]):has([class*="_homeUtilityBar_"])
   .composer-surface-chrome {
-  border: 1px solid var(--ds-border) !important;
+  border: 0 !important;
   border-radius: 0 0 22px 22px !important;
   box-shadow:
     0 10px 28px rgb(var(--ds-bg-rgb) / .24),
@@ -1353,12 +1033,12 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]):has(
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] [class*="_homeUtilityBar_"] {
-  background: var(--composer-surface) !important;
+  background: var(--ds-immersive-composer-solid) !important;
   box-shadow:
     inset 1px 0 var(--ds-immersive-line),
     inset -1px 0 var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
-  backdrop-filter: blur(20px) saturate(108%) !important;
+  backdrop-filter: none !important;
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"]
@@ -1376,7 +1056,7 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
     inset 1px 0 var(--ds-immersive-line),
     inset -1px 0 var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-panel-rgb) / .72) !important;
-  backdrop-filter: blur(18px) saturate(108%) !important;
+  backdrop-filter: blur(8px) saturate(102%) !important;
 }
 
 html[data-dream-skin="active"] [class*="_homeUtilityBar_"] button,
@@ -1401,55 +1081,7 @@ html[data-dream-skin="active"] .composer-surface-chrome button:not([class~="bg-t
 }
 
 html[data-dream-skin="active"] .composer-surface-chrome p.placeholder::after {
-  color: var(--ds-text-secondary) !important;
-  opacity: 1 !important;
-}
-
-html[data-dream-skin="active"] :is(input, textarea)::placeholder {
-  color: var(--ds-text-secondary) !important;
-  opacity: 1 !important;
-}
-
-/* Menus, popovers and dialogs are independent elevated surfaces. Background
-   content may inform their material tint but must never remain legible through
-   them. */
-html[data-dream-skin="active"] :is([role="menu"], [role="dialog"]),
-html[data-dream-skin="active"] [data-radix-popper-content-wrapper] > * {
-  color: var(--ds-text-primary) !important;
-  background: var(--ds-popover) !important;
-  border: 1px solid var(--ds-border) !important;
-  box-shadow: var(--ds-shadow-elevated) !important;
-  backdrop-filter: blur(18px) saturate(102%) !important;
-}
-
-html[data-dream-skin="active"] :is(
-  button,
-  a,
-  input,
-  textarea,
-  [role="button"],
-  [role="menuitem"],
-  [tabindex]
-):focus-visible {
-  outline: 2px solid var(--ds-focus) !important;
-  outline-offset: 2px !important;
-}
-
-html[data-dream-skin="active"] :is(
-  button,
-  input,
-  textarea,
-  [role="button"],
-  [role="menuitem"]
-):disabled,
-html[data-dream-skin="active"] :is(
-  button,
-  input,
-  textarea,
-  [role="button"],
-  [role="menuitem"]
-)[aria-disabled="true"] {
-  color: var(--ds-text-muted) !important;
+  color: rgb(var(--ds-muted-rgb) / .82) !important;
   opacity: 1 !important;
 }
 
@@ -1541,26 +1173,12 @@ html[data-dream-skin="active"] button[class~="bg-token-foreground"] {
   box-shadow: 0 5px 14px rgb(var(--ds-accent-rgb) / .20) !important;
 }
 
-html[data-dream-skin="active"] button[class~="bg-token-foreground"]:hover {
-  background: var(--ds-highlight) !important;
-}
-
-html[data-dream-skin="active"] button[class~="bg-token-foreground"]:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 8px rgb(var(--ds-accent-rgb) / .18) !important;
-}
-
 html[data-dream-skin="active"] article,
 html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px; }
 
 @media (max-width: 1120px) {
-  html[data-dream-skin="active"] {
-    --ambient-start: 52%;
-  }
   html[data-dream-skin="active"]
     main.main-surface:has([role="main"])::after { content: none; }
-  html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]
-    main.main-surface:not(:has([role="main"]))::after { content: none; }
   html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) { --thread-content-max-width: min(940px, calc(100cqw - 30px)) !important; }
   html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child { width: calc(100% - 28px) !important; }
 }

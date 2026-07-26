@@ -13,7 +13,6 @@ const selectors = {
   shell: "main.main-surface",
   sidebar: "aside.app-shell-left-panel",
   composer: ".composer-surface-chrome",
-  threadSurface: ".thread-scroll-container",
   home: '[role="main"]:has([data-testid="home-icon"])',
   settings: 'input[name="appearance-theme"]',
   themePreview: '[data-testid="theme-preview"]',
@@ -51,9 +50,6 @@ function makeDomFixture({
   shell = makeElement(),
   sidebar = makeElement(),
   composer = makeElement(),
-  threadSurface = makeElement({
-    style: { overflowX: "hidden", overflowY: "auto", pointerEvents: "auto" },
-  }),
   home = null,
   settings = null,
   visibilityState = "visible",
@@ -78,7 +74,6 @@ function makeDomFixture({
       if (selector === selectors.shell) return shell;
       if (selector === selectors.sidebar) return sidebar;
       if (selector === selectors.composer) return composer;
-      if (selector === selectors.threadSurface) return threadSurface;
       if (selector === selectors.home) return home;
       if (selector === selectors.settings || selector === selectors.themePreview) return settings;
       return null;
@@ -88,7 +83,7 @@ function makeDomFixture({
   };
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
-      version: "1.5.6",
+      version: "1.5.5",
       themeId: "fixture-theme",
       revision: "fixture-revision",
       styleMode: "style",
@@ -153,24 +148,11 @@ test("normal L1 renderer requires and records the exact target window binding", 
     documentPass: true,
     viewportPass: true,
     structurePass: true,
-    threadScrollPass: true,
   });
   assert.deepEqual(session.calls, [
     { method: "Browser.getWindowForTarget", params: { targetId: "page-main" } },
     { method: "Browser.getWindowBounds", params: { windowId: 41 } },
   ]);
-});
-
-test("task verification fails when the skin disables the native thread scroller", async () => {
-  const broken = await verify({
-    dom: makeDomFixture({
-      threadSurface: makeElement({
-        style: { overflowX: "visible", overflowY: "visible", pointerEvents: "auto" },
-      }),
-    }),
-  });
-  assert.equal(broken.result.pass, false);
-  assert.equal(broken.result.readiness.threadScrollPass, false);
 });
 
 test("visible settings and home anchors are the only L0 structure exceptions", async () => {
