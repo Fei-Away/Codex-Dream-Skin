@@ -59,7 +59,7 @@ updates, and uninstall steps.
 
 <p align="center">
   <a href="https://dreamskin.cc">
-    <img src="docs/images/dreamskin-mark.svg" alt="DreamSkin.cc" height="140">
+    <img src="docs/images/dreamskin-mark.svg" alt="DreamSkin.cc" width="140">
   </a>
 </p>
 

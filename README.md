@@ -57,7 +57,7 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
 
 <p align="center">
   <a href="https://dreamskin.cc">
-    <img src="docs/images/dreamskin-mark.svg" alt="DreamSkin.cc" height="140">
+    <img src="docs/images/dreamskin-mark.svg" alt="DreamSkin.cc" width="140">
   </a>
 </p>
 
