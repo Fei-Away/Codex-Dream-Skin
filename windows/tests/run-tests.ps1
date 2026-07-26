@@ -1331,7 +1331,12 @@ try {
   $projectRoot = Split-Path -Parent $Root
   $syncToolPath = Join-Path $projectRoot 'tools\sync-runtime-assets.mjs'
   $syncToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($syncToolPath, '--check')
-  if ($syncToolResult.ExitCode -ne 0) { throw "Runtime contract tool failed: $syncToolPath" }
+  if ($syncToolResult.ExitCode -ne 0) {
+    # The tool names each stale file on stdout; without this the failure is
+    # indistinguishable from the tool not running at all.
+    $syncDetail = ($syncToolResult.Output -join "`n").Trim()
+    throw "Runtime contract tool failed: $syncToolPath`n$syncDetail"
+  }
   $doctorToolPath = Join-Path $projectRoot 'tools\doctor-selectors.test.mjs'
   $doctorToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($doctorToolPath)
   if ($doctorToolResult.ExitCode -ne 0) { throw "Runtime contract tool failed: $doctorToolPath" }

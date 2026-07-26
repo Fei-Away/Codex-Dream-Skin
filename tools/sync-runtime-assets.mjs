@@ -66,6 +66,48 @@ function compileSafeCssFileValidator(source) {
   return source.replace(canonicalImport, 'from "../assets/safe-css-validator.mjs"');
 }
 
+// Both injectors enforce the 16384px / 50MP decode limits through this parser,
+// so the two platform copies must not drift. Windows additionally needs a tiny
+// CLI so theme-windows.ps1 can shell out to it; that entry point is appended
+// here instead of being maintained as a second hand-edited copy of the parser.
+const WINDOWS_IMAGE_METADATA_CLI = `
+// Keep the PowerShell theme store on the same strict parser as the injector.
+// The CLI is intentionally tiny: it only reads a user-selected file and emits
+// validated dimensions; it never writes or follows a caller-provided output.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const [mode, imagePath] = process.argv.slice(2);
+  if (mode !== "--check" || !imagePath) {
+    console.error("Usage: image-metadata.mjs --check <image>");
+    process.exitCode = 2;
+  } else {
+    try {
+      const resolved = path.resolve(imagePath);
+      const bytes = await fs.readFile(resolved);
+      const metadata = readImageMetadata(bytes, path.extname(resolved));
+      if (!metadata) throw new Error("Image metadata is invalid or exceeds the 16384px / 50MP safety limit");
+      console.log(JSON.stringify(metadata));
+    } catch (error) {
+      console.error(error?.message ?? String(error));
+      process.exitCode = 2;
+    }
+  }
+}
+`;
+
+function compileWindowsImageMetadata(source) {
+  if (source.includes("process.argv")) {
+    throw new Error("runtime/image-metadata.mjs must stay a pure parser; the CLI is appended at sync time");
+  }
+  const imports = [
+    'import fs from "node:fs/promises";',
+    'import path from "node:path";',
+    'import { fileURLToPath } from "node:url";',
+    "",
+    "",
+  ].join("\n");
+  return `${imports}${source.trimEnd()}\n${WINDOWS_IMAGE_METADATA_CLI}`;
+}
+
 const sourceCss = await fs.readFile(path.join(projectRoot, "runtime", "dream-skin.css"), "utf8");
 const sourceRuntime = await fs.readFile(path.join(projectRoot, "runtime", "renderer-inject.js"), "utf8");
 const sourceThemePackageValidator = await fs.readFile(
@@ -82,6 +124,10 @@ const sourceSafeCssPolicy = await fs.readFile(
 );
 const sourceSafeCssFileValidator = await fs.readFile(
   path.join(projectRoot, "runtime", "validate-safe-css-file.mjs"),
+  "utf8",
+);
+const sourceImageMetadata = await fs.readFile(
+  path.join(projectRoot, "runtime", "image-metadata.mjs"),
   "utf8",
 );
 const outputs = [
@@ -127,6 +173,14 @@ const outputs = [
       "macos/scripts/validate-safe-css-file.mjs",
       "windows/scripts/validate-safe-css-file.mjs",
     ],
+  },
+  {
+    content: sourceImageMetadata,
+    paths: ["macos/scripts/image-metadata.mjs"],
+  },
+  {
+    content: compileWindowsImageMetadata(sourceImageMetadata),
+    paths: ["windows/scripts/image-metadata.mjs"],
   },
 ];
 
