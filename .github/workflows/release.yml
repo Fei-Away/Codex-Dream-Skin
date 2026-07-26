@@ -1,5 +1,14 @@
 name: Release
 
+# This workflow deliberately does NOT gate on `workflow_run: [CI]`.  The guard
+# job below decides whether a main push is a real version bump by diffing
+# macos/VERSION against `github.event.before`, and a `workflow_run` payload
+# carries no `before` field.  Chaining CI would therefore disable the gate that
+# AGENTS.md requires against rebuilding or overwriting a Release when the
+# version did not change, and would break the idempotent `workflow_dispatch`
+# retry of a single tag.  The checks CI performs are instead repeated by the
+# `regressions` job below, run against the exact release commit rather than
+# whatever CI last happened to observe.
 on:
   push:
     branches:
@@ -164,9 +173,98 @@ jobs:
             echo "should_release=$should_release"
           } >> "$GITHUB_OUTPUT"
 
+  regressions:
+    name: Portable release regressions
+    needs: guard
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js for portable regressions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Check shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            bash -n "$file"
+          done < <(
+            find macos -type f \( -name '*.sh' -o -name '*.command' \) \
+              ! -path '*/release/*' -print
+          )
+
+      - name: Check Node.js syntax on both platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            node --check "$file" >/dev/null
+          done < <(
+            find macos windows -type f \( -name '*.mjs' -o -name '*.js' \) -print
+          )
+
+      # macos/tests/run-tests.sh already re-checks the macOS runtime assertions
+      # (legacy identifiers, app.asar mutation, python3/eval), so only the
+      # Windows execution-policy boundary is repeated here: the PowerShell
+      # suites assert it on named files, not across the whole tree.
+      - name: Check Windows execution-policy boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n --include='*.ps1' --include='*.iss' \
+            -F -- '-ExecutionPolicy Bypass' windows/scripts windows/installer >/dev/null; then
+            printf 'Windows runtime or installer code bypasses the PowerShell execution policy.\n' >&2
+            exit 1
+          fi
+
+      - name: Check Windows PowerShell source encoding
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          function visit(directory) {
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const file = path.join(directory, entry.name);
+              if (entry.isDirectory()) visit(file);
+              if (!entry.isFile() || path.extname(file) !== ".ps1") continue;
+              const bytes = fs.readFileSync(file);
+              const hasBom = bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]));
+              const content = hasBom ? bytes.subarray(3) : bytes;
+              if (content.some((byte) => byte >= 0x80) && !hasBom) {
+                throw new Error(`${file}: non-ASCII PowerShell 5.1 source requires a UTF-8 BOM`);
+              }
+            }
+          }
+
+          visit("windows");
+          NODE
+
+      # The platform runners execute run-tests.sh / run-tests.ps1, which only
+      # reference a subset of the *.test.mjs suites by name.  These globs are
+      # the only thing that reaches every portable regression, so they must run
+      # against the release commit before its tag exists.
+      - name: Run portable Node.js regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test macos/tests/*.test.mjs
+          node --test windows/tests/*.test.mjs
+          node macos/scripts/injector.mjs --check-payload >/dev/null
+          node windows/scripts/injector.mjs --check-payload >/dev/null
+
   create-tag:
     name: Create release tag
-    needs: guard
+    needs: [guard, regressions]
     if: needs.guard.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -283,12 +381,17 @@ jobs:
         env:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
-          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
-            -File .\windows\tests\run-tests.ps1
-          if ($LASTEXITCODE -ne 0) { throw "Windows regressions failed with exit code $LASTEXITCODE." }
-          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
-            -File .\windows\tests\installer-static.tests.ps1
-          if ($LASTEXITCODE -ne 0) { throw "Installer static checks failed with exit code $LASTEXITCODE." }
+          # Users run the shipped scripts under whichever shell their machine
+          # has, so both hosts must pass before the artifact is built.  Only
+          # Windows PowerShell 5.1 was exercised here previously.
+          foreach ($shell in @('powershell.exe', 'pwsh.exe')) {
+            & $shell -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+              -File .\windows\tests\run-tests.ps1
+            if ($LASTEXITCODE -ne 0) { throw "Windows regressions failed under $shell with exit code $LASTEXITCODE." }
+            & $shell -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+              -File .\windows\tests\installer-static.tests.ps1
+            if ($LASTEXITCODE -ne 0) { throw "Installer static checks failed under $shell with exit code $LASTEXITCODE." }
+          }
           $output = Join-Path $env:RUNNER_TEMP 'codex-dream-skin-release'
           New-Item -ItemType Directory -Path $output -Force | Out-Null
           & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned `
