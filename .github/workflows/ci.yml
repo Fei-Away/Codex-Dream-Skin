@@ -89,6 +89,24 @@ jobs:
             printf 'The macOS runtime must parse state without python3 or eval.\n' >&2
             exit 1
           fi
+          if grep -n -E 'target\.(title|url)' \
+            macos/scripts/injector.mjs windows/scripts/injector.mjs >/dev/null; then
+            printf 'Injector logs and results must not record page titles or URLs; keep only target IDs and structural markers.\n' >&2
+            exit 1
+          fi
+          if grep -n -E '(document\.title|location\.href)' \
+            macos/scripts/injector.mjs windows/scripts/injector.mjs >/dev/null; then
+            printf 'Injector renderer probes must not read the page title or URL back to the host.\n' >&2
+            exit 1
+          fi
+          for injector in macos/scripts/injector.mjs; do
+            if grep -n -E '\.replace\("__DREAM_SKIN_[A-Z0-9_]+_JSON__", [^(]' \
+              "$injector" >/dev/null; then
+              printf '%s: payload placeholders must use function replacements so a theme name containing $ cannot corrupt the payload.\n' \
+                "$injector" >&2
+              exit 1
+            fi
+          done
 
       - name: Check version consistency
         shell: bash

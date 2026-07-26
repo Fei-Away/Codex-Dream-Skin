@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { Script } from "node:vm";
 import { readImageMetadata } from "./image-metadata.mjs";
 import {
   normalizeThemeColor,
@@ -505,8 +506,6 @@ async function probeSession(session) {
     const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
-      title: document.title,
-      href: location.href,
       markers,
       codex: location.protocol === 'app:' &&
         ((markers.shell && markers.sidebar) || settings || markers.main),
@@ -770,7 +769,7 @@ function invalidateStaticPayloadAssets() {
   staticPayloadAssets = null;
 }
 
-async function loadPayload(themeDir) {
+export async function loadPayload(themeDir) {
   const startedAt = performance.now();
   const [staticAssets, loaded] = await Promise.all([
     loadStaticPayloadAssets(),
@@ -797,13 +796,18 @@ async function loadPayload(themeDir) {
     .update(JSON.stringify(theme))
     .digest("hex")
     .slice(0, 20);
+  // Every replacement value must be supplied as a function. A plain string
+  // replacement would still interpret `$$`, `$&`, `` $` `` and `$'` inside the
+  // JSON, so a theme name that legitimately contains `$` could silently corrupt
+  // or truncate the payload. Function replacements are inserted verbatim.
   const payload = template
-    .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(combinedCss))
-    .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify(artDataUrl))
-    .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify(theme))
-    .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(SKIN_VERSION))
-    .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify(styleRevision))
-    .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify(revision));
+    .replace("__DREAM_SKIN_CSS_JSON__", () => JSON.stringify(combinedCss))
+    .replace("__DREAM_SKIN_ART_JSON__", () => JSON.stringify(artDataUrl))
+    .replace("__DREAM_SKIN_THEME_JSON__", () => JSON.stringify(theme))
+    .replace("__DREAM_SKIN_VERSION_JSON__", () => JSON.stringify(SKIN_VERSION))
+    .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", () => JSON.stringify(styleRevision))
+    .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", () => JSON.stringify(revision));
+  assertPayloadIntegrity(payload);
   return {
     imageBytes: art.length,
     payload,
@@ -815,6 +819,27 @@ async function loadPayload(themeDir) {
       staticCacheHit: staticAssets.cacheHit,
     },
   };
+}
+
+// Fail closed before a payload can reach the renderer. Theme display fields are
+// attacker-influenced text, so template substitution is verified structurally
+// instead of trusting any single sanitiser:
+//   1. no placeholder token may survive substitution;
+//   2. the payload must still parse as the standalone expression that
+//      Runtime.evaluate would receive.
+// The second assertion is deliberately generic: it catches any corruption of
+// the template, not only the `$` replacement patterns that motivated it.
+// `new Script` compiles without running the payload, so nothing executes here.
+export function assertPayloadIntegrity(payload) {
+  if (/__DREAM_SKIN_[A-Z0-9_]+_JSON__/.test(payload)) {
+    throw new Error("Payload placeholders were not fully replaced");
+  }
+  try {
+    new Script(payload, { filename: "dream-skin-payload.js" });
+  } catch (error) {
+    throw new Error(`Payload is not a parsable renderer script: ${error.message}`);
+  }
+  return true;
 }
 
 async function applyToSession(session, payload) {
@@ -1289,7 +1314,7 @@ async function runOneShot(options) {
           loaded?.theme.id ?? null,
           loaded?.revision ?? null,
         );
-      results.push({ targetId: target.id, title: target.title, url: target.url, probe, result });
+      results.push({ targetId: target.id, markers: probe?.markers, result });
       if (operationToken) {
         const passed = options.mode === "remove" ? result === true : result?.pass;
         await presentOperationUi(
@@ -1320,9 +1345,7 @@ async function runOneShot(options) {
       }
       results.push({
         targetId: target.id,
-        title: target.title,
-        url: target.url,
-        probe,
+        markers: probe?.markers,
         error: error.message,
         result: null,
       });
@@ -1974,7 +1997,7 @@ async function runWatch(options) {
               session, record.operationToken, "success", `已应用「${current.theme.name}」`,
             );
           }
-          console.log(`[dream-skin] injected verified ChatGPT target ${target.id} (${target.title || target.url})`);
+          console.log(`[dream-skin] injected verified ChatGPT target ${target.id}`);
         } catch (error) {
           const recoveryStillCurrent = recoveryOperation && !activeOperation
             && pauseRecovery?.token === recoveryOperation.token;
@@ -2036,9 +2059,14 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
     const options = parseArgs(process.argv.slice(2));
     if (options.mode === "check") {
       const loaded = await loadPayload(options.themeDir);
+      // loadPayload already fails closed, but every installer, importer and
+      // theme switch gates on this command, so the guard is re-asserted at the
+      // CLI boundary rather than being an internal implementation detail.
+      assertPayloadIntegrity(loaded.payload);
       console.log(JSON.stringify({
         pass: true,
         version: SKIN_VERSION,
+        payloadIntegrity: "verified",
         themeId: loaded.theme.id,
         themeName: loaded.theme.name,
         imageBytes: loaded.imageBytes,
