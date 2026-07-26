@@ -350,6 +350,21 @@ codex_is_running() {
   [ -n "$(codex_main_pids)" ]
 }
 
+wait_for_codex_main_pid() {
+  local timeout_seconds="${1:-10}"
+  local deadline=$((SECONDS + timeout_seconds))
+  local pid=""
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    pid="$(codex_main_pids 2>/dev/null | /usr/bin/head -n 1)"
+    if [ -n "$pid" ]; then
+      printf '%s\n' "$pid"
+      return 0
+    fi
+    /bin/sleep 0.1
+  done
+  return 1
+}
+
 active_theme_appearance() {
   "$NODE" -e '
 const fs = require("node:fs");
@@ -636,8 +651,66 @@ mark_state_stale() {
   ' "$STATE_PATH"
 }
 
+release_injector_launchd_job() {
+  local service_target="gui/$(/usr/bin/id -u)/$INJECTOR_JOB_LABEL"
+  /bin/launchctl bootout "$service_target" >/dev/null 2>&1 || true
+  # Remove jobs left behind by older builds that used launchctl submit.
+  /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+}
+
+write_injector_launch_agent() {
+  local port="$1"
+  local host_pid="$2"
+  local job_plist="$STATE_ROOT/$INJECTOR_JOB_LABEL.plist"
+  local temporary=""
+  local argument=""
+  local arguments=(
+    "$NODE"
+    "$INJECTOR"
+    "--watch"
+    "--port"
+    "$port"
+    "--theme-dir"
+    "$THEME_DIR"
+    "--operation-state"
+    "$OPERATION_STATE_PATH"
+    "--operation-ack"
+    "$OPERATION_ACK_PATH"
+    "--host-pid"
+    "$host_pid"
+  )
+
+  temporary="$(/usr/bin/mktemp "$STATE_ROOT/.injector-launch-agent.XXXXXX")" || return 1
+  if ! /usr/bin/plutil -create xml1 "$temporary" \
+    || ! /usr/bin/plutil -insert Label -string "$INJECTOR_JOB_LABEL" "$temporary" \
+    || ! /usr/bin/plutil -insert ProgramArguments -array "$temporary"; then
+    /bin/rm -f "$temporary"
+    return 1
+  fi
+  for argument in "${arguments[@]}"; do
+    if ! /usr/bin/plutil -insert ProgramArguments -string "$argument" -append "$temporary"; then
+      /bin/rm -f "$temporary"
+      return 1
+    fi
+  done
+  if ! /usr/bin/plutil -insert RunAtLoad -bool true "$temporary" \
+    || ! /usr/bin/plutil -insert KeepAlive -bool false "$temporary" \
+    || ! /usr/bin/plutil -insert ProcessType -string Background "$temporary" \
+    || ! /usr/bin/plutil -insert StandardOutPath -string "$INJECTOR_LOG" "$temporary" \
+    || ! /usr/bin/plutil -insert StandardErrorPath -string "$INJECTOR_ERROR_LOG" "$temporary" \
+    || ! /bin/chmod 600 "$temporary" \
+    || ! /bin/mv -f "$temporary" "$job_plist"; then
+    /bin/rm -f "$temporary"
+    return 1
+  fi
+  printf '%s\n' "$job_plist"
+}
+
 stop_recorded_injector() {
-  [ -f "$STATE_PATH" ] || return 0
+  if [ ! -f "$STATE_PATH" ]; then
+    release_injector_launchd_job
+    return 0
+  fi
   local pid
   local saved_port
   local saved_start
@@ -649,7 +722,7 @@ stop_recorded_injector() {
   fi
   # Already paused / no daemon
   if [ "$pid" = "0" ]; then
-    /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+    release_injector_launchd_job
     return 0
   fi
   case "$pid" in
@@ -660,7 +733,7 @@ stop_recorded_injector() {
   esac
   while [ "${pid#0}" != "$pid" ]; do pid="${pid#0}"; done
   if [ -z "$pid" ]; then
-    /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+    release_injector_launchd_job
     return 0
   fi
 
@@ -687,7 +760,7 @@ stop_recorded_injector() {
     return 1
   fi
   /bin/kill -0 "$pid" 2>/dev/null || {
-    /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+    release_injector_launchd_job
     return 0
   }
   if ! recorded_injector_process_matches "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port"; then
@@ -695,13 +768,13 @@ stop_recorded_injector() {
     # identity check. A dead (or already reaped) recorded PID is safe to
     # forget; a live PID with mismatched identity is never signalled.
     if ! /bin/kill -0 "$pid" 2>/dev/null || [ -z "$(/bin/ps -p "$pid" -o command= 2>/dev/null || true)" ]; then
-      /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+      release_injector_launchd_job
       return 0
     fi
     printf 'Recorded injector PID %s is live but its identity does not match; refusing to signal it.\n' "$pid" >&2
     return 1
   fi
-  /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+  release_injector_launchd_job
   /bin/kill -TERM "$pid" 2>/dev/null || true
   local deadline=$((SECONDS + 6))
   while recorded_injector_process_matches "$pid" "$saved_start" "$saved_node" "$saved_injector" "$saved_port" \
@@ -725,20 +798,25 @@ stop_recorded_injector() {
 
 launch_injector_daemon() {
   local port="$1"
+  local host_pid="$2"
   local pid=""
+  local job_plist=""
+  local launchd_domain="gui/$(/usr/bin/id -u)"
   local deadline=$((SECONDS + 10))
+  case "$host_pid" in ''|*[!0-9]*) fail "Invalid Codex host PID: $host_pid" ;; esac
+  [ "$host_pid" -gt 1 ] 2>/dev/null && /bin/kill -0 "$host_pid" 2>/dev/null \
+    || fail "Codex host process is not running: $host_pid"
   : > "$INJECTOR_LOG"
   : > "$INJECTOR_ERROR_LOG"
-  /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+  release_injector_launchd_job
 
   # SwiftBar may terminate background children when a click action finishes.
-  # A submitted user job owns the watcher independently of that action.
-  if /bin/launchctl submit -l "$INJECTOR_JOB_LABEL" -o "$INJECTOR_LOG" -e "$INJECTOR_ERROR_LOG" -- \
-    "$NODE" "$INJECTOR" --watch --port "$port" --theme-dir "$THEME_DIR" \
-    --operation-state "$OPERATION_STATE_PATH" --operation-ack "$OPERATION_ACK_PATH" \
-    >/dev/null 2>&1; then
+  # A one-shot LaunchAgent owns the watcher without launchctl submit's inferred
+  # KeepAlive behavior, so a clean host-bound exit is not relaunched forever.
+  if job_plist="$(write_injector_launch_agent "$port" "$host_pid")" \
+    && /bin/launchctl bootstrap "$launchd_domain" "$job_plist" >/dev/null 2>&1; then
     while [ "$SECONDS" -lt "$deadline" ]; do
-      pid="$(/bin/launchctl print "gui/$(/usr/bin/id -u)/$INJECTOR_JOB_LABEL" 2>/dev/null \
+      pid="$(/bin/launchctl print "$launchd_domain/$INJECTOR_JOB_LABEL" 2>/dev/null \
         | /usr/bin/awk '/^[[:space:]]*pid = [0-9]+/{print $3; exit}')"
       if [ -n "$pid" ] && /bin/kill -0 "$pid" 2>/dev/null; then
         printf '%s\n' "$pid"
@@ -746,12 +824,13 @@ launch_injector_daemon() {
       fi
       /bin/sleep 0.2
     done
-    /bin/launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 || true
+    release_injector_launchd_job
   fi
 
-  # Fallback for systems where launchctl submit is unavailable.
+  # Fallback when the one-shot LaunchAgent cannot be created or bootstrapped.
   /usr/bin/nohup "$NODE" "$INJECTOR" --watch --port "$port" --theme-dir "$THEME_DIR" \
     --operation-state "$OPERATION_STATE_PATH" --operation-ack "$OPERATION_ACK_PATH" \
+    --host-pid "$host_pid" \
     >>"$INJECTOR_LOG" 2>>"$INJECTOR_ERROR_LOG" &
   pid="$!"
   /bin/sleep 0.15
@@ -792,6 +871,8 @@ hot_reapply_theme() {
   # endpoint already verified as belonging to the official Codex process.
   ensure_node_runtime || return 1
   verified_cdp_endpoint "$port" || return 1
+  codex_pid="$(codex_main_pids 2>/dev/null | /usr/bin/head -n 1)"
+  [ -n "$codex_pid" ] || return 1
   [ -n "$operation_token" ] || operation_token="$(new_operation_token)"
   write_operation_state applying "正在应用已选主题" "$operation_token" || return 1
   operation_args=(--operation-token "$operation_token")
@@ -799,8 +880,13 @@ hot_reapply_theme() {
   injector_protocol="$(state_field injectorProtocol 2>/dev/null || true)"
   injector_mode="$(state_field injectorMode 2>/dev/null || true)"
   if [ "$injector_protocol" = "2" ] || [ "$injector_protocol" = "3" ]; then
-    inj_pid="$(/bin/ps -axo pid=,command= | /usr/bin/awk -v inj="$INJECTOR" -v port="$port" '
-      index($0, inj) && index($0, "--watch") && index($0, "--port " port " --theme-dir ") { print $1; exit }
+    inj_pid="$(/bin/ps -axo pid=,command= | /usr/bin/awk \
+      -v inj="$INJECTOR" -v port="$port" -v host="$codex_pid" '
+      index($0, inj) && index($0, "--watch") && index($0, "--port " port " --theme-dir ") {
+        for (i = 2; i < NF; i += 1) {
+          if ($i == "--host-pid" && $(i + 1) == host) { print $1; exit }
+        }
+      }
     ')"
   fi
   if ! "$NODE" "$INJECTOR" --once --port "$port" --theme-dir "$THEME_DIR" \
@@ -816,10 +902,9 @@ hot_reapply_theme() {
     return 0
   fi
   stop_recorded_injector 2>/dev/null || return 1
-  inj_pid="$(launch_injector_daemon "$port")"
+  inj_pid="$(launch_injector_daemon "$port" "$codex_pid")"
   /bin/kill -0 "$inj_pid" 2>/dev/null || return 1
   started_at="$(process_started_at "$inj_pid")"
-  codex_pid="$(codex_main_pids 2>/dev/null | /usr/bin/head -n 1)"
   [ -n "$started_at" ] || started_at="$(/bin/date)"
   write_state "$port" "$inj_pid" "$started_at" "${codex_pid:-0}" active
   write_operation_state success "皮肤已应用" "$operation_token" || return 1

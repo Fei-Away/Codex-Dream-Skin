@@ -99,6 +99,7 @@ if [ -f "$STATE_PATH" ]; then
 fi
 
 INJECTOR_PID=""
+CODEX_PID=""
 if [ "$DEBUG_READY" = "false" ]; then
   # Codex is closed on this path (never started, or stopped just above), so it
   # is safe to sync the appearanceTheme pin to the staged theme before launch.
@@ -108,11 +109,18 @@ if [ "$DEBUG_READY" = "false" ]; then
   PORT="$(select_available_port "$PORT")"
   printf 'Launching ChatGPT with skin debug port %s…\n' "$PORT" >&2
   launch_codex_with_cdp "$PORT"
+fi
+
+CODEX_PID="$(wait_for_codex_main_pid 10)" \
+  || fail "Could not identify the Codex host process for the injector watcher."
+
+if [ "$DEBUG_READY" = "false" ]; then
   # Start probing immediately instead of waiting for the native window to finish loading.
   if [ "$FOREGROUND_INJECTOR" != "true" ]; then
-    INJECTOR_PID="$(launch_injector_daemon "$PORT")"
+    INJECTOR_PID="$(launch_injector_daemon "$PORT" "$CODEX_PID")"
   fi
   if ! wait_for_cdp "$PORT"; then
+    release_injector_launchd_job
     [ -z "$INJECTOR_PID" ] || /bin/kill -TERM "$INJECTOR_PID" 2>/dev/null || true
     fail "ChatGPT did not expose a verified loopback CDP endpoint on port $PORT within 45 seconds. See $APP_LOG and $APP_ERROR_LOG"
   fi
@@ -125,17 +133,17 @@ activate_codex_window
 
 if [ "$FOREGROUND_INJECTOR" = "true" ]; then
   exec "$NODE" "$INJECTOR" --watch --port "$PORT" --theme-dir "$THEME_DIR" \
-    --operation-state "$OPERATION_STATE_PATH" --operation-ack "$OPERATION_ACK_PATH"
+    --operation-state "$OPERATION_STATE_PATH" --operation-ack "$OPERATION_ACK_PATH" \
+    --host-pid "$CODEX_PID"
 fi
 
 if [ -z "$INJECTOR_PID" ]; then
-  INJECTOR_PID="$(launch_injector_daemon "$PORT")"
+  INJECTOR_PID="$(launch_injector_daemon "$PORT" "$CODEX_PID")"
 fi
 /bin/sleep 0.15
 /bin/kill -0 "$INJECTOR_PID" 2>/dev/null || fail "The injector exited during startup. See $INJECTOR_ERROR_LOG"
 INJECTOR_STARTED_AT="$(process_started_at "$INJECTOR_PID")"
 [ -n "$INJECTOR_STARTED_AT" ] || fail "Could not record the injector process start time."
-CODEX_PID="$(codex_main_pids | /usr/bin/head -n 1)"
 write_state "$PORT" "$INJECTOR_PID" "$INJECTOR_STARTED_AT" "$CODEX_PID"
 
 # Commit active only after the renderer, exact theme, and payload revision verify.

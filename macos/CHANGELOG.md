@@ -1,5 +1,11 @@
 # Changelog
 
+## 未发布
+
+### 修复
+
+- 修复关闭 ChatGPT 或 CDP 断开后 injector watcher 仍常驻并高频重试的问题（#218）：watcher 现在绑定启动时确认的 ChatGPT 主进程，主进程退出后立即停止；CDP 失败重试采用最长 30 秒的可中断指数退避，并将重复错误日志节流到 30 秒。后台任务改为 `KeepAlive=false` 的一次性 LaunchAgent，同时清理旧版 `launchctl submit` 作业，避免 watcher 正常退出后被 launchd 反复拉起。
+
 ## 1.5.5 — 2026-07-25
 
 ### 修复
