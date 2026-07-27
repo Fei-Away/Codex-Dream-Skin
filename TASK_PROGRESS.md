@@ -1,6 +1,37 @@
 # Task Progress
 
-Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
+Updated: 2026-07-27 02:35 CST (Asia/Shanghai)
+
+## macOS Rosetta Launcher Architecture Fix (2026-07-27)
+
+- [in progress] Branch `lt_fix_dream_skin_app_startup` is based on the exact
+  public `v1.5.6` commit `611c101`. The user's primary checkout and its
+  untracked `output/` directory remain untouched.
+- [fact] The legacy clickable App exits before launch because its x86_64 shell
+  context is compared with the official ChatGPT `26.721.41059` arm64-only
+  bundled Node. The signed ChatGPT app and Node are arm64, while the existing
+  theme bytes remain intact.
+- [complete] Replaced the parent-shell `uname -m` / Mach-O header comparison
+  with an actual execution check after the existing fixed-path code-signature
+  and OpenAI Team ID gates. An independent read-only review confirmed this is
+  the smallest cross-architecture fix and does not weaken runtime trust.
+- [verified] A real Rosetta x86_64 shell now validates and executes the official
+  arm64-only Node `v24.14.0`, records the validated runtime identity, and passes
+  the focused candidate-payload check. Bash syntax, the new static regression,
+  renderer, Safe CSS, staging, package and ZIP-boundary tests passed.
+- [blocked] The complete repository wrapper later reached an unrelated Swift
+  bounded-HTTP fixture and stopped because the installed Command Line Tools
+  compiler does not match its macOS SDK and the sandbox cannot write the Clang
+  module cache. Per the local no-compile rule, do not repair or rerun Swift
+  locally; leave that fixture to PR CI.
+- [complete] Synced only the reviewed `common-macos.sh` fix into the installed
+  legacy engine. The prior script and clickable App executable are recoverably
+  backed up under the Dream Skin Application Support repair-backups directory;
+  the App bundle and official ChatGPT bundle were not modified.
+- [pending] Launch through the repaired App and require exact live renderer,
+  loopback CDP and unchanged-theme verification before reporting success.
+- [pending] Commit, push and open a focused PR only after local and installed
+  acceptance pass. No version bump, tag or Release publication is in scope.
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
 

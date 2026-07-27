@@ -299,12 +299,9 @@ require_signed_node_runtime() {
   [ "$NODE_TEAM_ID" = "$EXPECTED_CODEX_TEAM_ID" ] \
     || fail "Unexpected bundled Node.js signing team: ${NODE_TEAM_ID:-missing}."
 
-  local machine_arch
   local node_major
-  machine_arch="$(/usr/bin/uname -m)"
-  /usr/bin/file "$RUNTIME_NODE" | /usr/bin/grep -q "$machine_arch" \
-    || fail "The ChatGPT Node.js runtime does not match this Mac architecture ($machine_arch)."
-  NODE_VERSION="$($RUNTIME_NODE --version)"
+  NODE_VERSION="$("$RUNTIME_NODE" --version 2>/dev/null)" \
+    || fail "The signed ChatGPT Node.js runtime could not be executed on this Mac."
   node_major="${NODE_VERSION#v}"
   node_major="${node_major%%.*}"
   case "$node_major" in ''|*[!0-9]*) fail "Could not parse bundled Node.js version: $NODE_VERSION" ;; esac
