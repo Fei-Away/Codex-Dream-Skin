@@ -534,6 +534,7 @@ function Set-DreamSkinActiveTheme {
   try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
   if ($null -eq $Theme) {
     $Theme = [pscustomobject]@{
+      schemaVersion = 1
       id = 'custom'
       name = '自定义主题'
       appearance = 'auto'
