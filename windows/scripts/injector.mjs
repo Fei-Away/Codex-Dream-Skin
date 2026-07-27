@@ -483,6 +483,13 @@ function sameFileStat(left, right) {
     && left.ctimeMs === right.ctimeMs;
 }
 
+function isContainedRelativePath(relativePath) {
+  return relativePath !== ""
+    && !path.isAbsolute(relativePath)
+    && relativePath !== ".."
+    && !relativePath.startsWith(`..${path.sep}`);
+}
+
 async function loadSafeCss(themeRoot) {
   const cssPath = path.join(themeRoot, "theme.css");
   let handle;
@@ -522,7 +529,7 @@ export async function loadTheme(themeDir) {
   if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
   const imagePath = path.resolve(realThemeDir, image);
   const relativeImage = path.relative(realThemeDir, imagePath);
-  if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
+  if (!isContainedRelativePath(relativeImage)) {
     throw new Error("Theme image must remain inside the selected theme directory");
   }
   const extension = path.extname(imagePath).toLowerCase();
@@ -531,7 +538,7 @@ export async function loadTheme(themeDir) {
   }
   const realImagePath = await fs.realpath(imagePath);
   const realRelativeImage = path.relative(realThemeDir, realImagePath);
-  if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
+  if (!isContainedRelativePath(realRelativeImage)) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
