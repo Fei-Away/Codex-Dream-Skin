@@ -58,7 +58,6 @@ progress "已收到点击…"
 set +e
 
 CHEAP_RUNNING="false"
-/usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 && CHEAP_RUNNING="true"
 SESSION="off"
 THEME_NAME=""
 PORT="9341"
@@ -68,6 +67,7 @@ if [ -x "$SCRIPT_DIR/status-dream-skin-macos.sh" ]; then
       session=*) SESSION="${line#session=}" ;;
       theme=*) THEME_NAME="${line#theme=}" ;;
       port=*) PORT="${line#port=}" ;;
+      codex=*) CHEAP_RUNNING="${line#codex=}" ;;
     esac
   done < <("$SCRIPT_DIR/status-dream-skin-macos.sh" 2>/dev/null)
 fi
