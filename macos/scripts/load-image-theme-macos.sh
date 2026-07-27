@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Dynamically load one pure image as the active theme.
+# Dynamically load an image or an MP4 as the active theme.
 # Hot-applies when CDP is already open (fast).
 
 set -euo pipefail
@@ -50,15 +50,21 @@ if [ -n "$FROM_LIBRARY" ]; then
 fi
 
 [ -n "$IMAGE" ] || fail "Pass --file <image> or --from-library <name-in-images-dir>"
-[ -f "$IMAGE" ] || fail "Image not found: $IMAGE"
+[ -f "$IMAGE" ] || fail "Media file not found: $IMAGE"
 
+VIDEO_MODE="false"
 case "$IMAGE" in
+  *.mp4|*.MP4) VIDEO_MODE="true" ;;
   *.png|*.PNG|*.jpg|*.JPG|*.jpeg|*.JPEG|*.webp|*.WEBP|*.heic|*.HEIC|*.tif|*.tiff|*.TIF|*.TIFF) ;;
-  *) fail "Unsupported image type: $IMAGE" ;;
+  *) fail "Unsupported image or video type: $IMAGE" ;;
 esac
 
 SOURCE_BYTES="$(/usr/bin/stat -f '%z' "$IMAGE")"
-[ "$SOURCE_BYTES" -le 52428800 ] || fail "Image larger than 50 MB."
+if [ "$VIDEO_MODE" = "true" ]; then
+  [ "$SOURCE_BYTES" -le 104857600 ] || fail "Video larger than 100 MB."
+else
+  [ "$SOURCE_BYTES" -le 52428800 ] || fail "Image larger than 50 MB."
+fi
 
 if [ -z "$THEME_NAME" ]; then
   base="$(/usr/bin/basename "$IMAGE")"
@@ -73,34 +79,47 @@ progress() {
   notify_user "$*"
 }
 
-progress "Loading image..."
+progress "Loading $([ "$VIDEO_MODE" = "true" ] && printf 'video' || printf 'image')..."
 
 # Fast Node for write-theme (avoid full codesign when possible)
 ensure_node_runtime
 
-image_name="background.jpg"
-temporary="$THEME_DIR/.background.$$.tmp.jpg"
-prepared="$THEME_DIR/$image_name"
-cleanup_temporary() { /bin/rm -f "$temporary"; }
-trap cleanup_temporary EXIT
+if [ "$VIDEO_MODE" = "true" ]; then
+  video_name="background.mp4"
+  temporary="$THEME_DIR/.background.$$.tmp.mp4"
+  cleanup_temporary() { /bin/rm -f "$temporary"; }
+  trap cleanup_temporary EXIT
+  /bin/cp -f "$IMAGE" "$temporary"
+  [ -s "$temporary" ] || fail "Prepared video is empty."
+  /bin/chmod 600 "$temporary"
+  /bin/mv -f "$temporary" "$THEME_DIR/$video_name"
+  image_name="$("$NODE" -e 'try{const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(typeof t.image==="string"?t.image:"")}catch{}' "$THEME_DIR/theme.json" 2>/dev/null || true)"
+  [ -n "$image_name" ] && [ -f "$THEME_DIR/$image_name" ] \
+    || fail "An existing fallback image is required before importing a video."
+else
+  image_name="background.jpg"
+  temporary="$THEME_DIR/.background.$$.tmp.jpg"
+  cleanup_temporary() { /bin/rm -f "$temporary"; }
+  trap cleanup_temporary EXIT
 
-# Prefer copying already-JPEG; sips only when needed (large PNG conversion is the slow part)
-ext="$(printf '%s' "$IMAGE" | /usr/bin/tr '[:upper:]' '[:lower:]')"
-case "$ext" in
-  *.jpg|*.jpeg)
-    /bin/cp -f "$IMAGE" "$temporary"
-    ;;
-  *)
-    /usr/bin/sips -s format jpeg -s formatOptions 82 -Z 2400 "$IMAGE" --out "$temporary" >/dev/null \
-      || fail "Could not convert image. Use PNG/JPEG/HEIC/TIFF/WebP."
-    [ -s "$temporary" ] || fail "Converted image is empty."
-    ;;
-esac
-[ -s "$temporary" ] || fail "Prepared image is empty."
-PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$temporary")"
-[ "$PREPARED_BYTES" -le 10485760 ] || fail "Prepared image larger than 10 MB."
-/bin/chmod 600 "$temporary"
-/bin/mv -f "$temporary" "$prepared"
+  # Prefer copying already-JPEG; sips only when needed (large PNG conversion is the slow part)
+  ext="$(printf '%s' "$IMAGE" | /usr/bin/tr '[:upper:]' '[:lower:]')"
+  case "$ext" in
+    *.jpg|*.jpeg)
+      /bin/cp -f "$IMAGE" "$temporary"
+      ;;
+    *)
+      /usr/bin/sips -s format jpeg -s formatOptions 82 -Z 2400 "$IMAGE" --out "$temporary" >/dev/null \
+        || fail "Could not convert image. Use PNG/JPEG/HEIC/TIFF/WebP."
+      [ -s "$temporary" ] || fail "Converted image is empty."
+      ;;
+  esac
+  [ -s "$temporary" ] || fail "Prepared image is empty."
+  PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$temporary")"
+  [ "$PREPARED_BYTES" -le 10485760 ] || fail "Prepared image larger than 10 MB."
+  /bin/chmod 600 "$temporary"
+  /bin/mv -f "$temporary" "$THEME_DIR/$image_name"
+fi
 
 theme_args=(
   custom
@@ -113,22 +132,26 @@ theme_args=(
   --safe-area "$SAFE_AREA"
   --task-mode "$TASK_MODE"
 )
+[ "$VIDEO_MODE" = "true" ] && theme_args+=(--video "$video_name")
 [ -n "$FOCUS_X" ] && theme_args+=(--focus-x "$FOCUS_X")
 [ -n "$FOCUS_Y" ] && theme_args+=(--focus-y "$FOCUS_Y")
 "$NODE" "$SCRIPT_DIR/write-theme.mjs" "${theme_args[@]}" >/dev/null
-/usr/bin/find "$THEME_DIR" -maxdepth 1 -type f -name 'background.*' ! -name "$image_name" -delete
+/usr/bin/find "$THEME_DIR" -maxdepth 1 -type f -name 'background.*' ! -name "$image_name" ! -name "${video_name:-}" -delete
 trap - EXIT
 
 lib_dir="$THEMES_ROOT/$theme_id"
 /bin/mkdir -p "$lib_dir"
 /bin/cp -f "$THEME_DIR/$image_name" "$THEME_DIR/theme.json" "$lib_dir/"
+[ "$VIDEO_MODE" = "true" ] && /bin/cp -f "$THEME_DIR/$video_name" "$lib_dir/"
 /bin/chmod 600 "$lib_dir/"* 2>/dev/null || true
 
-dest_lib_img="$IMAGES_DIR/$(/usr/bin/basename "$IMAGE")"
-src_dir="$(cd "$(dirname "$IMAGE")" && pwd -P)"
-img_dir="$(cd "$IMAGES_DIR" && pwd -P)"
-if [ "$src_dir/$(/usr/bin/basename "$IMAGE")" != "$img_dir/$(/usr/bin/basename "$IMAGE")" ]; then
-  /bin/cp -f "$IMAGE" "$dest_lib_img" 2>/dev/null || true
+if [ "$VIDEO_MODE" != "true" ]; then
+  dest_lib_img="$IMAGES_DIR/$(/usr/bin/basename "$IMAGE")"
+  src_dir="$(cd "$(dirname "$IMAGE")" && pwd -P)"
+  img_dir="$(cd "$IMAGES_DIR" && pwd -P)"
+  if [ "$src_dir/$(/usr/bin/basename "$IMAGE")" != "$img_dir/$(/usr/bin/basename "$IMAGE")" ]; then
+    /bin/cp -f "$IMAGE" "$dest_lib_img" 2>/dev/null || true
+  fi
 fi
 
 if [ "$APPLY_NOW" != "true" ]; then

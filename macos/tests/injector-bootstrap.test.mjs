@@ -110,5 +110,19 @@ assert.match(
 );
 assert.match(source, /visibleSuggestionLabels\.length >= result\.visibleCardCount/);
 assert.match(source, /result\.suggestionLabelColorsMatch/);
+assert.match(source, /DOM\.setFileInputFiles/,
+  "macOS video themes must use CDP file injection instead of exposing a local file URL.");
+assert.match(source, /videoTransport[\s\S]*mode: "blob"/,
+  "macOS video payloads must prefer Blob transport when no fallback URL is supplied.");
+assert.match(source, /Page\.setBypassCSP[\s\S]*enabled: true/,
+  "macOS video fallback fetches must enable CSP bypass only through the verified injector.");
+assert.match(source, /Page\.enable[\s\S]*Page\.setBypassCSP/,
+  "macOS video fallback fetches must enable CSP bypass before replaying media payloads.");
+const mediaPolicyStart = source.indexOf("async function enableMediaFetchForSession");
+const mediaPolicyEnd = source.indexOf("async function applyToSession", mediaPolicyStart);
+assert.doesNotMatch(source.slice(mediaPolicyStart, mediaPolicyEnd), /Page\.reload/,
+  "macOS video theme imports must not force a full page reload and visible flash.");
+assert.match(source, /mode: "blob", fallbackUrl: stagedMedia\.url/,
+  "macOS watch mode must prefer CDP file injection with a controlled fallback transport.");
 
 console.log("PASS: early injection is L0-ready, generation-safe, and removed on shutdown.");

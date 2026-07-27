@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,7 +17,7 @@ const macosInjector = path.join(macosRoot, "scripts", "injector.mjs");
 const windowsInjector = path.join(projectRoot, "windows", "scripts", "injector.mjs");
 const importer = path.join(macosRoot, "scripts", "import-theme-zip-macos.sh");
 const fixtureImage = path.join(macosRoot, "assets", "portal-hero.png");
-const tempRoot = await fs.mkdtemp(path.join("/tmp", "codex-dream-skin-package-contract-"));
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-dream-skin-package-contract-"));
 
 const colors = {
   background: "#071116",
@@ -58,6 +59,17 @@ function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function mp4Fixture(marker) {
+  const fileTypeBox = Buffer.alloc(24);
+  fileTypeBox.writeUInt32BE(fileTypeBox.length, 0);
+  fileTypeBox.write("ftyp", 4, "ascii");
+  fileTypeBox.write("isom", 8, "ascii");
+  fileTypeBox.writeUInt32BE(512, 12);
+  fileTypeBox.write("isom", 16, "ascii");
+  fileTypeBox.write("mp41", 20, "ascii");
+  return Buffer.concat([fileTypeBox, Buffer.from(marker, "ascii")]);
+}
+
 function fileEntry(filePath, mediaType, bytes) {
   return { path: filePath, mediaType, bytes: bytes.length, sha256: digest(bytes) };
 }
@@ -75,6 +87,7 @@ async function makeOfficial(name, options = {}) {
     art: { focusX: 0.7, focusY: 0.5, safeArea: "left", taskMode: "full" },
     colors,
   };
+  if (options.videoBytes) theme.video = "background.mp4";
   if (options.mutateTheme) options.mutateTheme(theme);
   const themeData = jsonBytes(theme);
   const files = [
@@ -94,6 +107,10 @@ async function makeOfficial(name, options = {}) {
     const license = Buffer.from(options.licenseText ?? "CC0-1.0\n", "utf8");
     files.push(fileEntry("LICENSE.txt", "text/plain", license));
     extraFiles.set("LICENSE.txt", license);
+  }
+  if (options.videoBytes) {
+    files.push(fileEntry("background.mp4", "video/mp4", options.videoBytes));
+    extraFiles.set("background.mp4", options.videoBytes);
   }
   if (options.signature) extraFiles.set("manifest.sig", Buffer.from("reserved-signature\n", "utf8"));
   const manifest = {
@@ -171,6 +188,25 @@ try {
     "theme.css",
     "theme.json",
   ]);
+
+  const officialVideo = await makeOfficial("official-video", {
+    videoBytes: mp4Fixture("official"),
+  });
+  const validatedVideo = await validate(officialVideo.source, "windows", "official-video");
+  assert.equal(validatedVideo.output.format, "official");
+  assert.deepEqual(
+    await fs.readFile(path.join(validatedVideo.stage, "background.mp4")),
+    mp4Fixture("official"),
+  );
+  const renamedOfficialVideo = await makeOfficial("official-renamed-video", {
+    videoBytes: Buffer.from("renamed-as-mp4"),
+  });
+  await expectRejected(
+    renamedOfficialVideo.source,
+    "windows",
+    /not a valid MP4 container/,
+    "official-renamed-video",
+  );
 
   const legacyOfficial = await makeOfficial("legacy-official-no-css", { css: false });
   await expectRejected(
@@ -293,6 +329,29 @@ try {
   const simple = await validate(simpleSource, "macos", "simple");
   assert.equal(simple.output.format, "simple");
   assert.equal(simple.output.safeCssStatus, "validated");
+
+  const simpleVideoSource = path.join(tempRoot, "simple-video-source");
+  await fs.mkdir(simpleVideoSource);
+  await fs.copyFile(fixtureImage, path.join(simpleVideoSource, "custom-background.png"));
+  await fs.copyFile(path.join(simpleSource, "theme.css"), path.join(simpleVideoSource, "theme.css"));
+  await fs.writeFile(path.join(simpleVideoSource, "background.mp4"), mp4Fixture("simple"));
+  await fs.writeFile(path.join(simpleVideoSource, "theme.json"), jsonBytes({
+    schemaVersion: 1,
+    id: "local_simple_video",
+    name: "Local Simplified Video Theme",
+    image: "custom-background.png",
+    video: "background.mp4",
+  }));
+  const simpleVideo = await validate(simpleVideoSource, "macos", "simple-video");
+  assert.equal(simpleVideo.output.format, "simple");
+  await fs.writeFile(path.join(simpleVideoSource, "background.mp4"), Buffer.from("renamed-as-mp4"));
+  await expectRejected(
+    simpleVideoSource,
+    "macos",
+    /not a valid MP4 container/,
+    "simple-renamed-video",
+  );
+
   const simpleWithoutCss = path.join(tempRoot, "simple-without-css");
   await fs.mkdir(simpleWithoutCss);
   await fs.copyFile(fixtureImage, path.join(simpleWithoutCss, "custom-background.png"));

@@ -4,7 +4,11 @@ import path from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { verifySession } from "../scripts/injector.mjs";
+import {
+  isDeferredRendererVerification,
+  rendererVerificationAccepted,
+  verifySession,
+} from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const startPath = path.resolve(here, "../scripts/start-dream-skin.ps1");
@@ -56,6 +60,8 @@ function makeDomFixture({
   hidden = false,
   viewportWidth = 1280,
   viewportHeight = 800,
+  videoMode = null,
+  videoReady = null,
 } = {}) {
   const styleNode = {};
   const documentElement = {
@@ -86,6 +92,10 @@ function makeDomFixture({
       version: "1.5.6",
       themeId: "fixture-theme",
       revision: "fixture-revision",
+      videoMode,
+      videoReady,
+      videoFailed: false,
+      videoError: null,
       styleMode: "style",
       styleNode,
       scope,
@@ -130,12 +140,22 @@ function makeSession({
 }
 
 async function verify(overrides = {}) {
-  const session = makeSession(overrides);
+  const {
+    nativeWindowFallback = async () => ({
+      pass: false,
+      bound: false,
+      reason: "fixture-native-window-unavailable",
+    }),
+    ...sessionOverrides
+  } = overrides;
+  const session = makeSession(sessionOverrides);
   const result = await verifySession(
     session,
     "page-main",
     "fixture-theme",
     "fixture-revision",
+    session,
+    nativeWindowFallback,
   );
   return { result, session };
 }
@@ -277,6 +297,29 @@ test("unrecognized window transport failures still fail closed", async () => {
     "An invalid target binding must not be reused for a bounds query.");
 });
 
+test("verified official-process window fallback supports Electron targets without Browser bindings", async () => {
+  const fallback = await verify({
+    bindingError: new Error("Browser window not found (-32000)"),
+    nativeWindowFallback: async () => ({
+      pass: true,
+      bound: true,
+      targetBound: false,
+      processBound: true,
+      source: "verified-codex-process-window",
+      processId: 101,
+      windowHandle: 202,
+      state: "normal",
+      width: 1280,
+      height: 800,
+      reason: null,
+    }),
+  });
+  assert.equal(fallback.result.pass, true);
+  assert.equal(fallback.result.nativeWindow.targetBound, false);
+  assert.equal(fallback.result.nativeWindow.processBound, true);
+  assert.equal(fallback.result.nativeWindow.source, "verified-codex-process-window");
+});
+
 test("minimized and undersized native windows fail closed", async () => {
   const minimized = await verify({
     currentBounds: { width: 1280, height: 800, windowState: "minimized" },
@@ -301,12 +344,33 @@ test("hidden documents and unreasonable viewports cannot pass", async () => {
   const hidden = await verify({ dom: makeDomFixture({ visibilityState: "hidden", hidden: true }) });
   assert.equal(hidden.result.pass, false);
   assert.equal(hidden.result.readiness.documentPass, false);
+  assert.equal(hidden.result.appliedPass, true);
+  assert.equal(isDeferredRendererVerification(hidden.result), true,
+    "An exact payload in a verified native window must defer while its document is hidden.");
+  assert.equal(rendererVerificationAccepted(hidden.result), false,
+    "Normal verification must remain strict for hidden renderers.");
+  assert.equal(rendererVerificationAccepted(hidden.result, true), true,
+    "Startup may retain an exact applied payload while its renderer is temporarily hidden.");
 
   const tiny = await verify({
     dom: makeDomFixture({ viewportWidth: 319, viewportHeight: 239 }),
   });
   assert.equal(tiny.result.pass, false);
   assert.equal(tiny.result.readiness.viewportPass, false);
+  assert.equal(isDeferredRendererVerification(tiny.result), false);
+});
+
+test("a visible video that cannot become ready is a real failure, not a hidden-window defer", async () => {
+  const failedVideo = await verify({
+    dom: makeDomFixture({ videoMode: "blob", videoReady: false }),
+  });
+  assert.equal(failedVideo.result.pass, false);
+  assert.equal(failedVideo.result.appliedPass, true);
+  assert.equal(failedVideo.result.videoPass, false);
+  assert.equal(failedVideo.result.videoFailed, false);
+  assert.equal(isDeferredRendererVerification(failedVideo.result), false);
+  assert.equal(rendererVerificationAccepted(failedVideo.result, true), false,
+    "The startup exception must not accept a visible video decode failure.");
 });
 
 test("zero-size and CSS-hidden shell anchors cannot satisfy L1", async () => {
@@ -344,4 +408,6 @@ test("start cannot announce active after renderer verification exhausts its dead
     "A nonzero verify result must reach the startup rollback after its bounded retry window.");
   assert.ok(stateCleanup > startupCatch && rethrow > stateCleanup && activeMessage > rethrow,
     "Verification failure must clear transient state and rethrow before the active message.");
+  assert.match(source, /--verify[\s\S]*--allow-hidden-applied/,
+    "Startup verification must preserve an exact applied payload while the renderer is hidden.");
 });

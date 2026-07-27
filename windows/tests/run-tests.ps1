@@ -10,6 +10,29 @@ $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-t
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
+  $validVideoFixture = Join-Path $temporaryRoot 'valid-video.mp4'
+  $invalidVideoFixture = Join-Path $temporaryRoot 'renamed-video.mp4'
+  [System.IO.File]::WriteAllBytes($validVideoFixture, [byte[]]@(
+    0, 0, 0, 24, 102, 116, 121, 112,
+    105, 115, 111, 109, 0, 0, 2, 0,
+    105, 115, 111, 109, 109, 112, 52, 49,
+    65, 65, 65, 65
+  ))
+  [System.IO.File]::WriteAllBytes(
+    $invalidVideoFixture,
+    [System.Text.Encoding]::ASCII.GetBytes('renamed-as-mp4')
+  )
+  Assert-DreamSkinVideoFile -Path $validVideoFixture
+  $invalidVideoRejected = $false
+  try {
+    Assert-DreamSkinVideoFile -Path $invalidVideoFixture
+  } catch {
+    $invalidVideoRejected = $_.Exception.Message -match 'not a valid MP4 container'
+  }
+  if (-not $invalidVideoRejected) {
+    throw 'Video validation accepted a non-MP4 file that only used the .mp4 extension.'
+  }
+
   $runtimeSourceName = 'runtime source ' + (-join @([char]0x6D4B, [char]0x8BD5))
   $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
   $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
@@ -631,6 +654,8 @@ try {
   }
   foreach ($unsafe in @(
     'ws://example.com:9335/devtools/page/test',
+    'ws://localhost:9335/devtools/page/test',
+    'ws://[::1]:9335/devtools/page/test',
     'ws://127.0.0.1:9336/devtools/page/test',
     'wss://127.0.0.1:9335/devtools/page/test',
     'ws://user@127.0.0.1:9335/devtools/page/test',
@@ -1008,6 +1033,28 @@ try {
     throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled presets.'
   }
 
+  $videoTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -VideoPath $validVideoFixture -Theme $null -Name '视频主题' -StateRoot $themeStateRoot
+  if (-not $videoTheme.VideoPath -or
+    -not (Test-Path -LiteralPath (Join-Path $themePaths.Active 'background.mp4') -PathType Leaf) -or
+    (Get-FileHash -LiteralPath $videoTheme.VideoPath -Algorithm SHA256).Hash -cne
+      (Get-FileHash -LiteralPath $validVideoFixture -Algorithm SHA256).Hash) {
+    throw 'Writing a video theme did not commit the validated MP4 into the active theme.'
+  }
+  if ($videoTheme.Theme.video -cne 'background.mp4') {
+    throw 'Writing a video theme did not record background.mp4 in theme.json.'
+  }
+  $videoFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $themePaths.Active
+  $null = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Theme $null -Name '临时图片主题' -StateRoot $themeStateRoot
+  $imageOnlyFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $themePaths.Active
+  if ($imageOnlyFingerprint -ceq $videoFingerprint) {
+    throw 'Switching from a video theme to an image theme must change the runtime fingerprint.'
+  }
+  if (Test-Path -LiteralPath (Join-Path $themePaths.Active 'background.mp4') -PathType Leaf) {
+    throw 'Switching to an image-only theme left the previous background.mp4 in the active theme.'
+  }
+
   $releaseFixtureRoot = Join-Path $temporaryRoot 'release-theme-fixture'
   $releaseFixtureAssets = Join-Path $releaseFixtureRoot 'assets'
   $releaseFixtureScripts = Join-Path $releaseFixtureRoot 'scripts'
@@ -1032,6 +1079,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\image-metadata.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\injector.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\install-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\media-server.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\restore-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\start-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-windows.ps1') -Destination $releaseFixtureScripts -Force
@@ -1163,6 +1211,7 @@ try {
     throw 'macOS and Windows selector contract assets are not byte-identical.'
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
+  $commonSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\common-windows.ps1')
   foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '继续显示皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
@@ -1172,6 +1221,14 @@ try {
     -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
     throw 'Tray pause/resume no longer mirrors macOS live-remove and re-apply semantics.'
   }
+  if (-not $traySource.Contains("-Enabled:(-not `$operationActive)") -or
+    -not $commonSource.Contains('function Test-DreamSkinOperationActive')) {
+    throw 'Tray does not disable mutating actions while a serialized Dream Skin operation is active.'
+  }
+  if (-not $traySource.Contains('正在应用或校验皮肤，请等待当前操作完成后再切换背景。')) {
+    throw 'Tray lock contention does not provide a non-modal busy notification.'
+  }
+  if (-not $traySource.Contains('一键更换视频背景')) { throw 'Tray video background action is missing.' }
   $themeWindowsSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-windows.ps1')
   foreach ($requiredLiveRemoveToken in @(
     'function Invoke-DreamSkinLiveRemove',

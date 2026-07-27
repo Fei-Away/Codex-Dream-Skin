@@ -14,6 +14,7 @@ const LIMITS = Object.freeze({
   simpleTheme: 1_048_576,
   css: 262_144,
   image: 10_485_760,
+  video: 100 * 1024 * 1024,
   license: 65_536,
   signature: 4_096,
 });
@@ -23,9 +24,13 @@ const BACKGROUND_MEDIA = new Map([
   ["background.jpg", "image/jpeg"],
   ["background.png", "image/png"],
 ]);
+const VIDEO_MEDIA = new Map([
+  ["background.mp4", "video/mp4"],
+]);
 const PAYLOAD_MEDIA = new Map([
   ["theme.json", "application/json"],
   ...BACKGROUND_MEDIA,
+  ...VIDEO_MEDIA,
   ["theme.css", "text/css"],
   ["LICENSE.txt", "text/plain"],
 ]);
@@ -206,6 +211,7 @@ function expectedLimit(name, simple = false) {
   if (name === "theme.css") return LIMITS.css;
   if (name === "LICENSE.txt") return LIMITS.license;
   if (name === "manifest.sig") return LIMITS.signature;
+  if (VIDEO_MEDIA.has(name)) return LIMITS.video;
   if (BACKGROUND_MEDIA.has(name) || /\.(?:png|jpe?g|webp)$/i.test(name)) return LIMITS.image;
   return 0;
 }
@@ -273,7 +279,7 @@ function validateOfficialTheme(value) {
   assertExactKeys(
     theme,
     THEME_REQUIRED,
-    [...THEME_COPY_KEYS, "promoUrl", "appearance", "art", "colors"],
+    [...THEME_COPY_KEYS, "promoUrl", "appearance", "art", "colors", "video"],
     "theme.json",
   );
   if (theme.schemaVersion !== 1) fail("theme.json must use schemaVersion 1");
@@ -281,6 +287,10 @@ function validateOfficialTheme(value) {
   assertString(theme.name, "theme.json.name", { min: 1, max: 80 });
   assertString(theme.image, "theme.json.image", { min: 1, max: 32, controls: null });
   if (!BACKGROUND_MEDIA.has(theme.image)) fail("theme.json.image must name one registered background file");
+  if (theme.video !== undefined) {
+    assertString(theme.video, "theme.json.video", { min: 1, max: 32, controls: null });
+    if (!VIDEO_MEDIA.has(theme.video)) fail("theme.json.video must name background.mp4");
+  }
   for (const key of THEME_COPY_KEYS) {
     if (theme[key] !== undefined) assertString(theme[key], `theme.json.${key}`, { max: 120 });
   }
@@ -407,6 +417,9 @@ function validateManifest(value, platform, clientVersion) {
   if (!files.has("theme.json") || backgrounds.length !== 1) {
     fail("manifest.files must contain theme.json and exactly one background file");
   }
+  if (files.has("background.mp4") && !files.has("theme.json")) {
+    fail("manifest.files video requires theme.json");
+  }
   if (files.has("theme.css") !== capabilities.has("safe-css")) {
     fail("theme.css presence must match the safe-css capability");
   }
@@ -440,6 +453,15 @@ function detectedImageMedia(bytes) {
   return "";
 }
 
+function isMp4Container(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 16) return false;
+  const view = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const firstBoxSize = view.readUInt32BE(0);
+  return firstBoxSize >= 16
+    && firstBoxSize <= view.length
+    && view.subarray(4, 8).toString("ascii") === "ftyp";
+}
+
 async function validateOfficial(root, names, platform, clientVersion) {
   for (const name of names) {
     if (!PACKAGE_FILES.has(name)) fail(`Official theme package contains unregistered file ${name}`);
@@ -465,6 +487,14 @@ async function validateOfficial(root, names, platform, clientVersion) {
   const theme = validateOfficialTheme(decodeJson(bytes.get("theme.json"), "theme.json"));
   if (manifest.themeId !== theme.id) fail("manifest.themeId does not match theme.json id");
   if (theme.image !== background) fail("theme.json image does not match the manifest background file");
+  if (theme.video !== undefined) {
+    if (!files.has(theme.video) || theme.video !== "background.mp4") {
+      fail("theme.json video does not match the manifest video file");
+    }
+    if (!isMp4Container(bytes.get(theme.video))) {
+      fail("background.mp4 content is not a valid MP4 container");
+    }
+  }
   if (detectedImageMedia(bytes.get(background)) !== BACKGROUND_MEDIA.get(background)) {
     fail(`${background} content does not match its extension and mediaType`);
   }
@@ -479,7 +509,7 @@ async function validateOfficial(root, names, platform, clientVersion) {
 }
 
 async function validateSimple(root, names) {
-  if (names.length !== 3 || !names.includes("theme.json") || !names.includes("theme.css")) {
+  if ((names.length !== 3 && names.length !== 4) || !names.includes("theme.json") || !names.includes("theme.css")) {
     fail("Local simplified ZIP must contain exactly theme.json, theme.css, and its image");
   }
   const themeBytes = await readStableFile(root, "theme.json", LIMITS.simpleTheme);
@@ -493,15 +523,27 @@ async function validateSimple(root, names) {
     || !/\.(?:png|jpe?g|webp)$/i.test(theme.image)
     || !names.includes(theme.image)
   ) fail("Local simplified theme image must be beside theme.json");
-  const [imageBytes, cssBytes] = await Promise.all([
+  const hasVideo = theme.video !== undefined;
+  if (hasVideo && (
+    path.basename(theme.video) !== theme.video
+    || CONTROL_PATTERN.test(theme.video)
+    || theme.video !== "background.mp4"
+    || !names.includes(theme.video)
+  )) fail("Local simplified theme video must be background.mp4 beside theme.json");
+  if (names.length !== (hasVideo ? 4 : 3)) fail("Local simplified ZIP contains unsupported files");
+  const [imageBytes, cssBytes, videoBytes] = await Promise.all([
     readStableFile(root, theme.image, LIMITS.image),
     readStableFile(root, "theme.css", LIMITS.css),
+    hasVideo ? readStableFile(root, theme.video, LIMITS.video) : Promise.resolve(null),
   ]);
   const expectedMedia = /\.png$/i.test(theme.image)
     ? "image/png"
     : /\.webp$/i.test(theme.image) ? "image/webp" : "image/jpeg";
   if (detectedImageMedia(imageBytes) !== expectedMedia) {
     fail(`${theme.image} content does not match its extension`);
+  }
+  if (videoBytes && !isMp4Container(videoBytes)) {
+    fail("background.mp4 content is not a valid MP4 container");
   }
   decodeAndValidateSafeCss(cssBytes);
   return {
@@ -513,6 +555,7 @@ async function validateSimple(root, names) {
       ["theme.json", themeBytes],
       [theme.image, imageBytes],
       ["theme.css", cssBytes],
+      ...(videoBytes ? [["background.mp4", videoBytes]] : []),
     ]),
   };
 }

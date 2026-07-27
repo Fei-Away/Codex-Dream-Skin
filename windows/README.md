@@ -81,6 +81,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-d
 打开 `Codex Dream Skin - Tray` 后可以：
 
 - 更换 PNG、JPEG 或 WebP 背景图。
+- 直接选择 MP4 视频背景。
 - 导入普通 `.zip` 主题包到“已保存主题”（不支持 `.dreamskin`）。
 - 保存当前主题并从「已保存主题」切换。
 - 暂停或继续显示皮肤。
@@ -93,6 +94,24 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-d
 请保存输入。链接不能指定任意下载地址、文件路径或命令，也不能静默应用；不完整的旧主题仍会被客户端拒绝。
 
 导入图片必须是纯背景，不要使用包含窗口、侧栏、输入框、文字或按钮的效果截图。图片上限为 10 MB；宽或高不能超过 16384 像素，总像素不能超过 5000 万。
+
+### 成功导入 MP4 视频
+
+推荐直接导入，不要先制作 ZIP：
+
+1. 从 `Codex Dream Skin` 快捷方式启动 Codex，并保持 `Codex Dream Skin - Tray` 运行。
+2. 在托盘菜单选择“一键更换视频背景”。
+3. 选择真实的 `.mp4` 文件。文件必须非空、不超过 100 MiB，并带有效的 MP4 `ftyp` 容器头；其他格式
+   仅修改扩展名无效。为兼容 Codex Chromium，建议使用 H.264/AVC 视频和 AAC 音频，或无音轨视频。
+4. 普通方式启动的 Codex 没有 Dream Skin 调试会话，首次应用可能要求重启一次。确认后等待启动器完成
+   真实渲染验证；以后在健康会话中切换图片、视频和已保存主题可以直接热更新。
+
+直接选择视频会沿用当前背景图作为 poster。热切换只有在渲染器确认视频可播放后才报告成功；失败时恢复
+切换前的图片或视频主题。视频只通过本机受控通道读取，不会上传。
+
+视频也可以放进包含 `theme.json`、非空 `theme.css` 和 poster 图片的主题 ZIP，但 ZIP 仍受下面的
+32 MiB 压缩包、64 MiB 解压总量限制，限制包含 MP4 本身。大于 64 MiB 的视频（例如 76 MiB 文件）应当
+使用托盘的直接选择方式。
 
 新的正式 Studio ZIP 必须包含 `manifest.json`、非空 `theme.json`、非空 `theme.css`、恰好一张 `background.webp|jpg|png`，并可选
 带 `LICENSE.txt`、`manifest.sig`；文件直接位于根目录或只包一层主题目录。本地简化包也必须恰好包含

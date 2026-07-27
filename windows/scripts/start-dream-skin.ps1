@@ -285,7 +285,7 @@ try {
       $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
         $Injector, '--verify', '--port', "$Port",
         '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
-        '--timeout-ms', '30000')
+        '--timeout-ms', '30000', '--allow-hidden-applied')
       Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
       if ($verify.ExitCode -eq 0) { break }
       # A verify can fail while the theme is demonstrably on screen: the

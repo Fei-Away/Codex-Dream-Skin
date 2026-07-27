@@ -12,6 +12,7 @@ if (!stageDirArg || !themesRootArg) {
 
 const MAX_CONFIG_BYTES = 1024 * 1024;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 const MAX_CSS_BYTES = 256 * 1024;
 const MAX_LICENSE_BYTES = 64 * 1024;
 const MAX_MANIFEST_BYTES = 64 * 1024;
@@ -68,7 +69,7 @@ async function readRegular(filePath, label, maxBytes) {
   }
 }
 
-function normalizedFingerprint(theme, imageBytes, cssBytes = null, licenseBytes = null) {
+function normalizedFingerprint(theme, imageBytes, cssBytes = null, licenseBytes = null, videoBytes = null) {
   const semanticTheme = { ...theme };
   delete semanticTheme.id;
   const hash = createHash("sha256")
@@ -77,6 +78,7 @@ function normalizedFingerprint(theme, imageBytes, cssBytes = null, licenseBytes 
     .update(imageBytes);
   if (cssBytes) hash.update("\0theme.css\0").update(cssBytes);
   if (licenseBytes) hash.update("\0LICENSE.txt\0").update(licenseBytes);
+  if (videoBytes) hash.update("\0background.mp4\0").update(videoBytes);
   return hash.digest("hex");
 }
 
@@ -96,6 +98,9 @@ async function readStoredTheme(directory) {
     const configBytes = await readRegular(path.join(directory, "theme.json"), "Saved theme config", MAX_CONFIG_BYTES);
     const theme = decodeTheme(configBytes, "Saved theme config");
     const imageBytes = await readRegular(path.join(directory, theme.image), "Saved theme image", MAX_IMAGE_BYTES);
+    const videoBytes = theme.video === undefined
+      ? null
+      : await readRegular(path.join(directory, theme.video), "Saved theme video", MAX_VIDEO_BYTES);
     const [cssBytes, licenseBytes] = await Promise.all([
       readOptionalRegular(path.join(directory, "theme.css"), "Saved theme CSS", MAX_CSS_BYTES),
       readOptionalRegular(path.join(directory, "LICENSE.txt"), "Saved theme license", MAX_LICENSE_BYTES),
@@ -103,8 +108,8 @@ async function readStoredTheme(directory) {
     if (cssBytes) decodeAndValidateSafeCss(cssBytes);
     return {
       theme,
-      fingerprint: normalizedFingerprint(theme, imageBytes, cssBytes, licenseBytes),
-      contentFingerprint: runtimeThemeContentFingerprint(theme, imageBytes, cssBytes),
+      fingerprint: normalizedFingerprint(theme, imageBytes, cssBytes, licenseBytes, videoBytes),
+      contentFingerprint: runtimeThemeContentFingerprint(theme, imageBytes, cssBytes, videoBytes),
     };
   } catch {
     return null;
@@ -170,6 +175,11 @@ async function main() {
   const imagePath = path.join(stageRoot, sourceTheme.image);
   assertContained(stageRoot, imagePath, "Imported theme image");
   const imageBytes = await readRegular(imagePath, "Imported theme image", MAX_IMAGE_BYTES);
+  const videoPath = sourceTheme.video === undefined ? null : path.join(stageRoot, sourceTheme.video);
+  if (videoPath) assertContained(stageRoot, videoPath, "Imported theme video");
+  const videoBytes = videoPath
+    ? await readRegular(videoPath, "Imported theme video", MAX_VIDEO_BYTES)
+    : null;
   const [manifestBytes, cssBytes, licenseBytes, signatureBytes] = await Promise.all([
     readOptionalRegular(path.join(stageRoot, "manifest.json"), "Imported manifest", MAX_MANIFEST_BYTES),
     readOptionalRegular(path.join(stageRoot, "theme.css"), "Imported theme CSS", MAX_CSS_BYTES),
@@ -180,7 +190,8 @@ async function main() {
   if (!cssBytes) throw new Error("New theme imports require non-empty theme.css");
   decodeAndValidateSafeCss(cssBytes);
   const safeCssStatus = "validated";
-  const fingerprint = normalizedFingerprint(sourceTheme, imageBytes, cssBytes, licenseBytes);
+  const fingerprint = normalizedFingerprint(sourceTheme, imageBytes, cssBytes, licenseBytes, videoBytes);
+  const contentFingerprint = runtimeThemeContentFingerprint(sourceTheme, imageBytes, cssBytes, videoBytes);
   const releaseLock = await acquireLock(themesRoot);
   let temporary = "";
   try {
@@ -217,14 +228,16 @@ async function main() {
     }
     const renamed = id !== (typeof sourceTheme.id === "string" ? sourceTheme.id.trim() : "");
     const theme = { ...sourceTheme, id };
+    if (videoBytes) theme.video = "background.mp4";
     const name = displayName(theme);
-    const contentFingerprint = runtimeThemeContentFingerprint(theme, imageBytes, cssBytes);
+    const contentFingerprint = runtimeThemeContentFingerprint(theme, imageBytes, cssBytes, videoBytes);
     const destination = path.join(themesRoot, id);
     assertContained(themesRoot, destination, "Imported theme destination");
 
     temporary = await fs.mkdtemp(path.join(themesRoot, ".theme-import-"));
     await fs.chmod(temporary, 0o700);
     await writeExclusive(path.join(temporary, theme.image), imageBytes);
+    if (videoBytes) await writeExclusive(path.join(temporary, "background.mp4"), videoBytes);
     await writeExclusive(
       path.join(temporary, "theme.json"),
       Buffer.from(`${JSON.stringify(theme, null, 2)}\n`, "utf8"),

@@ -1212,3 +1212,135 @@ html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px;
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Optional media layer. It is inert for image themes and spans the complete
+   Codex viewport when a validated MP4 URL is supplied by the injector. */
+#codex-dream-skin-background-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: transparent !important;
+  visibility: hidden;
+}
+
+#codex-dream-skin-background-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background-image: var(--ds-task-fade), var(--ds-task-shade);
+  background-repeat: no-repeat;
+  background-position: center, center;
+  background-size: 100% 100%, 100% 100%;
+}
+
+#codex-dream-skin-background-stage img,
+#codex-dream-skin-background-stage video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--ds-art-position, 50% 50%);
+  pointer-events: none;
+}
+
+#codex-dream-skin-background-stage img { z-index: 1; }
+#codex-dream-skin-background-stage video {
+  z-index: 1;
+  opacity: 0;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  #codex-dream-skin-background-stage {
+  visibility: visible;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  #codex-dream-skin-background-stage video {
+  opacity: 1;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  #codex-dream-skin-background-stage::before {
+  opacity: .46;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  #codex-dream-skin-background-stage video {
+  filter: brightness(1.15) saturate(1.04);
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  #codex-dream-skin-background-stage img {
+  display: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"] body {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* The image rules above are intentionally kept for image themes. Once the
+   video has its first frame, close every static-art entry point explicitly so
+   a Codex route cannot leave a second copy of the imported image visible. */
+html[data-dream-skin="active"][data-dream-media="video"]
+  __DREAM_SELECTOR_SHELL_MAIN__::before {
+  content: none !important;
+  background-image: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  __DREAM_SELECTOR_HOME_ROUTE__ > div:first-child > div:first-child > div:first-child {
+  background-image: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"] body > #root {
+  position: relative !important;
+  /* Keep every native task/composer surface above the full-window media stage.
+     The explicit stacking context also covers Codex's new-task route, whose
+     transparent wrappers can otherwise participate in the body's auto layer. */
+  z-index: 10 !important;
+  isolation: isolate;
+  background: transparent !important;
+}
+
+/* Some Codex builds mount dialogs and popovers directly under body instead of
+   inside #root. Keep those native surfaces above the media stage as well. */
+html[data-dream-skin="active"][data-dream-media="video"] body >
+  :is([role="dialog"], [aria-modal="true"], [data-radix-portal],
+    [data-radix-popper-content-wrapper]) {
+  z-index: 50 !important;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  body > #root __DREAM_SELECTOR_LEFT_PANEL__ {
+  background:
+    linear-gradient(180deg,
+      rgb(var(--ds-panel-rgb) / .38),
+      rgb(var(--ds-bg-rgb) / .28)) !important;
+  backdrop-filter: blur(8px) saturate(112%) !important;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"] __DREAM_SELECTOR_SHELL_MAIN__ {
+  background: transparent !important;
+}
+
+html[data-dream-skin="active"][data-dream-media="video"]
+  __DREAM_SELECTOR_SHELL_MAIN__::before {
+  content: none !important;
+}
+
+/* Wide image themes also paint artwork directly on body. In video mode the
+   video stage is the sole artwork source; keep the old body image only for
+   the image fallback path. */
+html[data-dream-skin="active"][data-dream-media="video"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  body,
+html[data-dream-skin="active"][data-dream-media="video"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)
+  body {
+  background-image: none !important;
+}

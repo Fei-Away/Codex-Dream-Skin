@@ -98,6 +98,7 @@ RUNTIME_SCRIPTS=(
   injector.mjs
   install-dream-skin-macos.sh
   load-image-theme-macos.sh
+  media-server.mjs
   pause-dream-skin-macos.sh
   publish-theme-import.mjs
   snapshot-active-theme-macos.sh

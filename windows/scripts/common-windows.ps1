@@ -23,6 +23,26 @@ function Enter-DreamSkinOperationLock {
   return $mutex
 }
 
+function Test-DreamSkinOperationActive {
+  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Operation")
+  $acquired = $false
+  try {
+    try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] {
+      $acquired = $true
+    }
+    if ($acquired) {
+      $mutex.ReleaseMutex()
+      $acquired = $false
+      return $false
+    }
+    return $true
+  } finally {
+    if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
+    $mutex.Dispose()
+  }
+}
+
 function Exit-DreamSkinOperationLock {
   param([Parameter(Mandatory = $true)][System.Threading.Mutex]$Mutex)
   try { $Mutex.ReleaseMutex() } finally { $Mutex.Dispose() }
@@ -200,6 +220,7 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\image-metadata.mjs',
     'scripts\injector.mjs',
     'scripts\install-dream-skin.ps1',
+    'scripts\media-server.mjs',
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
@@ -803,7 +824,7 @@ function Test-DreamSkinWebSocketUrl {
     $uri = [Uri]$Value
     $hostName = $uri.Host.ToLowerInvariant()
     return ($uri.IsAbsoluteUri -and $uri.Scheme -eq 'ws' -and $uri.Port -eq $Port -and
-      $hostName -in @('127.0.0.1', 'localhost', '::1', '[::1]') -and -not $uri.UserInfo -and
+      $hostName -eq '127.0.0.1' -and -not $uri.UserInfo -and
       -not $uri.Query -and -not $uri.Fragment -and
       $uri.AbsolutePath -cmatch '^/devtools/(?:page|browser)/[A-Za-z0-9._-]{1,200}$')
   } catch {
@@ -1027,6 +1048,35 @@ function Get-DreamSkinProcessStartedAt {
   } catch {
     return $null
   }
+}
+
+function Test-DreamSkinRecordedInjector {
+  param([AllowNull()][object]$State)
+  if ($null -eq $State -or -not $State.injectorPid) { return $false }
+  $processId = [int]$State.injectorPid
+  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
+  if (-not $process) { return $false }
+  $expectedInjector = if ($State.injectorPath) { "$($State.injectorPath)" } elseif ($State.skillRoot) {
+    Join-Path "$($State.skillRoot)" 'scripts\injector.mjs'
+  } else { $null }
+  $processPath = Get-DreamSkinProcessExecutablePath -ProcessInfo $process
+  if (-not $processPath -or -not $process.CommandLine) { return $false }
+  $isNodeExecutable = [System.IO.Path]::GetFileName("$processPath") -ieq 'node.exe'
+  $nodeMatches = -not $State.nodePath -or (Test-DreamSkinPathEqual -Left $processPath -Right "$($State.nodePath)")
+  $injectorMatches = [bool]($expectedInjector -and
+    (Test-DreamSkinCommandLineToken -CommandLine "$($process.CommandLine)" -Token $expectedInjector) -and
+    (Test-DreamSkinCommandLineToken -CommandLine "$($process.CommandLine)" -Token '--watch'))
+  if ($State.port) {
+    $portPattern = '(?i)(?:^|\s)--port(?:=|\s+)' + [regex]::Escape("$($State.port)") + '(?=$|\s)'
+    $injectorMatches = $injectorMatches -and [regex]::IsMatch("$($process.CommandLine)", $portPattern)
+  } else { $injectorMatches = $false }
+  if ($State.browserId) {
+    $browserPattern = '(?:^|\s)(?i:--browser-id)(?:=|\s+)' + [regex]::Escape("$($State.browserId)") + '(?=$|\s)'
+    $injectorMatches = $injectorMatches -and [regex]::IsMatch("$($process.CommandLine)", $browserPattern)
+  }
+  $startedAt = Get-DreamSkinProcessStartedAt -ProcessId $processId
+  $startMatches = -not $State.injectorStartedAt -or $startedAt -eq "$($State.injectorStartedAt)"
+  return [bool]($isNodeExecutable -and $nodeMatches -and $injectorMatches -and $startMatches)
 }
 
 function Stop-DreamSkinRecordedInjector {

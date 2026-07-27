@@ -3,6 +3,7 @@
 }
 
 $script:DreamSkinMaxImageBytes = 10 * 1024 * 1024
+$script:DreamSkinMaxVideoBytes = 100 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveBytes = 32 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveExpandedBytes = 64 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveEntries = 32
@@ -280,6 +281,47 @@ function Assert-DreamSkinImageFile {
   }
 }
 
+function Assert-DreamSkinVideoFile {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+    throw "Video does not exist: $fullPath"
+  }
+  if ([System.IO.Path]::GetExtension($fullPath).ToLowerInvariant() -ne '.mp4') {
+    throw 'Unsupported video format. Only MP4 is supported.'
+  }
+  $length = (Get-Item -LiteralPath $fullPath -Force).Length
+  if ($length -lt 1) { throw 'Theme video cannot be empty.' }
+  if ($length -gt $script:DreamSkinMaxVideoBytes) {
+    throw 'Theme video exceeds the 100 MB limit.'
+  }
+  # An .mp4 extension is not evidence of an MP4. Read the first box header and
+  # require a real `ftyp` container so a renamed file is rejected before the
+  # renderer is asked to decode it.
+  $stream = [System.IO.File]::Open(
+    $fullPath,
+    [System.IO.FileMode]::Open,
+    [System.IO.FileAccess]::Read,
+    [System.IO.FileShare]::Read
+  )
+  try {
+    $header = New-Object byte[] 16
+    $read = $stream.Read($header, 0, $header.Length)
+  } finally {
+    $stream.Dispose()
+  }
+  $firstBoxSize = if ($read -ge 4) {
+    ([uint64]$header[0] * 16777216) +
+      ([uint64]$header[1] * 65536) +
+      ([uint64]$header[2] * 256) +
+      [uint64]$header[3]
+  } else { 0 }
+  $boxType = if ($read -ge 8) { [System.Text.Encoding]::ASCII.GetString($header, 4, 4) } else { '' }
+  if ($read -lt 16 -or $boxType -cne 'ftyp' -or $firstBoxSize -lt 16 -or $firstBoxSize -gt $length) {
+    throw 'Theme video is not a valid MP4 container.'
+  }
+}
+
 function Assert-DreamSkinSafeCssFile {
   param([Parameter(Mandatory = $true)][string]$Path)
   $fullPath = [System.IO.Path]::GetFullPath($Path)
@@ -374,10 +416,26 @@ function Read-DreamSkinTheme {
     throw 'Theme image must remain inside its theme directory and exist.'
   }
   Assert-DreamSkinImageFile -Path $imagePath -SkipImageMetadata:$SkipImageMetadata
+  $videoPath = $null
+  if ($null -ne $theme.video -and "$($theme.video)") {
+    $video = "$($theme.video)"
+    if ([System.IO.Path]::IsPathRooted($video) -or
+      [System.IO.Path]::GetFileName($video) -ne $video -or
+      [System.IO.Path]::GetExtension($video).ToLowerInvariant() -ne '.mp4') {
+      throw 'Theme video path must be a relative MP4 filename.'
+    }
+    $videoPath = [System.IO.Path]::GetFullPath((Join-Path $directory $video))
+    if (-not (Test-DreamSkinThemePathWithin -Path $videoPath -Root $directory) -or
+      -not (Test-Path -LiteralPath $videoPath -PathType Leaf)) {
+      throw 'Theme video must remain inside its theme directory and exist.'
+    }
+    Assert-DreamSkinVideoFile -Path $videoPath
+  }
   return [pscustomobject]@{
     Directory = $directory
     ThemePath = $themePath
     ImagePath = $imagePath
+    VideoPath = $videoPath
     Theme = $theme
   }
 }
@@ -491,6 +549,8 @@ function Initialize-DreamSkinThemeStore {
     elseif ($activeId -ceq 'preset-gothic-void-crusade' -and
       (Test-Path -LiteralPath $gothicSourceTheme -PathType Leaf)) { $refreshSource = $gothicSource }
     if ($null -ne $refreshSource) {
+      $activeVideoPath = $null
+      try { $activeVideoPath = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).VideoPath } catch {}
       $sourcePack = Read-DreamSkinTheme -ThemeDirectory $refreshSource
       $sourceJson = Read-DreamSkinUtf8File -Path $sourcePack.ThemePath
       $activeJson = Read-DreamSkinUtf8File -Path $activeTheme
@@ -502,6 +562,17 @@ function Initialize-DreamSkinThemeStore {
         Assert-DreamSkinNoReparseComponents -Path $refreshedImage
         Assert-DreamSkinImageFile -Path $refreshedImage
         Copy-Item -LiteralPath $sourcePack.ThemePath -Destination $activeTheme -Force
+        if ($activeVideoPath) {
+          # Preset metadata refresh must not discard a user-imported video.
+          # The active video is already inside the managed theme directory;
+          # reattach its relative filename to the refreshed theme manifest.
+          Assert-DreamSkinNoReparseComponents -Path $activeVideoPath
+          $refreshed = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+          $refreshedTheme = $refreshed.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+          $refreshedTheme | Add-Member -NotePropertyName video `
+            -NotePropertyValue ([System.IO.Path]::GetFileName($activeVideoPath)) -Force
+          Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $refreshedTheme
+        }
       }
     }
   }
@@ -518,6 +589,7 @@ function New-DreamSkinThemeImageName {
 function Set-DreamSkinActiveTheme {
   param(
     [Parameter(Mandatory = $true)][string]$ImagePath,
+    [string]$VideoPath,
     [AllowNull()][object]$Theme,
     [string]$Name,
     [AllowNull()][string]$SafeCssPath,
@@ -529,9 +601,16 @@ function Set-DreamSkinActiveTheme {
   Ensure-DreamSkinManagedDirectory -Path $paths.Images -Root $paths.Root
   $source = [System.IO.Path]::GetFullPath($ImagePath)
   Assert-DreamSkinImageFile -Path $source
+  $videoSource = if ($VideoPath) { [System.IO.Path]::GetFullPath($VideoPath) } else { $null }
+  if ($videoSource) { Assert-DreamSkinVideoFile -Path $videoSource }
   $extension = [System.IO.Path]::GetExtension($source).ToLowerInvariant()
   $oldImage = $null
-  try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
+  $oldVideo = $null
+  try {
+    $oldTheme = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+    $oldImage = $oldTheme.ImagePath
+    $oldVideo = $oldTheme.VideoPath
+  } catch {}
   if ($null -eq $Theme) {
     $Theme = [pscustomobject]@{
       id = 'custom'
@@ -544,6 +623,9 @@ function Set-DreamSkinActiveTheme {
   $imageName = New-DreamSkinThemeImageName -Extension $extension
   $target = Join-Path $paths.Active $imageName
   $temporary = Join-Path $paths.Active ('.dream-tmp-' + [guid]::NewGuid().ToString('N') + $extension)
+  $videoName = 'background.mp4'
+  $videoTarget = Join-Path $paths.Active $videoName
+  $videoTemporary = Join-Path $paths.Active ('.dream-video-tmp-' + [guid]::NewGuid().ToString('N') + '.mp4')
   $temporaryCss = $null
   try {
     if ($SafeCssPath) {
@@ -562,6 +644,17 @@ function Set-DreamSkinActiveTheme {
     Move-Item -LiteralPath $temporary -Destination $target -Force
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinImageFile -Path $target
+    if ($videoSource) {
+      Assert-DreamSkinNoReparseComponents -Path $videoTarget
+      Assert-DreamSkinNoReparseComponents -Path $videoTemporary
+      Copy-Item -LiteralPath $videoSource -Destination $videoTemporary -Force
+      Assert-DreamSkinVideoFile -Path $videoTemporary
+      Move-Item -LiteralPath $videoTemporary -Destination $videoTarget -Force
+      Assert-DreamSkinVideoFile -Path $videoTarget
+      $Theme | Add-Member -NotePropertyName video -NotePropertyValue $videoName -Force
+    } elseif ($Theme.PSObject.Properties['video']) {
+      $Theme.PSObject.Properties.Remove('video')
+    }
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
     if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
@@ -585,6 +678,7 @@ function Set-DreamSkinActiveTheme {
     Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $Theme
   } finally {
     Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $videoTemporary -Force -ErrorAction SilentlyContinue
     if ($temporaryCss) { Remove-Item -LiteralPath $temporaryCss -Force -ErrorAction SilentlyContinue }
   }
   $sameImage = $oldImage -and ([System.IO.Path]::GetFullPath($oldImage) -ieq [System.IO.Path]::GetFullPath($target))
@@ -592,11 +686,21 @@ function Set-DreamSkinActiveTheme {
     (Test-DreamSkinThemePathWithin -Path $oldImage -Root $paths.Active)) {
     Remove-Item -LiteralPath $oldImage -Force -ErrorAction SilentlyContinue
   }
+  if ($oldVideo -and (-not $videoSource -or [System.IO.Path]::GetFullPath($oldVideo) -ine [System.IO.Path]::GetFullPath($videoTarget)) -and
+    (Test-DreamSkinThemePathWithin -Path $oldVideo -Root $paths.Active)) {
+    Remove-Item -LiteralPath $oldVideo -Force -ErrorAction SilentlyContinue
+  }
   $imageArchive = Join-Path $paths.Images $imageName
   Assert-DreamSkinNoReparseComponents -Path $imageArchive
   Copy-Item -LiteralPath $target -Destination $imageArchive -Force
   Assert-DreamSkinNoReparseComponents -Path $imageArchive
   Assert-DreamSkinImageFile -Path $imageArchive
+  if ($videoSource) {
+    $videoArchive = Join-Path $paths.Images $videoName
+    Assert-DreamSkinNoReparseComponents -Path $videoArchive
+    Copy-Item -LiteralPath $videoTarget -Destination $videoArchive -Force
+    Assert-DreamSkinVideoFile -Path $videoArchive
+  }
   return Read-DreamSkinTheme -ThemeDirectory $paths.Active
 }
 
@@ -627,6 +731,13 @@ function Save-DreamSkinCurrentTheme {
   $theme.id = $id
   $theme.name = $trimmed
   $theme.image = $imageName
+  if ($active.VideoPath) {
+    $destinationVideo = Join-Path $destination 'background.mp4'
+    Assert-DreamSkinNoReparseComponents -Path $destinationVideo
+    Copy-Item -LiteralPath $active.VideoPath -Destination $destinationVideo -Force
+    Assert-DreamSkinVideoFile -Path $destinationVideo
+    $theme.video = 'background.mp4'
+  }
   Write-DreamSkinTheme -ThemeDirectory $destination -Theme $theme
   $activeCss = Join-Path $paths.Active 'theme.css'
   if (Test-Path -LiteralPath $activeCss -PathType Leaf) {
@@ -739,6 +850,14 @@ function Get-DreamSkinThemeRuntimeContentFingerprint {
     $hasher.Dispose()
   }
   $imageHash = (Get-FileHash -LiteralPath $loaded.ImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  $videoIdentity = 'absent'
+  if ($loaded.VideoPath) {
+    Assert-DreamSkinNoReparseComponents -Path $loaded.VideoPath
+    if ((Get-Item -LiteralPath $loaded.VideoPath -Force).Length -gt $script:DreamSkinMaxVideoBytes) {
+      throw 'Theme video exceeds the 100 MB limit.'
+    }
+    $videoIdentity = (Get-FileHash -LiteralPath $loaded.VideoPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
   $cssPath = Join-Path $loaded.Directory 'theme.css'
   $cssIdentity = 'absent'
   if (Test-Path -LiteralPath $cssPath -PathType Leaf) {
@@ -748,7 +867,7 @@ function Get-DreamSkinThemeRuntimeContentFingerprint {
     }
     $cssIdentity = (Get-FileHash -LiteralPath $cssPath -Algorithm SHA256).Hash.ToLowerInvariant()
   }
-  $identity = "dreamskin-runtime-theme/1`0theme.json`0$themeHash`0image`0$imageHash`0theme.css`0$cssIdentity"
+  $identity = "dreamskin-runtime-theme/1`0theme.json`0$themeHash`0image`0$imageHash`0theme.css`0$cssIdentity`0video`0$videoIdentity"
   $identityBytes = [System.Text.Encoding]::UTF8.GetBytes($identity)
   $identityHasher = [System.Security.Cryptography.SHA256]::Create()
   try {
@@ -1133,9 +1252,20 @@ function Import-DreamSkinThemeZip {
     Assert-DreamSkinNoReparseComponents -Path $stagedImage
     Copy-Item -LiteralPath $source.ImagePath -Destination $stagedImage -Force
     Assert-DreamSkinImageFile -Path $stagedImage
+    $videoName = $null
+    if ($source.VideoPath) {
+      $videoName = 'background.mp4'
+      $stagedVideo = Join-Path $publishStage $videoName
+      Assert-DreamSkinNoReparseComponents -Path $stagedVideo
+      Copy-Item -LiteralPath $source.VideoPath -Destination $stagedVideo -Force
+      Assert-DreamSkinNoReparseComponents -Path $stagedVideo
+      Assert-DreamSkinVideoFile -Path $stagedVideo
+    }
     $theme = $source.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
     $theme.id = $id
     $theme.image = $imageName
+    if ($videoName) { $theme.video = $videoName }
+    elseif ($theme.PSObject.Properties['video']) { $theme.PSObject.Properties.Remove('video') }
     Write-DreamSkinTheme -ThemeDirectory $publishStage -Theme $theme
     foreach ($auxiliaryName in @('theme.css', 'LICENSE.txt')) {
       $auxiliarySource = Join-Path $sourceRoot $auxiliaryName
@@ -1225,7 +1355,7 @@ function Use-DreamSkinSavedTheme {
   $safeCssPath = Join-Path $directory 'theme.css'
   if (-not (Test-Path -LiteralPath $safeCssPath -PathType Leaf)) { $safeCssPath = $null }
   if ($safeCssPath) { Assert-DreamSkinSafeCssFile -Path $safeCssPath }
-  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme `
+  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -VideoPath $saved.VideoPath -Theme $theme `
     -SafeCssPath $safeCssPath -StateRoot $StateRoot
 }
 

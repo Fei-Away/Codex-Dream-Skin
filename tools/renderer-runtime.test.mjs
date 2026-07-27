@@ -27,7 +27,7 @@ function classList(initial) {
   };
 }
 
-function makeFixture({ nativeAppearance = "dark", settings = false, adopted = true } = {}) {
+function makeFixture({ nativeAppearance = "dark", settings = false, adopted = true, autoMetadata = false } = {}) {
   const attrs = new Map();
   const rootStyle = styleDeclaration();
   const rootClasses = classList([nativeAppearance === "dark" ? "electron-dark" : "electron-light"]);
@@ -39,6 +39,8 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   const intervals = new Map();
   const listeners = new Map();
   const revoked = [];
+  const fetchCalls = [];
+  let documentHidden = false;
   let nextId = 0;
   let nextBlob = 0;
   const attributesFor = (values) => [...values].map(([name, value]) => ({ name, value }));
@@ -62,6 +64,11 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     node.parentElement = root;
     if (node.id) nodes.set(node.id, node);
     return node;
+  };
+  const shell = {
+    children: [],
+    prepend(node) { node.parentElement = shell; shell.children.unshift(node); if (node.id) nodes.set(node.id, node); return node; },
+    appendChild(node) { node.parentElement = shell; shell.children.push(node); if (node.id) nodes.set(node.id, node); return node; },
   };
   const body = makeDomNode("body", root);
   body.appendChild = (node) => {
@@ -109,17 +116,75 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     };
     return node;
   };
+  const makeMediaNode = (tagName) => {
+    const node = {
+      tagName,
+      id: "",
+      parentElement: null,
+      dataset: {},
+      style: styleDeclaration(),
+      children: [],
+      listeners: new Map(),
+      eventListeners: new Map(),
+      src: "",
+      readyState: autoMetadata ? 1 : 0,
+      loadCalls: 0,
+      appendChild(child) { child.parentElement = node; node.children.push(child); if (child.id) nodes.set(child.id, child); return child; },
+      replaceChildren(...children) {
+        for (const child of node.children) child.parentElement = null;
+        node.children = [];
+        for (const child of children) node.appendChild(child);
+      },
+      setAttribute(name, value) { node[name] = String(value); },
+      removeAttribute(name) { delete node[name]; },
+      addEventListener(type, callback) {
+        const callbacks = node.eventListeners.get(type) || new Set();
+        callbacks.add(callback);
+        node.eventListeners.set(type, callbacks);
+        node.listeners.set(type, callback);
+      },
+      removeEventListener(type, callback) {
+        const callbacks = node.eventListeners.get(type);
+        if (!callbacks) return;
+        callbacks.delete(callback);
+        if (callbacks.size === 0) {
+          node.eventListeners.delete(type);
+          node.listeners.delete(type);
+        } else {
+          node.listeners.set(type, [...callbacks].at(-1));
+        }
+      },
+      pause() {},
+      load() { node.loadCalls += 1; },
+      play() { return Promise.resolve(); },
+      remove() {
+        if (node.id) nodes.delete(node.id);
+        const parent = node.parentElement;
+        if (Array.isArray(parent?.children)) {
+          const index = parent.children.indexOf(node);
+          if (index >= 0) parent.children.splice(index, 1);
+        }
+        node.parentElement = null;
+      },
+    };
+    return node;
+  };
   const document = {
+    get hidden() { return documentHidden; },
+    get visibilityState() { return documentHidden ? "hidden" : "visible"; },
     documentElement: root,
     head: root,
     body,
     adoptedStyleSheets: adopted ? [] : undefined,
-    createElement(tag) { return tag === "style" ? makeStyleNode() : { tagName: tag }; },
+    addEventListener(type, callback) { listeners.set(`document:${type}`, callback); },
+    removeEventListener(type) { listeners.delete(`document:${type}`); },
+    createElement(tag) { return tag === "style" ? makeStyleNode() : makeMediaNode(tag); },
     getElementById(id) { return nodes.get(id) || null; },
     querySelector(selector) {
       if (settings && (selector.includes("appearance-theme") || selector.includes("theme-preview"))) {
         return makeDomNode(`settings:${selector}`, body);
       }
+      if (selector === "main.main-surface") return shell;
       return (selectorNodes.get(selector) || [])[0] || null;
     },
     querySelectorAll(selector) {
@@ -153,6 +218,9 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     addEventListener() {},
     removeEventListener() {},
   };
+  const FixtureURL = class extends globalThis.URL {};
+  FixtureURL.createObjectURL = () => { nextBlob += 1; return `blob:fixture-${nextBlob}`; };
+  FixtureURL.revokeObjectURL = (value) => { revoked.push(value); };
   const context = {
     window,
     document,
@@ -161,18 +229,22 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     Blob,
     Uint8Array,
     atob,
-    URL: {
-      createObjectURL() { nextBlob += 1; return `blob:fixture-${nextBlob}`; },
-      revokeObjectURL(value) { revoked.push(value); },
-    },
+    URL: FixtureURL,
     performance: { now: () => 1 },
     setTimeout(callback, delay) { const id = ++nextId; timers.set(id, { callback, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
     setInterval(callback, delay) { const id = ++nextId; intervals.set(id, { callback, delay }); return id; },
     clearInterval(id) { intervals.delete(id); },
     console,
+    fetch: async (...args) => {
+      fetchCalls.push(args);
+      return {
+        ok: true,
+        blob: async () => new Blob(["fixture-video"], { type: "video/mp4" }),
+      };
+    },
   };
-  const payloadFor = (theme = {}) => {
+  const payloadFor = (theme = {}, videoUrl = null) => {
     const template = fixture.template;
     return template
       .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(".fixture { color: red; }"))
@@ -180,7 +252,8 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
       .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify({ id: "fixture", appearance: "auto", ...theme }))
       .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify("test"))
       .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", JSON.stringify("css-rev"))
-      .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify("payload-rev"));
+      .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify("payload-rev"))
+      .replace("__DREAM_SKIN_VIDEO_JSON__", JSON.stringify(videoUrl));
   };
   const flushTimers = (maximumDelay = Infinity) => {
     for (const [id, timer] of [...timers]) {
@@ -192,9 +265,14 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     register('[data-message-author-role]', node);
     return node;
   };
+  const setVisibility = (hidden) => {
+    documentHidden = Boolean(hidden);
+    listeners.get("document:visibilitychange")?.();
+  };
   return {
-    addDynamicMessage, attrs, context, document, domNodes, flushTimers, intervals, listeners,
-    nodes, observers, partFixtures, payloadFor, revoked, root, rootClasses, rootStyle, timers, window,
+    addDynamicMessage, attrs, context, document, domNodes, fetchCalls, flushTimers, intervals, listeners,
+    nodes, observers, partFixtures, payloadFor, revoked, root, rootClasses, rootStyle, setVisibility,
+    shell, timers, window,
   };
 }
 
@@ -252,6 +330,12 @@ export async function runRendererRuntimeTest(assetRoot) {
   // and the measured fossil selector must be absent from the canonical CSS.
   assert.doesNotMatch(css, /(?:^|[.#\s])(?:codex-dream-skin|dream-skin-home|dream-home|dream-task)(?:[\s.#:{>]|$)|home-suggestion-list-item/);
   assert.match(css, /html\[data-dream-skin="active"\]/);
+  assert.match(css, /data-dream-media="video"[\s\S]*background-image: none !important/,
+    "Video mode must explicitly disable the static-art background rules.");
+  assert.match(template, /video-pending/,
+    "Video themes must expose a pending state while the first frame is loading.");
+  assert.match(template, /videoGeneration/,
+    "Video event handlers must isolate stale media generations.");
   // Home gating must stay single-level: CSS forbids :has() inside :has(),
   // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
@@ -270,7 +354,8 @@ export async function runRendererRuntimeTest(assetRoot) {
   const unscoped = unscopedCssRules(css).join("\n");
   assert.doesNotMatch(unscoped, /\[role="main"\]:has\(\[data-testid="home-icon"\]\)/);
   assert.doesNotMatch(unscoped, /\.group\\\/project-selector/);
-
+  assert.match(css, /html\[data-dream-skin="active"\][\s\S]*\[role="main"\]:has\(\[data-testid="home-icon"\]\)[^{}]*[\s\S]*\.group\\\/project-selector/,
+    "Project-picker styling must remain scoped to the home route.");
   const home = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(home.payloadFor({ art: { safeArea: "left", taskMode: "banner" } }), home.context);
   const state = home.window.__CODEX_DREAM_SKIN_STATE__;
@@ -330,6 +415,152 @@ export async function runRendererRuntimeTest(assetRoot) {
   partObserver.callback([{ type: "childList" }]);
   home.flushTimers(80);
   assert.equal(dynamicMessage.getAttribute("data-ds-part"), "message");
+
+  const video = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(video.payloadFor({}, "http://127.0.0.1:1234/media/0123456789abcdef0123456789abcdef"), video.context);
+  const videoState = video.window.__CODEX_DREAM_SKIN_STATE__;
+  const stage = video.nodes.get("codex-dream-skin-background-stage");
+  assert.equal(video.attrs.get("data-dream-media"), "video-pending");
+  assert.equal(video.attrs.get("data-dream-video-ready"), "false");
+  assert.ok(stage, "Video must mount a dedicated background stage");
+  assert.equal(stage.children.length, 1, "Video mode must use one media element");
+  assert.equal(stage.children[0].tagName, "video");
+  assert.equal(stage.children[0].loop, true, "Video backgrounds must loop natively");
+  for (let attempt = 0; attempt < 24 && !stage.children[0].src; attempt += 1) {
+    await Promise.resolve();
+  }
+  assert.match(stage.children[0].src, /^blob:fixture-/);
+  stage.children[0].listeners.get("loadedmetadata")();
+  await Promise.resolve();
+  stage.children[0].listeners.get("loadeddata")();
+  assert.equal(video.attrs.get("data-dream-media"), "video");
+  assert.equal(video.attrs.get("data-dream-video-ready"), "true");
+  assert.equal("poster" in stage.children[0], false,
+    "The poster must be removed after the first decoded frame.");
+  assert.equal(stage.children[0].style.opacity, "",
+    "The first ready video must clear its pending inline visibility guard.");
+  assert.deepEqual(
+    [...videoState.mediaTransitions].map((entry) => entry.state),
+    ["video-pending", "video"],
+    "Initial video load must expose one pending state followed by the ready state.",
+  );
+  const transientAbort = stage.children[0].listeners.get("abort");
+  const loadCallsBeforeAbort = stage.children[0].loadCalls;
+  transientAbort();
+  assert.equal(video.attrs.get("data-dream-media"), "video",
+    "A transient abort must not expose the image fallback.");
+  video.flushTimers(500);
+  await Promise.resolve();
+  assert.equal(stage.children[0].loadCalls, loadCallsBeforeAbort,
+    "A transient abort must resume playback without reloading the source and exposing its poster.");
+  const endedHandler = stage.children[0].listeners.get("ended");
+  assert.equal(typeof endedHandler, "function", "Video backgrounds must recover from an unexpected ended event");
+  endedHandler();
+  await Promise.resolve();
+  assert.equal(video.attrs.get("data-dream-video-ready"), "true");
+  assert.equal(video.attrs.get("data-dream-media"), "video");
+  assert.equal(video.attrs.get("data-dream-video-ready"), "true");
+  assert.match(stage.children[0].src, /^blob:fixture-/);
+  assert.equal(video.fetchCalls[0][1].headers["X-Codex-Dream-Skin-Token"],
+    "0123456789abcdef0123456789abcdef");
+  const transientPlaybackError = Object.assign(new Error("background media was interrupted"), {
+    name: "AbortError",
+  });
+  stage.children[0].listeners.get("error")(transientPlaybackError);
+  assert.equal(videoState.videoFailed, false,
+    "A recoverable playback error must not race its scheduled retry with image fallback.");
+  video.flushTimers(500);
+  await Promise.resolve();
+  assert.equal(video.attrs.get("data-dream-media"), "video");
+  video.setVisibility(true);
+  for (let attempt = 0; attempt < 25; attempt += 1) transientAbort();
+  video.flushTimers(500);
+  await Promise.resolve();
+  assert.equal(videoState.videoFailed, false,
+    "A hidden renderer must not exhaust the finite playback retry budget.");
+  assert.equal(videoState.videoReady, true,
+    "Suspending a ready hidden video must preserve the last known good frame state.");
+  assert.equal(video.timers.size, 0,
+    "Hidden playback failures must wait for visibilitychange instead of polling.");
+  video.setVisibility(false);
+  await Promise.resolve();
+  assert.equal(videoState.videoReady, true,
+    "Visibility restoration must resume the existing video without image fallback.");
+  const previousVideoState = videoState;
+  const previousVideoStage = stage;
+  const previousVideo = stage.children[0];
+  const previousVideoError = stage.children[0].listeners.get("error");
+  const staleVideo = video.document.createElement("video");
+  staleVideo.poster = "blob:stale-poster";
+  stage.appendChild(staleVideo);
+  vm.runInNewContext(video.payloadFor({}, "http://127.0.0.1:1234/media/fedcba9876543210fedcba9876543210"), video.context);
+  const replacementState = video.window.__CODEX_DREAM_SKIN_STATE__;
+  const replacementStage = video.nodes.get("codex-dream-skin-background-stage");
+  const replacementVideo = replacementStage.children.at(-1);
+  assert.notEqual(replacementState, previousVideoState);
+  assert.equal(replacementStage, previousVideoStage,
+    "A replacement video must reuse the mounted stage rather than its parent shell.");
+  assert.equal(previousVideo.parentElement, previousVideoStage,
+    "The previous video must remain mounted until the replacement is ready.");
+  assert.equal(staleVideo.parentElement, null,
+    "A replacement must discard any video left by an older superseded handoff.");
+  assert.equal(previousVideo.eventListeners.size, 0,
+    "A handed-off video must not retain listeners from its superseded runtime.");
+  assert.equal(video.attrs.get("data-dream-media"), "video",
+    "A ready previous video must remain the displayed medium during replacement loading.");
+  assert.equal(replacementVideo.style.opacity, "0",
+    "A pending replacement must not expose its poster over the previous video.");
+  assert.deepEqual(
+    [...replacementState.mediaTransitions].map((entry) => entry.state),
+    ["video"],
+    "A ready handoff must never transition the replacement runtime through image or pending display.",
+  );
+  previousVideoError(new Error("detached old video error"));
+  assert.equal(video.attrs.get("data-dream-media"), "video",
+    "An old video's late error must not hide the ready handoff or fail the replacement generation.");
+  assert.equal(video.window.__CODEX_DREAM_SKIN_STATE__.videoFailed, false);
+  for (let attempt = 0; attempt < 24 && !replacementVideo.src; attempt += 1) {
+    await Promise.resolve();
+  }
+  assert.match(replacementVideo.src, /^blob:fixture-/);
+  replacementVideo.listeners.get("loadedmetadata")();
+  await Promise.resolve();
+  replacementVideo.listeners.get("loadeddata")();
+  assert.equal(replacementVideo.style.opacity, "",
+    "The replacement visibility guard must clear only after its first frame.");
+  assert.equal(
+    replacementState.mediaTransitions.some((entry) => entry.state !== "video"),
+    false,
+    "A successful video-to-video handoff must keep video as the displayed medium throughout.",
+  );
+  assert.equal(previousVideo.parentElement, null,
+    "The previous video must be released after the replacement becomes ready.");
+  assert.equal(replacementStage.children.length, 1,
+    "A completed handoff must leave exactly one video in the background stage.");
+  assert.equal(video.attrs.get("data-dream-media"), "video");
+  assert.equal(replacementState.cleanup(), true);
+  assert.equal(video.nodes.has("codex-dream-skin-background-stage"), false);
+
+  const blobVideo = makeFixture({ nativeAppearance: "dark", autoMetadata: true });
+  vm.runInNewContext(blobVideo.payloadFor({}, {
+    mode: "blob",
+    fallbackUrl: "http://127.0.0.1:1234/media/0123456789abcdef0123456789abcdef",
+  }), blobVideo.context);
+  const blobState = blobVideo.window.__CODEX_DREAM_SKIN_STATE__;
+  const blobInput = blobVideo.nodes.get("codex-dream-skin-video-input");
+  assert.equal(blobState.videoMode, "blob");
+  assert.equal(blobInput.type, "file");
+  assert.equal(blobInput.accept, "video/mp4");
+  blobInput.files = [{ name: "fixture.mp4", type: "video/mp4" }];
+  assert.equal(await blobState.attachVideoFile(), true, "CDP-provided file input must attach as a Blob URL");
+  const blobStage = blobVideo.nodes.get("codex-dream-skin-background-stage");
+  assert.ok(blobStage, "Blob video must mount a dedicated background stage");
+  assert.equal(blobStage.children.length, 1, "Blob video mode must use one media element");
+  assert.match(blobStage.children[0].src, /^blob:fixture-/);
+  assert.equal(blobVideo.fetchCalls.length, 0, "Blob-first mode must not fetch the loopback fallback eagerly");
+  assert.equal(blobState.cleanup(), true);
+  assert.equal(blobVideo.nodes.has("codex-dream-skin-video-input"), false);
+
 
   const full = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);

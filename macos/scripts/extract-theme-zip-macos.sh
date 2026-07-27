@@ -188,7 +188,7 @@ if [ -f "$SOURCE_ROOT/manifest.json" ]; then
   while IFS= read -r -d '' source_file; do
     source_name="$(/usr/bin/basename "$source_file")"
     case "$source_name" in
-      manifest.json|manifest.sig|theme.json|theme.css|LICENSE.txt) ;;
+      manifest.json|manifest.sig|theme.json|theme.css|LICENSE.txt|background.mp4) ;;
       background.webp|background.jpg|background.png)
         official_backgrounds=$((official_backgrounds + 1))
         ;;
@@ -200,8 +200,9 @@ if [ -f "$SOURCE_ROOT/manifest.json" ]; then
   [ -f "$SOURCE_ROOT/theme.css" ] \
     || fail_extract "New official theme ZIP imports require theme.css and the safe-css capability."
 else
-  [ "$source_file_count" -eq 3 ] && [ -f "$SOURCE_ROOT/theme.css" ] \
-    || fail_extract "A local simplified theme ZIP must contain exactly theme.json, theme.css, and one referenced image."
+  [ "$source_file_count" -eq 3 ] || [ "$source_file_count" -eq 4 ]
+  [ -f "$SOURCE_ROOT/theme.css" ] \
+    || fail_extract "A local simplified theme ZIP must contain theme.json, theme.css, and one referenced image."
 fi
 
 while IFS= read -r -d '' source_file; do

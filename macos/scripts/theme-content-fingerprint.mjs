@@ -7,7 +7,7 @@ function updateFramed(hash, label, bytes) {
   hash.update(labelBytes).update("\0").update(length).update(bytes);
 }
 
-export function runtimeThemeContentFingerprint(theme, imageBytes, cssBytes = null) {
+export function runtimeThemeContentFingerprint(theme, imageBytes, cssBytes = null, videoBytes = null) {
   const hash = createHash("sha256");
   hash.update("dreamskin-runtime-theme/1\0");
   updateFramed(hash, "theme.json", Buffer.from(JSON.stringify(theme), "utf8"));
@@ -17,5 +17,7 @@ export function runtimeThemeContentFingerprint(theme, imageBytes, cssBytes = nul
   } else {
     hash.update("theme.css\0absent\0");
   }
+  if (videoBytes) updateFramed(hash, "video", videoBytes);
+  else hash.update("video\0absent\0");
   return hash.digest("hex");
 }

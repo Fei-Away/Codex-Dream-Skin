@@ -214,6 +214,28 @@ compatibility plus every declared payload file's byte length and SHA-256.
 registered parts. It is revalidated on every import and apply. `manifest.sig`
 is not used for signature verification.
 
+### Import an MP4 video background
+
+You can also choose a video directly from the platform menu without making a ZIP first:
+
+- macOS: open the menu-bar app and choose **一键更换视频背景…**.
+- Windows: open the system-tray menu and choose **一键更换视频背景**.
+- Select an `.mp4` file in the picker and confirm. Dream Skin creates and applies a video theme.
+
+A video theme still requires a static image for its poster and failure fallback. The video is read only through the controlled local loopback path and is not uploaded to an external service. The file must be a non-empty MP4 no larger than 100 MiB. If playback fails, the page becomes hidden, or the theme changes, Dream Skin pauses and cleans up the video and restores the image.
+
+You can also create or import a video theme manually. In `theme.json`, `video` must be a filename inside the theme directory; absolute paths and traversal are not accepted:
+
+```json
+{
+  "schemaVersion": 1,
+  "image": "background.jpg",
+  "video": "background.mp4"
+}
+```
+
+Place `background.jpg` (or another supported image) and `background.mp4` next to `theme.json` and `theme.css`, either in a theme directory or in a ZIP, then choose **Import Theme ZIP…**. A manually placed theme must also contain both the image and video files. Do not use symbolic links, junctions, or files outside the theme directory. After import, the theme is added to **Saved Themes** and can be selected from the menu or tray.
+
 The local simplified ZIP must contain exactly non-empty `theme.json`, non-empty
 `theme.css`, and its referenced image. That format has no official
 manifest integrity or compatibility declaration and should come from a trusted

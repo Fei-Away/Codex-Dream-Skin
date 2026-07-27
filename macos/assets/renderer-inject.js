@@ -1,17 +1,19 @@
 // Canonical cross-platform renderer. Run tools/sync-runtime-assets.mjs after editing.
-((cssText, artDataUrl, themeConfig) => {
+((cssText, artDataUrl, themeConfig, videoConfig) => {
   const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main.main-surface","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header.app-header-tint","tier":"L1","scope":"all","required":true},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"home-banners","selector":".home-banners","tier":"L2","scope":"home","required":false},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"composer-toolbar","selector":".composer-surface-chrome [class*=\"_footer_\"]","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"thread-surface","selector":".thread-scroll-container","tier":"L2","scope":"thread","required":false},{"key":"message","selector":"[data-message-author-role]","tier":"L2","scope":"thread","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
   const STYLE_REGISTRY_KEY = "__CODEX_DREAM_SKIN_STYLE_SHEETS__";
   const STYLE_ID = "codex-dream-skin-style";
+  const BACKGROUND_STAGE_ID = "codex-dream-skin-background-stage";
+  const VIDEO_INPUT_ID = "codex-dream-skin-video-input";
   const SHELL_ATTR = "data-dream-shell";
   const PART_ATTR = "data-ds-part";
   const ROOT_ATTRS = [
     "data-dream-skin", SHELL_ATTR,
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
-    "data-dream-art-ready",
+    "data-dream-art-ready", "data-dream-media", "data-dream-video-ready",
   ];
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
@@ -54,6 +56,23 @@
     typeof existingAnalysisCache.set === "function" ? existingAnalysisCache : new Map();
   window[ANALYSIS_CACHE_KEY] = analysisCache;
   let artAnalysis = typeof THEME.artKey === "string" ? analysisCache.get(THEME.artKey) ?? null : null;
+  const normalizedVideoConfig = typeof videoConfig === "string"
+    ? { mode: "server", url: videoConfig }
+    : videoConfig && typeof videoConfig === "object" ? videoConfig : null;
+  const videoUrl = typeof normalizedVideoConfig?.url === "string"
+    ? normalizedVideoConfig.url : null;
+  const videoMode = normalizedVideoConfig?.mode === "blob" ? "blob"
+    : /^https?:\/\//i.test(videoUrl || "") ? "server" : null;
+  const videoSource = videoMode === "server" ? videoUrl : null;
+  const videoFallbackSource = typeof normalizedVideoConfig?.fallbackUrl === "string" &&
+    normalizedVideoConfig.fallbackUrl ? normalizedVideoConfig.fallbackUrl : null;
+  const videoEnabled = videoMode === "blob" || Boolean(videoSource);
+  let backgroundState = null;
+  let handedOffVideo = null;
+  let videoGeneration = 0;
+  let videoFailed = false;
+  let videoReady = false;
+  let videoError = null;
   let analysisTimer = null;
   let rootObserver = null;
   let partObserver = null;
@@ -61,6 +80,7 @@
   let styleMode = null;
   let styleNode = null;
   let styleSheet = null;
+  const mediaTransitions = [];
   const now = () => typeof performance === "object" && typeof performance.now === "function"
     ? performance.now() : Date.now();
   const metrics = {
@@ -82,6 +102,9 @@
   };
 
   const previous = window[STATE_KEY];
+  const previousHandoff = videoEnabled && typeof previous?.handoffVideo === "function"
+    ? previous.handoffVideo() : null;
+  if (previousHandoff) handedOffVideo = { ...previousHandoff, preserve: true };
   if (typeof previous?.cleanup === "function") previous.cleanup();
   window[DISABLED_KEY] = false;
 
@@ -353,6 +376,411 @@
     setStyleProperty(root, "--ds-theme-image-focus-y", String(Number(focusY.toFixed(4))));
   };
 
+  const detachBackgroundVideoListeners = (state) => {
+    if (!state) return;
+    if (state.retryTimer) {
+      clearTimeout(state.retryTimer);
+      state.retryTimer = null;
+    }
+    try { state.video.removeEventListener("error", state.onError); } catch {}
+    try { state.video.removeEventListener("loadeddata", state.onReady); } catch {}
+    try { state.video.removeEventListener("playing", state.onReady); } catch {}
+    try { state.video.removeEventListener("ended", state.onEnded); } catch {}
+    try { state.video.removeEventListener("stalled", state.onStalled); } catch {}
+    try { state.video.removeEventListener("abort", state.onAbort); } catch {}
+    try { state.video.removeEventListener("emptied", state.onEmptied); } catch {}
+    try { state.video.removeEventListener("timeupdate", state.onTimeUpdate); } catch {}
+    try { document.removeEventListener("visibilitychange", state.onVisibility); } catch {}
+  };
+
+  const removeBackgroundStage = () => {
+    const state = backgroundState;
+    backgroundState = null;
+    if (!state) {
+      document.getElementById(BACKGROUND_STAGE_ID)?.remove();
+      if (handedOffVideo) {
+        try { handedOffVideo.video.pause(); handedOffVideo.video.remove(); } catch {}
+        if (handedOffVideo.objectUrl) {
+          try { URL.revokeObjectURL(handedOffVideo.objectUrl); } catch {}
+        }
+        handedOffVideo = null;
+      }
+      return;
+    }
+    if (handedOffVideo?.video === state.video) {
+      // Preserve only the decoded frame and object URL. The superseded runtime
+      // must not keep visibility/media listeners that can restart this node.
+      detachBackgroundVideoListeners(state);
+      handedOffVideo = null;
+      return;
+    }
+    try { state.video.pause(); } catch {}
+    detachBackgroundVideoListeners(state);
+    try { state.video.removeAttribute("src"); state.video.load(); } catch {}
+    if (state.objectUrl) {
+      try { URL.revokeObjectURL(state.objectUrl); } catch {}
+    }
+    state.stage.remove();
+    if (handedOffVideo) {
+      try { handedOffVideo.video.pause(); handedOffVideo.video.remove(); } catch {}
+      if (handedOffVideo.objectUrl) {
+        try { URL.revokeObjectURL(handedOffVideo.objectUrl); } catch {}
+      }
+      handedOffVideo = null;
+    }
+  };
+
+  const captureVideoError = (error = null, video = backgroundState?.video) => {
+    videoError = {
+      name: error?.name || null,
+      message: error?.message || null,
+      mediaCode: video?.error?.code ?? null,
+      readyState: video?.readyState ?? null,
+      networkState: video?.networkState ?? null,
+    };
+  };
+
+  const isCurrentVideoState = (state) => Boolean(
+    state && backgroundState === state && state.generation === videoGeneration,
+  );
+
+  const fallbackToImage = (error = null, expectedState = null) => {
+    if (expectedState && !isCurrentVideoState(expectedState)) return false;
+    if (videoFailed) return;
+    captureVideoError(error, expectedState?.video ?? backgroundState?.video);
+    videoFailed = true;
+    videoReady = false;
+    removeBackgroundStage();
+    const root = document.documentElement;
+    if (root) applyRootState(root);
+    return true;
+  };
+
+  const revealVideo = (state) => {
+    if (!isCurrentVideoState(state) || videoFailed || videoReady) return;
+    // The replacement element stays inline-hidden while the verified previous
+    // video remains visible. Reveal it only after Chromium produced a frame.
+    try { state.video.style.opacity = ""; } catch {}
+    // The poster is useful only before the first decoded frame. Keeping it on
+    // a live element lets Chromium expose the static image again during a
+    // transient stall or buffer reset, which looks like image/video flashing.
+    try { state.video.removeAttribute("poster"); } catch {}
+    videoReady = true;
+    const root = document.documentElement;
+    if (root) applyRootState(root);
+    if (handedOffVideo) {
+      const oldVideo = handedOffVideo.video;
+      const oldObjectUrl = handedOffVideo.objectUrl;
+      handedOffVideo = null;
+      try { oldVideo.pause(); oldVideo.remove(); } catch {}
+      if (oldObjectUrl) {
+        try { URL.revokeObjectURL(oldObjectUrl); } catch {}
+      }
+    }
+  };
+
+  const isTransientBackgroundPause = (error, video) => {
+    const hidden = document.visibilityState === "hidden" || document.hidden;
+    if (!hidden) return false;
+    const message = String(error?.message || "").toLowerCase();
+    if (error?.name === "AbortError" && /background media|save power|paused/.test(message)) return true;
+    // Chromium can emit an empty media error while the app target reports
+    // hidden, even though the loopback response is valid. Treat that event as
+    // transient and retry instead of exposing the fallback image.
+    if (!video?.error && !message) return true;
+    return !video?.error && /failed to fetch|network|load|media/.test(message);
+  };
+
+  const isTransientVideoError = (error, video) => {
+    if (isTransientBackgroundPause(error, video)) return true;
+    const code = video?.error?.code ?? null;
+    // MEDIA_ERR_ABORTED, MEDIA_ERR_NETWORK, and Chromium's empty error object
+    // are recoverable while a source is being replaced or the page is hidden.
+    return code === null || code === 1 || code === 2;
+  };
+
+  const retryTransientVideo = (state) => {
+    if (!state || videoFailed || !state.video.src || state.retryCount >= 20) return false;
+    if (document.visibilityState === "hidden" || document.hidden) {
+      // Chromium may suspend an already-valid media element for as long as
+      // the renderer stays hidden. Do not spend the finite retry budget while
+      // playback is intentionally unavailable; visibilitychange resumes it.
+      state.pendingPlay = true;
+      return true;
+    }
+    if (state.retryTimer) return true;
+    state.retryCount += 1;
+    state.retryTimer = setTimeout(() => {
+      state.retryTimer = null;
+      if (!isCurrentVideoState(state) || videoFailed || !state.video.src) return;
+      if (document.visibilityState === "hidden" || document.hidden) {
+        state.pendingPlay = true;
+        return;
+      }
+      Promise.resolve(state.video.play?.()).then(() => {
+        if (!isCurrentVideoState(state) || videoFailed) return;
+        state.pendingPlay = false;
+        revealVideo(state);
+      }).catch(state.onError);
+    }, 500);
+    return true;
+  };
+
+  const ensureVideoInput = () => {
+    if (videoMode !== "blob" || !document?.createElement) return null;
+    let input = document.getElementById(VIDEO_INPUT_ID);
+    if (input) return input;
+    input = document.createElement("input");
+    input.type = "file";
+    input.id = VIDEO_INPUT_ID;
+    input.accept = "video/mp4";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    Object.assign(input.style, {
+      position: "fixed",
+      width: "1px",
+      height: "1px",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+    (document.body || document.documentElement)?.appendChild(input);
+    return input;
+  };
+
+  const mediaTokenFromUrl = (source) => {
+    try {
+      const parsed = new URL(source);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+      return /^\/media\/([a-f0-9]{32})$/i.exec(parsed.pathname)?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const playVideoObjectUrl = async (state, objectUrl) => {
+    if (!isCurrentVideoState(state) || videoFailed) return false;
+    if (state.objectUrl && state.objectUrl !== objectUrl) {
+      try { URL.revokeObjectURL(state.objectUrl); } catch {}
+    }
+    state.objectUrl = objectUrl;
+    state.video.src = objectUrl;
+    state.video.load();
+    if (document.visibilityState === "hidden" || document.hidden) {
+      state.pendingPlay = true;
+      return true;
+    }
+    if (state.video.readyState < 1) {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("Video metadata load timed out"));
+        }, 15000);
+        const cleanup = () => {
+          clearTimeout(timer);
+          state.video.removeEventListener("loadedmetadata", onMetadata);
+          state.video.removeEventListener("error", onError);
+        };
+        const onMetadata = () => { cleanup(); resolve(); };
+        const onError = () => { cleanup(); reject(new Error("Video metadata could not be loaded")); };
+        state.video.addEventListener("loadedmetadata", onMetadata, { once: true });
+        state.video.addEventListener("error", onError, { once: true });
+      });
+    }
+    await state.video.play();
+    if (!isCurrentVideoState(state) || videoFailed) return false;
+    state.pendingPlay = false;
+    // play() is the fallback for shells that do not expose a usable
+    // loadeddata/playing event to the injected runtime.
+    revealVideo(state);
+    return true;
+  };
+
+  const loadVideoFromUrl = async (state, source) => {
+    if (!state || state.loading) return false;
+    state.loading = true;
+    try {
+    const token = mediaTokenFromUrl(source);
+    const headers = token ? { "X-Codex-Dream-Skin-Token": token } : undefined;
+    const response = await fetch(source, { credentials: "omit", headers });
+    if (!response.ok) throw new Error("Video request failed: " + response.status);
+    const blob = await response.blob();
+    if (!isCurrentVideoState(state) || videoFailed) return false;
+    return playVideoObjectUrl(state, URL.createObjectURL(blob));
+    } finally {
+      state.loading = false;
+    }
+  };
+
+  const fallbackToServer = async (expectedState = null) => {
+    const state = expectedState ?? backgroundState;
+    if (!isCurrentVideoState(state) || !videoFallbackSource || state.fallbackStarted) return false;
+    state.fallbackStarted = true;
+    try {
+      return await loadVideoFromUrl(state, videoFallbackSource);
+    } catch (error) {
+      fallbackToImage(error, state);
+      return false;
+    }
+  };
+
+  const handleVideoFailure = (state, error = null) => {
+    if (!isCurrentVideoState(state) || videoFailed) return false;
+    captureVideoError(error, state.video);
+    if (isTransientVideoError(error, state.video) && retryTransientVideo(state)) {
+      state.pendingPlay = true;
+      return false;
+    }
+    if (videoFallbackSource && !state.fallbackStarted) {
+      void fallbackToServer(state);
+      return false;
+    }
+    return fallbackToImage(error, state);
+  };
+
+  const attachVideoFile = async () => {
+    if (videoMode !== "blob") return false;
+    const input = ensureVideoInput();
+    ensureBackgroundStage();
+    const state = backgroundState;
+    const file = input?.files?.[0];
+    if (!state || !file) return false;
+    try {
+      await playVideoObjectUrl(state, URL.createObjectURL(file));
+      applyRootState(document.documentElement);
+      return true;
+    } catch (error) {
+      return handleVideoFailure(state, error);
+    }
+  };
+
+  const ensureBackgroundStage = () => {
+    if (!videoEnabled || videoFailed || !document?.createElement) return;
+    ensureVideoInput();
+    if (backgroundState?.stage?.parentElement) return;
+    const previousVideo = handedOffVideo?.video?.parentElement ? handedOffVideo.video : null;
+    const stage = handedOffVideo?.stage?.parentElement
+      ? handedOffVideo.stage
+      : document.getElementById(BACKGROUND_STAGE_ID) || document.createElement("div");
+    stage.id = BACKGROUND_STAGE_ID;
+    // A failed or superseded handoff can leave an older video in the shared
+    // stage. Keep at most the one explicitly handed off by the immediately
+    // previous runtime; two playable nodes can alternate frames and posters.
+    for (const child of [...(stage.children || [])]) {
+      if (child === previousVideo) continue;
+      const staleSource = typeof child.src === "string" ? child.src : "";
+      try { child.pause?.(); } catch {}
+      try { child.removeAttribute?.("src"); child.load?.(); } catch {}
+      try { child.remove?.(); } catch {}
+      if (staleSource.startsWith("blob:")) {
+        try { URL.revokeObjectURL(staleSource); } catch {}
+      }
+    }
+    if (!previousVideo) stage.replaceChildren?.();
+    if (previousVideo && !stage.parentElement) {
+      const parent = document.body || document.documentElement;
+      if (!parent) return;
+      if (typeof parent.prepend === "function") parent.prepend(stage);
+      else parent.appendChild(stage);
+    }
+    // The video is a viewport background, not a main-surface decoration. Keep
+    // it under the app root so the sidebar, main content, and native overlays
+    // all share one continuous moving background.
+    const parent = stage.parentElement || document.body || document.documentElement;
+    if (!parent) return;
+
+    const video = document.createElement("video");
+    video.muted = true;
+    video.defaultMuted = true;
+    video.autoplay = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.poster = artUrl;
+    video.setAttribute("aria-hidden", "true");
+    // `data-dream-media="video"` intentionally remains set during a ready
+    // handoff so CSS keeps the previous video visible. Prevent that selector
+    // from exposing the pending replacement or its poster before first frame.
+    video.style.opacity = "0";
+    const onError = (error = null) => {
+      // A detached video can still deliver abort/error after a new theme has
+      // installed. Its event must never fail the newer media generation.
+      if (!isCurrentVideoState(state)) return;
+      handleVideoFailure(state, error);
+    };
+    const onVisibility = () => {
+      if (videoFailed || document.visibilityState === "hidden" || document.hidden) return;
+      if (videoMode === "server" && !state.loading && !video.src) {
+        void loadVideoFromUrl(state, videoSource).catch(onError);
+        return;
+      }
+      if (video.src) {
+        Promise.resolve(video.play?.()).then(() => {
+          state.pendingPlay = false;
+          revealVideo(state);
+        }).catch(onError);
+      }
+    };
+    const onReady = () => revealVideo(state);
+    const onEnded = () => {
+      if (videoFailed || backgroundState !== state || document.visibilityState === "hidden" || document.hidden) return;
+      state.pendingPlay = true;
+      try { video.currentTime = 0; } catch {}
+      Promise.resolve(video.play?.()).then(() => {
+        state.pendingPlay = false;
+        revealVideo(state);
+      }).catch(onError);
+    };
+    const onStalled = () => {
+      if (videoFailed || !isCurrentVideoState(state)) return;
+      state.pendingPlay = true;
+      retryTransientVideo(state);
+    };
+    const onAbort = () => {
+      if (videoFailed || !isCurrentVideoState(state)) return;
+      state.pendingPlay = true;
+      retryTransientVideo(state);
+    };
+    const onEmptied = () => {
+      if (videoFailed || !isCurrentVideoState(state) || !video.src) return;
+      state.pendingPlay = true;
+      retryTransientVideo(state);
+    };
+    const onTimeUpdate = () => {
+      if (videoFailed || !isCurrentVideoState(state)) return;
+      const currentTime = Number(video.currentTime);
+      if (!Number.isFinite(currentTime)) return;
+      if (currentTime < state.lastPlaybackTime ||
+          currentTime - state.lastPlaybackTime >= 0.1) {
+        state.lastPlaybackTime = currentTime;
+        state.retryCount = 0;
+        state.pendingPlay = false;
+      }
+    };
+    const state = {
+      stage, video, onError, onVisibility, onReady, onEnded, onStalled, onAbort, onEmptied,
+      onTimeUpdate,
+      generation: ++videoGeneration,
+      objectUrl: null, fallbackStarted: false, retryTimer: null, retryCount: 0,
+      loading: false, pendingPlay: false, lastPlaybackTime: -1,
+    };
+    backgroundState = state;
+    video.addEventListener("error", onError);
+    video.addEventListener("loadeddata", onReady);
+    video.addEventListener("playing", onReady);
+    video.addEventListener("ended", onEnded);
+    video.addEventListener("stalled", onStalled);
+    video.addEventListener("abort", onAbort);
+    video.addEventListener("emptied", onEmptied);
+    video.addEventListener("timeupdate", onTimeUpdate);
+    document.addEventListener("visibilitychange", onVisibility);
+    stage.appendChild(video);
+    if (typeof parent.prepend === "function") parent.prepend(stage);
+    else parent.appendChild(stage);
+    if (videoMode === "server") {
+      void loadVideoFromUrl(backgroundState, videoSource).catch(onError);
+    }
+  };
+
   const analyzeArt = () => new Promise((resolve) => {
     const startedAt = now();
     metrics.analysisRuns += 1;
@@ -550,7 +978,28 @@
     const shell = resolvedShell();
     setAttribute(root, "data-dream-skin", "active");
     setAttribute(root, SHELL_ATTR, shell);
-    setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
+    const mediaReady = videoEnabled && !videoFailed && videoReady;
+    const handoffReady = videoEnabled && !videoFailed &&
+      handedOffVideo?.ready === true && Boolean(handedOffVideo.video?.parentElement);
+    const mediaState = mediaReady || handoffReady
+      ? "video"
+      : videoEnabled && !videoFailed ? "video-pending" : "image-fallback";
+    const previousMedia = mediaTransitions[mediaTransitions.length - 1];
+    if (!previousMedia || previousMedia.state !== mediaState ||
+        previousMedia.videoReady !== videoReady) {
+      mediaTransitions.push({
+        state: mediaState,
+        videoReady,
+        handoffReady,
+        at: Date.now(),
+      });
+      if (mediaTransitions.length > 16) mediaTransitions.shift();
+    }
+    setAttribute(root, "data-dream-media", mediaState);
+    setAttribute(root, "data-dream-video-ready", videoReady ? "true" : "false");
+    // Keep the poster image visible until the video has produced a frame. This
+    // avoids a blank flash while a replacement media source is loading.
+    setStyleProperty(root, "--dream-skin-art", mediaState === "video" ? "none" : `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
     return shell;
@@ -664,7 +1113,10 @@
     const root = document.documentElement;
     if (!root) return;
     metrics.ensureCalls += 1;
+    // Commit the media mode before touching the stage. This prevents the
+    // previous body image from being painted during a video-theme swap.
     if (rootPass) applyRootState(root);
+    if (rootPass) ensureBackgroundStage();
     if (partPass) refreshParts();
     if (scopePass) refreshScope();
   };
@@ -693,6 +1145,8 @@
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (analysisTimer) clearTimeout(analysisTimer);
+    removeBackgroundStage();
+    document.getElementById(VIDEO_INPUT_ID)?.remove();
     if (state?.mediaHandler && state?.mediaQuery) {
       try { state.mediaQuery.removeEventListener("change", state.mediaHandler); } catch {}
     }
@@ -762,6 +1216,26 @@
     navigation: navigationApi,
     navigationHandler,
     artUrl,
+    videoUrl: videoSource,
+    videoMode,
+    get videoFailed() { return videoFailed; },
+    get videoReady() { return videoReady; },
+    get videoError() { return videoError; },
+    mediaTransitions,
+    ensureVideoInput,
+    attachVideoFile,
+    useVideoFallback: fallbackToServer,
+    handoffVideo: () => {
+      const state = backgroundState;
+      if (!state?.stage?.parentElement || !state.video?.parentElement) return null;
+      handedOffVideo = {
+        stage: state.stage,
+        video: state.video,
+        objectUrl: state.objectUrl,
+        ready: videoReady && !videoFailed,
+      };
+      return { ...handedOffVideo };
+    },
     installToken,
     styleMode,
     styleNode,
@@ -842,4 +1316,4 @@
     styleMode,
     analysis: artAnalysis,
   };
-})(__DREAM_SKIN_CSS_JSON__, __DREAM_SKIN_ART_JSON__, __DREAM_SKIN_THEME_JSON__)
+})(__DREAM_SKIN_CSS_JSON__, __DREAM_SKIN_ART_JSON__, __DREAM_SKIN_THEME_JSON__, __DREAM_SKIN_VIDEO_JSON__)

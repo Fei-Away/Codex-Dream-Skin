@@ -197,6 +197,12 @@ function Copy-DreamSkinActiveThemeSnapshot {
   $imageName = [System.IO.Path]::GetFileName($active.ImagePath)
   Copy-Item -LiteralPath $active.ThemePath -Destination (Join-Path $Destination 'theme.json') -Force
   Copy-Item -LiteralPath $active.ImagePath -Destination (Join-Path $Destination $imageName) -Force
+  # theme.json names the video, so a snapshot that skips the MP4 would restore a
+  # manifest pointing at a file that no longer exists.
+  if ($active.VideoPath) {
+    $videoName = [System.IO.Path]::GetFileName($active.VideoPath)
+    Copy-Item -LiteralPath $active.VideoPath -Destination (Join-Path $Destination $videoName) -Force
+  }
   $activeCss = Join-Path $Paths.Active 'theme.css'
   if (Test-Path -LiteralPath $activeCss -PathType Leaf) {
     Assert-DreamSkinSafeCssFile -Path $activeCss
@@ -257,8 +263,10 @@ function Restore-DreamSkinActiveThemeSnapshot {
   $theme = $snapshot.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
   $cssPath = Join-Path $SnapshotDirectory 'theme.css'
   if (-not (Test-Path -LiteralPath $cssPath -PathType Leaf)) { $cssPath = $null }
-  $null = Set-DreamSkinActiveTheme -ImagePath $snapshot.ImagePath -Theme $theme `
-    -SafeCssPath $cssPath -StateRoot $StateRoot
+  # Restoring a video theme has to pass the MP4 back through the same bounded
+  # validation Set-DreamSkinActiveTheme applies to a fresh import.
+  $null = Set-DreamSkinActiveTheme -ImagePath $snapshot.ImagePath -VideoPath $snapshot.VideoPath `
+    -Theme $theme -SafeCssPath $cssPath -StateRoot $StateRoot
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   $restoredFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $paths.Active
   if ($restoredFingerprint -cne $ExpectedContentFingerprint) {

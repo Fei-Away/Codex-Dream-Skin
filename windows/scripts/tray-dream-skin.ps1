@@ -49,6 +49,15 @@ try {
 
   function Show-DreamSkinTrayError {
     param([string]$Message)
+    if ($Message -like '*Another Codex Dream Skin install, start, restore, or verify operation is already running.*') {
+      $notify.ShowBalloonTip(
+        2400,
+        'Codex Dream Skin',
+        '正在应用或校验皮肤，请等待当前操作完成后再切换背景。',
+        [System.Windows.Forms.ToolTipIcon]::Warning
+      )
+      return
+    }
     [void][System.Windows.Forms.MessageBox]::Show(
       $Message,
       'Codex Dream Skin',
@@ -57,12 +66,49 @@ try {
     )
   }
 
+  function Test-DreamSkinWatcherActive {
+    $statePath = Join-Path $StateRoot 'state.json'
+    if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { return $false }
+    try {
+      $state = Read-DreamSkinState -Path $statePath
+      if ($null -eq $state -or -not $state.injectorPid) { return $false }
+      if (-not (Test-DreamSkinRecordedInjector -State $state)) { return $false }
+      if (-not $state.port -or -not $state.codexExe) { return $false }
+      $codex = [pscustomobject]@{ Executable = "$($state.codexExe)" }
+      return Test-DreamSkinCodexPortOwner -Port ([int]$state.port) -Codex $codex
+    } catch {
+      return $false
+    }
+  }
+
   function Start-DreamSkinPowerShell {
     param([Parameter(Mandatory = $true)][string]$Script, [string[]]$Arguments = @())
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
     $argumentLine = '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
     Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
+  }
+
+  function Ensure-DreamSkinWatcher {
+    if (Test-DreamSkinWatcherActive) { return $true }
+    Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+    return $false
+  }
+
+  function Confirm-DreamSkinThemeApplied {
+    param([int]$TimeoutMs = 12000)
+    $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
+    if ($null -eq $session) { return $false }
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
+    do {
+      $probe = Invoke-DreamSkinNative -FilePath $session.NodePath -ArgumentList @(
+        $session.Injector, '--verify', '--port', "$($session.Port)",
+        '--browser-id', $session.BrowserId, '--theme-dir', $session.Paths.Active,
+        '--timeout-ms', '2500') -DiscardStderr
+      if ($probe.ExitCode -eq 0) { return $true }
+      Start-Sleep -Milliseconds 400
+    } while ([DateTime]::UtcNow -lt $deadline)
+    return $false
   }
 
   function Add-DreamSkinTrayItem {
@@ -114,19 +160,20 @@ try {
 
   function Rebuild-DreamSkinTrayMenu {
     $menu.Items.Clear()
+    $operationActive = Test-DreamSkinOperationActive
     $paused = Test-DreamSkinPaused -StateRoot $StateRoot
     $state = $null
     try { $state = Read-DreamSkinState -Path $paths.State } catch {}
     $active = $null
     try { $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata } catch {}
-    $status = if ($paused) { '状态：已暂停' } elseif ($state) { '状态：运行中' } else { '状态：未运行' }
+    $status = if ($operationActive) { '状态：正在应用或校验' } elseif ($paused) { '状态：已暂停' } elseif ($state) { '状态：运行中' } else { '状态：未运行' }
     if ($null -ne $active -and $null -ne $active.Theme -and $active.Theme.name) {
       $status += " · $($active.Theme.name)"
     }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text $status -Action $null -Enabled $false
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
 
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '应用或重新应用' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '应用或重新应用' -Enabled:(-not $operationActive) -Action {
       $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
       $begin = $null
       if ($null -ne $session) {
@@ -143,7 +190,7 @@ try {
     # Match macOS menubar: pause = mark + live remove; resume lets the serialized
     # start path clear pause only after its safety checks and any restart consent.
     if ($paused) {
-      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '继续显示皮肤' -Action {
+      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '继续显示皮肤' -Enabled:(-not $operationActive) -Action {
         # Keep pause set while the start path validates and prompts; show in-window
         # loading when the existing CDP session is still reachable.
         $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
@@ -164,7 +211,7 @@ try {
         )
       }
     } else {
-      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '暂停皮肤' -Action {
+      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '暂停皮肤' -Enabled:(-not $operationActive) -Action {
         # Match macOS pause: marker + live remove with in-window loading / result.
         $removal = Invoke-DreamSkinTrayThemeOperation -Action {
           Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot | Out-Null
@@ -181,7 +228,7 @@ try {
         }
       }
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '更换背景图' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '更换背景图' -Enabled:(-not $operationActive) -Action {
       $dialog = [System.Windows.Forms.OpenFileDialog]::new()
       $dialog.Title = '选择 Codex Dream Skin 背景图'
       $dialog.Filter = 'Image files|*.png;*.jpg;*.jpeg;*.webp|All files|*.*'
@@ -193,13 +240,36 @@ try {
               -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '背景图已更新。', [System.Windows.Forms.ToolTipIcon]::Info)
+          $watcherReady = Ensure-DreamSkinWatcher
+          $message = if ($watcherReady) { '背景图已更新。' } else { '背景图已更新，正在重新启动 Dream Skin…' }
+          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
         }
       } finally {
         $dialog.Dispose()
       }
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '导入主题 ZIP…' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '一键更换视频背景' -Enabled:(-not $operationActive) -Action {
+      $dialog = [System.Windows.Forms.OpenFileDialog]::new()
+      $dialog.Title = '选择 Codex Dream Skin 视频背景'
+      $dialog.Filter = 'MP4 video|*.mp4'
+      $dialog.Multiselect = $false
+      try {
+        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+          $null = Invoke-DreamSkinTrayThemeOperation -Action {
+            $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+            $null = Set-DreamSkinActiveTheme -ImagePath $active.ImagePath -VideoPath $dialog.FileName `
+              -Theme $active.Theme -StateRoot $StateRoot
+            Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
+          }
+          $watcherReady = Ensure-DreamSkinWatcher
+          $message = if ($watcherReady) { '视频背景已更新。' } else { '视频背景已更新，正在重新启动 Dream Skin…' }
+          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
+        }
+      } finally {
+        $dialog.Dispose()
+      }
+    }
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '导入主题 ZIP…' -Enabled:(-not $operationActive) -Action {
       $dialog = [System.Windows.Forms.OpenFileDialog]::new()
       $dialog.Title = '选择 Codex Dream Skin 主题 ZIP'
       $dialog.Filter = 'Dream Skin theme ZIP|*.zip'
@@ -224,7 +294,7 @@ try {
         $dialog.Dispose()
       }
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Enabled:(-not $operationActive) -Action {
       $name = [Microsoft.VisualBasic.Interaction]::InputBox('输入主题名称：', '保存 Codex Dream Skin 主题', '')
       if ($name.Trim()) {
         $saved = Invoke-DreamSkinTrayThemeOperation -Action {
@@ -249,9 +319,19 @@ try {
             $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedPath -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已应用：$savedName", [System.Windows.Forms.ToolTipIcon]::Info)
+          $watcherReady = Ensure-DreamSkinWatcher
+          if ($watcherReady -and (Confirm-DreamSkinThemeApplied)) {
+            $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已应用：$savedName", [System.Windows.Forms.ToolTipIcon]::Info)
+          } elseif ($watcherReady) {
+            $notify.ShowBalloonTip(3200, 'Codex Dream Skin',
+              "主题文件已更新，但当前窗口尚未确认应用：$savedName。", [System.Windows.Forms.ToolTipIcon]::Warning)
+          } else {
+            $notify.ShowBalloonTip(3200, 'Codex Dream Skin',
+              "主题文件已更新，但当前窗口尚未应用；正在重新启动 Dream Skin：$savedName。",
+              [System.Windows.Forms.ToolTipIcon]::Warning)
+          }
         }.GetNewClosure()
-        $null = Add-DreamSkinTrayItem -Items $savedMenu.DropDownItems -Text $savedName -Action $savedAction
+        $null = Add-DreamSkinTrayItem -Items $savedMenu.DropDownItems -Text $savedName -Enabled:(-not $operationActive) -Action $savedAction
       }
     }
     [void]$menu.Items.Add($savedMenu)

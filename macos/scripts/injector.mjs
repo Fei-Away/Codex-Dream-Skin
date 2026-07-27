@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Script } from "node:vm";
 import { readImageMetadata } from "./image-metadata.mjs";
+import { MAX_VIDEO_BYTES, MediaServerController, isMp4Container } from "./media-server.mjs";
 import {
   normalizeThemeColor,
   normalizeThemeText,
@@ -360,7 +361,6 @@ function isValidCdpPageTarget(item, port) {
     return false;
   }
 }
-
 class CdpSession {
   constructor(target, port) {
     this.target = target;
@@ -636,6 +636,25 @@ export async function loadTheme(themeDir) {
     throw new Error(`${configPath} has an invalid image field`);
   }
   if (path.basename(raw.image) !== raw.image) throw new Error("Theme image must stay inside its theme directory");
+  let videoPath = null;
+  if (raw.video !== undefined) {
+    if (typeof raw.video !== "string" || !raw.video || path.basename(raw.video) !== raw.video ||
+        /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(raw.video) ||
+        path.extname(raw.video).toLowerCase() !== ".mp4") {
+      throw new Error(`${configPath} has an invalid video field; only a relative MP4 filename is supported`);
+    }
+    try {
+      videoPath = await fs.realpath(path.join(assetsRoot, raw.video));
+    } catch (error) {
+      if (error.code === "ENOENT") throw new Error(`Theme video is missing: ${path.join(assetsRoot, raw.video)}`);
+      throw error;
+    }
+    assertContainedPath(assetsRoot, videoPath, "Theme video");
+    const videoStat = await fs.stat(videoPath);
+    if (!videoStat.isFile() || videoStat.size < 1 || videoStat.size > MAX_VIDEO_BYTES) {
+      throw new Error(`Theme video must be a non-empty MP4 no larger than ${MAX_VIDEO_BYTES} bytes`);
+    }
+  }
   const choice = (value, name, choices) => {
     if (value === undefined) return undefined;
     if (typeof value !== "string" || !choices.includes(value)) {
@@ -693,6 +712,7 @@ export async function loadTheme(themeDir) {
       line: normalizeThemeColor(rawColors?.line, "rgba(124, 255, 70, .28)"),
     },
   };
+  if (raw.video !== undefined) theme.video = raw.video;
   if (appearance !== undefined) theme.appearance = appearance;
   if (Object.values(art).some((value) => value !== undefined)) {
     theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
@@ -734,12 +754,21 @@ export async function loadTheme(themeDir) {
     if (art.length < 1 || art.length > MAX_ART_BYTES) {
       throw new Error(`Theme image must be a non-empty file no larger than ${MAX_ART_BYTES} bytes`);
     }
+    const videoBytes = videoPath ? await fs.readFile(videoPath) : Buffer.alloc(0);
+    if (videoPath && videoBytes.length !== (await fs.stat(videoPath)).size) {
+      throw new Error("Theme video changed while being loaded");
+    }
+    if (videoPath && !isMp4Container(videoBytes)) {
+      throw new Error("Theme video is not a valid MP4 container");
+    }
     const safeCss = await loadSafeCss(assetsRoot);
     return {
       art,
       assetsRoot,
       extension,
       imagePath,
+      videoPath,
+      videoBytes,
       safeCss: safeCss?.source ?? "",
       safeCssPath: safeCss?.path ?? null,
       safeCssStatus: safeCss ? "validated" : "none",
@@ -769,14 +798,21 @@ function invalidateStaticPayloadAssets() {
   staticPayloadAssets = null;
 }
 
-export async function loadPayload(themeDir) {
+export async function loadPayload(themeDir, candidateTheme = null, mediaUrl = null) {
   const startedAt = performance.now();
   const [staticAssets, loaded] = await Promise.all([
     loadStaticPayloadAssets(),
-    loadTheme(themeDir),
+    candidateTheme ?? loadTheme(themeDir),
   ]);
   const { css, template } = staticAssets;
   const { art, extension, safeCss, safeCssStatus, theme } = loaded;
+  const videoTransport = loaded.videoPath
+    ? (mediaUrl && typeof mediaUrl === "object"
+      ? mediaUrl
+      : typeof mediaUrl === "string" && mediaUrl
+        ? { mode: "server", url: mediaUrl }
+        : { mode: "blob" })
+    : null;
   const combinedCss = safeCss ? `${css}\n${safeCss}\n` : css;
   const styleRevision = createHash("sha256").update(combinedCss).digest("hex").slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
@@ -794,6 +830,8 @@ export async function loadPayload(themeDir) {
     .update(combinedCss)
     .update(template)
     .update(JSON.stringify(theme))
+    .update("\0")
+    .update(loaded.videoBytes)
     .digest("hex")
     .slice(0, 20);
   // Every replacement value must be supplied as a function. A plain string
@@ -804,12 +842,15 @@ export async function loadPayload(themeDir) {
     .replace("__DREAM_SKIN_CSS_JSON__", () => JSON.stringify(combinedCss))
     .replace("__DREAM_SKIN_ART_JSON__", () => JSON.stringify(artDataUrl))
     .replace("__DREAM_SKIN_THEME_JSON__", () => JSON.stringify(theme))
+    .replace("__DREAM_SKIN_VIDEO_JSON__", () => JSON.stringify(videoTransport))
     .replace("__DREAM_SKIN_VERSION_JSON__", () => JSON.stringify(SKIN_VERSION))
     .replace("__DREAM_SKIN_STYLE_REVISION_JSON__", () => JSON.stringify(styleRevision))
     .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", () => JSON.stringify(revision));
   assertPayloadIntegrity(payload);
   return {
     imageBytes: art.length,
+    videoPath: loaded.videoPath,
+    videoTransport,
     payload,
     revision,
     safeCssStatus,
@@ -842,8 +883,75 @@ export function assertPayloadIntegrity(payload) {
   return true;
 }
 
-async function applyToSession(session, payload) {
-  return session.evaluate(payload);
+const VIDEO_INPUT_SELECTOR = "#codex-dream-skin-video-input";
+const VIDEO_STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
+const mediaPolicyTargets = new Set();
+
+async function attachBlobVideoToSession(session, loadedPayload) {
+  if (loadedPayload?.videoTransport?.mode !== "blob" || !loadedPayload.videoPath) return true;
+  const deadline = Date.now() + 8000;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      const inputReady = await session.evaluate(`Boolean(window[${JSON.stringify(VIDEO_STATE_KEY)}]?.ensureVideoInput?.())`);
+      if (!inputReady) throw new Error("Renderer did not create the video file input");
+      await session.send("DOM.enable");
+      const document = await session.send("DOM.getDocument", { depth: -1 });
+      const node = await session.send("DOM.querySelector", {
+        nodeId: document.root.nodeId,
+        selector: VIDEO_INPUT_SELECTOR,
+      });
+      if (!node.nodeId) throw new Error("Video file input is not attached to the renderer DOM");
+      await session.send("DOM.setFileInputFiles", { nodeId: node.nodeId, files: [loadedPayload.videoPath] });
+      const attached = await session.evaluate(
+        `window[${JSON.stringify(VIDEO_STATE_KEY)}]?.attachVideoFile?.() === true`,
+      );
+      if (attached) return true;
+      const prepared = await session.evaluate(`(() => {
+        const state = window[${JSON.stringify(VIDEO_STATE_KEY)}];
+        const video = document.querySelector("#codex-dream-skin-background-stage video");
+        return Boolean(video?.src && !state?.videoFailed);
+      })()`);
+      if (prepared) return true;
+      const handled = await session.evaluate(
+        `Boolean(window[${JSON.stringify(VIDEO_STATE_KEY)}]?.videoFailed)`,
+      );
+      if (handled) return true;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  throw new Error(`Could not attach the local MP4 through CDP: ${lastError?.message ?? "timed out"}`);
+}
+
+async function syncMediaFetchPolicyForSession(session, loadedPayload) {
+  const transport = loadedPayload?.videoTransport;
+  const needsBypass = transport?.mode === "server" || Boolean(transport?.fallbackUrl);
+  const targetId = session.target?.id;
+  if (typeof targetId !== "string") return;
+  const bypassActive = mediaPolicyTargets.has(targetId);
+  if (needsBypass === bypassActive) return;
+  if (needsBypass) {
+    // The renderer fetches the loopback fallback and turns it into a Blob URL.
+    // Enable this only after the CDP target has passed the ChatGPT identity
+    // probe; image-only themes and unrelated app pages retain their normal CSP.
+    await session.send("Page.enable").catch(() => {});
+    await session.send("Page.setWebLifecycleState", { state: "active" }).catch(() => {});
+    await session.send("Page.setBypassCSP", { enabled: true });
+    mediaPolicyTargets.add(targetId);
+  } else {
+    await session.send("Page.enable").catch(() => {});
+    await session.send("Page.setBypassCSP", { enabled: false }).catch(() => {});
+    mediaPolicyTargets.delete(targetId);
+  }
+}
+
+async function applyToSession(session, payload, loadedPayload = null) {
+  await syncMediaFetchPolicyForSession(session, loadedPayload);
+  const result = await session.evaluate(payload);
+  await attachBlobVideoToSession(session, loadedPayload);
+  return result;
 }
 
 function nextOperationToken() {
@@ -1277,12 +1385,14 @@ async function runOneShot(options) {
 
   for (const { target, session, probe } of connected) {
     try {
-      if (options.mode === "remove") await removeFromSession(session);
-      else if (options.mode === "once") {
+      if (options.mode === "remove") {
+        await removeFromSession(session);
+        await syncMediaFetchPolicyForSession(session, null);
+      } else if (options.mode === "once") {
         await bestEffortOperationUi(
           session, "update", operationToken, "loading", `正在应用「${loaded.theme.name}」…`,
         );
-        await applyToSession(session, payload);
+        await applyToSession(session, payload, loaded);
       }
 
       if (options.reload) {
@@ -1294,7 +1404,7 @@ async function runOneShot(options) {
               session, operationToken, "loading", `正在应用「${loaded.theme.name}」…`,
             );
           }
-          await applyToSession(session, payload);
+          await applyToSession(session, payload, loaded);
         }
       }
 
@@ -1522,7 +1632,26 @@ async function watchOperationState(statePath, onState) {
 }
 
 async function runWatch(options) {
-  let current = await loadPayload(options.themeDir);
+  const mediaServers = new MediaServerController();
+  const stagePayload = async (candidateTheme = null) => {
+    const theme = candidateTheme ?? await loadTheme(options.themeDir);
+    const stagedMedia = await mediaServers.stage(theme.videoPath);
+    try {
+      const videoTransport = theme.videoPath
+        ? stagedMedia?.url
+          ? { mode: "blob", fallbackUrl: stagedMedia.url }
+          : { mode: "blob" }
+        : null;
+      const payload = await loadPayload(options.themeDir, theme, videoTransport);
+      return { payload, stagedMedia };
+    } catch (error) {
+      await mediaServers.abort(stagedMedia);
+      throw error;
+    }
+  };
+  const initial = await stagePayload();
+  await mediaServers.commit(initial.stagedMedia);
+  let current = initial.payload;
   const sessions = new Map();
   const rejected = new Set();
   let stopping = false;
@@ -1667,9 +1796,19 @@ async function runWatch(options) {
   const refreshPayload = async () => {
     const refreshEpoch = mutationEpoch;
     let next;
+    let stagedMedia = null;
     try {
-      next = await loadPayload(options.themeDir);
+      const candidateTheme = await loadTheme(options.themeDir);
+      const staged = await stagePayload(candidateTheme);
+      next = staged.payload;
+      stagedMedia = staged.stagedMedia;
+      if (next.revision === current.revision) {
+        await mediaServers.abort(stagedMedia);
+        return;
+      }
+      await mediaServers.commit(stagedMedia);
     } catch (error) {
+      await mediaServers.abort(stagedMedia);
       await Promise.all([...sessions.values()].map(async (record) => {
         if (record.session.closed) return;
         const externalOperation = activeOperation;
@@ -1685,7 +1824,6 @@ async function runWatch(options) {
       }));
       throw error;
     }
-    if (next.revision === current.revision) return;
     current = next;
     if (controlOnly || mutationEpoch !== refreshEpoch) {
       console.log(`[dream-skin] staged theme ${current.theme.id} while skin is paused`);
@@ -1715,7 +1853,7 @@ async function runWatch(options) {
         }
         record.earlyScriptId = nextIdentifier;
         record.needsLoadFallback = !nextIdentifier;
-        await applyToSession(session, current.payload);
+        await applyToSession(session, current.payload, current);
         if (controlOnly || mutationEpoch !== refreshEpoch) continue;
         const verification = await waitForVerifiedSession(
           session,
@@ -1871,6 +2009,7 @@ async function runWatch(options) {
           }
           record.session.close();
           sessions.delete(id);
+          mediaPolicyTargets.delete(id);
         }
       }
 
@@ -1902,7 +2041,7 @@ async function runWatch(options) {
             setTimeout(() => {
               if (session.closed || controlOnly || mutationEpoch !== fallbackEpoch
                 || !record.needsLoadFallback) return;
-              applyToSession(session, current.payload).catch((error) => {
+              applyToSession(session, current.payload, current).catch((error) => {
                 console.error(`[dream-skin] fallback reinject failed: ${error.message}`);
               });
             }, 0);
@@ -1927,12 +2066,14 @@ async function runWatch(options) {
             await removeEarly(record);
             session.close();
             sessions.delete(target.id);
+            mediaPolicyTargets.delete(target.id);
             if (!rejected.has(target.id)) {
               console.error(`[dream-skin] rejected non-ChatGPT app target ${target.id}`);
               rejected.add(target.id);
             }
             continue;
           }
+          await syncMediaFetchPolicyForSession(session, current);
           rejected.delete(target.id);
           if (controlOnly || pausing || mutationEpoch !== connectionEpoch) {
             await invalidateEarly(record);
@@ -1969,7 +2110,14 @@ async function runWatch(options) {
             await session.evaluate(
               `window.__CODEX_DREAM_SKIN_EARLY_GENERATION__ = ${JSON.stringify(`fallback:${current.revision}`)}`,
             );
-            await applyToSession(session, current.payload);
+            await applyToSession(session, current.payload, current);
+          } else if (current.videoTransport?.mode === "server" || current.videoTransport?.fallbackUrl) {
+            // Early payloads can run before CSP is relaxed; replay the full
+            // media payload after the verified-target media policy is active.
+            await applyToSession(session, current.payload, current);
+          } else {
+            await syncMediaFetchPolicyForSession(session, current);
+            await attachBlobVideoToSession(session, current);
           }
           if (controlOnly || mutationEpoch !== connectionEpoch) {
             await invalidateEarly(record);
@@ -2020,6 +2168,7 @@ async function runWatch(options) {
           if (record) await removeEarly(record);
           session?.close();
           sessions.delete(target.id);
+          mediaPolicyTargets.delete(target.id);
           console.error(`[dream-skin] inject failed for ${target.id}: ${error.message}`);
         } finally {
           finishTargetSetup();
@@ -2045,6 +2194,7 @@ async function runWatch(options) {
         : Promise.resolve(false)));
     await Promise.all([...sessions.values()].map((record) => removeEarly(record)));
     for (const record of sessions.values()) record.session.close();
+    await mediaServers.close();
   }
 }
 

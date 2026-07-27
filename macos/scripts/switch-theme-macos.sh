@@ -129,6 +129,7 @@ process.stdout.write(value.contentFingerprint);
 [ -z "$EXPECTED_CONTENT_FINGERPRINT" ] \
   || [ "$STAGED_CONTENT_FINGERPRINT" = "$EXPECTED_CONTENT_FINGERPRINT" ] \
   || fail "Saved theme content no longer matches the package that was imported."
+THEME_VIDEO="$("$NODE" -e 'try{const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(typeof t.video==="string"?t.video:"")}catch{}' "$stage/theme.json" 2>/dev/null || true)"
 # Validate the exact staged pair, not the mutable library directory. The
 # injector performs the full schema, path, dimensions, and image checks.
 "$NODE" "$INJECTOR" --check-payload --theme-dir "$stage" >/dev/null \
@@ -153,10 +154,11 @@ done
 /bin/mv -f "$stage/theme.json" "$THEME_DIR/theme.json"
 if [ -n "$SAFE_CSS_NAME" ]; then
   /usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
-    ! -name 'theme.json' ! -name "$THEME_IMAGE" ! -name 'theme.css' -delete
+    ! -name 'theme.json' ! -name "$THEME_IMAGE" ! -name 'theme.css' \
+    ! -name "$THEME_VIDEO" -delete
 else
   /usr/bin/find "$THEME_DIR" -maxdepth 1 -type f \
-    ! -name 'theme.json' ! -name "$THEME_IMAGE" -delete
+    ! -name 'theme.json' ! -name "$THEME_IMAGE" ! -name "$THEME_VIDEO" -delete
 fi
 /bin/rm -rf "$stage"
 stage=""

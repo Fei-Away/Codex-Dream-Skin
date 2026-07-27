@@ -91,7 +91,7 @@ async function makeThemeDir(overrides) {
 // running any renderer logic. If substitution corrupted the payload the values
 // recovered here diverge from the theme on disk.
 function readPayloadArguments(payload) {
-  const marker = "((cssText, artDataUrl, themeConfig) => {";
+  const marker = "((cssText, artDataUrl, themeConfig, videoConfig) => {";
   const at = payload.indexOf(marker);
   assert.notEqual(at, -1, "payload must keep the canonical renderer IIFE signature");
   const probe = `${payload.slice(0, at + marker.length)}
@@ -224,10 +224,11 @@ test("the macOS injector builds payloads with function replacements only", async
     "__DREAM_SKIN_CSS_JSON__",
     "__DREAM_SKIN_ART_JSON__",
     "__DREAM_SKIN_THEME_JSON__",
+    "__DREAM_SKIN_VIDEO_JSON__",
     "__DREAM_SKIN_VERSION_JSON__",
     "__DREAM_SKIN_STYLE_REVISION_JSON__",
     "__DREAM_SKIN_PAYLOAD_REVISION_JSON__",
-  ], "all six payload placeholders must still be substituted");
+  ], "all seven payload placeholders must still be substituted");
 });
 
 test.after(async () => {

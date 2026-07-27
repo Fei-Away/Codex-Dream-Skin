@@ -42,8 +42,16 @@ function validateUnit(value, name) {
   return parsed;
 }
 
+function hasControlCharacters(value) {
+  return [...value].some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
+      || codePoint === 0x2028 || codePoint === 0x2029;
+  });
+}
+
 function validateText(value, name, maxLength, fallback) {
-  if (/\p{Cc}|\u2028|\u2029/u.test(value)) {
+  if (hasControlCharacters(value)) {
     throw new Error(`${name} must be a single line without control characters.`);
   }
   const normalized = value.trim();
@@ -102,7 +110,7 @@ if (mode !== "custom") {
 
 const requestedImage = valueFor("image", "background.jpg");
 const image = path.basename(requestedImage);
-if (/\p{Cc}|\u2028|\u2029/u.test(image)) {
+if (hasControlCharacters(image)) {
   throw new Error("image must be a single-line filename without control characters.");
 }
 if (image !== requestedImage || image === "." || image === "..") {
@@ -115,6 +123,22 @@ assertContainedPath(canonicalOutputDir, imagePath, "image");
 const imageStat = await fs.stat(imagePath);
 if (!imageStat.isFile() || imageStat.size < 1 || imageStat.size > 10 * 1024 * 1024) {
   throw new Error("The prepared theme image must be non-empty and no larger than 10 MB.");
+}
+
+const requestedVideo = hasValue("video") ? valueFor("video") : "";
+let video = "";
+if (requestedVideo) {
+  video = path.basename(requestedVideo);
+  if (video !== requestedVideo || hasControlCharacters(video) || video === "." || video === "..") {
+    throw new Error("video must be a filename inside the output directory.");
+  }
+  if (!/\.mp4$/i.test(video)) throw new Error("video must be an MP4 filename.");
+  const videoPath = await fs.realpath(path.join(canonicalOutputDir, video));
+  assertContainedPath(canonicalOutputDir, videoPath, "video");
+  const videoStat = await fs.stat(videoPath);
+  if (!videoStat.isFile() || videoStat.size < 1 || videoStat.size > 100 * 1024 * 1024) {
+    throw new Error("The prepared theme video must be non-empty and no larger than 100 MB.");
+  }
 }
 
 const name = validateText(valueFor("name", "我的 Codex Dream Skin"), "name", 80, "我的 Codex Dream Skin");
@@ -165,6 +189,7 @@ const custom = {
 
 if (focusX !== null) custom.art.focusX = focusX;
 if (focusY !== null) custom.art.focusY = focusY;
+if (video) custom.video = video;
 if (Object.keys(explicitColors).length) custom.colors = explicitColors;
 
 await atomicWrite(themePath, `${JSON.stringify(custom, null, 2)}\n`);

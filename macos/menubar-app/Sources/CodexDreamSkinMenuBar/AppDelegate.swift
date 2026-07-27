@@ -284,6 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
     addActionItem("换一张背景图…", action: #selector(chooseBackgroundImage), enabled: !busy)
+    addActionItem("一键更换视频背景…", action: #selector(chooseBackgroundVideo), enabled: !busy)
     addActionItem("导入主题 ZIP…", action: #selector(chooseThemeArchive), enabled: !busy)
     addSavedThemesMenu(enabled: !busy)
     addActionItem("打开主题文件夹", action: #selector(openThemesFolder))
@@ -481,6 +482,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       named: "load-image-theme-macos.sh",
       arguments: ["--file", imageURL.path],
       operation: "更换背景图"
+    )
+  }
+
+  @objc private func chooseBackgroundVideo() {
+    let panel = NSOpenPanel()
+    panel.title = "选择 Dream Skin 视频背景"
+    panel.prompt = "选择"
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowsMultipleSelection = false
+    panel.allowedContentTypes = [.mpeg4Movie]
+    activateForUserInteraction()
+    guard panel.runModal() == .OK, let videoURL = panel.url else { return }
+    runInstalledScript(
+      named: "load-image-theme-macos.sh",
+      arguments: ["--file", videoURL.path],
+      operation: "更换视频背景"
     )
   }
 

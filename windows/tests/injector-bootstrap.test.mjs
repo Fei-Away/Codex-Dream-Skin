@@ -1,13 +1,28 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { earlyPayloadFor } from "../scripts/injector.mjs";
+import {
+  earlyPayloadFor,
+  loadTheme,
+} from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
+
+function mp4Fixture(marker) {
+  const fileTypeBox = Buffer.alloc(24);
+  fileTypeBox.writeUInt32BE(fileTypeBox.length, 0);
+  fileTypeBox.write("ftyp", 4, "ascii");
+  fileTypeBox.write("isom", 8, "ascii");
+  fileTypeBox.writeUInt32BE(512, 12);
+  fileTypeBox.write("isom", 16, "ascii");
+  fileTypeBox.write("mp41", 20, "ascii");
+  return Buffer.concat([fileTypeBox, Buffer.from(marker, "ascii")]);
+}
 
 function createFixture() {
   const domReady = [];
@@ -103,5 +118,66 @@ assert.match(source, /if \(!fallbackTargets\.get\(id\)\) return;/,
   "Fallback listeners must stay inert after a successful early registration.");
 assert.match(source, /Page\.removeScriptToEvaluateOnNewDocument/,
   "Watcher shutdown and theme refresh must unregister persistent Page scripts.");
+assert.match(source, /DOM\.setFileInputFiles/,
+  "Windows video themes must use CDP file injection instead of exposing a local file URL.");
+assert.match(source, /videoTransport[\s\S]*mode: "blob"/,
+  "Windows video payloads must prefer Blob transport when no fallback URL is supplied.");
+assert.match(source, /Page\.setBypassCSP[\s\S]*enabled: true/,
+  "Windows video fallback fetches must enable CSP bypass only through the verified injector.");
+assert.match(source, /Page\.enable[\s\S]*Page\.setBypassCSP/,
+  "Windows video fallback fetches must enable CSP bypass before replaying media payloads.");
+const mediaPolicyStart = source.indexOf("async function enableMediaFetchForSession");
+const mediaPolicyEnd = source.indexOf("async function applyToSession", mediaPolicyStart);
+assert.doesNotMatch(source.slice(mediaPolicyStart, mediaPolicyEnd), /Page\.reload/,
+  "Windows video theme imports must not force a full page reload and visible flash.");
+assert.match(source, /mode: "blob", fallbackUrl: stagedMedia\.url/,
+  "Windows watch mode must prefer CDP file injection with a controlled fallback transport.");
+assert.match(source, /videoHandle\.createReadStream[\s\S]*fingerprintHash\.update\(chunk\)/,
+  "Windows theme fingerprints must stream video content instead of retaining a full MP4 buffer.");
+assert.doesNotMatch(source, /videoBytes\s*=\s*videoPath\s*\?\s*await fs\.readFile/,
+  "Windows watcher audits must not allocate the entire video solely to fingerprint it.");
+assert.match(source, /rejectedSourceStamp[\s\S]*candidateTheme\.sourceStamp === rejectedSourceStamp/,
+  "A renderer-rejected video revision must not be reapplied until its source files change.");
+assert.match(source, /verifyCodexPortOwner\(port\)[\s\S]*DreamSkinNativeWindowProbe[\s\S]*EnumChildWindows/,
+  "Electron window fallback must bind a visible native window to the verified official Codex executable.");
+assert.match(source, /source: "verified-codex-process-window"/,
+  "Native-window fallback evidence must identify its process-window binding source.");
+assert.match(source, /updateError\.deferred[\s\S]*live theme update deferred for a hidden renderer/,
+  "A hidden renderer must defer a live switch instead of terminating the watcher during rollback.");
+assert.match(source, /rendererVerificationAccepted\(lastResult, allowHiddenApplied\)/,
+  "Startup verification must be able to accept only the explicit hidden-renderer defer state.");
+const updateCommit = source.indexOf("Keep the previous media server alive until every renderer verifies the update");
+const updateApply = source.indexOf("await applyToSession(session, loadedPayload.payload, loadedPayload);", updateCommit);
+const commitIndex = source.indexOf("await mediaServers.commit(paused ? null : stagedMedia);", updateApply);
+assert.ok(updateCommit >= 0 && updateApply > updateCommit && commitIndex > updateApply,
+  "Windows theme updates must keep the previous media server until renderer verification succeeds, then publish staged media.");
+assert.match(source, /async function verifyCodexPortOwner\(port\)/,
+  "Windows identity rebind must verify the loopback listener belongs to the recorded Codex executable.");
+assert.match(source, /rebound verified CDP browser identity/,
+  "Windows watch mode must report a successful verified identity rebind.");
+assert.match(source, /listAppTargets\(options\.port, identityState\.browserId\)/,
+  "Windows watch mode must bind target discovery to the current browser identity.");
+assert.match(source, /identityState\.generation !== identityGeneration/,
+  "Windows target setup must abort when the browser identity rotates mid-connection.");
+assert.match(source, /candidate\.open\(\)[\s\S]*confirmedBrowserId !== nextBrowserId/,
+  "Identity rebinding must reopen and revalidate the candidate browser identity.");
+assert.match(source, /await cleanupIdentitySessions\(\)/,
+  "Identity rebinding must discard sessions anchored to the old browser identity.");
+assert.doesNotMatch(source, /LOOPBACK_HOSTS = new Set\(\["127\.0\.0\.1", "localhost"/,
+  "Windows CDP validation must not widen beyond the loopback address required by the startup contract.");
 
-console.log("PASS: Windows early injection is L0-ready, generation-safe, ordered before probing, and fallback-scoped.");
+const fingerprintRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dream-skin-fingerprint-"));
+try {
+  await fs.copyFile(path.resolve(here, "../assets/dream-reference.jpg"), path.join(fingerprintRoot, "background.jpg"));
+  await fs.writeFile(path.join(fingerprintRoot, "background.mp4"), mp4Fixture("AAAA"));
+  await fs.writeFile(path.join(fingerprintRoot, "theme.json"), JSON.stringify({
+    id: "fingerprint-fixture", name: "Fingerprint fixture", image: "background.jpg", video: "background.mp4",
+  }));
+  const first = await loadTheme(fingerprintRoot);
+  await fs.writeFile(path.join(fingerprintRoot, "background.mp4"), mp4Fixture("BBBB"));
+  const second = await loadTheme(fingerprintRoot);
+  assert.notEqual(first.fingerprint, second.fingerprint,
+    "Replacing an MP4 under the same filename must change the theme fingerprint.");
+} finally {
+  await fs.rm(fingerprintRoot, { recursive: true, force: true });
+}
