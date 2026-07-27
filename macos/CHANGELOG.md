@@ -8,6 +8,7 @@
 
 ### 修复
 
+- 修复菜单栏拥挤时仅菜单栏 App 的唯一入口可能在首次启动就被 macOS 隐藏的问题。状态项现在使用稳定的 autosave 名称，且只在用户尚未保存位置时设置可达的初始位置；后续手动排列仍由 AppKit 持久化并恢复。
 - 注入器日志与 `--check` 结果不再记录页面标题和 URL。这些字段经 `launchctl submit -o` 落进 `~/Library/Application Support/` 下的长期日志文件,而 Codex 的窗口标题包含会话名与项目名。Windows 侧早已修正(见其 1.3.0 条目),macOS 未同步。渲染器探针也不再把 `document.title` 和 `location.href` 回传给宿主,仅保留结构标记。新增仓库级静态检查防止回归。
 
 ### 内部

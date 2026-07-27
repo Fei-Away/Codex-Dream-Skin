@@ -17,7 +17,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private let fileManager = FileManager.default
-  private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+  private lazy var statusItem: NSStatusItem = {
+    let autosaveName = "cc.dreamskin.menubar.primary"
+    let preferredPositionKey = "NSStatusItem Preferred Position \(autosaveName)"
+    if UserDefaults.standard.object(forKey: preferredPositionKey) == nil {
+      // Keep this menu-bar-only app reachable on its first launch. AppKit
+      // persists later user rearrangement under the same autosave name.
+      UserDefaults.standard.set(0.0, forKey: preferredPositionKey)
+    }
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    item.autosaveName = autosaveName
+    return item
+  }()
   private let menu = NSMenu()
   private var snapshot = StatusSnapshot()
   private var statusRefreshRunning = false
