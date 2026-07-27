@@ -1,74 +1,316 @@
 name: Release
 
+# This workflow deliberately does NOT gate on `workflow_run: [CI]`.  The guard
+# job below decides whether a main push is a real version bump by diffing
+# macos/VERSION against `github.event.before`, and a `workflow_run` payload
+# carries no `before` field.  Chaining CI would therefore disable the gate that
+# AGENTS.md requires against rebuilding or overwriting a Release when the
+# version did not change, and would break the idempotent `workflow_dispatch`
+# retry of a single tag.  The checks CI performs are instead repeated by the
+# `regressions` job below, run against the exact release commit rather than
+# whatever CI last happened to observe.
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-main
   cancel-in-progress: false
 
 jobs:
   guard:
-    name: Validate release tag
+    name: Prepare release candidate
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      release_sha: ${{ steps.version.outputs.release_sha }}
+      should_release: ${{ steps.version.outputs.should_release }}
     steps:
       - name: Check out source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js for manifest checks
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
 
-      - name: Match tag and platform versions
+      - name: Match main versions and release state
         id: version
         shell: bash
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          tag="${RELEASE_TAG}"
-          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tags must look like v1.2.3: $tag" >&2
-            exit 1
-          fi
           main_sha="$(git rev-parse origin/main)"
-          tag_sha="$(git rev-parse HEAD)"
-          if [[ "$tag_sha" != "$main_sha" ]]; then
-            echo "Release tag must point at the current origin/main commit: tag=$tag_sha main=$main_sha" >&2
-            exit 1
-          fi
           version="$(tr -d '[:space:]' < macos/VERSION)"
           windows_version="$(tr -d '[:space:]' < windows/VERSION)"
           package_version="$(node -p "JSON.parse(require('fs').readFileSync('macos/package.json', 'utf8')).version")"
-          for value in "$version" "$windows_version" "$package_version"; do
-            if [[ ! "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          common_version="$(sed -n 's/^SKIN_VERSION=\"\([^\"]*\)\"$/\1/p' macos/scripts/common-macos.sh)"
+          macos_injector_version="$(sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p' macos/scripts/injector.mjs)"
+          windows_injector_version="$(sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p' windows/scripts/injector.mjs)"
+          for value in "$version" "$windows_version" "$package_version" "$common_version" "$macos_injector_version" "$windows_injector_version"; do
+            [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
               echo "A platform version is not semantic: $value" >&2
               exit 1
-            fi
+            }
           done
-          if [[ "$tag" != "v$version" || "$windows_version" != "$version" || "$package_version" != "$version" ]]; then
-            echo "Tag/version mismatch: tag=$tag macOS=$version Windows=$windows_version package=$package_version" >&2
+          if [[ "$windows_version" != "$version" || "$package_version" != "$version" ||
+                "$common_version" != "$version" || "$macos_injector_version" != "$version" ||
+                "$windows_injector_version" != "$version" ]]; then
+            echo "The six release version sources do not match." >&2
             exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          tag="v$version"
+          release_sha="$main_sha"
+          should_release="true"
+          version_unchanged="false"
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            [[ -n "$BEFORE_SHA" && "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]] || {
+              echo "A main push without a predecessor cannot publish." >&2
+              exit 1
+            }
+            previous_version="$(git show "$BEFORE_SHA:macos/VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
+            if [[ "$previous_version" == "$version" ]]; then
+              version_unchanged="true"
+            else
+              [[ "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+                echo "Previous main version is invalid: $previous_version" >&2
+                exit 1
+              }
+              CURRENT_VERSION="$version" PREVIOUS_VERSION="$previous_version" node <<'NODE'
+          const current = process.env.CURRENT_VERSION.split(".").map(Number);
+          const previous = process.env.PREVIOUS_VERSION.split(".").map(Number);
+          const comparison = current[0] - previous[0] || current[1] - previous[1] || current[2] - previous[2];
+          if (comparison <= 0) {
+            console.error("Release version must increase.");
+            process.exit(1);
+          }
+          NODE
+            fi
+          fi
+
+          tag_sha="$(git ls-remote origin "refs/tags/$tag" | awk 'NR == 1 { print $1 }')"
+          if [[ -n "$tag_sha" ]]; then
+            tag_commit="$(git rev-parse "$tag_sha^{commit}" 2>/dev/null || true)"
+            [[ -n "$tag_commit" ]] || {
+              echo "Existing $tag is not a commit-backed tag." >&2
+              exit 1
+            }
+            tagged_macos="$(git show "$tag_commit:macos/VERSION" | tr -d '[:space:]')"
+            tagged_windows="$(git show "$tag_commit:windows/VERSION" | tr -d '[:space:]')"
+            tagged_package="$(git show "$tag_commit:macos/package.json" | node -e 'let s=""; process.stdin.on("data", (chunk) => s += chunk); process.stdin.on("end", () => process.stdout.write(JSON.parse(s).version));')"
+            tagged_common="$(git show "$tag_commit:macos/scripts/common-macos.sh" | sed -n 's/^SKIN_VERSION=\"\([^\"]*\)\"$/\1/p')"
+            tagged_macos_injector="$(git show "$tag_commit:macos/scripts/injector.mjs" | sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p')"
+            tagged_windows_injector="$(git show "$tag_commit:windows/scripts/injector.mjs" | sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p')"
+            [[ "$tagged_macos" == "$version" && "$tagged_windows" == "$version" &&
+               "$tagged_package" == "$version" && "$tagged_common" == "$version" &&
+               "$tagged_macos_injector" == "$version" && "$tagged_windows_injector" == "$version" ]] || {
+              echo "Existing $tag does not contain a consistent $version payload." >&2
+              exit 1
+            }
+          fi
+          release_state=""
+          if release_json="$(gh release view "$tag" --json isDraft 2>/dev/null)"; then
+            release_state="$(jq -r '.isDraft | if . then "draft" else "published" end' <<<"$release_json")"
+          fi
+          if [[ "$release_state" == "published" ]]; then
+            if [[ "$EVENT_NAME" == "workflow_dispatch" || "$version_unchanged" == "true" ]]; then
+              [[ -n "$tag_sha" ]] || {
+                echo "Published $tag has no corresponding remote tag." >&2
+                exit 1
+              }
+              should_release="false"
+              echo "Public $tag already exists; skipping duplicate publication."
+            else
+              [[ "$tag_commit" == "$release_sha" ]] || {
+                echo "Published $tag does not point at $release_sha." >&2
+                exit 1
+              }
+            fi
+            should_release="false"
+          elif [[ -n "$tag_sha" ]]; then
+            if [[ "$version_unchanged" == "true" ]]; then
+              release_sha="$tag_commit"
+              echo "Resuming incomplete $tag from its existing tagged commit."
+            else
+              [[ "$tag_commit" == "$release_sha" ]] || {
+                echo "Existing $tag points at $tag_sha, not $release_sha." >&2
+                exit 1
+              }
+            fi
+          elif [[ "$should_release" == "true" ]]; then
+            previous_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1 || true)"
+            if [[ -n "$previous_tag" ]]; then
+              previous_version="${previous_tag#v}"
+              CURRENT_VERSION="$version" PREVIOUS_VERSION="$previous_version" node <<'NODE'
+          const current = process.env.CURRENT_VERSION.split(".").map(Number);
+          const previous = process.env.PREVIOUS_VERSION.split(".").map(Number);
+          const comparison = current[0] - previous[0] || current[1] - previous[1] || current[2] - previous[2];
+          if (comparison <= 0) {
+            console.error("Release version is not newer than the latest tag.");
+            process.exit(1);
+          }
+          NODE
+            fi
+          fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "release_sha=$release_sha"
+            echo "should_release=$should_release"
+          } >> "$GITHUB_OUTPUT"
+
+  regressions:
+    name: Portable release regressions
+    needs: guard
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js for portable regressions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Check shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            bash -n "$file"
+          done < <(
+            find macos -type f \( -name '*.sh' -o -name '*.command' \) \
+              ! -path '*/release/*' -print
+          )
+
+      - name: Check Node.js syntax on both platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            node --check "$file" >/dev/null
+          done < <(
+            find macos windows -type f \( -name '*.mjs' -o -name '*.js' \) -print
+          )
+
+      # macos/tests/run-tests.sh already re-checks the macOS runtime assertions
+      # (legacy identifiers, app.asar mutation, python3/eval), so only the
+      # Windows execution-policy boundary is repeated here: the PowerShell
+      # suites assert it on named files, not across the whole tree.
+      - name: Check Windows execution-policy boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n --include='*.ps1' --include='*.iss' \
+            -F -- '-ExecutionPolicy Bypass' windows/scripts windows/installer >/dev/null; then
+            printf 'Windows runtime or installer code bypasses the PowerShell execution policy.\n' >&2
+            exit 1
+          fi
+
+      - name: Check Windows PowerShell source encoding
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          function visit(directory) {
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const file = path.join(directory, entry.name);
+              if (entry.isDirectory()) visit(file);
+              if (!entry.isFile() || path.extname(file) !== ".ps1") continue;
+              const bytes = fs.readFileSync(file);
+              const hasBom = bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]));
+              const content = hasBom ? bytes.subarray(3) : bytes;
+              if (content.some((byte) => byte >= 0x80) && !hasBom) {
+                throw new Error(`${file}: non-ASCII PowerShell 5.1 source requires a UTF-8 BOM`);
+              }
+            }
+          }
+
+          visit("windows");
+          NODE
+
+      # The platform runners execute run-tests.sh / run-tests.ps1, which only
+      # reference a subset of the *.test.mjs suites by name.  These globs are
+      # the only thing that reaches every portable regression, so they must run
+      # against the release commit before its tag exists.
+      - name: Run portable Node.js regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test macos/tests/*.test.mjs
+          node --test windows/tests/*.test.mjs
+          node macos/scripts/injector.mjs --check-payload >/dev/null
+          node windows/scripts/injector.mjs --check-payload >/dev/null
+
+  create-tag:
+    name: Create release tag
+    needs: [guard, regressions]
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create or verify tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.guard.outputs.tag }}
+          RELEASE_SHA: ${{ needs.guard.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          existing="$(git ls-remote origin "refs/tags/$TAG" | awk 'NR == 1 { print $1 }')"
+          if [[ -n "$existing" ]]; then
+            [[ "$existing" == "$RELEASE_SHA" ]] || {
+              echo "Refusing to reuse $TAG at $existing; expected $RELEASE_SHA." >&2
+              exit 1
+            }
+            exit 0
+          fi
+          created="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$TAG" -f "sha=$RELEASE_SHA" --jq '.object.sha')"
+          [[ "$created" == "$RELEASE_SHA" ]] || {
+            echo "GitHub created $TAG at unexpected SHA: $created" >&2
+            exit 1
+          }
 
   build-macos:
     name: Build macOS DMG
-    needs: guard
+    needs: [guard, create-tag]
+    if: needs.guard.outputs.should_release == 'true'
     runs-on: macos-latest
     steps:
       - name: Check out source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          persist-credentials: false
 
       - name: Set up Node.js for macOS regressions
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -105,11 +347,15 @@ jobs:
 
   build-windows:
     name: Build Windows Setup
-    needs: guard
+    needs: [guard, create-tag]
+    if: needs.guard.outputs.should_release == 'true'
     runs-on: windows-latest
     steps:
       - name: Check out source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          persist-credentials: false
 
       - name: Set up Node.js for Windows regressions
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -135,12 +381,17 @@ jobs:
         env:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
-          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
-            -File .\windows\tests\run-tests.ps1
-          if ($LASTEXITCODE -ne 0) { throw "Windows regressions failed with exit code $LASTEXITCODE." }
-          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
-            -File .\windows\tests\installer-static.tests.ps1
-          if ($LASTEXITCODE -ne 0) { throw "Installer static checks failed with exit code $LASTEXITCODE." }
+          # Users run the shipped scripts under whichever shell their machine
+          # has, so both hosts must pass before the artifact is built.  Only
+          # Windows PowerShell 5.1 was exercised here previously.
+          foreach ($shell in @('powershell.exe', 'pwsh.exe')) {
+            & $shell -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+              -File .\windows\tests\run-tests.ps1
+            if ($LASTEXITCODE -ne 0) { throw "Windows regressions failed under $shell with exit code $LASTEXITCODE." }
+            & $shell -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+              -File .\windows\tests\installer-static.tests.ps1
+            if ($LASTEXITCODE -ne 0) { throw "Installer static checks failed under $shell with exit code $LASTEXITCODE." }
+          }
           $output = Join-Path $env:RUNNER_TEMP 'codex-dream-skin-release'
           New-Item -ItemType Directory -Path $output -Force | Out-Null
           & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned `
@@ -161,15 +412,19 @@ jobs:
           path: ${{ runner.temp }}/codex-dream-skin-release/CodexDreamSkin-Setup-v${{ needs.guard.outputs.version }}.exe
           retention-days: 14
 
-  publish-draft:
-    name: Create draft GitHub Release
-    needs: [guard, build-macos, build-windows]
+  publish-release:
+    name: Validate and publish GitHub Release
+    needs: [guard, create-tag, build-macos, build-windows]
+    if: needs.guard.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Check out source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          persist-credentials: false
 
       - name: Download release artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -182,6 +437,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.guard.outputs.version }}
+          RELEASE_SHA: ${{ needs.guard.outputs.release_sha }}
         run: |
           set -euo pipefail
           test -s "dist/CodexDreamSkin-v${VERSION}.dmg"
@@ -205,29 +461,38 @@ jobs:
           or [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md).
           No terminal trust command is required for ordinary users.
 
-          This release is created as a draft for a maintainer to review before publishing.
+          This release was built automatically from ${RELEASE_SHA} after the version bump reached main.
           EOF
 
-      - name: Create draft release
+      - name: Stage, verify, and publish release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.guard.outputs.version }}
+          TAG: ${{ needs.guard.outputs.tag }}
+          RELEASE_SHA: ${{ needs.guard.outputs.release_sha }}
         run: |
-          if gh release view "v${VERSION}" >/dev/null 2>&1; then
-            is_draft="$(gh release view "v${VERSION}" --json isDraft --jq .isDraft)"
+          set -euo pipefail
+          tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')"
+          [[ "$tag_sha" == "$RELEASE_SHA" ]] || {
+            echo "Release tag $TAG points at $tag_sha, expected $RELEASE_SHA." >&2
+            exit 1
+          }
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$TAG" --json isDraft --jq .isDraft)"
             test "$is_draft" = true || {
               echo "Refusing to replace an already published v${VERSION} release." >&2
               exit 1
             }
-            gh release upload "v${VERSION}" --clobber \
+            gh release upload "$TAG" --clobber \
               dist/CodexDreamSkin-v${VERSION}.dmg \
               dist/CodexDreamSkin-Setup-v${VERSION}.exe \
               dist/SHA256SUMS.txt
-            gh release edit "v${VERSION}" --draft \
+            gh release edit "$TAG" --draft \
               --title "Codex Dream Skin v${VERSION}" \
               --notes-file release-notes.md
           else
-            gh release create "v${VERSION}" \
+            gh release create "$TAG" \
+              --verify-tag \
               --draft \
               --title "Codex Dream Skin v${VERSION}" \
               --notes-file release-notes.md \
@@ -235,3 +500,43 @@ jobs:
               dist/CodexDreamSkin-Setup-v${VERSION}.exe \
               dist/SHA256SUMS.txt
           fi
+
+          RELEASE_JSON="$(gh release view "$TAG" --json isDraft,isPrerelease,tagName,assets)"
+          RELEASE_JSON="$RELEASE_JSON" VERSION="$VERSION" node <<'NODE'
+          const fs = require("node:fs");
+          const crypto = require("node:crypto");
+          const release = JSON.parse(process.env.RELEASE_JSON);
+          if (!release.isDraft || release.isPrerelease || release.tagName !== "v" + process.env.VERSION) {
+            throw new Error("Draft release metadata is invalid before publication.");
+          }
+          const expected = [
+            "CodexDreamSkin-v" + process.env.VERSION + ".dmg",
+            "CodexDreamSkin-Setup-v" + process.env.VERSION + ".exe",
+            "SHA256SUMS.txt",
+          ];
+          if (release.assets.length !== expected.length || !expected.every((name) => release.assets.some((asset) => asset.name === name))) {
+            throw new Error("Release asset set is incomplete or contains unexpected files.");
+          }
+          for (const name of expected) {
+            const asset = release.assets.find((item) => item.name === name);
+            const local = fs.readFileSync("dist/" + name);
+            const digest = "sha256:" + crypto.createHash("sha256").update(local).digest("hex");
+            if (!asset.size || asset.digest !== digest) throw new Error("Remote digest mismatch for " + name);
+          }
+          NODE
+
+          gh release edit "$TAG" --draft=false --latest
+          final_json="$(gh release view "$TAG" --json isDraft,isPrerelease,tagName,assets)"
+          RELEASE_JSON="$final_json" VERSION="$VERSION" node <<'NODE'
+          const release = JSON.parse(process.env.RELEASE_JSON);
+          const expected = [
+            "CodexDreamSkin-v" + process.env.VERSION + ".dmg",
+            "CodexDreamSkin-Setup-v" + process.env.VERSION + ".exe",
+            "SHA256SUMS.txt",
+          ];
+          if (release.isDraft || release.isPrerelease || release.tagName !== "v" + process.env.VERSION ||
+              release.assets.length !== expected.length || !expected.every((name) => release.assets.some((asset) => asset.name === name && asset.state === "uploaded"))) {
+            throw new Error("Published release verification failed.");
+          }
+          console.log("Published public release " + release.tagName + " with " + release.assets.length + " verified assets.");
+          NODE

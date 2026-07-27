@@ -113,8 +113,8 @@ const canonicalOutputDir = await fs.realpath(outputDir);
 const imagePath = await fs.realpath(path.join(canonicalOutputDir, image));
 assertContainedPath(canonicalOutputDir, imagePath, "image");
 const imageStat = await fs.stat(imagePath);
-if (!imageStat.isFile() || imageStat.size < 1 || imageStat.size > 16 * 1024 * 1024) {
-  throw new Error("The prepared theme image must be non-empty and no larger than 16 MB.");
+if (!imageStat.isFile() || imageStat.size < 1 || imageStat.size > 10 * 1024 * 1024) {
+  throw new Error("The prepared theme image must be non-empty and no larger than 10 MB.");
 }
 
 const name = validateText(valueFor("name", "我的 Codex Dream Skin"), "name", 80, "我的 Codex Dream Skin");

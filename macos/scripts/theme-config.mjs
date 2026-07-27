@@ -20,18 +20,6 @@ if (!["auto", "light", "dark"].includes(appearance)) {
   throw new Error(`Unsupported appearance "${appearanceArg}"; expected auto, light, or dark.`);
 }
 
-function desktopSection(content) {
-  const headers = [...content.matchAll(/^[\t ]*\[[\t ]*desktop[\t ]*\][\t ]*(?:#[^\r\n]*)?(?:\r?\n|$)/gm)];
-  if (headers.length > 1) throw new Error("Refusing to rewrite multiple [desktop] tables.");
-  const header = headers[0];
-  if (!header) return null;
-  const bodyStart = header.index + header[0].length;
-  const remainder = content.slice(bodyStart);
-  const nextHeader = /^[\t ]*\[/m.exec(remainder);
-  const bodyEnd = nextHeader ? bodyStart + nextHeader.index : content.length;
-  return { bodyStart, bodyEnd, body: content.slice(bodyStart, bodyEnd) };
-}
-
 function tomlStructureForLine(line) {
   let result = "";
   let quote = null;
@@ -62,26 +50,88 @@ function tomlStructureForLine(line) {
   return result;
 }
 
-function assertSupportedTomlLayout(content) {
-  for (const line of content.split(/\r?\n/)) {
-    const structure = tomlStructureForLine(line);
-    const assignment = structure.indexOf("=");
-    if (assignment < 0) continue;
-    let depth = 0;
-    for (const character of structure.slice(assignment + 1)) {
-      if (character === "[") depth += 1;
-      if (character === "]") depth -= 1;
-    }
-    if (depth > 0) {
-      throw new Error("Refusing to rewrite TOML containing multiline arrays.");
+function isTomlTableHeader(structure) {
+  const value = structure.trim();
+  if (value.startsWith("[[")) {
+    return value.endsWith("]]")
+      && !value.slice(2, -2).includes("[")
+      && !value.slice(2, -2).includes("]");
+  }
+  return value.startsWith("[")
+    && !value.startsWith("[[")
+    && value.endsWith("]")
+    && !value.slice(1, -1).includes("[")
+    && !value.slice(1, -1).includes("]");
+}
+
+function updateTomlArrayDepth(structure, initialDepth) {
+  let depth = initialDepth;
+  for (const character of structure) {
+    if (character === "[") depth += 1;
+    if (character === "]") depth -= 1;
+    if (depth < 0) {
+      throw new Error("Refusing to rewrite TOML containing an unmatched array bracket.");
     }
   }
+  return depth;
+}
+
+function tomlTableHeaders(content) {
+  const headers = [];
+  const lines = content.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  let offset = 0;
+  let arrayDepth = 0;
+
+  for (const line of lines) {
+    const structure = tomlStructureForLine(line).trim();
+    if (arrayDepth === 0 && isTomlTableHeader(structure)) {
+      headers.push({
+        index: offset,
+        bodyStart: offset + line.length,
+        desktop: /^[\t ]*\[[\t ]*desktop[\t ]*\][\t ]*(?:#[^\r\n]*)?(?:\r?\n)?$/.test(line),
+      });
+    } else {
+      const assignment = structure.indexOf("=");
+      if (arrayDepth === 0 && assignment < 0) {
+        if (structure.includes("[") || structure.includes("]")) {
+          throw new Error("Refusing to rewrite malformed TOML array syntax.");
+        }
+      } else {
+        const expression = arrayDepth > 0 ? structure : structure.slice(assignment + 1);
+        arrayDepth = updateTomlArrayDepth(expression, arrayDepth);
+      }
+    }
+    offset += line.length;
+  }
+
+  if (arrayDepth !== 0) {
+    throw new Error("Refusing to rewrite TOML containing an unterminated array.");
+  }
+  return headers;
+}
+
+function desktopSection(content) {
+  const headers = tomlTableHeaders(content);
+  const desktopHeaders = headers.filter((header) => header.desktop);
+  if (desktopHeaders.length > 1) throw new Error("Refusing to rewrite multiple [desktop] tables.");
+  const header = desktopHeaders[0];
+  if (!header) return null;
+  const position = headers.indexOf(header);
+  const bodyEnd = headers[position + 1]?.index ?? content.length;
+  return { bodyStart: header.bodyStart, bodyEnd, body: content.slice(header.bodyStart, bodyEnd) };
 }
 
 function settingLines(body, key) {
   const token = key.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
   const matches = body.match(new RegExp(`^${token}[\\t ]*=.*$`, "gm")) ?? [];
   if (matches.length > 1) throw new Error(`Refusing to rewrite duplicate ${key} settings.`);
+  if (matches.some((line) => {
+    const structure = tomlStructureForLine(line);
+    const assignment = structure.indexOf("=");
+    return updateTomlArrayDepth(structure.slice(assignment + 1), 0) !== 0;
+  })) {
+    throw new Error(`Refusing to rewrite multiline ${key} settings.`);
+  }
   return { matches, token };
 }
 
@@ -238,7 +288,6 @@ async function main() {
   if (content.includes('"""') || content.includes("'''")) {
     throw new Error("Refusing to rewrite TOML containing multiline strings.");
   }
-  assertSupportedTomlLayout(content);
   let section = desktopSection(content);
 
   if (mode === "install") {

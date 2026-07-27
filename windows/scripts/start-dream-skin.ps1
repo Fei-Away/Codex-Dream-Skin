@@ -4,7 +4,9 @@ param(
   [switch]$RestartExisting,
   [switch]$PromptRestart,
   [string]$ProfilePath,
-  [switch]$ForegroundInjector
+  [switch]$ForegroundInjector,
+  [ValidateRange(0, 300000)][int]$OperationLockTimeoutMilliseconds = 0,
+  [switch]$RequireUnpaused
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,7 +15,8 @@ $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
-$operationLock = Enter-DreamSkinOperationLock
+$operationLock = Enter-DreamSkinOperationLock `
+  -TimeoutMilliseconds $OperationLockTimeoutMilliseconds
 try {
   Assert-DreamSkinPort -Port $Port
   if ($ProfilePath) { $ProfilePath = [System.IO.Path]::GetFullPath($ProfilePath) }
@@ -29,6 +32,9 @@ try {
   $VerifyPath = Join-Path $StateRoot 'verify.log'
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot
   $pauseWasSet = Test-DreamSkinPaused -StateRoot $StateRoot
+  if ($RequireUnpaused -and $pauseWasSet) {
+    throw 'A newer pause request superseded this theme apply before renderer verification.'
+  }
 
   $previousState = Read-DreamSkinState -Path $StatePath
   if (-not $PortExplicit -and $null -ne $previousState -and $previousState.port) {
@@ -115,6 +121,9 @@ try {
   $debugLaunchAttempted = $false
   $debugLaunch = $null
   $debugLaunchBaselineProcessIds = @()
+  # Set by the verify loop when the renderer reports a visible, structurally
+  # complete skin even though verification did not pass overall.
+  $skinLooksRendered = $false
   try {
     if ($null -eq (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex)) {
       # Codex is closed on this path; sync the appearanceTheme pin to the
@@ -279,6 +288,22 @@ try {
         '--timeout-ms', '30000')
       Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
       if ($verify.ExitCode -eq 0) { break }
+      # A verify can fail while the theme is demonstrably on screen: the
+      # renderer reports the document visible, the viewport sized and the shell
+      # structure present, and only the native-window probe -- which some Codex
+      # builds never resolve -- comes back false.  Killing Codex in that state
+      # destroys a working skin the user is looking at, so remember it and let
+      # the rollback below leave the app alone (#267).
+      $skinLooksRendered = $false
+      try {
+        $verifyJson = ($verify.Output -join "`n") | ConvertFrom-Json -ErrorAction Stop
+        $readiness = $verifyJson.readiness
+        $skinLooksRendered = [bool]$verifyJson.installed -and [bool]$verifyJson.stylePresent -and
+          [bool]$readiness.documentPass -and [bool]$readiness.viewportPass -and
+          [bool]$readiness.structurePass
+      } catch {
+        $skinLooksRendered = $false
+      }
       if ($daemon.HasExited) { throw "The injector exited during startup. See $StderrPath" }
       if ((Get-Date) -ge $verifyDeadline) { throw "Dream Skin verification failed. See $VerifyPath" }
       Start-Sleep -Seconds 3
@@ -318,13 +343,21 @@ try {
       }
     }
     if ($injectorStopped) { Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue }
-    if ($launchedWithCdp) {
+    if ($launchedWithCdp -and -not $skinLooksRendered) {
       try {
         Stop-DreamSkinCodex -Codex $codex -AllowForce
         $null = Start-DreamSkinCodex -Codex $codex
       } catch {
         Write-Warning 'Startup rollback could not fully restart Codex; close Codex to ensure its CDP port is closed.'
       }
+    } elseif ($launchedWithCdp) {
+      # The skin is on screen and only an inconclusive probe failed. Force-
+      # restarting Codex here would take a working window away from the user
+      # and leave them with the stock appearance, which is worse than the
+      # unverified state we are in. The injector is already stopped and the
+      # state file removed, so nothing claims this session is verified; Codex
+      # keeps running with its debug port until the user closes it (#267).
+      Write-Warning 'Dream Skin could not verify this session, but the theme is rendered. Codex was left running; close and reopen it to return to the stock appearance.'
     }
     if ($pauseWasSet -and $pauseCleared) {
       try {

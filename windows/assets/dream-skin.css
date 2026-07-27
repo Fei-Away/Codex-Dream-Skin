@@ -42,6 +42,9 @@
     rgb(var(--ds-bg-rgb) / .18) 32%,
     rgb(var(--ds-bg-rgb) / .76) 68%,
     rgb(var(--ds-bg-rgb) / 1) 100%);
+  --ds-task-full-veil: linear-gradient(
+    rgb(var(--ds-bg-rgb) / .10),
+    rgb(var(--ds-bg-rgb) / .10));
   --ds-immersive-edge: rgb(var(--ds-bg-rgb) / .40);
   --ds-immersive-mid: rgb(var(--ds-bg-rgb) / .26);
   --ds-immersive-far: rgb(var(--ds-bg-rgb) / .16);
@@ -89,6 +92,9 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
     rgb(var(--ds-bg-rgb) / .22) 34%,
     rgb(var(--ds-bg-rgb) / .78) 70%,
     rgb(var(--ds-bg-rgb) / 1) 100%);
+  --ds-task-full-veil: linear-gradient(
+    rgb(var(--ds-panel-rgb) / .10),
+    rgb(var(--ds-panel-rgb) / .10));
   --ds-immersive-edge: rgb(var(--ds-panel-rgb) / .44);
   --ds-immersive-mid: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-far: rgb(var(--ds-panel-rgb) / .14);
@@ -347,6 +353,19 @@ html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-
   background-size: 100% 100%, 100% 100%, cover;
 }
 
+/* Studio's full mode keeps the task artwork at normal strength with only the
+   baseline readability veil. Ambient mode deliberately uses the heavier task
+   fade/shade below, while off removes the artwork entirely. */
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])
+  main.main-surface:not(:has([role="main"]))::before {
+  inset: 0;
+  height: auto;
+  background-image: var(--ds-task-full-veil), var(--dream-skin-art);
+  background-position: center, var(--ds-art-position);
+  background-size: 100% 100%, cover;
+  opacity: 1;
+}
+
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
   main.main-surface:not(:has([role="main"]))::before {
   inset: 0;
@@ -360,6 +379,46 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"])) body::after {
   content: "";
   background-image: var(--dream-skin-art) !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"])) body {
+  background-image: var(--dream-skin-art) !important;
+  background-position: var(--ds-art-position) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
+  aside.app-shell-left-panel {
+  background: linear-gradient(90deg,
+    var(--ds-immersive-sidebar),
+    var(--ds-immersive-edge) 100%) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
+  aside.app-shell-left-panel::after {
+  background: transparent !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
+  main.main-surface:not(:has([role="main"])) {
+  background: linear-gradient(90deg,
+    var(--ds-immersive-edge),
+    var(--ds-immersive-mid) 64%,
+    var(--ds-immersive-far)) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]
+  main.main-surface:not(:has([role="main"]))::before {
+  content: none;
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"]))
@@ -609,6 +668,47 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > di
   padding-bottom: 0 !important;
 }
 
+/* Codex 26.721+: home-route's first child now only wraps the (usually empty)
+   native .home-banners slot; the real content column moved out to become
+   this wrapper's sibling instead of its descendant. The two rules above
+   still assume the old nesting and force this now-mostly-empty wrapper to
+   100% height / 440px, which pushes the real sibling content off-screen
+   (see #244). Override with higher specificity only when that new slot is
+   present, so pre-26.721 layouts are untouched. */
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) {
+  min-height: 0 !important;
+  padding-top: 0 !important;
+}
+
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners {
+  flex: 0 1 auto !important;
+  min-height: 0 !important;
+}
+
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child {
+  height: auto !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-dream-skin="active"]
+  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child::before {
+  content: none !important;
+}
+
+/* Codex 26.721+: this chain (3-6 first-child levels deep) targets the old
+   compact hero-art card that used to live inside div:first-child's second
+   level. That level is now the empty .home-banners slot (see #244), so on
+   the new DOM these rules currently match nothing and the compact hero card
+   is dormant rather than misrendered. Left as-is pending a real fixture of
+   the new nested shape; the critical content-invisible bug is the block
+   above this one. */
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child {
   position: relative !important;
   isolation: isolate;

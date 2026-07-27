@@ -55,15 +55,39 @@ MOUNTED_APP="$MOUNT/Codex Dream Skin.app"
 /usr/bin/codesign --verify --deep --strict "$MOUNTED_APP"
 [ "$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$MOUNTED_APP/Contents/Info.plist")" = "$VERSION" ] \
   || { printf 'Mounted app version does not match VERSION.\n' >&2; exit 1; }
+[ "$(/usr/bin/plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.0 raw -o - "$MOUNTED_APP/Contents/Info.plist")" = "dreamskin" ] \
+  || { printf 'Mounted app does not register the dreamskin URL scheme.\n' >&2; exit 1; }
 [ "$(/usr/bin/tr -d '[:space:]' < "$MOUNTED_APP/Contents/Resources/engine/VERSION")" = "$VERSION" ] \
   || { printf 'Mounted engine version does not match VERSION.\n' >&2; exit 1; }
 [ -f "$MOUNTED_APP/Contents/Resources/LICENSE.txt" ] \
   && [ -f "$MOUNTED_APP/Contents/Resources/NOTICE.md" ] \
   || { printf 'Mounted app is missing license notices.\n' >&2; exit 1; }
+# The shipped DMG is the only artifact users ever see, so the icon contract is
+# verified here as well as at generation time: a trap that swallowed the icon
+# builder's exit code once shipped an iconless DMG (#220).
+MOUNTED_ICON_NAME="$(/usr/bin/plutil -extract CFBundleIconFile raw -o - \
+  "$MOUNTED_APP/Contents/Info.plist" 2>/dev/null)" \
+  || { printf 'Mounted app does not declare CFBundleIconFile.\n' >&2; exit 1; }
+[ -n "$MOUNTED_ICON_NAME" ] \
+  || { printf 'Mounted app declares an empty CFBundleIconFile.\n' >&2; exit 1; }
+MOUNTED_ICON="$MOUNTED_APP/Contents/Resources/${MOUNTED_ICON_NAME%.icns}.icns"
+[ -s "$MOUNTED_ICON" ] \
+  || { printf 'Mounted app icon is missing or empty: %s\n' "$MOUNTED_ICON" >&2; exit 1; }
 [ -f "$MOUNTED_APP/Contents/Resources/engine/presets/preset-gothic-void-crusade/theme.json" ] \
   || { printf 'Mounted app is missing the public release preset.\n' >&2; exit 1; }
 [ ! -e "$MOUNTED_APP/Contents/Resources/engine/presets/preset-arina-hashimoto" ] \
   || { printf 'Mounted app contains a rights-restricted preset.\n' >&2; exit 1; }
+MOUNTED_ENGINE="$MOUNTED_APP/Contents/Resources/engine"
+[ -f "$MOUNTED_ENGINE/assets/selectors.json" ] \
+  || { printf 'Mounted app is missing the selector contract.\n' >&2; exit 1; }
+for runtime_script in apply-community-theme-macos.sh snapshot-active-theme-macos.sh \
+  theme-switch-lock-macos.sh; do
+  [ -x "$MOUNTED_ENGINE/scripts/$runtime_script" ] \
+    || { printf 'Mounted runtime script is missing or not executable: %s\n' "$runtime_script" >&2; exit 1; }
+done
+[ -f "$MOUNTED_ENGINE/scripts/theme-content-fingerprint.mjs" ] \
+  && [ ! -x "$MOUNTED_ENGINE/scripts/theme-content-fingerprint.mjs" ] \
+  || { printf 'Mounted fingerprint helper has unsafe or missing permissions.\n' >&2; exit 1; }
 for excluded in build-client-release.sh build-dmg.sh build-menubar-app.sh build-release.sh \
   generate-app-icon.sh install-menubar-macos.sh prepare-standalone-docs.sh; do
   [ ! -e "$MOUNTED_APP/Contents/Resources/engine/scripts/$excluded" ] \

@@ -87,21 +87,30 @@ fi
 
 RUNTIME_SCRIPTS=(
   apply-from-menubar-macos.sh
+  apply-community-theme-macos.sh
   check-update-macos.sh
   common-macos.sh
   customize-theme-macos.sh
   doctor-macos.sh
+  extract-theme-zip-macos.sh
   image-metadata.mjs
+  import-theme-zip-macos.sh
   injector.mjs
   install-dream-skin-macos.sh
   load-image-theme-macos.sh
   pause-dream-skin-macos.sh
+  publish-theme-import.mjs
+  snapshot-active-theme-macos.sh
   restore-dream-skin-macos.sh
+  snapshot-theme-zip.mjs
   stage-theme.mjs
+  theme-content-fingerprint.mjs
+  theme-switch-lock-macos.sh
   start-dream-skin-macos.sh
   status-dream-skin-macos.sh
   switch-theme-macos.sh
   theme-config.mjs
+  validate-safe-css-file.mjs
   verify-dream-skin-macos.sh
   write-theme.mjs
 )

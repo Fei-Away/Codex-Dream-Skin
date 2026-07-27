@@ -12,10 +12,14 @@ release/
 runtime/*
 !runtime/
 !runtime/dream-skin.css
+!runtime/image-metadata.mjs
 !runtime/renderer-inject.js
+!runtime/safe-css-policy.json
+!runtime/safe-css-validator.mjs
+!runtime/theme-package-validator.mjs
+!runtime/validate-safe-css-file.mjs
 
 # local agent context
-AGENTS.md
 TASK_PROGRESS.md
 修复记录*.md
 docs/architecture-cdp-and-cross-platform-grok45.md
