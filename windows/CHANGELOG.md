@@ -4,6 +4,7 @@
 
 ### 修复
 
+- 收窄首页/主壳 CSS 干预：不再清空原生 token surface 背景，不再改写 composer 圆角/边框/阴影/backdrop，不再抬升 utility bar z-index 或 translateY；把侧栏与输入区外观交回 Codex，仅保留视频舞台等必要层。
 - 托盘更换背景图、视频与已保存主题改为「快照 → 写入 → 真实窗口校验 → 失败回滚」：校验失败恢复切换前主题；序列化辅助参数改为 `$Operation`，避免嵌套 scriptblock 递归自调用。
 - 活动主题写入增加短窗口 `.theme-update-in-progress` 标记：大文件先备妥，仅在提交 image/video/theme.json/css 的瞬间挡住观察者，避免读到半套文件；成功提交后清除标记，过期标记不永久卡住观察者。
 

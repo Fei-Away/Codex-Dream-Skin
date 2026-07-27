@@ -356,6 +356,15 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.doesNotMatch(unscoped, /\.group\\\/project-selector/);
   assert.match(css, /html\[data-dream-skin="active"\][\s\S]*\[role="main"\]:has\(\[data-testid="home-icon"\]\)[^{}]*[\s\S]*\.group\\\/project-selector/,
     "Project-picker styling must remain scoped to the home route.");
+  assert.doesNotMatch(css, /html\[data-dream-skin="active"\][^{}]*\[class\*="_homeUtilityBar_"\][^{}]*\{[^}]*transform:\s*translateY\(19px\)/,
+    "The skin must not move Codex's native utility bar with a global transform.");
+  assert.doesNotMatch(css, /html\[data-dream-skin="active"\][^{}]*\[class\*="_homeUtilityBar_"\][^{}]*\{[^}]*z-index:\s*20/,
+    "The skin must not force the utility bar above native composer layers.");
+  assert.doesNotMatch(css, /html\[data-dream-skin="active"\]\s+main\.main-surface\s*\{[^}]*overflow:\s*hidden/,
+    "The skin must not clip native task and side-panel surfaces at the shell.");
+  assert.doesNotMatch(css, /:is\(div, section, aside\)\[class~="bg-token-main-surface-primary"\][^{]*\{[^}]*background:\s*transparent/,
+    "Native token surfaces must not be globally cleared behind the artwork.");
+
   const home = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(home.payloadFor({ art: { safeArea: "left", taskMode: "banner" } }), home.context);
   const state = home.window.__CODEX_DREAM_SKIN_STATE__;

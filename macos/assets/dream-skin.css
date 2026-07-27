@@ -291,8 +291,6 @@ html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] 
 
 html[data-dream-skin="active"] main.main-surface {
   position: relative !important;
-  isolation: isolate;
-  overflow: hidden !important;
   background: var(--ds-bg) !important;
   border: 1px solid var(--ds-line) !important;
   border-right: 0 !important;
@@ -497,22 +495,8 @@ html[data-dream-skin="active"][data-dream-shell="light"] main.main-surface:not(:
   text-shadow: none;
 }
 
-/* Newer Codex builds paint the list/detail panes (pull requests, the chat
-   review/terminal/browser/files side panel) with token surfaces instead of
-   [role="main"]. The side panel can coexist with a visible home shell, so this
-   transparency is deliberately not gated on the home-route selector. The nested
-   surfaces all carry the same token, so they are cleared everywhere and the
-   translucent pane tint is painted once, on the bordered outer wrapper. */
-html[data-dream-skin="active"] main.main-surface
-  :is(div, section, aside)[class~="bg-token-main-surface-primary"] {
-  background: transparent !important;
-}
-
-html[data-dream-skin="active"] main.main-surface
-  div[class~="bg-token-main-surface-primary"][class~="border-l"] {
-  background: rgb(var(--ds-panel-rgb) / .62) !important;
-  backdrop-filter: blur(10px) saturate(106%) !important;
-}
+/* Keep Codex token surfaces intact so native side panels retain their own
+   background, border, radius, and stacking behavior. */
 
 html[data-dream-skin="active"] main.main-surface:not(:has([role="main"])) article {
   border: 1px solid rgb(var(--ds-muted-rgb) / .12);
@@ -888,16 +872,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:first-child { justify-content: center !important; }
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:last-child { align-items: center !important; text-align: center !important; }
 
-html[data-dream-skin="active"] .composer-surface-chrome {
-  overflow: visible !important;
-  border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
-  border-radius: 22px !important;
-  background: rgb(var(--ds-panel-rgb) / .94) !important;
-  box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
-  backdrop-filter: blur(16px) saturate(108%) !important;
-}
-
-html[data-dream-skin="active"] .composer-surface-chrome::before { content: none !important; }
+/* Let Codex own the composer surface geometry and stacking order. */
 
 /* A wide image can carry the home screen too. The native hero remains live,
    but the artwork is painted once on the window instead of repeated in a card. */
@@ -979,24 +954,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has
   backdrop-filter: blur(8px) saturate(104%) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] .composer-surface-chrome {
-  background: var(--ds-immersive-composer-solid) !important;
-  border: 0 !important;
-  box-shadow:
-    0 10px 30px rgb(var(--ds-bg-rgb) / .20),
-    inset 0 0 0 1px var(--ds-immersive-line),
-    inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
-  backdrop-filter: none !important;
-}
-
-html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
-  .composer-surface-chrome {
-  box-shadow:
-    0 10px 28px rgb(var(--ds-bg-rgb) / .14),
-    inset 0 0 0 1px var(--ds-immersive-line),
-    inset 0 1px rgb(var(--ds-panel-rgb) / .72) !important;
-  backdrop-filter: blur(8px) saturate(102%) !important;
-}
+/* Codex owns the native utility/composer geometry in wide-art mode. */
 
 html[data-dream-skin="active"][data-dream-shell="light"]
   .composer-surface-chrome p.placeholder::after {
@@ -1004,60 +962,7 @@ html[data-dream-skin="active"][data-dream-shell="light"]
   opacity: 1 !important;
 }
 
-/* Current Codex builds render the home project picker as a separate opaque
-   cap above the composer. Join both native controls into one continuous
-   surface while leaving task and utility-route inputs untouched. */
-html[data-dream-skin="active"] [class*="_homeUtilityBar_"] {
-  top: 0 !important;
-  width: 100% !important;
-  margin-inline: 0 !important;
-  padding-inline: 18px !important;
-  border-radius: 22px 22px 0 0 !important;
-  background: rgb(var(--ds-panel-rgb) / .94) !important;
-  box-shadow:
-    inset 1px 0 rgb(var(--ds-muted-rgb) / .18),
-    inset -1px 0 rgb(var(--ds-muted-rgb) / .18),
-    inset 0 1px rgb(var(--ds-muted-rgb) / .18) !important;
-  backdrop-filter: blur(16px) saturate(108%) !important;
-}
-
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]):has([class*="_homeUtilityBar_"])
-  .composer-surface-chrome {
-  border: 0 !important;
-  border-radius: 0 0 22px 22px !important;
-  box-shadow:
-    0 10px 28px rgb(var(--ds-bg-rgb) / .24),
-    inset 1px 0 rgb(var(--ds-muted-rgb) / .18),
-    inset -1px 0 rgb(var(--ds-muted-rgb) / .18),
-    inset 0 -1px rgb(var(--ds-muted-rgb) / .18) !important;
-}
-
-html[data-dream-skin="active"][data-dream-art-wide="true"] [class*="_homeUtilityBar_"] {
-  background: var(--ds-immersive-composer-solid) !important;
-  box-shadow:
-    inset 1px 0 var(--ds-immersive-line),
-    inset -1px 0 var(--ds-immersive-line),
-    inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
-  backdrop-filter: none !important;
-}
-
-html[data-dream-skin="active"][data-dream-art-wide="true"]
-  [role="main"]:has([data-testid="home-icon"]):has([class*="_homeUtilityBar_"]) .composer-surface-chrome {
-  box-shadow:
-    0 10px 30px rgb(var(--ds-bg-rgb) / .20),
-    inset 1px 0 var(--ds-immersive-line),
-    inset -1px 0 var(--ds-immersive-line),
-    inset 0 -1px var(--ds-immersive-line) !important;
-}
-
-html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
-  [class*="_homeUtilityBar_"] {
-  box-shadow:
-    inset 1px 0 var(--ds-immersive-line),
-    inset -1px 0 var(--ds-immersive-line),
-    inset 0 1px rgb(var(--ds-panel-rgb) / .72) !important;
-  backdrop-filter: blur(8px) saturate(102%) !important;
-}
+/* Wide artwork does not change Codex's native utility/composer surfaces. */
 
 html[data-dream-skin="active"] [class*="_homeUtilityBar_"] button,
 html[data-dream-skin="active"] .composer-surface-chrome button:not([class~="bg-token-foreground"]) {
@@ -1132,27 +1037,6 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface
 html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface
   .thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary {
   background: transparent !important;
-}
-
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) div:has(> .horizontal-scroll-fade-mask .group\/project-selector) {
-  position: relative;
-  padding-top: 28px !important;
-  border: 1px solid rgb(var(--ds-muted-rgb) / .16);
-  border-bottom: 0;
-  background: rgb(var(--ds-panel-rgb) / .92) !important;
-}
-
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
-  content: var(--dream-skin-project-label, "选择项目");
-  position: absolute;
-  left: 13px;
-  top: 6px;
-  z-index: 2;
-  color: var(--ds-muted);
-  font-size: 12px;
-  font-weight: 720;
-  letter-spacing: 0;
-  white-space: nowrap;
 }
 
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/project-selector > button {
