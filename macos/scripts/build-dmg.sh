@@ -62,6 +62,17 @@ MOUNTED_APP="$MOUNT/Codex Dream Skin.app"
 [ -f "$MOUNTED_APP/Contents/Resources/LICENSE.txt" ] \
   && [ -f "$MOUNTED_APP/Contents/Resources/NOTICE.md" ] \
   || { printf 'Mounted app is missing license notices.\n' >&2; exit 1; }
+# The shipped DMG is the only artifact users ever see, so the icon contract is
+# verified here as well as at generation time: a trap that swallowed the icon
+# builder's exit code once shipped an iconless DMG (#220).
+MOUNTED_ICON_NAME="$(/usr/bin/plutil -extract CFBundleIconFile raw -o - \
+  "$MOUNTED_APP/Contents/Info.plist" 2>/dev/null)" \
+  || { printf 'Mounted app does not declare CFBundleIconFile.\n' >&2; exit 1; }
+[ -n "$MOUNTED_ICON_NAME" ] \
+  || { printf 'Mounted app declares an empty CFBundleIconFile.\n' >&2; exit 1; }
+MOUNTED_ICON="$MOUNTED_APP/Contents/Resources/${MOUNTED_ICON_NAME%.icns}.icns"
+[ -s "$MOUNTED_ICON" ] \
+  || { printf 'Mounted app icon is missing or empty: %s\n' "$MOUNTED_ICON" >&2; exit 1; }
 [ -f "$MOUNTED_APP/Contents/Resources/engine/presets/preset-gothic-void-crusade/theme.json" ] \
   || { printf 'Mounted app is missing the public release preset.\n' >&2; exit 1; }
 [ ! -e "$MOUNTED_APP/Contents/Resources/engine/presets/preset-arina-hashimoto" ] \

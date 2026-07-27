@@ -83,7 +83,7 @@ function makeDomFixture({
   };
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
-      version: "1.5.5",
+      version: "1.5.6",
       themeId: "fixture-theme",
       revision: "fixture-revision",
       styleMode: "style",
@@ -148,6 +148,8 @@ test("normal L1 renderer requires and records the exact target window binding", 
     documentPass: true,
     viewportPass: true,
     structurePass: true,
+    nativeWindowPass: true,
+    fallbackWindowPass: false,
   });
   assert.deepEqual(session.calls, [
     { method: "Browser.getWindowForTarget", params: { targetId: "page-main" } },
@@ -187,18 +189,86 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
   assert.equal(noAnchor.result.readiness.structurePass, false);
 });
 
-test("missing or unsupported Browser window APIs fail closed", async () => {
-  const missing = await verify({
+// Regression for #256. The previous version of this test asserted that a
+// -32000 "no window with given target found" reply must fail verification, and
+// went further than macOS by demanding the same for -32601. Codex 26.721.x
+// (Chrome/150) answers -32000 for the app's real, focused, on-screen window --
+// confirmed live over CDP: the error is byte-identical before and after
+// actually activating the window, while documentVisibility correctly flips
+// hidden -> visible. Locking that in meant Windows could never verify on that
+// build, i.e. the assertion protected the bug. Both codes now mean "the Browser
+// window API told us nothing", and the renderer's own visibility evidence
+// decides. The fail-closed part that is real -- a hidden document -- is
+// asserted below and must stay.
+test("uninformative Browser window replies defer to the renderer, hidden documents still fail", async () => {
+  for (const [label, bindingError] of [
+    ["window-not-found", new Error("No window with given target found (-32000)")],
+    ["window-not-found-by-code", Object.assign(new Error("Browser window not found"), { cdpCode: -32000 })],
+    ["domain-unsupported", new Error("'Browser.getWindowForTarget' wasn't found (-32601)")],
+    ["domain-unsupported-by-code", Object.assign(new Error("Protocol method unavailable"), { cdpCode: -32601 })],
+    ["domain-unsupported-prose", new Error("Method not found (-32601)")],
+  ]) {
+    const visible = await verify({ bindingError });
+    assert.equal(visible.result.pass, true,
+      `${label}: a visible, laid-out renderer must still verify when CDP cannot resolve the native window.`);
+    assert.equal(visible.result.nativeWindow.unsupported, true, label);
+    assert.equal(visible.result.nativeWindow.pass, false, label);
+    assert.equal(visible.result.readiness.windowPass, true, label);
+    assert.equal(visible.result.readiness.nativeWindowPass, false, label);
+    assert.equal(visible.result.readiness.fallbackWindowPass, true, label);
+
+    const hidden = await verify({
+      bindingError,
+      dom: makeDomFixture({ visibilityState: "hidden", hidden: true }),
+    });
+    assert.equal(hidden.result.pass, false,
+      `${label}: a hidden document must fail even when the native window check is unusable.`);
+    assert.equal(hidden.result.readiness.documentPass, false, label);
+
+    const tiny = await verify({
+      bindingError,
+      dom: makeDomFixture({ viewportWidth: 319, viewportHeight: 239 }),
+    });
+    assert.equal(tiny.result.pass, false,
+      `${label}: an unreasonable viewport must fail even when the native window check is unusable.`);
+    assert.equal(tiny.result.readiness.viewportPass, false, label);
+
+    const noStructure = await verify({
+      bindingError,
+      dom: makeDomFixture({ shell: null, sidebar: null }),
+    });
+    assert.equal(noStructure.result.pass, false,
+      `${label}: a missing L1 shell must fail even when the native window check is unusable.`);
+    assert.equal(noStructure.result.readiness.structurePass, false, label);
+  }
+});
+
+test("distinguishable window reasons keep their labels", async () => {
+  const notFound = await verify({
     bindingError: new Error("No window with given target found (-32000)"),
   });
-  assert.equal(missing.result.pass, false);
-  assert.equal(missing.result.nativeWindow.reason, "target-window-unavailable");
+  assert.equal(notFound.result.nativeWindow.reason, "browser-window-not-found");
 
   const unsupported = await verify({
     bindingError: new Error("'Browser.getWindowForTarget' wasn't found (-32601)"),
   });
-  assert.equal(unsupported.result.pass, false);
   assert.equal(unsupported.result.nativeWindow.reason, "browser-window-api-unavailable");
+});
+
+test("unrecognized window transport failures still fail closed", async () => {
+  // Anything that is not a "the API cannot answer" signal -- a dropped socket,
+  // a timeout, an unclassified protocol code -- has no fallback and must fail.
+  for (const bindingError of [
+    new Error("CDP socket closed"),
+    new Error("CDP command timed out: Browser.getWindowForTarget"),
+    Object.assign(new Error("Internal error (-32603)"), { cdpCode: -32603 }),
+  ]) {
+    const result = await verify({ bindingError });
+    assert.equal(result.result.pass, false, bindingError.message);
+    assert.equal(result.result.nativeWindow.reason, "target-window-unavailable", bindingError.message);
+    assert.notEqual(result.result.nativeWindow.unsupported, true, bindingError.message);
+    assert.equal(result.result.readiness.windowPass, false, bindingError.message);
+  }
 
   const zeroWindowId = await verify({ windowId: 0 });
   assert.equal(zeroWindowId.result.pass, false);
