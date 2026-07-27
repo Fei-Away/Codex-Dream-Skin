@@ -1232,8 +1232,8 @@ export async function verifySession(
       nativeWindowPass, fallbackWindowPass,
     };
     result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.businessClassPollution === 0 && windowPass &&
-      documentPass && viewportPass && structurePass &&
+      result.stylePresent && result.businessClassPollution === 0 && !result.documentOverflow.x &&
+      windowPass && documentPass && viewportPass && structurePass &&
       payloadPass &&
       (!result.homePresent || (Boolean(result.homeSurface?.visible && result.hero?.visible) &&
         (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
