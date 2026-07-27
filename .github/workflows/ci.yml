@@ -39,7 +39,7 @@ jobs:
           while IFS= read -r file; do
             node --check "$file" >/dev/null
           done < <(
-            find macos windows -type f \( -name '*.mjs' -o -name '*.js' \) -print
+            find runtime tools macos windows -type f \( -name '*.mjs' -o -name '*.js' \) -print
           )
 
       - name: Check Windows PowerShell source encoding
@@ -129,6 +129,7 @@ jobs:
         run: |
           node --test macos/tests/*.test.mjs
           node --test windows/tests/*.test.mjs
+          node --test tools/*.test.mjs
           node macos/scripts/injector.mjs --check-payload >/dev/null
           node windows/scripts/injector.mjs --check-payload >/dev/null
 

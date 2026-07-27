@@ -208,7 +208,7 @@ jobs:
           while IFS= read -r file; do
             node --check "$file" >/dev/null
           done < <(
-            find macos windows -type f \( -name '*.mjs' -o -name '*.js' \) -print
+            find runtime tools macos windows -type f \( -name '*.mjs' -o -name '*.js' \) -print
           )
 
       # macos/tests/run-tests.sh already re-checks the macOS runtime assertions
@@ -259,6 +259,7 @@ jobs:
           set -euo pipefail
           node --test macos/tests/*.test.mjs
           node --test windows/tests/*.test.mjs
+          node --test tools/*.test.mjs
           node macos/scripts/injector.mjs --check-payload >/dev/null
           node windows/scripts/injector.mjs --check-payload >/dev/null
 
