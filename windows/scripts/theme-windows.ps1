@@ -726,6 +726,66 @@ function Set-DreamSkinActiveTheme {
   return Read-DreamSkinTheme -ThemeDirectory $paths.Active
 }
 
+function Copy-DreamSkinActiveThemeSnapshot {
+  param(
+    [Parameter(Mandatory = $true)][object]$Paths,
+    [Parameter(Mandatory = $true)][string]$Destination
+  )
+  if (Test-Path -LiteralPath $Destination) {
+    throw 'The active-theme snapshot destination already exists.'
+  }
+  $expectedFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
+    -ThemeDirectory $Paths.Active
+  Ensure-DreamSkinManagedDirectory -Path $Destination -Root $Paths.Root
+  $active = Read-DreamSkinTheme -ThemeDirectory $Paths.Active
+  $imageName = [System.IO.Path]::GetFileName($active.ImagePath)
+  Copy-Item -LiteralPath $active.ThemePath -Destination (Join-Path $Destination 'theme.json') -Force
+  Copy-Item -LiteralPath $active.ImagePath -Destination (Join-Path $Destination $imageName) -Force
+  if ($active.VideoPath) {
+    $videoName = [System.IO.Path]::GetFileName($active.VideoPath)
+    Copy-Item -LiteralPath $active.VideoPath -Destination (Join-Path $Destination $videoName) -Force
+  }
+  $activeCss = Join-Path $Paths.Active 'theme.css'
+  if (Test-Path -LiteralPath $activeCss -PathType Leaf) {
+    Assert-DreamSkinSafeCssFile -Path $activeCss
+    Copy-Item -LiteralPath $activeCss -Destination (Join-Path $Destination 'theme.css') -Force
+  }
+  $snapshotFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
+    -ThemeDirectory $Destination
+  if ($snapshotFingerprint -cne $expectedFingerprint) {
+    throw 'The active theme changed while its rollback snapshot was being copied.'
+  }
+  return [pscustomobject]@{
+    Directory = $Destination
+    ContentFingerprint = $snapshotFingerprint
+  }
+}
+
+function Restore-DreamSkinActiveThemeSnapshot {
+  param(
+    [Parameter(Mandatory = $true)][string]$SnapshotDirectory,
+    [Parameter(Mandatory = $true)][string]$StateRoot,
+    [Parameter(Mandatory = $true)][string]$ExpectedContentFingerprint
+  )
+  $snapshotFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
+    -ThemeDirectory $SnapshotDirectory
+  if ($snapshotFingerprint -cne $ExpectedContentFingerprint) {
+    throw 'The rollback snapshot changed before it could be restored.'
+  }
+  $snapshot = Read-DreamSkinTheme -ThemeDirectory $SnapshotDirectory
+  $theme = $snapshot.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  $cssPath = Join-Path $SnapshotDirectory 'theme.css'
+  if (-not (Test-Path -LiteralPath $cssPath -PathType Leaf)) { $cssPath = $null }
+  $null = Set-DreamSkinActiveTheme -ImagePath $snapshot.ImagePath -VideoPath $snapshot.VideoPath `
+    -Theme $theme -SafeCssPath $cssPath -StateRoot $StateRoot
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $restoredFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $paths.Active
+  if ($restoredFingerprint -cne $ExpectedContentFingerprint) {
+    throw 'The previous active-theme files were not restored exactly.'
+  }
+  return $restoredFingerprint
+}
+
 function Save-DreamSkinCurrentTheme {
   param(
     [Parameter(Mandatory = $true)][string]$Name,

@@ -184,33 +184,6 @@ function Save-DreamSkinCommunityDownload {
   }
 }
 
-function Copy-DreamSkinActiveThemeSnapshot {
-  param(
-    [Parameter(Mandatory = $true)][object]$Paths,
-    [Parameter(Mandatory = $true)][string]$Destination
-  )
-  if (Test-Path -LiteralPath $Destination) {
-    throw 'The active-theme snapshot destination already exists.'
-  }
-  Ensure-DreamSkinManagedDirectory -Path $Destination -Root $Paths.Root
-  $active = Read-DreamSkinTheme -ThemeDirectory $Paths.Active
-  $imageName = [System.IO.Path]::GetFileName($active.ImagePath)
-  Copy-Item -LiteralPath $active.ThemePath -Destination (Join-Path $Destination 'theme.json') -Force
-  Copy-Item -LiteralPath $active.ImagePath -Destination (Join-Path $Destination $imageName) -Force
-  # theme.json names the video, so a snapshot that skips the MP4 would restore a
-  # manifest pointing at a file that no longer exists.
-  if ($active.VideoPath) {
-    $videoName = [System.IO.Path]::GetFileName($active.VideoPath)
-    Copy-Item -LiteralPath $active.VideoPath -Destination (Join-Path $Destination $videoName) -Force
-  }
-  $activeCss = Join-Path $Paths.Active 'theme.css'
-  if (Test-Path -LiteralPath $activeCss -PathType Leaf) {
-    Assert-DreamSkinSafeCssFile -Path $activeCss
-    Copy-Item -LiteralPath $activeCss -Destination (Join-Path $Destination 'theme.css') -Force
-  }
-  return Read-DreamSkinTheme -ThemeDirectory $Destination
-}
-
 function Copy-DreamSkinImportedThemeSnapshot {
   param(
     [Parameter(Mandatory = $true)][string]$SourceDirectory,
@@ -251,28 +224,6 @@ function Copy-DreamSkinImportedThemeSnapshot {
     Directory = $Destination
     ContentFingerprint = $contentFingerprint
   }
-}
-
-function Restore-DreamSkinActiveThemeSnapshot {
-  param(
-    [Parameter(Mandatory = $true)][string]$SnapshotDirectory,
-    [Parameter(Mandatory = $true)][string]$StateRoot,
-    [Parameter(Mandatory = $true)][string]$ExpectedContentFingerprint
-  )
-  $snapshot = Read-DreamSkinTheme -ThemeDirectory $SnapshotDirectory
-  $theme = $snapshot.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-  $cssPath = Join-Path $SnapshotDirectory 'theme.css'
-  if (-not (Test-Path -LiteralPath $cssPath -PathType Leaf)) { $cssPath = $null }
-  # Restoring a video theme has to pass the MP4 back through the same bounded
-  # validation Set-DreamSkinActiveTheme applies to a fresh import.
-  $null = Set-DreamSkinActiveTheme -ImagePath $snapshot.ImagePath -VideoPath $snapshot.VideoPath `
-    -Theme $theme -SafeCssPath $cssPath -StateRoot $StateRoot
-  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
-  $restoredFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $paths.Active
-  if ($restoredFingerprint -cne $ExpectedContentFingerprint) {
-    throw 'The previous active-theme files were not restored exactly.'
-  }
-  return $restoredFingerprint
 }
 
 function Set-DreamSkinActiveThemeFromSnapshot {

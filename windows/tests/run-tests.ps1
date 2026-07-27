@@ -1034,29 +1034,31 @@ try {
   }
 
   $videoTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
-    -VideoPath $validVideoFixture -Theme $null -Name '视频主题' -StateRoot $themeStateRoot
-  if (-not $videoTheme.VideoPath -or
-    -not (Test-Path -LiteralPath (Join-Path $themePaths.Active 'background.mp4') -PathType Leaf) -or
-    (Get-FileHash -LiteralPath $videoTheme.VideoPath -Algorithm SHA256).Hash -cne
-      (Get-FileHash -LiteralPath $validVideoFixture -Algorithm SHA256).Hash) {
-    throw 'Writing a video theme did not commit the validated MP4 into the active theme.'
-  }
-  if ($videoTheme.Theme.video -cne 'background.mp4') {
-    throw 'Writing a video theme did not record background.mp4 in theme.json.'
-  }
+    -VideoPath $validVideoFixture -Theme $null -Name '视频回滚测试' -StateRoot $themeStateRoot
   if (Test-Path -LiteralPath (Join-Path $themePaths.Active '.theme-update-in-progress')) {
     throw 'A successful active-theme commit left its watcher transaction marker behind.'
   }
   $videoFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $themePaths.Active
+  $snapshotDirectory = Join-Path $themePaths.Root '.test-video-rollback'
+  $snapshot = Copy-DreamSkinActiveThemeSnapshot -Paths $themePaths -Destination $snapshotDirectory
+  if (-not $videoTheme.VideoPath -or
+    -not (Test-Path -LiteralPath (Join-Path $snapshot.Directory 'background.mp4') -PathType Leaf) -or
+    $snapshot.ContentFingerprint -cne $videoFingerprint) {
+    throw 'Active-theme rollback snapshots did not preserve the validated video bytes.'
+  }
   $null = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '临时图片主题' -StateRoot $themeStateRoot
-  $imageOnlyFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $themePaths.Active
-  if ($imageOnlyFingerprint -ceq $videoFingerprint) {
-    throw 'Switching from a video theme to an image theme must change the runtime fingerprint.'
+  $restoredFingerprint = Restore-DreamSkinActiveThemeSnapshot `
+    -SnapshotDirectory $snapshot.Directory -StateRoot $themeStateRoot `
+    -ExpectedContentFingerprint $snapshot.ContentFingerprint
+  $restoredVideoTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
+  if ($restoredFingerprint -cne $videoFingerprint -or -not $restoredVideoTheme.VideoPath -or
+    (Get-FileHash -LiteralPath $restoredVideoTheme.VideoPath -Algorithm SHA256).Hash -cne
+      (Get-FileHash -LiteralPath $validVideoFixture -Algorithm SHA256).Hash) {
+    throw 'Video rollback did not restore the exact previous active theme.'
   }
-  if (Test-Path -LiteralPath (Join-Path $themePaths.Active 'background.mp4') -PathType Leaf) {
-    throw 'Switching to an image-only theme left the previous background.mp4 in the active theme.'
-  }
+  Assert-DreamSkinNoReparseComponents -Path $snapshotDirectory
+  Remove-Item -LiteralPath $snapshotDirectory -Recurse -Force
 
   $releaseFixtureRoot = Join-Path $temporaryRoot 'release-theme-fixture'
   $releaseFixtureAssets = Join-Path $releaseFixtureRoot 'assets'

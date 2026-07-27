@@ -111,6 +111,20 @@ try {
     return $false
   }
 
+  function Request-DreamSkinCodexActivation {
+    try {
+      $state = Read-DreamSkinState -Path (Join-Path $StateRoot 'state.json')
+      if ($null -eq $state) { return $false }
+      $registered = @(Get-DreamSkinRegisteredCodexInstalls)
+      $codex = Resolve-DreamSkinCodexInstallFromState -State $state -RegisteredInstalls $registered
+      if ($null -eq $codex) { return $false }
+      $null = Start-DreamSkinCodex -Codex $codex
+      return $true
+    } catch {
+      return $false
+    }
+  }
+
   function Add-DreamSkinTrayItem {
     param(
       [Parameter(Mandatory = $true)]
@@ -134,12 +148,71 @@ try {
   }
 
   function Invoke-DreamSkinTrayThemeOperation {
-    param([Parameter(Mandatory = $true)][scriptblock]$Action)
+    param([Parameter(Mandatory = $true)][scriptblock]$Operation)
     $themeOperationLock = Enter-DreamSkinOperationLock
     try {
-      return & $Action
+      return & $Operation
     } finally {
       Exit-DreamSkinOperationLock -Mutex $themeOperationLock
+    }
+  }
+
+  function Invoke-DreamSkinVerifiedThemeOperation {
+    param([Parameter(Mandatory = $true)][scriptblock]$Action)
+    $snapshotRoot = Join-Path $paths.Root ('.tray-rollback-' + [guid]::NewGuid().ToString('N'))
+    $wasPaused = Test-DreamSkinPaused -StateRoot $StateRoot
+    try {
+      $operation = Invoke-DreamSkinTrayThemeOperation -Operation {
+        $snapshot = Copy-DreamSkinActiveThemeSnapshot -Paths $paths -Destination $snapshotRoot
+        try {
+          $value = & $Action
+        } catch {
+          $null = Restore-DreamSkinActiveThemeSnapshot -SnapshotDirectory $snapshot.Directory `
+            -StateRoot $StateRoot -ExpectedContentFingerprint $snapshot.ContentFingerprint
+          Set-DreamSkinPaused -Paused $wasPaused -StateRoot $StateRoot | Out-Null
+          throw
+        }
+        return [pscustomobject]@{
+          Value = $value
+          Snapshot = $snapshot
+        }
+      }
+
+      $watcherReady = Ensure-DreamSkinWatcher
+      if ($watcherReady) { $null = Request-DreamSkinCodexActivation }
+      if ($watcherReady -and (Confirm-DreamSkinThemeApplied)) {
+        return [pscustomobject]@{
+          Value = $operation.Value
+          Verified = $true
+          Pending = $false
+        }
+      }
+      if ($watcherReady) {
+        $null = Invoke-DreamSkinTrayThemeOperation -Operation {
+          $null = Restore-DreamSkinActiveThemeSnapshot `
+            -SnapshotDirectory $operation.Snapshot.Directory `
+            -StateRoot $StateRoot `
+            -ExpectedContentFingerprint $operation.Snapshot.ContentFingerprint
+          Set-DreamSkinPaused -Paused $wasPaused -StateRoot $StateRoot | Out-Null
+        }
+        if (Confirm-DreamSkinThemeApplied) {
+          throw '新主题没有通过真实窗口验证，已恢复之前的主题。'
+        }
+        throw '新主题没有通过真实窗口验证，之前的主题也未能重新确认；请重新启动 Dream Skin。'
+      }
+      return [pscustomobject]@{
+        Value = $operation.Value
+        Verified = $false
+        Pending = $true
+      }
+    } finally {
+      if (Test-Path -LiteralPath $snapshotRoot) {
+        if (-not (Test-DreamSkinThemePathWithin -Path $snapshotRoot -Root $paths.Root)) {
+          throw 'Refusing to clean a tray rollback snapshot outside the managed theme root.'
+        }
+        Assert-DreamSkinNoReparseComponents -Path $snapshotRoot
+        Remove-Item -LiteralPath $snapshotRoot -Recurse -Force -ErrorAction SilentlyContinue
+      }
     }
   }
 
@@ -213,7 +286,7 @@ try {
     } else {
       $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '暂停皮肤' -Enabled:(-not $operationActive) -Action {
         # Match macOS pause: marker + live remove with in-window loading / result.
-        $removal = Invoke-DreamSkinTrayThemeOperation -Action {
+        $removal = Invoke-DreamSkinTrayThemeOperation -Operation {
           Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot | Out-Null
           Invoke-DreamSkinLiveRemove -StateRoot $StateRoot
         }
@@ -235,13 +308,12 @@ try {
       $dialog.Multiselect = $false
       try {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-          $null = Invoke-DreamSkinTrayThemeOperation -Action {
+          $applied = Invoke-DreamSkinVerifiedThemeOperation -Action {
             $null = Set-DreamSkinActiveTheme -ImagePath $dialog.FileName -Theme $null `
               -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
-          $watcherReady = Ensure-DreamSkinWatcher
-          $message = if ($watcherReady) { '背景图已更新。' } else { '背景图已更新，正在重新启动 Dream Skin…' }
+          $message = if ($applied.Verified) { '背景图已更新。' } else { '背景图已更新，正在重新启动 Dream Skin…' }
           $notify.ShowBalloonTip(1800, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
         }
       } finally {
@@ -255,14 +327,13 @@ try {
       $dialog.Multiselect = $false
       try {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-          $null = Invoke-DreamSkinTrayThemeOperation -Action {
+          $applied = Invoke-DreamSkinVerifiedThemeOperation -Action {
             $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active
             $null = Set-DreamSkinActiveTheme -ImagePath $active.ImagePath -VideoPath $dialog.FileName `
               -Theme $active.Theme -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
-          $watcherReady = Ensure-DreamSkinWatcher
-          $message = if ($watcherReady) { '视频背景已更新。' } else { '视频背景已更新，正在重新启动 Dream Skin…' }
+          $message = if ($applied.Verified) { '视频背景已更新。' } else { '视频背景已更新，正在重新启动 Dream Skin…' }
           $notify.ShowBalloonTip(1800, 'Codex Dream Skin', $message, [System.Windows.Forms.ToolTipIcon]::Info)
         }
       } finally {
@@ -297,7 +368,7 @@ try {
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Enabled:(-not $operationActive) -Action {
       $name = [Microsoft.VisualBasic.Interaction]::InputBox('输入主题名称：', '保存 Codex Dream Skin 主题', '')
       if ($name.Trim()) {
-        $saved = Invoke-DreamSkinTrayThemeOperation -Action {
+        $saved = Invoke-DreamSkinTrayThemeOperation -Operation {
           Save-DreamSkinCurrentTheme -Name $name -StateRoot $StateRoot
         }
         $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已保存：$($saved.Theme.name)", [System.Windows.Forms.ToolTipIcon]::Info)
@@ -315,16 +386,12 @@ try {
         $savedPath = $saved.Path
         $savedName = $saved.Name
         $savedAction = {
-          $null = Invoke-DreamSkinTrayThemeOperation -Action {
+          $applied = Invoke-DreamSkinVerifiedThemeOperation -Action {
             $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedPath -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
-          $watcherReady = Ensure-DreamSkinWatcher
-          if ($watcherReady -and (Confirm-DreamSkinThemeApplied)) {
+          if ($applied.Verified) {
             $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已应用：$savedName", [System.Windows.Forms.ToolTipIcon]::Info)
-          } elseif ($watcherReady) {
-            $notify.ShowBalloonTip(3200, 'Codex Dream Skin',
-              "主题文件已更新，但当前窗口尚未确认应用：$savedName。", [System.Windows.Forms.ToolTipIcon]::Warning)
           } else {
             $notify.ShowBalloonTip(3200, 'Codex Dream Skin',
               "主题文件已更新，但当前窗口尚未应用；正在重新启动 Dream Skin：$savedName。",

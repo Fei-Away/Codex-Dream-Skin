@@ -154,6 +154,38 @@ const updateApply = source.indexOf("await applyToSession(session, loadedPayload.
 const commitIndex = source.indexOf("await mediaServers.commit(paused ? null : stagedMedia);", updateApply);
 assert.ok(updateCommit >= 0 && updateApply > updateCommit && commitIndex > updateApply,
   "Windows theme updates must keep the previous media server until renderer verification succeeds, then publish staged media.");
+const traySource = await fs.readFile(path.resolve(here, "../scripts/tray-dream-skin.ps1"), "utf8");
+const verifiedOperationStart = traySource.indexOf("function Invoke-DreamSkinVerifiedThemeOperation");
+const verifiedOperationEnd = traySource.indexOf("function Set-DreamSkinAutoStart", verifiedOperationStart);
+const verifiedOperationSource = traySource.slice(verifiedOperationStart, verifiedOperationEnd);
+assert.ok(verifiedOperationStart >= 0 && verifiedOperationEnd > verifiedOperationStart,
+  "Windows tray must expose one verified transaction for image, video, and saved-theme switches.");
+for (const requiredBoundary of [
+  "Copy-DreamSkinActiveThemeSnapshot",
+  "Ensure-DreamSkinWatcher",
+  "Request-DreamSkinCodexActivation",
+  "Confirm-DreamSkinThemeApplied",
+  "Restore-DreamSkinActiveThemeSnapshot",
+]) {
+  assert.ok(verifiedOperationSource.includes(requiredBoundary),
+    `Verified tray switching is missing ${requiredBoundary}.`);
+}
+assert.equal(
+  traySource.match(/Invoke-DreamSkinVerifiedThemeOperation -Action/g)?.length,
+  3,
+  "Image, video, and saved-theme tray actions must all use verified switching.",
+);
+assert.match(
+  traySource,
+  /function Invoke-DreamSkinTrayThemeOperation \{[\s\S]*?\[scriptblock\]\$Operation[\s\S]*?return & \$Operation/,
+  "The serialized tray helper must not shadow the verified operation's Action callback.",
+);
+assert.equal(
+  traySource.match(/Invoke-DreamSkinTrayThemeOperation -Operation/g)?.length,
+  4,
+  "Every serialized tray operation must use the non-shadowing Operation parameter.",
+);
+
 assert.match(source, /async function verifyCodexPortOwner\(port\)/,
   "Windows identity rebind must verify the loopback listener belongs to the recorded Codex executable.");
 assert.match(source, /rebound verified CDP browser identity/,
