@@ -7,6 +7,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readImageMetadata } from "./image-metadata.mjs";
 import { MAX_VIDEO_BYTES, MediaServerController, isMp4Container } from "./media-server.mjs";
+const THEME_UPDATE_MARKER_NAME = ".theme-update-in-progress";
+const THEME_UPDATE_MARKER_MAX_AGE_MS = 120000;
 import {
   normalizeThemeColor,
   normalizeThemeText,
@@ -552,7 +554,34 @@ async function loadSafeCss(themeRoot) {
   }
 }
 
+
+export async function isThemeUpdateInProgress(themeDir, now = Date.now()) {
+  const markerPath = path.join(themeDir, THEME_UPDATE_MARKER_NAME);
+  try {
+    const markerStat = await fs.stat(markerPath);
+    if (!markerStat.isFile()) return false;
+    const ageMs = now - markerStat.mtimeMs;
+    return ageMs < 0 || ageMs <= THEME_UPDATE_MARKER_MAX_AGE_MS;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function waitForThemeUpdateCommit(themeDir, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  while (await isThemeUpdateInProgress(themeDir)) {
+    if (Date.now() >= deadline) {
+      throw new Error("Active theme update did not commit before the watcher startup deadline");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 export async function loadTheme(themeDir) {
+  if (await isThemeUpdateInProgress(themeDir)) {
+    throw new Error("Active theme update is still being committed");
+  }
   const realThemeDir = await fs.realpath(themeDir);
   const themePath = path.join(realThemeDir, "theme.json");
   const themeText = await fs.readFile(themePath, "utf8");
@@ -709,7 +738,8 @@ export async function loadTheme(themeDir) {
   if (!sameFileStat(themeStat, themeAfter) ||
       !sameFileStat(imageStat, imageAfter) ||
       (videoStat ? !videoAfter || !sameFileStat(videoStat, videoAfter) : videoAfter !== null) ||
-      (safeCss?.stat ? !cssAfter || !sameFileStat(safeCss.stat, cssAfter) : cssAfter !== null)) {
+      (safeCss?.stat ? !cssAfter || !sameFileStat(safeCss.stat, cssAfter) : cssAfter !== null) ||
+      await isThemeUpdateInProgress(realThemeDir)) {
     throw new Error("Active theme changed while its committed snapshot was being loaded");
   }
   const fingerprint = fingerprintHash
@@ -2051,6 +2081,7 @@ async function runWatch(options) {
   process.on("SIGTERM", stop);
 
   try {
+    await waitForThemeUpdateCommit(options.themeDir);
     const initial = await stagePayload(null, !paused);
     loadedPayload = initial.payload;
     activeTheme = initial.theme;
@@ -2084,7 +2115,9 @@ async function runWatch(options) {
       let nextTheme = activeTheme;
       let stagedMedia = null;
       let payloadUpdateFailed = false;
-      if (!nextPaused) {
+      const themeUpdatePending = !nextPaused &&
+        await isThemeUpdateInProgress(options.themeDir);
+      if (!nextPaused && !themeUpdatePending) {
         try {
           const now = Date.now();
           let shouldAudit = !loadedPayload || paused || now - lastStrongThemeAuditAt >= STRONG_THEME_AUDIT_MS;

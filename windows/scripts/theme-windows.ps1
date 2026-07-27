@@ -9,6 +9,7 @@ $script:DreamSkinMaxThemeArchiveExpandedBytes = 64 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveEntries = 32
 $script:DreamSkinCommunityApiOrigin = 'https://api.dreamskin.cc'
 $script:DreamSkinMaxCommunityMetadataBytes = 64 * 1024
+$script:DreamSkinThemeUpdateMarkerName = '.theme-update-in-progress'
 
 function Test-DreamSkinCommunityVersionId {
   param([AllowNull()][string]$Value)
@@ -627,6 +628,10 @@ function Set-DreamSkinActiveTheme {
   $videoTarget = Join-Path $paths.Active $videoName
   $videoTemporary = Join-Path $paths.Active ('.dream-video-tmp-' + [guid]::NewGuid().ToString('N') + '.mp4')
   $temporaryCss = $null
+  $updateMarker = Join-Path $paths.Active $script:DreamSkinThemeUpdateMarkerName
+  $updateToken = [guid]::NewGuid().ToString('N')
+  $markerWritten = $false
+  $themeCommitted = $false
   try {
     if ($SafeCssPath) {
       $safeCssSource = [System.IO.Path]::GetFullPath($SafeCssPath)
@@ -641,14 +646,23 @@ function Set-DreamSkinActiveTheme {
     Copy-Item -LiteralPath $source -Destination $temporary -Force
     Assert-DreamSkinNoReparseComponents -Path $temporary
     Assert-DreamSkinImageFile -Path $temporary
+    if ($videoSource) {
+      Assert-DreamSkinNoReparseComponents -Path $videoTemporary
+      Copy-Item -LiteralPath $videoSource -Destination $videoTemporary -Force
+      Assert-DreamSkinVideoFile -Path $videoTemporary
+    }
+
+    # Prepare and validate large files first. The marker covers only the short
+    # commit window so the watcher cannot load an image/video/manifest mixture.
+    Assert-DreamSkinNoReparseComponents -Path $updateMarker
+    Write-DreamSkinUtf8FileAtomically -Path $updateMarker -Content ($updateToken + "`r`n")
+    $markerWritten = $true
+
     Move-Item -LiteralPath $temporary -Destination $target -Force
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinImageFile -Path $target
     if ($videoSource) {
       Assert-DreamSkinNoReparseComponents -Path $videoTarget
-      Assert-DreamSkinNoReparseComponents -Path $videoTemporary
-      Copy-Item -LiteralPath $videoSource -Destination $videoTemporary -Force
-      Assert-DreamSkinVideoFile -Path $videoTemporary
       Move-Item -LiteralPath $videoTemporary -Destination $videoTarget -Force
       Assert-DreamSkinVideoFile -Path $videoTarget
       $Theme | Add-Member -NotePropertyName video -NotePropertyValue $videoName -Force
@@ -676,10 +690,18 @@ function Set-DreamSkinActiveTheme {
       Remove-Item -LiteralPath $activeCss -Force -ErrorAction SilentlyContinue
     }
     Write-DreamSkinTheme -ThemeDirectory $paths.Active -Theme $Theme
+    $themeCommitted = $true
   } finally {
     Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $videoTemporary -Force -ErrorAction SilentlyContinue
     if ($temporaryCss) { Remove-Item -LiteralPath $temporaryCss -Force -ErrorAction SilentlyContinue }
+    if ($markerWritten -and $themeCommitted -and
+      (Test-Path -LiteralPath $updateMarker -PathType Leaf)) {
+      $currentMarker = (Read-DreamSkinUtf8File -Path $updateMarker).Trim()
+      if ($currentMarker -ceq $updateToken) {
+        Remove-Item -LiteralPath $updateMarker -Force -ErrorAction Stop
+      }
+    }
   }
   $sameImage = $oldImage -and ([System.IO.Path]::GetFullPath($oldImage) -ieq [System.IO.Path]::GetFullPath($target))
   if ($oldImage -and -not $sameImage -and

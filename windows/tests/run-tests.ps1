@@ -1044,6 +1044,9 @@ try {
   if ($videoTheme.Theme.video -cne 'background.mp4') {
     throw 'Writing a video theme did not record background.mp4 in theme.json.'
   }
+  if (Test-Path -LiteralPath (Join-Path $themePaths.Active '.theme-update-in-progress')) {
+    throw 'A successful active-theme commit left its watcher transaction marker behind.'
+  }
   $videoFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $themePaths.Active
   $null = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '临时图片主题' -StateRoot $themeStateRoot

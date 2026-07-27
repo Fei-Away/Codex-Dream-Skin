@@ -6,6 +6,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import {
   earlyPayloadFor,
+  isThemeUpdateInProgress,
   loadTheme,
 } from "../scripts/injector.mjs";
 
@@ -146,6 +147,8 @@ assert.match(source, /updateError\.deferred[\s\S]*live theme update deferred for
   "A hidden renderer must defer a live switch instead of terminating the watcher during rollback.");
 assert.match(source, /rendererVerificationAccepted\(lastResult, allowHiddenApplied\)/,
   "Startup verification must be able to accept only the explicit hidden-renderer defer state.");
+assert.match(source, /themeUpdatePending[\s\S]*isThemeUpdateInProgress\(options\.themeDir\)/,
+  "The watcher must not load a partially committed active-theme transaction.");
 const updateCommit = source.indexOf("Keep the previous media server alive until every renderer verifies the update");
 const updateApply = source.indexOf("await applyToSession(session, loadedPayload.payload, loadedPayload);", updateCommit);
 const commitIndex = source.indexOf("await mediaServers.commit(paused ? null : stagedMedia);", updateApply);
@@ -178,6 +181,22 @@ try {
   const second = await loadTheme(fingerprintRoot);
   assert.notEqual(first.fingerprint, second.fingerprint,
     "Replacing an MP4 under the same filename must change the theme fingerprint.");
+
+  const updateMarker = path.join(fingerprintRoot, ".theme-update-in-progress");
+  await fs.writeFile(updateMarker, "fixture-update");
+  assert.equal(await isThemeUpdateInProgress(fingerprintRoot), true,
+    "A fresh active-theme marker must hold the watcher on its verified payload.");
+  await assert.rejects(
+    loadTheme(fingerprintRoot),
+    /still being committed/,
+    "Theme loading must reject a writer's in-progress active files.",
+  );
+  const staleMarkerTime = new Date(Date.now() - 180000);
+  await fs.utimes(updateMarker, staleMarkerTime, staleMarkerTime);
+  assert.equal(await isThemeUpdateInProgress(fingerprintRoot), false,
+    "A stale marker must not freeze the watcher indefinitely after a crashed writer.");
+  await fs.unlink(updateMarker);
+  assert.equal(await isThemeUpdateInProgress(fingerprintRoot), false);
 } finally {
   await fs.rm(fingerprintRoot, { recursive: true, force: true });
 }
