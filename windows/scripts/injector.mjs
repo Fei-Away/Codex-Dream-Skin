@@ -1318,8 +1318,8 @@ export async function verifySession(
       ))
     );
     result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.businessClassPollution === 0 && windowPass &&
-      documentPass && viewportPass && structurePass &&
+      result.stylePresent && result.businessClassPollution === 0 && !result.documentOverflow.x &&
+      windowPass && documentPass && viewportPass && structurePass &&
       payloadPass && homePass;
     return result;
   })()`);
