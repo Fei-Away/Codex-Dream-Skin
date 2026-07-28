@@ -244,7 +244,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     && (!expected.expectedRevision || result.revision === expected.expectedRevision);
   const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
     ? result.suggestionLabels.filter((item) => item?.visible) : [];
-  const homePass = !result.homeRoute || (
+  const homePass = !result.homePresent || (
     result.homePresent && result.hero?.visible && result.hero.width >= 280
     && result.hero.height >= 120 && (result.visibleCardCount === 0 || (
       visibleSuggestionLabels.length >= result.visibleCardCount
@@ -268,7 +268,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   result.softNotes = {
     projectButtonOptional: !result.projectButton?.visible,
     composerOptionalOnNonTaskRoutes: !result.composer?.visible,
-    suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
+    suggestionCardsOptional: result.homePresent && result.visibleCardCount === 0,
   };
   return result;
 }

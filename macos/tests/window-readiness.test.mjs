@@ -56,6 +56,29 @@ const baseRenderer = {
 assert.equal(readyNativeWindow.status, "ready");
 assert.equal(assessRendererVerification(baseRenderer, readyNativeWindow, exactPayload).pass, true);
 
+// Codex can retain a home-icon probe while the canonical home container has
+// already disappeared during a thread-route transition. The auxiliary signal
+// is diagnostic only: an otherwise healthy thread renderer must not be forced
+// to expose a home hero that cannot exist on that route.
+const threadWithStaleHomeSignal = { ...baseRenderer, homeRoute: true };
+assert.equal(
+  assessRendererVerification(threadWithStaleHomeSignal, readyNativeWindow, exactPayload).pass,
+  true,
+  "A thread renderer with no canonical home container must not require a home hero.",
+);
+
+const actualHomeWithoutHero = {
+  ...baseRenderer,
+  scope: { level: "L1", baseState: "home" },
+  homeRoute: true,
+  homePresent: true,
+};
+assert.equal(
+  assessRendererVerification(actualHomeWithoutHero, readyNativeWindow, exactPayload).pass,
+  false,
+  "A canonical home route must still expose its visible hero.",
+);
+
 const windowCalls = [];
 assert.equal((await inspectNativeWindow({
   target: { id: "target-main" },

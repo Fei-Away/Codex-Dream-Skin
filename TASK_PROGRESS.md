@@ -1,5 +1,16 @@
 # Task Progress
 
+Updated: 2026-07-28 21:51 CST (Asia/Shanghai)
+
+## macOS Thread Route Verification Fix (2026-07-28)
+
+- [in progress] Branch `fix/macos-thread-route-verification` from `main@611c101`.
+- [fact] On this Mac, public Dream Skin `1.5.6` injects the selected Gothic Void Crusade payload into Codex `26.721.41059`: theme ID/revision, CSS, L1 shell/sidebar, viewport and overflow checks all pass. Native `Browser.getWindowForTarget` returns the already-supported `-32000` fallback.
+- [fact] First retry also showed the renderer was hidden. Explicit app activation changed `documentVisibility` to `visible`, but the verifier still failed because runtime scope was `thread` while the legacy home probe returned `homeRoute: true`, `homePresent: false`, `hero: null`. The macOS verifier then incorrectly required a home hero on the thread route and fail-closed.
+- [complete] Added a failing regression for this exact tuple in `macos/tests/window-readiness.test.mjs`; old code failed with `false !== true`. The minimal fix gates home-hero verification and its soft diagnostic on canonical `homePresent`, matching Windows' established verifier contract. A canonical home container without a visible hero still fails.
+- [verified] Targeted window-readiness regression passes. The macOS suite reached and passed syntax, selector, shared-runtime sync, payload, injector and Safe CSS tests before unrelated host gates: the installed ChatGPT runtime fails the shell importer's code-signature validation, and the local Swift 6.3.3 compiler cannot build the Command Line Tools SDK's Swift 6.3.2 module cache. The latter also cannot write the sandboxed clang cache. These are not presented as passes or bypassed.
+- [next] Run focused static checks, inspect and commit the minimal diff, copy the verified injector into the user engine with a timestamped backup, then repeat the real frontmost Codex application/verification.
+
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
