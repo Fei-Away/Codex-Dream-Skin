@@ -1,6 +1,27 @@
 # Task Progress
 
-Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
+Updated: 2026-07-28 16:16 CST (Asia/Shanghai)
+
+## Safe CSS backdrop-filter variable fix (2026-07-28)
+
+- [in progress] Worktree `/Users/yeelight/Desktop/workspace/ai/Codex-Dream-Skin-safe-css-fix`
+  on branch `codex/fix-safe-css-backdrop-var`, based on `upstream/main@611c101`.
+- [complete] Reproduced the public `0.1.1` theme failure against the client Safe CSS
+  validator. The package contains `blur(var(--ds-theme-surface-blur))`, which is a
+  registered contract value but cannot match the client's non-nested blur regex.
+- [complete] A cross-platform regression now accepts the registered blur variable
+  and still rejects an unrelated registered variable. The canonical runtime
+  validator minimally captures the nested function argument, and the generated
+  macOS/Windows copies are byte-identical.
+- [verified] Safe CSS tests passed 9/9; all portable macOS Node tests passed 54/54;
+  all portable Windows Node tests passed 17/17; both injector payload checks,
+  runtime asset sync check, `git diff --check`, and the applicable macOS repository
+  suite passed. The real public `0.1.1` market package validates as the official
+  format through both platform validators. Full-Xcode, installed signed-runtime,
+  and Doctor integrations were environment skips. This macOS host has no
+  PowerShell, so PowerShell 5.1/7 remain explicit PR CI gates.
+- [approved] Explicit approval was received to commit the reviewed five-file
+  change, push the feature branch, and open the upstream pull request.
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
 

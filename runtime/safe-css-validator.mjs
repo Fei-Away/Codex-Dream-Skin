@@ -278,7 +278,7 @@ function validatePropertyValue(property, value) {
   }
   if (property === "backdrop-filter") {
     if (value.toLowerCase() === "none") return true;
-    const match = value.match(/^blur\(\s*([^\s)]+)\s*\)$/i);
+    const match = value.match(/^blur\(\s*(.+?)\s*\)$/i);
     return Boolean(match && (
       registeredVar(match[1], new Set(["--ds-theme-surface-blur"]))
       || zeroOrPx(match[1], 0, 20)

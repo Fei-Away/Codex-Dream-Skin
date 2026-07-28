@@ -68,6 +68,25 @@ test("accepts only the bounded public part/property/value contract", () => {
   }
 });
 
+test("accepts the registered surface blur variable inside backdrop-filter", () => {
+  const source = `[data-ds-part="sidebar"] {
+  backdrop-filter: blur(var(--ds-theme-surface-blur));
+}`;
+  for (const validator of validators) {
+    assert.deepEqual(validator.validateSafeCss(source), {
+      contract: "dreamskin-safe-css/1",
+      status: "validated",
+      bytes: new TextEncoder().encode(source).length,
+      ruleCount: 1,
+      declarationCount: 1,
+    });
+  }
+  assertRejected(
+    `[data-ds-part="sidebar"] { backdrop-filter: blur(var(--ds-theme-surface-radius)); }`,
+    "value/unsupported",
+  );
+});
+
 test("rejects selector escape, global reach, DOM coupling, and unregistered parts", () => {
   for (const source of [
     `:root { color: #fff; }`,
