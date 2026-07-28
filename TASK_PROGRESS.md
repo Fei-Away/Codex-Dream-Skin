@@ -6,7 +6,8 @@
 - [complete] Audited the three fork-only commits. The PowerShell 5.1 empty tray collection fix is already present upstream; the two local documentation screenshots remain fork-only; the light-shell native menu readability fix still needs migration to the shared runtime CSS.
 - [complete] Merged `upstream/main` into `fix/windows-tray-menu-readability` without rewriting the fork's existing commits. Documentation and tray conflicts use current upstream behavior; the light-shell native menu readability fix now lives in shared `runtime/dream-skin.css` and is synchronized to both platform assets with a Windows regression assertion.
 - [verified] Runtime sync check, Windows injector/renderer syntax, 16 focused portable Node regressions, and the complete Windows PowerShell regression suite pass. The suite's forced cleanup warnings are intentional failure-injection fixtures; all five final groups report `PASS`.
-- [in progress] Run `git diff --check`, review the final fork-only delta against `upstream/main`, and create the local merge commit. Do not push until the user finishes testing the v1.5.6 Release and asks to publish the branch.
+- [complete] Reviewed the final fork-only delta against `upstream/main` and created local merge commit `13d1237`. The fork's own delta is whitespace-clean; repository-wide `git diff --cached --check` only reported an upstream-preserved trailing space in the official Inno Setup translation file.
+- [pending] Do not push until the user finishes testing the v1.5.6 Release and asks to publish the branch.
 - [fact] No push, pull request, tag, Release, or local Codex installation/update has been performed in this task.
 
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
