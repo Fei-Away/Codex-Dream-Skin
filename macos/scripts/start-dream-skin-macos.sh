@@ -6,6 +6,10 @@ OPERATION_TOKEN=""
 OPERATION_FINISHED="false"
 VERIFY_OUTPUT=""
 
+activate_codex_window() {
+  /usr/bin/open -a "$CODEX_BUNDLE" >/dev/null 2>&1 || true
+}
+
 record_start_exit() {
   local code="$1"
   local line="$2"
@@ -96,6 +100,11 @@ fi
 
 INJECTOR_PID=""
 if [ "$DEBUG_READY" = "false" ]; then
+  # Codex is closed on this path (never started, or stopped just above), so it
+  # is safe to sync the appearanceTheme pin to the staged theme before launch.
+  # Best-effort: a config we refuse to rewrite should not block starting.
+  sync_appearance_pin >/dev/null \
+    || printf 'Warning: could not sync Codex appearanceTheme to the active theme; native menus may keep the previous appearance.\n' >&2
   PORT="$(select_available_port "$PORT")"
   printf 'Launching ChatGPT with skin debug port %s…\n' "$PORT" >&2
   launch_codex_with_cdp "$PORT"
@@ -103,13 +112,16 @@ if [ "$DEBUG_READY" = "false" ]; then
   if [ "$FOREGROUND_INJECTOR" != "true" ]; then
     INJECTOR_PID="$(launch_injector_daemon "$PORT")"
   fi
-  # Some builds open the window slowly; also try activating the app once.
-  /usr/bin/open -na "$CODEX_BUNDLE" --args --remote-debugging-address=127.0.0.1 --remote-debugging-port="$PORT" >/dev/null 2>&1 || true
   if ! wait_for_cdp "$PORT"; then
     [ -z "$INJECTOR_PID" ] || /bin/kill -TERM "$INJECTOR_PID" 2>/dev/null || true
     fail "ChatGPT did not expose a verified loopback CDP endpoint on port $PORT within 45 seconds. See $APP_LOG and $APP_ERROR_LOG"
   fi
 fi
+
+# LaunchServices activation reaches the already-running, identity-bound App.
+# Do not use -n here: a second instance can arrive before ChatGPT has registered
+# its reopen handler and leave a debuggable renderer without a native window.
+activate_codex_window
 
 if [ "$FOREGROUND_INJECTOR" = "true" ]; then
   exec "$NODE" "$INJECTOR" --watch --port "$PORT" --theme-dir "$THEME_DIR" \
@@ -139,7 +151,9 @@ else
   verify_code=$?
 fi
 if [ "$verify_code" -ne 0 ]; then
-  # One more force inject before giving up
+  # A slow App startup may register its reopen handler after CDP. Activate the
+  # exact bundle once more before the final force-inject and verification pass.
+  activate_codex_window
   if [ -n "$OPERATION_TOKEN" ]; then
     "$NODE" "$INJECTOR" --once --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 15000 \
       --operation-token "$OPERATION_TOKEN" >/dev/null 2>&1 || true

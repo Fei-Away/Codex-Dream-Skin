@@ -6,9 +6,9 @@ Chinese guide: [`reference-background-prompt-guide.md`](./reference-background-p
 
 > Public prompts default to an original fictional adult. They do not name or imitate a celebrity, private individual, copyrighted character, or living artist's signature style. Use an authorized identity reference only when you hold the necessary likeness and asset rights. Generated artwork is not an official OpenAI/Codex visual or endorsement.
 
-## Current Tested Feature: Arina Hashimoto
+## Source-Only Reference: Arina Hashimoto (Excluded From Public Packages)
 
-- **Switchable theme:** `macos/presets/preset-arina-hashimoto/`; Windows seeds from `windows/assets/theme.json` plus the byte-identical `windows/assets/dream-reference.jpg`. Both installers seed Arina Hashimoto.
+- **Source-only switchable reference:** `macos/presets/preset-arina-hashimoto/`; source Windows runs can use `windows/assets/theme.json` plus the byte-identical `windows/assets/dream-reference.jpg`. Public DMG and Setup.exe exclude these files and seed only the rights-reviewed Gothic Void Crusade.
 - **User-supplied pure source:** `docs/images/presets/arina-hashimoto-source.png` (`1672 × 941`). The preset's `2560 × 1440` JPEG is a standardized release derivative and does not create additional source detail.
 - **Real runtime results:** `arina-hashimoto-light.jpg` and `arina-hashimoto-dark.jpg` are light/dark screenshots for preview only. They are not importable wallpapers.
 - **Relationship to earlier examples:** this is the current tested preset, not `docs/images/gallery/skin-01.jpg` and not one of the skin-01–08 concept mockups. skin-01 contributes only a related pink-rose direction and UI-copy reference.
@@ -21,7 +21,7 @@ The “effect” shown in a README is not automatically an importable wallpaper.
 
 | Type | Repository path | What it is | A complete theme? |
 |---|---|---|---|
-| **Current featured preset** | `macos/presets/preset-arina-hashimoto/`; Windows seeds from `windows/assets/theme.json` plus the byte-identical `dream-reference.jpg` | A cross-platform theme pack containing a UI-free wallpaper; both installers seed Arina Hashimoto | **Yes** |
+| **Source-only reference preset** | `macos/presets/preset-arina-hashimoto/`; source Windows runs use `windows/assets/theme.json` plus the byte-identical `dream-reference.jpg` | Use locally only after an independent rights review; public DMG/Setup.exe use Gothic Void Crusade instead | **Only in an authorized local source checkout** |
 | **Pure source art** | `docs/images/presets/arina-hashimoto-source.png` | User-supplied source wallpaper around `1672 × 941`; no `theme.json` | **No**; it can be selected as an image, but is not a complete pack |
 | **Real injected previews** | `docs/images/presets/arina-hashimoto-light.jpg`, `arina-hashimoto-dark.jpg` | Light/dark Codex screenshots containing real controls | **No** |
 | **Concept gallery** | `docs/images/gallery/skin-01.jpg`–`skin-08.jpg` | UI effect mockups used only to communicate visual directions | **No** |
@@ -29,7 +29,7 @@ The “effect” shown in a README is not automatically an importable wallpaper.
 
 `docs/images/hero-banner-red-white.png` and `macos/assets/portal-hero.png` are legacy 3:1 banner assets, not the current 16:9 universal-theme master. Do not substitute either for `preset-*/background.jpg` unless the output is intentionally homepage-banner-only.
 
-Rule of thumb: **switch themes from `macos/presets/preset-*`; generate from this guide; study directions in `docs/images/gallery/`; inspect runtime results in `docs/images/presets/*-light.jpg` / `*-dark.jpg`.** A `theme.json` and a `background.jpg` in the same `preset-*` directory form a seedable theme; `docs/images/` is documentation/archive space, not a mirror of the theme library.
+Rule of thumb: **public installers default to Gothic Void Crusade; use the source-only reference preset locally only after a rights review.** Generate from this guide; study directions in `docs/images/gallery/`; inspect runtime results in `docs/images/presets/*-light.jpg` / `*-dark.jpg`. A `theme.json` and a `background.jpg` in the same `preset-*` directory form a seedable theme; `docs/images/` is documentation/archive space, not a mirror of the theme library.
 
 Path classification is not a likeness or redistribution license. The current `preset-arina-hashimoto` contains user-provided human/AI portrait material included at the maintainer's direction. Public repository inclusion neither grants nor proves likeness, generation, commercial-use, or further-redistribution rights; see `macos/NOTICE.md` for the file-level boundary.
 

@@ -27,7 +27,9 @@ SESSION="off"
 INJECTOR_ALIVE="false"
 CDP_OK="false"
 THEME_NAME=""
+THEME_ID=""
 APPLIED_THEME_NAME=""
+APPLIED_THEME_ID=""
 CODEX_RUNNING="false"
 OPERATION_STATUS=""
 OPERATION_MESSAGE=""
@@ -100,6 +102,7 @@ if [ -f "$STATE_PATH" ]; then
   saved_start="$(read_json_text_field "$STATE_SNAPSHOT" injectorStartedAt)"
   saved_node="$(read_json_text_field "$STATE_SNAPSHOT" nodePath)"
   saved_injector="$(read_json_text_field "$STATE_SNAPSHOT" injectorPath)"
+  APPLIED_THEME_ID="$(read_json_text_field "$STATE_SNAPSHOT" appliedThemeId)"
   APPLIED_THEME_NAME="$(read_json_text_field "$STATE_SNAPSHOT" appliedThemeName)"
   if injector_identity_matches "${pid:-}" "$saved_start" "$saved_node" "$saved_injector" "$PORT"; then
     INJECTOR_ALIVE="true"
@@ -125,9 +128,11 @@ fi
 
 if [ -f "$THEME_DIR/theme.json" ]; then
   THEME_SNAPSHOT="$(/bin/cat "$THEME_DIR/theme.json" 2>/dev/null)"
+  THEME_ID="$(read_json_text_field "$THEME_SNAPSHOT" id)"
   THEME_NAME="$(read_json_text_field "$THEME_SNAPSHOT" name)"
-  [ -n "$THEME_NAME" ] || THEME_NAME="$(read_json_text_field "$THEME_SNAPSHOT" id)"
+  [ -n "$THEME_NAME" ] || THEME_NAME="$THEME_ID"
 fi
+[ -n "$APPLIED_THEME_ID" ] || { [ "$SESSION" = "active" ] && APPLIED_THEME_ID="$THEME_ID"; }
 [ -n "$APPLIED_THEME_NAME" ] || { [ "$SESSION" = "active" ] && APPLIED_THEME_NAME="$THEME_NAME"; }
 
 if [ -f "$OPERATION_STATE_PATH" ]; then
@@ -197,10 +202,11 @@ if [ "$JSON" = "true" ]; then
   json_escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; printf '%s' "$s"; }
   bool() { [ "$1" = "true" ] && printf 'true' || printf 'false'; }
   case "$PORT" in ''|*[!0-9]*) port_json="\"$(json_escape "$PORT")\"" ;; *) port_json="$PORT" ;; esac
-  printf '{"session":"%s","operation":"%s","operationMessage":"%s","port":%s,"injectorAlive":%s,"cdpOk":%s,"codexRunning":%s,"themeName":"%s","appliedThemeName":"%s"}\n' \
+  printf '{"session":"%s","operation":"%s","operationMessage":"%s","port":%s,"injectorAlive":%s,"cdpOk":%s,"codexRunning":%s,"themeId":"%s","themeName":"%s","appliedThemeId":"%s","appliedThemeName":"%s"}\n' \
     "$(json_escape "$SESSION")" "$(json_escape "$OPERATION_STATUS")" "$(json_escape "$OPERATION_MESSAGE")" \
     "$port_json" "$(bool "$INJECTOR_ALIVE")" "$(bool "$CDP_OK")" "$(bool "$CODEX_RUNNING")" \
-    "$(json_escape "$THEME_NAME")" "$(json_escape "$APPLIED_THEME_NAME")"
+    "$(json_escape "$THEME_ID")" "$(json_escape "$THEME_NAME")" \
+    "$(json_escape "$APPLIED_THEME_ID")" "$(json_escape "$APPLIED_THEME_NAME")"
   exit 0
 fi
 
@@ -212,5 +218,7 @@ printf 'port=%s\n' "$PORT"
 printf 'injector=%s\n' "$INJECTOR_ALIVE"
 printf 'cdp=%s\n' "$CDP_OK"
 printf 'codex=%s\n' "$CODEX_RUNNING"
+printf 'theme_id=%s\n' "${THEME_ID:-}"
 printf 'theme=%s\n' "${THEME_NAME:-}"
+printf 'applied_theme_id=%s\n' "${APPLIED_THEME_ID:-}"
 printf 'applied_theme=%s\n' "${APPLIED_THEME_NAME:-}"

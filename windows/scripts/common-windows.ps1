@@ -1,17 +1,24 @@
 . (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
 function Enter-DreamSkinOperationLock {
+  param(
+    [ValidateRange(0, 300000)]
+    [int]$TimeoutMilliseconds = 0
+  )
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Operation")
   $acquired = $false
   try {
-    $acquired = $mutex.WaitOne(0)
+    $acquired = $mutex.WaitOne($TimeoutMilliseconds)
   } catch [System.Threading.AbandonedMutexException] {
     $acquired = $true
   }
   if (-not $acquired) {
     $mutex.Dispose()
-    throw 'Another Codex Dream Skin install, start, restore, or verify operation is already running.'
+    if ($TimeoutMilliseconds -eq 0) {
+      throw 'Another Codex Dream Skin install, start, restore, or verify operation is already running.'
+    }
+    throw "Another Codex Dream Skin operation did not finish within $TimeoutMilliseconds ms."
   }
   return $mutex
 }
@@ -55,9 +62,13 @@ function Get-DreamSkinRuntimeEnginePaths {
   return [pscustomobject]@{
     Root = $root
     Scripts = $scripts
+    Runtime = Join-Path $root 'runtime'
+    Version = Join-Path $root 'VERSION'
+    CommunityApply = Join-Path $scripts 'apply-community-theme.ps1'
     Start = Join-Path $scripts 'start-dream-skin.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
+    CheckUpdate = Join-Path $scripts 'check-update.ps1'
   }
 }
 
@@ -78,6 +89,51 @@ function Test-DreamSkinTrayActive {
   } finally {
     if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
     $mutex.Dispose()
+  }
+}
+
+function Stop-DreamSkinTrayProcess {
+  param(
+    [string[]]$ScriptPaths = @(),
+    [switch]$RequireStopped
+  )
+  if ($ScriptPaths.Count -eq 0) {
+    $ScriptPaths = @((Get-DreamSkinRuntimeEnginePaths).Tray)
+  }
+  $normalized = @($ScriptPaths | ForEach-Object {
+    try { [System.IO.Path]::GetFullPath($_) } catch { $null }
+  } | Where-Object { $_ })
+  $failures = @()
+  try {
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" `
+      -ErrorAction Stop
+    foreach ($process in $processes) {
+      if ($process.ProcessId -eq $PID -or -not $process.CommandLine) { continue }
+      $matchesTray = $false
+      foreach ($scriptPath in $normalized) {
+        if ($process.CommandLine.IndexOf($scriptPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+          $matchesTray = $true
+          break
+        }
+      }
+      if (-not $matchesTray) { continue }
+      try {
+        Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+        Wait-Process -Id $process.ProcessId -Timeout 5 -ErrorAction SilentlyContinue
+      } catch {
+        $failures += "PID $($process.ProcessId): $($_.Exception.Message)"
+      }
+    }
+  } catch {
+    $failures += $_.Exception.Message
+  }
+  if ($failures.Count -gt 0) {
+    $message = 'Could not close the Dream Skin tray automatically: ' + ($failures -join '; ')
+    if ($RequireStopped) { throw $message }
+    Write-Warning $message
+  }
+  if ($RequireStopped -and (Test-DreamSkinTrayActive)) {
+    throw 'The Dream Skin tray is still active. Exit it and retry the operation.'
   }
 }
 
@@ -126,11 +182,20 @@ function Install-DreamSkinRuntimeEngine {
   $fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
   $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $fullStateRoot
   $required = @(
+    'VERSION',
     'assets\dream-reference.jpg',
     'assets\dream-skin.css',
     'assets\renderer-inject.js',
+    'assets\safe-css-policy.json',
+    'assets\safe-css-validator.mjs',
+    'assets\selectors.json',
+    'assets\theme-package-validator.mjs',
     'assets\theme.json',
+    'presets\preset-gothic-void-crusade\background.jpg',
+    'presets\preset-gothic-void-crusade\theme.json',
+    'scripts\apply-community-theme.ps1',
     'scripts\common-windows.ps1',
+    'scripts\check-update.ps1',
     'scripts\config-utf8.ps1',
     'scripts\image-metadata.mjs',
     'scripts\injector.mjs',
@@ -139,14 +204,24 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
     'scripts\tray-dream-skin.ps1',
+    'scripts\validate-safe-css-file.mjs',
     'scripts\verify-dream-skin.ps1'
   )
+  $sourceHasBundledRuntime = Test-Path -LiteralPath (Join-Path $sourceRoot 'runtime') `
+    -PathType Container
+  if ($sourceHasBundledRuntime) {
+    $required += @('runtime\node\node.exe', 'runtime\node\LICENSE')
+  }
   foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot $relative) -PathType Leaf)) {
       throw "Dream Skin runtime source is incomplete: $relative"
     }
   }
-  foreach ($directoryName in @('assets', 'scripts')) {
+  $sourceDirectories = @('assets', 'scripts', 'presets')
+  if ($sourceHasBundledRuntime) {
+    $sourceDirectories += 'runtime'
+  }
+  foreach ($directoryName in $sourceDirectories) {
     $sourceDirectory = Join-Path $sourceRoot $directoryName
     if ((Test-DreamSkinPathEqual -Left $fullStateRoot -Right $sourceDirectory) -or
       (Test-DreamSkinPathWithin -Path $fullStateRoot -Root $sourceDirectory)) {
@@ -162,7 +237,9 @@ function Install-DreamSkinRuntimeEngine {
   Ensure-DreamSkinManagedDirectory -Path $stagingRoot -Root $fullStateRoot
 
   try {
-    foreach ($directoryName in @('assets', 'scripts')) {
+    Copy-Item -LiteralPath (Join-Path $sourceRoot 'VERSION') -Destination $stagingRoot `
+      -Force -ErrorAction Stop
+    foreach ($directoryName in $sourceDirectories) {
       Copy-Item -LiteralPath (Join-Path $sourceRoot $directoryName) -Destination $stagingRoot `
         -Recurse -Force -ErrorAction Stop
     }
@@ -174,13 +251,13 @@ function Install-DreamSkinRuntimeEngine {
     }
 
     $sourcePrefix = $sourceRoot.TrimEnd('\') + '\'
-    $sourceFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'assets'), (Join-Path $sourceRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
+    $sourceFileRoots = @($sourceDirectories | ForEach-Object { Join-Path $sourceRoot $_ })
+    $stagedFileRoots = @($sourceDirectories | ForEach-Object { Join-Path $stagingRoot $_ })
+    $sourceFiles = @((Get-Item -LiteralPath (Join-Path $sourceRoot 'VERSION'))) + @(
+      Get-ChildItem -LiteralPath $sourceFileRoots -Recurse -File -Force -ErrorAction Stop
     )
-    $stagedFiles = @(
-      Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'assets'), (Join-Path $stagingRoot 'scripts') `
-        -Recurse -File -Force -ErrorAction Stop
+    $stagedFiles = @((Get-Item -LiteralPath (Join-Path $stagingRoot 'VERSION'))) + @(
+      Get-ChildItem -LiteralPath $stagedFileRoots -Recurse -File -Force -ErrorAction Stop
     )
     if ($sourceFiles.Count -ne $stagedFiles.Count) {
       throw 'Staged Dream Skin runtime file count does not match its source.'
@@ -199,6 +276,12 @@ function Install-DreamSkinRuntimeEngine {
     foreach ($runtimeScript in Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'scripts') `
       -Filter '*.ps1' -Recurse -File -Force -ErrorAction Stop) {
       Unblock-File -LiteralPath $runtimeScript.FullName -ErrorAction Stop
+    }
+    if (Test-Path -LiteralPath (Join-Path $stagingRoot 'runtime') -PathType Container) {
+      foreach ($runtimeFile in Get-ChildItem -LiteralPath (Join-Path $stagingRoot 'runtime') `
+        -Recurse -File -Force -ErrorAction Stop) {
+        Unblock-File -LiteralPath $runtimeFile.FullName -ErrorAction Stop
+      }
     }
 
     $hasBackup = $false
@@ -249,6 +332,39 @@ function Test-DreamSkinCommandLineToken {
   if (-not $CommandLine -or -not $Token) { return $false }
   $pattern = '(?i)(?:^|[\s"])' + [regex]::Escape($Token) + '(?=$|[\s"])'
   return [regex]::IsMatch($CommandLine, $pattern)
+}
+
+function Get-DreamSkinCodexDebugArgumentStatus {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Processes,
+    [Parameter(Mandatory = $true)][int]$Port
+  )
+  Assert-DreamSkinPort -Port $Port
+  $flag = "--remote-debugging-port=$Port"
+  $encodedFlag = [Uri]::EscapeDataString($flag)
+  $sawReadableCommandLine = $false
+  $sawProtocolRedirect = $false
+  foreach ($process in $Processes) {
+    $commandLine = "$($process.CommandLine)"
+    if (-not $commandLine) { continue }
+    $sawReadableCommandLine = $true
+    $protocolPattern = '(?i)(?<!\S)"?(?<url>codex://[^\s"]*)"?'
+    $protocolMatches = [regex]::Matches($commandLine, $protocolPattern)
+    foreach ($protocolMatch in $protocolMatches) {
+      $protocolArgument = $protocolMatch.Groups['url'].Value
+      if ($protocolArgument.IndexOf($encodedFlag, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        $protocolArgument.IndexOf($flag, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        $sawProtocolRedirect = $true
+      }
+    }
+    $rawArguments = [regex]::Replace($commandLine, $protocolPattern, ' ')
+    if (Test-DreamSkinCommandLineToken -CommandLine $rawArguments -Token $flag) {
+      return 'forwarded'
+    }
+  }
+  if ($sawProtocolRedirect) { return 'protocol-redirected' }
+  if ($sawReadableCommandLine) { return 'not-forwarded' }
+  return 'uninspectable'
 }
 
 function ConvertTo-DreamSkinProcessArgument {
@@ -303,16 +419,39 @@ function Invoke-DreamSkinNative {
   }
 }
 
-function Get-DreamSkinNodeRuntime {
-  param([int]$MinimumMajor = 22)
+function Assert-DreamSkinTrustedNodeImage {
+  param([Parameter(Mandatory = $true)][string]$Path)
 
-  $command = Get-Command node.exe -ErrorAction SilentlyContinue
-  if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
-  if (-not $command) { throw "Node.js $MinimumMajor or newer is required and was not found in PATH." }
-  $versionProbe = Invoke-DreamSkinNative -FilePath $command.Source -ArgumentList @('-p', 'process.versions.node') -DiscardStderr
+  # Runs BEFORE the binary is ever executed. Get-DreamSkinValidatedNodeRuntime
+  # learns the version by running `node -p`, so any authenticity check placed
+  # after that point would already have executed attacker-controlled code.
+  $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop
+  if ("$($signature.Status)" -ine 'Valid') {
+    throw "The Node.js runtime is not validly signed: $Path ($($signature.Status))."
+  }
+  $subject = "$($signature.SignerCertificate.Subject)"
+  # Publisher names observed on official Node.js builds. The subject is echoed
+  # in the failure so an unexpected-but-legitimate publisher can be identified
+  # and added deliberately, rather than the check being loosened blindly.
+  if ($subject -notmatch '(?i)O=("?)(OpenJS Foundation|Node\.js Foundation|Microsoft Corporation|GitHub, Inc\.)') {
+    throw "The Node.js runtime is signed by an unexpected publisher: $subject"
+  }
+}
+
+function Get-DreamSkinValidatedNodeRuntime {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [int]$MinimumMajor = 22
+  )
+  $candidate = [System.IO.Path]::GetFullPath($Path)
+  if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+    throw "Node.js runtime does not exist: $candidate"
+  }
+  Assert-DreamSkinTrustedNodeImage -Path $candidate
+  $versionProbe = Invoke-DreamSkinNative -FilePath $candidate -ArgumentList @('-p', 'process.versions.node') -DiscardStderr
   $version = ($versionProbe.Output -join '').Trim()
   if ($versionProbe.ExitCode -ne 0 -or -not $version) { throw 'The Node.js runtime could not be validated.' }
-  $pathProbe = Invoke-DreamSkinNative -FilePath $command.Source -ArgumentList @('-p', 'process.execPath') -DiscardStderr
+  $pathProbe = Invoke-DreamSkinNative -FilePath $candidate -ArgumentList @('-p', 'process.execPath') -DiscardStderr
   $runtimePath = ($pathProbe.Output -join '').Trim()
   if ($pathProbe.ExitCode -ne 0 -or -not $runtimePath -or -not (Test-Path -LiteralPath $runtimePath)) {
     throw 'The Node.js executable path could not be validated.'
@@ -322,6 +461,35 @@ function Get-DreamSkinNodeRuntime {
     throw "Node.js $MinimumMajor or newer is required; found $version at $runtimePath."
   }
   return [pscustomobject]@{ Path = $runtimePath; Version = $version; Major = $major }
+}
+
+function Get-DreamSkinNodeRuntime {
+  param([int]$MinimumMajor = 22)
+
+  # The runtime that runs Safe CSS validation, theme-package validation, image
+  # metadata limits and the injector must not be redirectable: anyone able to
+  # write HKCU\Environment (no admin needed) could otherwise point every
+  # validator at their own node.exe and bypass all of them at once. So there is
+  # no environment-variable override -- macOS pins the same way, see
+  # require_signed_node_runtime in macos/scripts/common-macos.sh.
+  #
+  # An installed engine always ships runtime\node\node.exe and must use it. The
+  # repository source tree has no bundled copy (the installer downloads it), so
+  # running the suite from source falls back to PATH -- but that candidate goes
+  # through the exact same Authenticode gate, so a hostile node.exe on PATH is
+  # rejected before it is ever executed.
+  $runtimeRoot = Split-Path -Parent $PSScriptRoot
+  $bundledNode = Join-Path $runtimeRoot 'runtime\node\node.exe'
+  if (Test-Path -LiteralPath $bundledNode -PathType Leaf) {
+    return Get-DreamSkinValidatedNodeRuntime -Path $bundledNode -MinimumMajor $MinimumMajor
+  }
+
+  $command = Get-Command node.exe -ErrorAction SilentlyContinue
+  if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
+  if (-not $command) {
+    throw "The bundled Node.js runtime is missing ($bundledNode) and Node.js $MinimumMajor or newer was not found in PATH."
+  }
+  return Get-DreamSkinValidatedNodeRuntime -Path $command.Source -MinimumMajor $MinimumMajor
 }
 
 function ConvertTo-DreamSkinCodexInstall {
@@ -445,6 +613,131 @@ function Start-DreamSkinCodex {
   $processId = [CodexDreamSkin.PackageLauncher]::Launch($appUserModelId, $argumentLine)
   if ($processId -le 0) { throw 'Windows did not return a Codex process ID after package activation.' }
   return $processId
+}
+
+function Assert-DreamSkinCodexDirectLaunchTarget {
+  param([Parameter(Mandatory = $true)][object]$Codex)
+  $expectedExecutable = if ($Codex.PackageRoot) {
+    Join-Path "$($Codex.PackageRoot)" 'app\ChatGPT.exe'
+  } else {
+    $null
+  }
+  $expectedAppUserModelId = if ($Codex.PackageFamilyName -and $Codex.ApplicationId) {
+    "$($Codex.PackageFamilyName)!$($Codex.ApplicationId)"
+  } else {
+    $null
+  }
+  if ("$($Codex.SignatureKind)" -ine 'Store' -or -not $Codex.PackageFullName -or
+    -not $expectedExecutable -or -not $expectedAppUserModelId -or
+    "$($Codex.AppUserModelId)" -cne $expectedAppUserModelId -or
+    -not (Test-DreamSkinPathEqual -Left "$($Codex.Executable)" -Right $expectedExecutable) -or
+    -not (Test-Path -LiteralPath $expectedExecutable -PathType Leaf)) {
+    throw 'Direct launch requires the exact executable from the validated OpenAI.Codex Store package.'
+  }
+}
+
+function Start-DreamSkinCodexDirect {
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Arguments
+  )
+  Assert-DreamSkinCodexDirectLaunchTarget -Codex $Codex
+  $argumentLine = ConvertTo-DreamSkinArgumentLine -Arguments $Arguments
+  $process = Start-Process -FilePath "$($Codex.Executable)" -ArgumentList $argumentLine `
+    -PassThru -ErrorAction Stop
+  try {
+    if ($process.Id -le 0) { throw 'Windows did not return a Codex process ID after direct launch.' }
+    return $process.Id
+  } finally {
+    $process.Dispose()
+  }
+}
+
+function Get-DreamSkinDirectLaunchFailureKind {
+  param([Parameter(Mandatory = $true)][System.Exception]$Exception)
+  $current = $Exception
+  while ($null -ne $current) {
+    if ($current -is [System.UnauthorizedAccessException] -or
+      ($current -is [System.ComponentModel.Win32Exception] -and $current.NativeErrorCode -eq 5) -or
+      $current.HResult -eq -2147024891) {
+      return 'access-denied'
+    }
+    $current = $current.InnerException
+  }
+  return 'start-failed'
+}
+
+function Wait-DreamSkinCodexDebugArgumentStatus {
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [Parameter(Mandatory = $true)][int]$Port,
+    [int]$TimeoutSeconds = 5
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $lastStatus = 'uninspectable'
+  do {
+    $processes = @(Get-DreamSkinCodexProcesses -Codex $Codex)
+    $lastStatus = Get-DreamSkinCodexDebugArgumentStatus -Processes $processes -Port $Port
+    if ($lastStatus -in @('forwarded', 'protocol-redirected')) { return $lastStatus }
+    if ((Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+  } while ((Get-Date) -lt $deadline)
+  return $lastStatus
+}
+
+function Start-DreamSkinCodexForDebugging {
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Arguments,
+    [Parameter(Mandatory = $true)][int]$Port,
+    [AllowEmptyCollection()][int[]]$PreserveProcessIds
+  )
+  $preservedProcessIds = if ($PSBoundParameters.ContainsKey('PreserveProcessIds')) {
+    @($PreserveProcessIds)
+  } else {
+    @(Get-DreamSkinCodexProcesses -Codex $Codex | ForEach-Object { [int]$_.ProcessId })
+  }
+  $packageProcessId = Start-DreamSkinCodex -Codex $Codex -Arguments $Arguments
+  $packageStatus = Wait-DreamSkinCodexDebugArgumentStatus -Codex $Codex -Port $Port
+  if ($packageStatus -ne 'protocol-redirected') {
+    return [pscustomobject]@{
+      ProcessId = $packageProcessId
+      Strategy = 'package-activation'
+      ArgumentStatus = $packageStatus
+      PackageArgumentStatus = $packageStatus
+    }
+  }
+
+  try {
+    Stop-DreamSkinCodex -Codex $Codex -PreserveProcessIds $preservedProcessIds -AllowForce
+  } catch {
+    throw "Codex package activation did not retain the CDP arguments, and its process could not be closed safely: $($_.Exception.Message)"
+  }
+
+  try {
+    $directProcessId = Start-DreamSkinCodexDirect -Codex $Codex -Arguments $Arguments
+  } catch {
+    $failureKind = Get-DreamSkinDirectLaunchFailureKind -Exception $_.Exception
+    throw [System.InvalidOperationException]::new(
+      "Codex $($Codex.Version) converted the CDP argument into a codex:// navigation path. Direct launch of the validated Store executable failed ($failureKind), so this Codex/Windows combination cannot expose the Dream Skin debugging endpoint without modifying the protected app package.",
+      $_.Exception)
+  }
+
+  $directStatus = Wait-DreamSkinCodexDebugArgumentStatus -Codex $Codex -Port $Port
+  if ($directStatus -in @('protocol-redirected', 'not-forwarded')) {
+    try {
+      Stop-DreamSkinCodex -Codex $Codex -PreserveProcessIds $preservedProcessIds -AllowForce
+    } catch {
+      throw "Direct Codex launch did not retain the CDP arguments and could not be closed safely: $($_.Exception.Message)"
+    }
+    throw "Codex $($Codex.Version) did not retain the CDP argument during package activation or validated direct launch. Dream Skin cannot run without modifying the protected app package."
+  }
+
+  return [pscustomobject]@{
+    ProcessId = $directProcessId
+    Strategy = 'direct-store-executable'
+    ArgumentStatus = $directStatus
+    PackageArgumentStatus = $packageStatus
+  }
 }
 
 function Get-DreamSkinCodexStatePathCandidate {
@@ -625,6 +918,25 @@ function Test-DreamSkinCodexCdpEndpoint {
   return $null -ne (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $Codex)
 }
 
+function Get-DreamSkinVerifiedCdpIdentityForAnyRegistered {
+  # A Store auto-update replaces the "current" package directory while the
+  # older version keeps running and owning the verified endpoint.  Accepting
+  # any registered OpenAI.Codex install keeps the strict owner validation
+  # (every candidate passed the same package identity checks) without
+  # restarting a healthy skinned Codex just because the Store updated.
+  param([int]$Port)
+  foreach ($install in @(Get-DreamSkinRegisteredCodexInstalls)) {
+    $identity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $install
+    if ($null -ne $identity) {
+      return [pscustomobject]@{
+        Identity = $identity
+        Codex = $install
+      }
+    }
+  }
+  return $null
+}
+
 function Select-DreamSkinPort {
   param([int]$PreferredPort)
   for ($candidate = $PreferredPort; $candidate -le [Math]::Min(65535, $PreferredPort + 100); $candidate++) {
@@ -777,19 +1089,40 @@ function Get-DreamSkinCodexProcesses {
     })
 }
 
+function Get-DreamSkinCodexProcessesExcept {
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [AllowEmptyCollection()][int[]]$PreserveProcessIds = @()
+  )
+  $preserved = @{}
+  foreach ($processId in $PreserveProcessIds) {
+    if ($processId -gt 0) { $preserved[$processId] = $true }
+  }
+  return @(
+    Get-DreamSkinCodexProcesses -Codex $Codex | Where-Object {
+      -not $preserved.ContainsKey([int]$_.ProcessId)
+    }
+  )
+}
+
 function Stop-DreamSkinCodex {
-  param([Parameter(Mandatory = $true)][object]$Codex, [switch]$AllowForce)
-  $processes = Get-DreamSkinCodexProcesses -Codex $Codex
+  param(
+    [Parameter(Mandatory = $true)][object]$Codex,
+    [AllowEmptyCollection()][int[]]$PreserveProcessIds = @(),
+    [switch]$AllowForce
+  )
+  $processes = Get-DreamSkinCodexProcessesExcept -Codex $Codex -PreserveProcessIds $PreserveProcessIds
   if ($processes.Count -eq 0) { return }
   foreach ($item in $processes) {
     try { [void](Get-Process -Id $item.ProcessId -ErrorAction Stop).CloseMainWindow() } catch {}
   }
 
   $deadline = (Get-Date).AddSeconds(15)
-  while ((Get-DreamSkinCodexProcesses -Codex $Codex).Count -gt 0 -and (Get-Date) -lt $deadline) {
+  while ((Get-DreamSkinCodexProcessesExcept -Codex $Codex `
+      -PreserveProcessIds $PreserveProcessIds).Count -gt 0 -and (Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 250
   }
-  $remaining = Get-DreamSkinCodexProcesses -Codex $Codex
+  $remaining = Get-DreamSkinCodexProcessesExcept -Codex $Codex -PreserveProcessIds $PreserveProcessIds
   if ($remaining.Count -eq 0) { return }
   if (-not $AllowForce) {
     throw 'Codex did not close within 15 seconds. Close it manually or explicitly authorize a forced restart.'
@@ -802,7 +1135,10 @@ function Stop-DreamSkinCodex {
     }
   }
   Start-Sleep -Milliseconds 500
-  if ((Get-DreamSkinCodexProcesses -Codex $Codex).Count -gt 0) { throw 'Codex could not be stopped safely.' }
+  if ((Get-DreamSkinCodexProcessesExcept -Codex $Codex `
+      -PreserveProcessIds $PreserveProcessIds).Count -gt 0) {
+    throw 'Codex could not be stopped safely.'
+  }
 }
 
 function Confirm-DreamSkinRestart {

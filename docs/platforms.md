@@ -33,21 +33,25 @@
 | Codex 配置 | `%USERPROFILE%\.codex\config.toml` |
 | 默认 CDP 端口 | 首选 `9335`，冲突时自动选空闲口（Mac 包默认从 `9341` 起） |
 
-Windows 启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` 包清单解析 AppUserModelId，并通过系统应用包激活接口传递 CDP 参数；不会直接执行受 WindowsApps ACL 限制的可执行文件路径。
+Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` 包清单解析 AppUserModelId，并通过系统应用包激活接口完成。若新版 owl runtime 明确把 CDP 参数转换成 `codex://` 路径，调试启动会对同一个已验证 Store 包内的精确 `app\ChatGPT.exe` 做一次原始参数回退；ACL 拒绝或参数保留后仍无可信监听都会停止并回滚，不修改或接管 WindowsApps 权限。Issue #235 已在 `26.715.10079.0` 与 `26.721.3404.0` 分别实机确认这两种失败，因此该回退只作安全诊断，不代表受影响 owl 版本已恢复兼容。
 
 ## 能力矩阵
 
 | 功能 | macOS | Windows |
 |------|:-----:|:-------:|
+| 普通用户安装包 | ✅ DMG | ✅ Setup.exe |
+| 原生控制入口 | ✅ 菜单栏 App | ✅ 系统托盘 |
 | 安装脚本 | ✅ | ✅ |
 | 启动 + 注入 | ✅ | ✅ |
 | 一键恢复 | ✅ | ✅ |
 | 实机 verify / 截图 | ✅ | ✅ |
 | 用户选图定制 | ✅ | ✅（系统托盘「更换背景图」） |
 | 本地主题保存 / 切换 | ✅（菜单栏） | ✅（系统托盘） |
+| 普通 `.zip` 主题导入 | ✅（菜单栏） | ✅（系统托盘） |
+| Gallery / 在线 Studio 入口 | ✅（菜单栏） | ✅（系统托盘） |
 | 官方签名校验 | ✅ | Store 签名类型 + 包身份 |
 | 客户部署提示词 | ✅ | ❌（可用 Mac 文案改写） |
-| 打客户 ZIP | ✅ `build-client-release.sh` | 手动压缩 `windows/` |
+| 旧版离线 ZIP | ✅ `build-client-release.sh` | 不再建议手动压缩源码 |
 
 ## 自适应图像主题契约
 
@@ -68,23 +72,31 @@ Windows 启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` �
 - `appearance`：`auto | light | dark`。`auto` 跟随 Codex/ChatGPT 与系统外观；`light` / `dark` 为显式覆盖。图像亮度只参与配色和构图，不会反向覆盖用户选择的外观。
 - `art.focusX` / `art.focusY`：`0..1` 的归一化焦点坐标（左/上为 `0`，右/下为 `1`）。用于控制背景定位，超出范围的值会被拒绝或限制。
 - `art.safeArea`：`auto | left | right | center | none`。`auto` 根据左右信息量推断适合放置原生首页内容的一侧；其余值显式指定安全区，`none` 表示不保留安全区。
-- `art.taskMode`：`auto | ambient | banner | off`。`auto` 对超宽图使用横幅/纵向渐隐，对普通比例图使用低噪环境背景；`off` 在任务页关闭背景图。
+- `art.taskMode`：`auto | ambient | banner | full | off`。`auto` 对超宽图使用横幅/纵向渐隐，对普通比例图使用低噪环境背景；`full` 保留完整画面并仅叠加基础可读性遮罩；`off` 在任务页关闭背景图。
 
 显式的 `appearance` 优先于 Codex/ChatGPT 外观；焦点、安全区和任务模式的显式值优先于图像分析。首页保留更完整的主视觉和原生控件，任务页默认降低背景干扰以保证代码、消息和输入框可读。
 
 ### 平台差异
 
 - macOS 的选图脚本会把这些字段写入主题库，可通过 `--appearance`、`--focus-x`、`--focus-y`、`--safe-area`、`--task-mode` 设置。
-- Windows 安装会把运行所需的 `assets/` 与 `scripts/` 原子复制到 `%LOCALAPPDATA%\CodexDreamSkin\engine`，所有快捷方式均指向该受管副本，因此安装后可移动或删除源码目录。安装还会初始化 `active-theme`、`themes` 与 `images`，并把「桥本有菜」同时设为首次默认和可切换的已保存主题。系统托盘支持更换背景、保存当前主题、从「已保存主题」切换、暂停和恢复；图片与 `theme.json` 保存在主题仓库中，不写进 Codex 的 `config.toml`。安装会保留用户已有的 `appearanceTheme`；仅在识别到旧版精确托管的浅色三元组时按备份迁移。
+- Windows 安装会把运行所需的 `assets/`、`presets/`、`scripts/` 与可选内置运行时原子复制到 `%LOCALAPPDATA%\CodexDreamSkin\engine`，所有快捷方式均指向该受管副本，因此安装后可移动或删除源码目录。源码安装会保留「桥本有菜」与 Gothic Void Crusade 两个本地参考主题；公开 Setup.exe 只使用已确认可分发的 Gothic Void Crusade 作为首次默认和可切换主题。系统托盘支持更换背景、保存当前主题、从「已保存主题」切换、暂停和恢复；图片与 `theme.json` 保存在主题仓库中，不写进 Codex 的 `config.toml`。安装会保留用户已有的 `appearanceTheme`；仅在识别到旧版精确托管的浅色三元组时按备份迁移。
 - Windows 渲染器仍支持在注入前用 `window.__CODEX_DREAM_SKIN_CONFIG__` 提供内存级可选覆盖（形状同上，颜色覆盖使用 `palette.accent`），但普通用户应优先使用持久化主题仓库与托盘。
+
+### 主题 ZIP 与手动目录
+
+- 两端只接受普通 `.zip`，明确不兼容 `.dreamskin` 后缀。新的正式 Studio 包必须包含 `manifest.json`、非空 `theme.json`、非空 `theme.css`、恰好一张 `background.webp|jpg|png`，并可选带 `LICENSE.txt`、`manifest.sig`；文件位于 ZIP 根目录或唯一一层顶级主题目录。仅供本机可信工作流使用的简化格式也必须恰好包含 `theme.json`、`theme.css` 与其引用图片。
+- 导入前限制为 32 MiB 压缩文件、32 个条目和 64 MiB 解压总量，并拒绝路径穿越、链接/reparse、嵌套压缩包、未注册负载以及未通过主题/图片校验的内容。正式包还会核对平台、最低客户端版本及清单中每个负载文件的大小与 SHA-256。
+- `theme.css` 必须通过同一份 Safe CSS allowlist，本机在导入和每次应用时都会复验；通过后只作用于 12 个注册 `data-ds-part` 部件。升级前已经保存且没有 CSS 的 legacy 主题仍可使用，但不会注入额外 CSS。`manifest.sig` 是预留文件，当前不验证签名也不写入主题库；`LICENSE.txt` 随主题保留。
+- 导入目标始终是 saved themes；不会自动覆盖或应用 active / last-known-good。完全相同的内容返回重复结果，同 ID 的不同主题自动保存到新的安全目录。
+- 手动解压时，把直接包含 `theme.json`、`theme.css` 与背景图的完整目录放到 macOS `~/Library/Application Support/CodexDreamSkinStudio/themes/` 或 Windows `%LOCALAPPDATA%\CodexDreamSkin\themes\`。两端控制菜单均提供“打开主题文件夹”；该路径绕过归档校验，只应用于可信内容。
 
 ## 预设与图片类型
 
-- `macos/presets/preset-arina-hashimoto/` 是置顶的实测精选主题「桥本有菜 / Arina Hashimoto」。macOS 安装后用 `switch-theme-macos.sh --id preset-arina-hashimoto` 切换。
+- `macos/presets/preset-arina-hashimoto/` 是「桥本有菜 / Arina Hashimoto」源码参考主题；公开安装包在人物与素材分发权确认前明确排除它。
 - 该 preset pack 中只有 `background.jpg`（`2560 × 1440`、16:9、纯背景）和 `theme.json` 会被播种；它由用户提供的 `1672 × 941` 源 PNG 标准化导出，不代表增加了源图细节。Byte-identical 源图归档在 `docs/images/presets/arina-hashimoto-source.png`，不会随 preset 播种；`arina-hashimoto-light.jpg` 与 `arina-hashimoto-dark.jpg` 是 `2308 × 1572` Retina 浅/暗真实首页截图，未发送输入仅在截图时用临时本地样式遮蔽，只作效果预览，绝不能当背景导入。
 - `macos/presets/preset-gothic-void-crusade/` 是社区作者贡献的原创哥特科幻主题；macOS 没有活动主题时默认启用它。升级只清理固定的旧内置预设 ID，不删除 `custom-*` 或当前活动主题副本。
-- Windows 自带与 macOS byte-identical 的 `windows/assets/dream-reference.jpg` 纯背景，并在首次初始化时播种「桥本有菜」；可直接从「已保存主题 → 桥本有菜」切换。README 实机截图仍只作预览，绝不能作为背景导入。
-- Windows 导入和 macOS 快速加载入口会拒绝空文件或超过 16 MB 的输入；macOS 主定制入口可接收最高 50 MB 的源图，但转换后的主题文件必须不超过 16 MB。两端 payload 构建还会拒绝任一边超过 16384px 或总像素超过 50MP 的声明尺寸；Windows 在复制导入图前复用 Node 元数据解析器执行同一限制。Windows 注入器用图片与主题内容的 SHA-256 修订值识别热更新，并在构建首帧 payload 前同步读取图片比例。
+- 源码树中的 `windows/assets/dream-reference.jpg` 与 macOS 人物参考素材 byte-identical，仅用于本地参考；Windows Release 构建会在打包前以经过固定哈希核验的 Gothic Void Crusade 替换它，确保 Setup.exe 不分发权利未确认的人物素材。README 实机截图仍只作预览，绝不能作为背景导入。
+- Windows 导入和 macOS 快速加载入口会拒绝空文件或超过 10 MB 的输入；macOS 主定制入口可接收最高 50 MB 的源图，但转换后的主题文件必须不超过 10 MB。两端 payload 构建还会拒绝任一边超过 16384px 或总像素超过 50MP 的声明尺寸；Windows 在复制导入图前复用 Node 元数据解析器执行同一限制。Windows 注入器用图片、主题和 Safe CSS 内容的 SHA-256 修订值识别热更新，并在构建首帧 payload 前同步读取图片比例。
 - 自定义生图优先使用 `2560 × 1440`（16:9）：左侧约 50%～58% 保持低信息、低对比，主体放在右侧约 58%～88%。输出必须是连续铺满画布的纯背景，禁止窗口、侧栏、卡片、输入框、文字、Logo 和水印。
 - 可直接复制的无人物、右侧成年人物与参考图编辑模板见 `docs/reference-background-prompt-guide.md`；公共默认提示词不指定真人或名人。
 

@@ -98,7 +98,7 @@ case "$ext" in
 esac
 [ -s "$temporary" ] || fail "Prepared image is empty."
 PREPARED_BYTES="$(/usr/bin/stat -f '%z' "$temporary")"
-[ "$PREPARED_BYTES" -le 16777216 ] || fail "Prepared image larger than 16 MB."
+[ "$PREPARED_BYTES" -le 10485760 ] || fail "Prepared image larger than 10 MB."
 /bin/chmod 600 "$temporary"
 /bin/mv -f "$temporary" "$prepared"
 

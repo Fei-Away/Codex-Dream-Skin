@@ -129,8 +129,13 @@ case "$OPERATION_LINE" in
   *)
     case "$SESSION_LINE" in
       active)
+        # Same pair as Windows tray when running: re-apply + pause (live remove).
         echo "重新应用皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
         echo "暂停皮肤 | bash=\"$PAUSE\" terminal=false refresh=true"
+        ;;
+      paused)
+        # Same resume affordance as Windows tray "继续显示皮肤": clear pause and apply.
+        echo "继续显示皮肤 | bash=\"$APPLY\" terminal=false refresh=true"
         ;;
       stale|unknown)
         echo "修复并应用 | bash=\"$APPLY\" terminal=false refresh=true"
@@ -155,7 +160,7 @@ if [ -d "$THEMES_ROOT" ]; then
     [ -d "$dir" ] || continue
     [ -f "$dir/theme.json" ] || continue
     tid="$(/usr/bin/basename "$dir")"
-    case "$tid" in *[!A-Za-z0-9_-]*|'') continue ;; esac
+    case "$tid" in ''|.*|*[!A-Za-z0-9._-]*) continue ;; esac
     [ "${#tid}" -le 80 ] || continue
     tname="$(/usr/bin/plutil -extract name raw -o - "$dir/theme.json" 2>/dev/null)"
     [ -n "$tname" ] || tname="$tid"

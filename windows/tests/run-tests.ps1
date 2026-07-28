@@ -14,10 +14,21 @@ try {
   $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
   $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
   New-Item -ItemType Directory -Path $runtimeSourceRoot | Out-Null
-  foreach ($directoryName in @('assets', 'scripts')) {
+  Copy-Item -LiteralPath (Join-Path $Root 'VERSION') -Destination $runtimeSourceRoot -Force
+  foreach ($directoryName in @('assets', 'scripts', 'presets')) {
     Copy-Item -LiteralPath (Join-Path $Root $directoryName) -Destination $runtimeSourceRoot `
       -Recurse -Force -ErrorAction Stop
   }
+  $runtimeNodeDirectory = Join-Path $runtimeSourceRoot 'runtime\node'
+  New-Item -ItemType Directory -Path $runtimeNodeDirectory -Force | Out-Null
+  $pathNode = Get-Command node.exe -ErrorAction SilentlyContinue
+  if (-not $pathNode) { $pathNode = Get-Command node -ErrorAction Stop }
+  Copy-Item -LiteralPath $pathNode.Source -Destination (Join-Path $runtimeNodeDirectory 'node.exe') -Force
+  [System.IO.File]::WriteAllText(
+    (Join-Path $runtimeNodeDirectory 'LICENSE'),
+    'Node.js runtime license fixture',
+    [System.Text.UTF8Encoding]::new($false)
+  )
   $zoneMarkedSourceScript = Join-Path $runtimeSourceRoot 'scripts\start-dream-skin.ps1'
   Set-Content -LiteralPath $zoneMarkedSourceScript -Stream 'Zone.Identifier' `
     -Value "[ZoneTransfer]`r`nZoneId=3`r`n" -Encoding Ascii
@@ -27,18 +38,25 @@ try {
 
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $runtimeSourceRoot -StateRoot $runtimeStateRoot
   $sourcePrefix = $runtimeSourceRoot.TrimEnd('\') + '\'
-  $runtimeSourceFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $runtimeSourceRoot 'assets'), (Join-Path $runtimeSourceRoot 'scripts') `
+  $runtimeSourceFiles = @((Get-Item -LiteralPath (Join-Path $runtimeSourceRoot 'VERSION'))) + @(
+    Get-ChildItem -LiteralPath (Join-Path $runtimeSourceRoot 'assets'), `
+      (Join-Path $runtimeSourceRoot 'scripts'), (Join-Path $runtimeSourceRoot 'presets'), `
+      (Join-Path $runtimeSourceRoot 'runtime') `
       -Recurse -File -Force
   )
-  $runtimeEngineFiles = @(
-    Get-ChildItem -LiteralPath (Join-Path $engine.Root 'assets'), (Join-Path $engine.Root 'scripts') `
+  $runtimeEngineFiles = @((Get-Item -LiteralPath $engine.Version)) + @(
+    Get-ChildItem -LiteralPath (Join-Path $engine.Root 'assets'), `
+      (Join-Path $engine.Root 'scripts'), (Join-Path $engine.Root 'presets'), `
+      (Join-Path $engine.Root 'runtime') `
       -Recurse -File -Force
   )
   if ($runtimeSourceFiles.Count -ne $runtimeEngineFiles.Count -or
+    -not (Test-DreamSkinPathWithin -Path $engine.CommunityApply -Root $runtimeStateRoot) -or
+    -not (Test-Path -LiteralPath $engine.CommunityApply -PathType Leaf) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Start -Root $runtimeStateRoot) -or
     -not (Test-DreamSkinPathWithin -Path $engine.Restore -Root $runtimeStateRoot) -or
-    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot)) {
+    -not (Test-DreamSkinPathWithin -Path $engine.Tray -Root $runtimeStateRoot) -or
+    -not (Test-Path -LiteralPath (Join-Path $engine.Runtime 'node\node.exe') -PathType Leaf)) {
     throw 'Installed runtime paths are incomplete or still point outside the managed state root.'
   }
   foreach ($sourceFile in $runtimeSourceFiles) {
@@ -94,6 +112,24 @@ try {
     Remove-DreamSkinRuntimeTree -Path $runtimeBackup.FullName -StateRoot $runtimeStateRoot
   }
 
+  $missingBundledNodeRoot = Join-Path $temporaryRoot 'missing-bundled-node-source'
+  Copy-Item -LiteralPath $runtimeSourceRoot -Destination $missingBundledNodeRoot -Recurse -Force
+  Remove-Item -LiteralPath (Join-Path $missingBundledNodeRoot 'runtime\node\LICENSE') -Force
+  $engineSentinelHash = (Get-FileHash -Algorithm SHA256 `
+    -LiteralPath (Join-Path $engine.Root 'scripts\runtime-update.test')).Hash
+  $missingBundledNodeRejected = $false
+  try {
+    $null = Install-DreamSkinRuntimeEngine -SkillRoot $missingBundledNodeRoot `
+      -StateRoot $runtimeStateRoot
+  } catch {
+    $missingBundledNodeRejected = $true
+  }
+  if (-not $missingBundledNodeRejected -or
+    (Get-FileHash -Algorithm SHA256 `
+      -LiteralPath (Join-Path $engine.Root 'scripts\runtime-update.test')).Hash -cne $engineSentinelHash) {
+    throw 'An incomplete bundled Node runtime replaced the previously valid managed engine.'
+  }
+
   $invalidRuntimeRoot = Join-Path $temporaryRoot 'invalid-runtime-source'
   New-Item -ItemType Directory -Path $invalidRuntimeRoot | Out-Null
   foreach ($directoryName in @('assets', 'scripts')) {
@@ -138,6 +174,45 @@ try {
   if ($hashVerificationIndex -lt 0 -or $unblockIndex -le $hashVerificationIndex) {
     throw 'Runtime scripts are not unblocked only after staged byte-content verification.'
   }
+  foreach ($requiredNodeBehavior in @(
+    'runtime\node\node.exe',
+    'runtime\node\LICENSE',
+    '$sourceHasBundledRuntime',
+    'Get-DreamSkinValidatedNodeRuntime',
+    'Assert-DreamSkinTrustedNodeImage'
+  )) {
+    if (-not $commonSource.Contains($requiredNodeBehavior)) {
+      throw "Bundled Node.js discovery is missing: $requiredNodeBehavior"
+    }
+  }
+  # The Node runtime executes every validator we own (Safe CSS, theme package,
+  # image metadata, injector), so its path must not be redirectable by anyone
+  # who can write HKCU\Environment without admin rights.
+  if ($commonSource.Contains('$env:CODEX_DREAM_SKIN_NODE')) {
+    throw 'The Node.js runtime path must not be overridable through an environment variable.'
+  }
+  # A bundled runtime, when present, wins over PATH. The source tree has no
+  # bundled copy, so PATH stays reachable for the suite -- but every candidate,
+  # bundled or not, is funnelled through the same signature gate below.
+  $bundledIndex = $commonSource.IndexOf(
+    'Get-DreamSkinValidatedNodeRuntime -Path $bundledNode', [System.StringComparison]::Ordinal
+  )
+  $pathFallbackIndex = $commonSource.IndexOf(
+    'Get-Command node.exe -ErrorAction SilentlyContinue', [System.StringComparison]::Ordinal
+  )
+  if ($bundledIndex -lt 0 -or $pathFallbackIndex -le $bundledIndex) {
+    throw 'The bundled Node.js runtime must be preferred over whatever PATH resolves to.'
+  }
+  # Authenticity must be proven before the binary runs; `node -p` is execution.
+  $trustIndex = $commonSource.IndexOf(
+    'Assert-DreamSkinTrustedNodeImage -Path $candidate', [System.StringComparison]::Ordinal
+  )
+  $probeIndex = $commonSource.IndexOf(
+    "Invoke-DreamSkinNative -FilePath `$candidate", [System.StringComparison]::Ordinal
+  )
+  if ($trustIndex -lt 0 -or $probeIndex -le $trustIndex) {
+    throw 'The Node.js runtime is executed before its signature is verified.'
+  }
   $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
   $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
   if ($trayGuardIndex -lt 0 -or $engineInstallIndex -le $trayGuardIndex) {
@@ -171,7 +246,8 @@ try {
       throw "Installed runtime script failed to parse after its source checkout was removed: $($installedScript.Name)"
     }
   }
-  if (-not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
+  if (-not (Test-Path -LiteralPath $engine.CommunityApply -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $engine.Start -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf) -or
     -not (Test-Path -LiteralPath $engine.Tray -PathType Leaf)) {
     throw 'Installed launch, restore, or tray entry point disappeared with the source checkout.'
@@ -183,18 +259,21 @@ try {
     return
   }
 
-  $atomicReplacePath = Join-Path $temporaryRoot 'atomic-replace.txt'
+  $atomicTestRoot = Join-Path $temporaryRoot 'atomic-writer'
+  New-Item -ItemType Directory -Path $atomicTestRoot | Out-Null
+  $atomicReplacePath = Join-Path $atomicTestRoot 'atomic-replace.txt'
   [System.IO.File]::WriteAllText($atomicReplacePath, 'before')
   Write-DreamSkinUtf8FileAtomically -Path $atomicReplacePath -Content 'after'
   if ((Read-DreamSkinUtf8File -Path $atomicReplacePath) -cne 'after') {
     throw 'Atomic writer did not replace an existing file under Windows PowerShell.'
   }
-  $atomicArtifacts = @(Get-ChildItem -LiteralPath $temporaryRoot -Force |
+  $atomicArtifacts = @(Get-ChildItem -LiteralPath $atomicTestRoot -Force |
     Where-Object { $_.FullName -ne $atomicReplacePath })
   if ($atomicArtifacts.Count -ne 0) {
     throw 'Atomic writer left internal replacement artifacts behind.'
   }
   Remove-Item -LiteralPath $atomicReplacePath -Force
+  Remove-Item -LiteralPath $atomicTestRoot -Force
 
   $realAtomicCleanup = (Get-Command Remove-DreamSkinAtomicArtifact -CommandType Function).ScriptBlock
   $previousWarningPreference = $WarningPreference
@@ -243,6 +322,96 @@ try {
   } finally {
     $WarningPreference = $previousWarningPreference
     Set-Item -Path Function:\Remove-DreamSkinAtomicArtifact -Value $realAtomicCleanup
+  }
+
+  $realAppearanceMarkerWriter = (Get-Command Write-DreamSkinAppearanceMarker -CommandType Function).ScriptBlock
+  try {
+    function Write-DreamSkinAppearanceMarker {
+      param([Parameter(Mandatory = $true)][string]$BackupPath)
+      throw 'forced appearance-marker write failure'
+    }
+    $markerFailureConfig = Join-Path $temporaryRoot 'marker-failure-config.toml'
+    $markerFailureBackup = Join-Path $temporaryRoot 'marker-failure-config.before.toml'
+    $markerFailureOriginal = "model = `"gpt-5`"`r`n`r`n[desktop]`r`nappearanceTheme = `"system`"`r`n"
+    [System.IO.File]::WriteAllText(
+      $markerFailureConfig,
+      $markerFailureOriginal,
+      [System.Text.UTF8Encoding]::new($false, $true)
+    )
+    $markerFailureBytes = [System.IO.File]::ReadAllBytes($markerFailureConfig)
+    $markerFailureRejected = $false
+    try {
+      Install-DreamSkinBaseTheme -ConfigPath $markerFailureConfig -BackupPath $markerFailureBackup
+    } catch {
+      $markerFailureRejected = $true
+    }
+    if (-not $markerFailureRejected -or
+      -not (Test-DreamSkinBytesEqual -Left $markerFailureBytes `
+        -Right ([System.IO.File]::ReadAllBytes($markerFailureConfig))) -or
+      (Test-Path -LiteralPath $markerFailureBackup) -or
+      (Test-Path -LiteralPath (Get-DreamSkinAppearanceMarkerPath -BackupPath $markerFailureBackup))) {
+      throw 'Appearance-marker failure changed config or discarded transaction consistency.'
+    }
+  } finally {
+    Set-Item -Path Function:\Write-DreamSkinAppearanceMarker -Value $realAppearanceMarkerWriter
+  }
+
+  # A legacy upgrade can already have a durable backup but no appearance
+  # marker. If the marker commits and the config commit then fails, the marker
+  # must still be removed so restore continues to recognize the legacy light
+  # trio and recovers the saved appearanceTheme.
+  $realAtomicBytesWriter = (Get-Command Write-DreamSkinBytesAtomically -CommandType Function).ScriptBlock
+  $legacyCommitFailureConfig = Join-Path $temporaryRoot 'legacy-commit-failure.toml'
+  $legacyCommitFailureBackup = Join-Path $temporaryRoot 'legacy-commit-failure.before.toml'
+  $legacyOriginal = "model = `"gpt-5`"`r`n`r`n[desktop]`r`n$($script:DreamSkinLegacyAppearanceTheme)`r`n$($script:DreamSkinManagedLightCodeTheme)`r`n$($script:DreamSkinManagedLightChromeTheme)`r`n"
+  $legacyBackup = "model = `"gpt-5`"`r`n`r`n[desktop]`r`nappearanceTheme = `"system`"`r`n"
+  [System.IO.File]::WriteAllText(
+    $legacyCommitFailureConfig,
+    $legacyOriginal,
+    [System.Text.UTF8Encoding]::new($false, $true)
+  )
+  [System.IO.File]::WriteAllText(
+    $legacyCommitFailureBackup,
+    $legacyBackup,
+    [System.Text.UTF8Encoding]::new($false, $true)
+  )
+  $legacyOriginalBytes = [System.IO.File]::ReadAllBytes($legacyCommitFailureConfig)
+  $legacyBackupBytes = [System.IO.File]::ReadAllBytes($legacyCommitFailureBackup)
+  $legacyCommitFailureRejected = $false
+  try {
+    function Write-DreamSkinBytesAtomically {
+      param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$Bytes,
+        [AllowNull()][byte[]]$ExpectedBytes
+      )
+      if ([System.IO.Path]::GetFullPath($Path) -ieq
+        [System.IO.Path]::GetFullPath($legacyCommitFailureConfig)) {
+        throw 'forced config commit failure after marker write'
+      }
+      & $realAtomicBytesWriter @PSBoundParameters
+    }
+    try {
+      Install-DreamSkinBaseTheme -ConfigPath $legacyCommitFailureConfig `
+        -BackupPath $legacyCommitFailureBackup
+    } catch {
+      $legacyCommitFailureRejected = $true
+    }
+  } finally {
+    Set-Item -Path Function:\Write-DreamSkinBytesAtomically -Value $realAtomicBytesWriter
+  }
+  if (-not $legacyCommitFailureRejected -or
+    -not (Test-DreamSkinBytesEqual -Left $legacyOriginalBytes `
+      -Right ([System.IO.File]::ReadAllBytes($legacyCommitFailureConfig))) -or
+    -not (Test-DreamSkinBytesEqual -Left $legacyBackupBytes `
+      -Right ([System.IO.File]::ReadAllBytes($legacyCommitFailureBackup))) -or
+    (Test-Path -LiteralPath (Get-DreamSkinAppearanceMarkerPath -BackupPath $legacyCommitFailureBackup))) {
+    throw 'Legacy config commit failure left an appearance marker or changed the recoverable backup.'
+  }
+  Restore-DreamSkinBaseTheme -ConfigPath $legacyCommitFailureConfig `
+    -BackupPath $legacyCommitFailureBackup
+  if ((Read-DreamSkinUtf8File -Path $legacyCommitFailureConfig) -notmatch 'appearanceTheme = "system"') {
+    throw 'Legacy restore did not recover appearanceTheme after marker cleanup.'
   }
 
   $configPath = Join-Path $temporaryRoot 'config.toml'
@@ -494,6 +663,47 @@ try {
     (Test-DreamSkinCommandLineToken -CommandLine $watchCommand -Token 'Dream Skin\injector.mjs')) {
     throw 'Injector command-line token validation is not boundary-safe.'
   }
+  $forwardedDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" --remote-debugging-port=9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus -Processes @($forwardedDebugProcess) -Port 9335) -cne 'forwarded') {
+    throw 'A raw Chromium debugging argument was not recognized as forwarded.'
+  }
+  $redirectedDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new?path=--remote-debugging-port%3D9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus -Processes @($redirectedDebugProcess) -Port 9335) -cne 'protocol-redirected') {
+    throw 'An owl codex:// debugging-argument redirect was not recognized.'
+  }
+  $unencodedRedirectedDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new?path=--remote-debugging-port=9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus `
+      -Processes @($unencodedRedirectedDebugProcess) -Port 9335) -cne 'protocol-redirected') {
+    throw 'An unencoded debugging flag inside codex:// was confused with a raw Chromium argument.'
+  }
+  $separateRawDebugProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new --remote-debugging-port=9335'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus `
+      -Processes @($separateRawDebugProcess) -Port 9335) -cne 'forwarded') {
+    throw 'A separate raw debugging argument was hidden by an ordinary codex:// argument.'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus `
+      -Processes @($redirectedDebugProcess, $forwardedDebugProcess) -Port 9335) -cne 'forwarded') {
+    throw 'A raw forwarded argument did not take precedence over a protocol-looking helper process.'
+  }
+  $ordinaryProtocolProcess = [pscustomobject]@{
+    CommandLine = '"C:\Program Files\WindowsApps\OpenAI.Codex\app\ChatGPT.exe" codex://threads/new?path=C%3A%5Cwork'
+  }
+  if ((Get-DreamSkinCodexDebugArgumentStatus -Processes @($ordinaryProtocolProcess) -Port 9335) -cne 'not-forwarded' -or
+    (Get-DreamSkinCodexDebugArgumentStatus -Processes @() -Port 9335) -cne 'uninspectable') {
+    throw 'Debugging argument inspection confused an ordinary protocol launch or an empty process set.'
+  }
+  if ((Get-DreamSkinDirectLaunchFailureKind -Exception ([System.UnauthorizedAccessException]::new('denied'))) -cne 'access-denied' -or
+    (Get-DreamSkinDirectLaunchFailureKind -Exception ([System.InvalidOperationException]::new('failed'))) -cne 'start-failed') {
+    throw 'Direct Store launch failures were not classified safely.'
+  }
   if (-not (Test-DreamSkinBrowserId -Value 'browser-123') -or
     (Test-DreamSkinBrowserId -Value 'browser 123')) {
     throw 'CDP browser ID validation is not boundary-safe.'
@@ -579,6 +789,124 @@ try {
     -not (Test-DreamSkinPathEqual -Left $fakeInstall.Executable -Right $fakeExecutable)) {
     throw 'Registered Appx package identity conversion failed.'
   }
+  Assert-DreamSkinCodexDirectLaunchTarget -Codex $fakeInstall
+  $invalidDirectTarget = [pscustomobject]@{
+    PackageRoot = $fakeInstall.PackageRoot
+    Executable = (Join-Path $fakeInstall.PackageRoot 'other\ChatGPT.exe')
+    PackageFullName = $fakeInstall.PackageFullName
+    PackageFamilyName = $fakeInstall.PackageFamilyName
+    ApplicationId = $fakeInstall.ApplicationId
+    AppUserModelId = $fakeInstall.AppUserModelId
+    SignatureKind = $fakeInstall.SignatureKind
+  }
+  $invalidDirectTargetRejected = $false
+  try { Assert-DreamSkinCodexDirectLaunchTarget -Codex $invalidDirectTarget } catch {
+    $invalidDirectTargetRejected = $true
+  }
+  if (-not $invalidDirectTargetRejected) { throw 'Direct launch accepted an executable outside the validated Store manifest path.' }
+
+  $launcherFunctionNames = @(
+    'Start-DreamSkinCodex',
+    'Wait-DreamSkinCodexDebugArgumentStatus',
+    'Start-DreamSkinCodexDirect',
+    'Stop-DreamSkinCodex',
+    'Get-DreamSkinCodexProcesses'
+  )
+  $originalLauncherFunctions = @{}
+  foreach ($functionName in $launcherFunctionNames) {
+    $originalLauncherFunctions[$functionName] = (Get-Command $functionName -CommandType Function).ScriptBlock
+  }
+  try {
+    Set-Item 'function:Start-DreamSkinCodex' -Value { param($Codex, $Arguments) return 101 }
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'forwarded' }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value { throw 'Direct fallback must not run for compatible package activation.' }
+    Set-Item 'function:Stop-DreamSkinCodex' -Value {
+      param($Codex, [int[]]$PreserveProcessIds, [switch]$AllowForce)
+    }
+    Set-Item 'function:Get-DreamSkinCodexProcesses' -Value {
+      return @(
+        [pscustomobject]@{ ProcessId = 10 },
+        [pscustomobject]@{ ProcessId = 20 },
+        [pscustomobject]@{ ProcessId = 30 }
+      )
+    }
+    $newProcesses = @(Get-DreamSkinCodexProcessesExcept -Codex $fakeInstall -PreserveProcessIds @(10, 30))
+    if ($newProcesses.Count -ne 1 -or $newProcesses[0].ProcessId -ne 20) {
+      throw 'Launch rollback did not preserve the exact pre-launch Codex PID set.'
+    }
+    $compatibleLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($compatibleLaunch.ProcessId -ne 101 -or $compatibleLaunch.Strategy -cne 'package-activation') {
+      throw 'Compatible package activation did not remain the preferred launch strategy.'
+    }
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'uninspectable' }
+    $uninspectableLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($uninspectableLaunch.Strategy -cne 'package-activation' -or
+      $uninspectableLaunch.ArgumentStatus -cne 'uninspectable') {
+      throw 'An uninspectable package process was not kept on the conservative package-activation path.'
+    }
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'not-forwarded' }
+    $notForwardedLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($notForwardedLaunch.Strategy -cne 'package-activation' -or
+      $notForwardedLaunch.ArgumentStatus -cne 'not-forwarded') {
+      throw 'A command-line observation without explicit protocol redirection triggered an unsafe fallback.'
+    }
+
+    $script:dreamSkinDebugStatusCall = 0
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value {
+      param($Codex, $Port)
+      $script:dreamSkinDebugStatusCall += 1
+      if ($script:dreamSkinDebugStatusCall -eq 1) { return 'protocol-redirected' }
+      return 'forwarded'
+    }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value { param($Codex, $Arguments) return 202 }
+    $fallbackLaunch = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+      -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    if ($fallbackLaunch.ProcessId -ne 202 -or $fallbackLaunch.Strategy -cne 'direct-store-executable' -or
+      $fallbackLaunch.PackageArgumentStatus -cne 'protocol-redirected') {
+      throw 'owl protocol redirection did not use the validated direct Store executable fallback.'
+    }
+
+    $script:dreamSkinDebugStatusCall = 0
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value {
+      param($Codex, $Port)
+      $script:dreamSkinDebugStatusCall += 1
+      if ($script:dreamSkinDebugStatusCall -eq 1) { return 'protocol-redirected' }
+      return 'not-forwarded'
+    }
+    $directArgumentFailureReported = $false
+    try {
+      $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+        -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    } catch {
+      $directArgumentFailureReported = $_.Exception.Message.Contains(
+        'package activation or validated direct launch')
+    }
+    if (-not $directArgumentFailureReported) {
+      throw 'A direct fallback that also dropped the CDP argument did not fail closed.'
+    }
+
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'protocol-redirected' }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value {
+      throw [System.UnauthorizedAccessException]::new('denied')
+    }
+    $accessDeniedReported = $false
+    try {
+      $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
+        -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    } catch {
+      $accessDeniedReported = $_.Exception.Message.Contains('(access-denied)') -and
+        $_.Exception.Message.Contains('protected app package')
+    }
+    if (-not $accessDeniedReported) { throw 'A blocked direct Store launch did not produce the compatibility error.' }
+  } finally {
+    foreach ($functionName in $launcherFunctionNames) {
+      Set-Item ("function:$functionName") -Value $originalLauncherFunctions[$functionName]
+    }
+    Remove-Variable -Name dreamSkinDebugStatusCall -Scope Script -ErrorAction SilentlyContinue
+  }
   $fakeManifest.Package.Applications.Application[1].Id = 'Invalid App'
   if ($null -ne (ConvertTo-DreamSkinCodexInstall -Package $fakePackage -Manifest $fakeManifest)) {
     throw 'An invalid packaged-app application ID was accepted.'
@@ -654,10 +982,15 @@ try {
     throw 'Default Windows theme did not seed the Arina Hashimoto wallpaper contract.'
   }
   $preseededThemes = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot)
-  if ($preseededThemes.Count -ne 1 -or
-    $preseededThemes[0].Id -cne 'preset-arina-hashimoto' -or
-    $preseededThemes[0].Name -cne '桥本有菜') {
-    throw 'Arina Hashimoto was not preseeded in the Windows saved-theme menu.'
+  $preseededIds = @($preseededThemes | ForEach-Object { $_.Id })
+  if ($preseededThemes.Count -lt 2 -or
+    $preseededIds -notcontains 'preset-arina-hashimoto' -or
+    $preseededIds -notcontains 'preset-gothic-void-crusade') {
+    throw 'Windows did not preseed both Arina Hashimoto and Gothic Void Crusade.'
+  }
+  $gothicSeed = $preseededThemes | Where-Object { $_.Id -ceq 'preset-gothic-void-crusade' } | Select-Object -First 1
+  if ($null -eq $gothicSeed -or $gothicSeed.Name -cne 'Gothic Void Crusade') {
+    throw 'Gothic Void Crusade was not preseeded with the expected display name.'
   }
   $updatedTheme = Set-DreamSkinActiveTheme -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
     -Theme $null -Name '测试主题' -StateRoot $themeStateRoot
@@ -670,12 +1003,69 @@ try {
   }
   $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   $idempotentTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
-  if ($idempotentTheme.Theme.id -cne 'custom' -or
-    @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 1) {
-    throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled preset.'
+  $afterReinitCount = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count
+  if ($idempotentTheme.Theme.id -cne 'custom' -or $afterReinitCount -ne 2) {
+    throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled presets.'
   }
+
+  $releaseFixtureRoot = Join-Path $temporaryRoot 'release-theme-fixture'
+  $releaseFixtureAssets = Join-Path $releaseFixtureRoot 'assets'
+  $releaseFixtureScripts = Join-Path $releaseFixtureRoot 'scripts'
+  $releaseFixturePresets = Join-Path $releaseFixtureRoot 'presets'
+  $releaseFixturePresetDirectory = Join-Path $releaseFixturePresets 'preset-gothic-void-crusade'
+  $releaseFixtureState = Join-Path $temporaryRoot 'release-theme-state'
+  $repositoryRoot = Split-Path -Parent $Root
+  $publicPresetRoot = Join-Path $repositoryRoot 'macos\presets\preset-gothic-void-crusade'
+  New-Item -ItemType Directory -Path $releaseFixtureAssets, $releaseFixtureScripts, $releaseFixturePresetDirectory -Force | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Root 'VERSION') -Destination $releaseFixtureRoot -Force
+  foreach ($releaseAsset in @(
+    'dream-skin.css', 'renderer-inject.js', 'safe-css-policy.json', 'safe-css-validator.mjs', 'selectors.json',
+    'theme-package-validator.mjs'
+  )) {
+    Copy-Item -LiteralPath (Join-Path $Root "assets\$releaseAsset") `
+      -Destination $releaseFixtureAssets -Force
+  }
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\common-windows.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\apply-community-theme.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\check-update.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\config-utf8.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\image-metadata.mjs') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\injector.mjs') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\install-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\restore-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\start-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-windows.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\tray-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\validate-safe-css-file.mjs') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\verify-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $publicPresetRoot 'background.jpg') `
+    -Destination $releaseFixturePresetDirectory -Force
+  Copy-Item -LiteralPath (Join-Path $publicPresetRoot 'theme.json') `
+    -Destination $releaseFixturePresetDirectory -Force
+  Copy-Item -LiteralPath (Join-Path $publicPresetRoot 'background.jpg') `
+    -Destination (Join-Path $releaseFixtureAssets 'dream-reference.jpg') -Force
+  $releaseFixtureTheme = (Read-DreamSkinUtf8File -Path (Join-Path $publicPresetRoot 'theme.json')) |
+    ConvertFrom-Json
+  $releaseFixtureTheme.image = 'dream-reference.jpg'
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $releaseFixtureAssets 'theme.json') `
+    -Content (($releaseFixtureTheme | ConvertTo-Json -Depth 8) + "`r`n")
+  $releaseThemePaths = Initialize-DreamSkinThemeStore -SkillRoot $releaseFixtureRoot `
+    -StateRoot $releaseFixtureState
+  $releaseActiveTheme = Read-DreamSkinTheme -ThemeDirectory $releaseThemePaths.Active
+  $releaseSavedThemes = @(Get-DreamSkinSavedThemes -StateRoot $releaseFixtureState)
+  if ($releaseActiveTheme.Theme.id -cne 'preset-gothic-void-crusade' -or
+    $releaseSavedThemes.Count -ne 1 -or
+    $releaseSavedThemes[0].Id -cne 'preset-gothic-void-crusade') {
+    throw 'Release-safe bundled theme did not seed dynamically by its validated preset id.'
+  }
+  $releaseEngine = Install-DreamSkinRuntimeEngine -SkillRoot $releaseFixtureRoot `
+    -StateRoot (Join-Path $temporaryRoot 'release-engine-state')
+  if (-not (Test-Path -LiteralPath (Join-Path $releaseEngine.Root 'presets\preset-gothic-void-crusade\theme.json') -PathType Leaf)) {
+    throw 'Release-shaped payload could not stage its public Gothic preset into the managed engine.'
+  }
+
   $savedTheme = Save-DreamSkinCurrentTheme -Name '已保存主题' -StateRoot $themeStateRoot
-  if ($savedTheme.Theme.name -cne '已保存主题' -or @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 2) {
+  if ($savedTheme.Theme.name -cne '已保存主题' -or @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count -ne 3) {
     throw 'Saved theme creation or discovery failed.'
   }
   $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedTheme.Directory -StateRoot $themeStateRoot
@@ -704,7 +1094,7 @@ try {
   New-Item -ItemType Directory -Path $oversizedTheme | Out-Null
   $oversizedImage = Join-Path $oversizedTheme 'oversized.jpg'
   $oversizedStream = [System.IO.File]::Open($oversizedImage, [System.IO.FileMode]::CreateNew)
-  try { $oversizedStream.SetLength((16 * 1024 * 1024) + 1) } finally { $oversizedStream.Dispose() }
+  try { $oversizedStream.SetLength((10 * 1024 * 1024) + 1) } finally { $oversizedStream.Dispose() }
   Write-DreamSkinUtf8FileAtomically -Path (Join-Path $oversizedTheme 'theme.json') `
     -Content "{`"image`":`"oversized.jpg`"}`r`n"
   $oversizedReadRejected = $false
@@ -714,7 +1104,7 @@ try {
     $null = Set-DreamSkinActiveTheme -ImagePath $oversizedImage -Theme $null -StateRoot $themeStateRoot
   } catch { $oversizedSetRejected = $true }
   if (-not $oversizedReadRejected -or -not $oversizedSetRejected) {
-    throw 'The 16 MB image limit was not enforced before theme copy or payload construction.'
+    throw 'The 10 MB image limit was not enforced before theme copy or payload construction.'
   }
 
   $oversizedDimensionImage = Join-Path $temporaryRoot 'oversized-dimension.png'
@@ -742,33 +1132,116 @@ try {
 
   $css = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\dream-skin.css')
   foreach ($requiredCss in @(
-    'background-image: var(--dream-art)',
+    'background-image: var(--dream-skin-art)',
     'main.main-surface > header.app-header-tint',
     '[class~="group/application-menu-top-bar"]',
     '.app-shell-main-content-top-fade',
     '.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary',
-    '--dream-immersive-composer',
-    'background-position: var(--dream-art-position)',
-    '.dream-home-utility',
-    ':has(.dream-home-utility) .composer-surface-chrome',
-    ':is(.dream-task-ambient, .dream-task-banner):has(main.main-surface:not(.dream-home-shell))'
+    '--ds-immersive-composer',
+    'background-position: var(--ds-art-position)',
+    'html[data-dream-skin="active"]',
+    'main.main-surface:has([role="main"])',
+    'main.main-surface:not(:has([role="main"]))'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
+  if ($css -notmatch 'html\[data-dream-skin="active"\]\s+\[class~="group/application-menu-top-bar"\]\s*\{') {
+    throw 'The native application menu bar lacks a shell-independent readability backdrop.'
+  }
+  if ($css.Contains('home-suggestion-list-item') -or
+    $css.Contains('.dream-skin-home') -or $css.Contains('.dream-home') -or
+    $css.Contains('.dream-task') -or $css.Contains('codex-dream-skin-chrome')) {
+    throw 'Canonical CSS still contains retired marker classes or fossil selectors.'
+  }
+  $macCssPath = Join-Path (Split-Path -Parent $Root) 'macos\assets\dream-skin.css'
+  if (-not (Test-Path -LiteralPath $macCssPath) -or
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $macCssPath).Hash -cne
+    (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Root 'assets\dream-skin.css')).Hash) {
+    throw 'macOS and Windows canonical CSS assets are not byte-identical.'
+  }
+  $macSelectorsPath = Join-Path (Split-Path -Parent $Root) 'macos\assets\selectors.json'
+  if (-not (Test-Path -LiteralPath $macSelectorsPath) -or
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $macSelectorsPath).Hash -cne
+    (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Root 'assets\selectors.json')).Hash) {
+    throw 'macOS and Windows selector contract assets are not byte-identical.'
+  }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '继续显示皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
-  if (-not $traySource.Contains('$nextPaused') -or -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
-    throw 'Tray pause/restore closures do not terminate cleanly.'
+  if (-not $traySource.Contains('Invoke-DreamSkinLiveRemove') -or
+    -not $traySource.Contains("Set-DreamSkinPaused -Paused `$true") -or
+    -not $traySource.Contains("Set-DreamSkinPaused -Paused `$false") -or
+    -not $traySource.Contains('[System.Windows.Forms.Application]::Exit()')) {
+    throw 'Tray pause/resume no longer mirrors macOS live-remove and re-apply semantics.'
   }
-  if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 1 -or
+  $themeWindowsSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-windows.ps1')
+  foreach ($requiredLiveRemoveToken in @(
+    'function Invoke-DreamSkinLiveRemove',
+    'function Show-DreamSkinOperationUi',
+    "'--remove'",
+    "'--browser-id'",
+    "'--begin-operation'",
+    'Invoke-DreamSkinNative'
+  )) {
+    if (-not $themeWindowsSource.Contains($requiredLiveRemoveToken)) {
+      throw "Live remove helper is missing required token: $requiredLiveRemoveToken"
+    }
+  }
+  $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
+  foreach ($requiredOperationUi in @(
+    'chatgpt-dream-skin-operation',
+    'begin-operation',
+    'finish-operation',
+    '正在暂停皮肤…',
+    'presentOperationUi',
+    'operationUiExpression'
+  )) {
+    if (-not $injectorSource.Contains($requiredOperationUi)) {
+      throw "Windows injector operation UI is missing: $requiredOperationUi"
+    }
+  }
+  if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 2 -or
     $traySource.Contains('-ExecutionPolicy Bypass')) {
     throw 'Tray actions still bypass the PowerShell execution policy.'
+  }
+  if (-not $traySource.Contains("Start-Process -FilePath `$powershell -ArgumentList `$argumentLine -WindowStyle Hidden") -or
+    -not $traySource.Contains('ConvertTo-DreamSkinProcessArgument -Value $paths.Images')) {
+    throw 'Tray subprocesses can show a console window or split a spaced image-directory path.'
   }
   if (-not $traySource.Contains('Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata') -or
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
+  }
+  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动')) {
+    if (-not $traySource.Contains($requiredReleaseAction)) {
+      throw "Tray release action is missing: $requiredReleaseAction"
+    }
+  }
+  $trayTokens = $null
+  $trayParseErrors = $null
+  $trayAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $traySource,
+    [ref]$trayTokens,
+    [ref]$trayParseErrors
+  )
+  if ($trayParseErrors.Count -gt 0) { throw "Tray script failed to parse: $($trayParseErrors[0].Message)" }
+  $addTrayItemAst = $trayAst.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Add-DreamSkinTrayItem'
+  }, $true)
+  if ($null -eq $addTrayItemAst) { throw 'Tray item helper could not be loaded for an empty-menu behavior check.' }
+  Invoke-Expression $addTrayItemAst.Extent.Text
+  Add-Type -AssemblyName System.Windows.Forms
+  $emptyMenu = [System.Windows.Forms.ContextMenuStrip]::new()
+  try {
+    $probeItem = Add-DreamSkinTrayItem -Items $emptyMenu.Items -Text 'first-item-probe' -Action $null -Enabled $false
+    if ($emptyMenu.Items.Count -ne 1 -or $probeItem.Text -ne 'first-item-probe' -or $probeItem.Enabled) {
+      throw 'Tray item helper cannot add the first disabled entry to an empty menu.'
+    }
+  } finally {
+    $emptyMenu.Dispose()
   }
   $restoreSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\restore-dream-skin.ps1')
   if (-not $restoreSource.Contains('Stop-DreamSkinTrayProcess')) {
@@ -780,8 +1253,8 @@ try {
   }
   $startSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\start-dream-skin.ps1')
   if ($startSource.Contains('Start-Process -FilePath $codex.Executable') -or
-    -not $startSource.Contains('Start-DreamSkinCodex -Codex $codex')) {
-    throw 'Start still executes the WindowsApps path instead of activating the registered package.'
+    -not $startSource.Contains('Start-DreamSkinCodexForDebugging -Codex $codex')) {
+    throw 'Start bypasses the guarded package-activation and Store-executable launch strategy.'
   }
   $stateReadIndex = $startSource.IndexOf('$previousState = Read-DreamSkinState', [System.StringComparison]::Ordinal)
   $restartPromptIndex = $startSource.IndexOf('$restartAuthorized = Confirm-DreamSkinRestart', [System.StringComparison]::Ordinal)
@@ -799,13 +1272,78 @@ try {
     -not $startSource.Contains('Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot')) {
     throw 'Start does not preserve an existing pause marker when startup rolls back.'
   }
+  if (-not $startSource.Contains('$verifyDeadline') -or
+    -not $startSource.Contains('Start-Sleep -Seconds 3')) {
+    throw 'Start lost the verification retry window; a single early-boot miss must not tear the startup down.'
+  }
+  if (-not $startSource.Contains('direct Store executable fallback did not expose a verified loopback CDP endpoint') -or
+    -not $startSource.Contains('may disable CDP in this production runtime')) {
+    throw 'A direct launch that retains CDP arguments but exposes no listener no longer reports the owl runtime failure.'
+  }
+  if (-not $startSource.Contains('-PreserveProcessIds $debugLaunchBaselineProcessIds -AllowForce') -or
+    -not $startSource.Contains('reopening Codex without a debugging port')) {
+    throw 'The no-listener launch path no longer closes only new Codex processes and restores a normal launch.'
+  }
+  if (-not $startSource.Contains('WaitForExit(15000)')) {
+    throw 'Startup rollback no longer waits long enough for its own injector to exit; short waits leave duelling watchers.'
+  }
+  if (-not $startSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
+    throw 'Start lost the any-registered endpoint fallback for Store auto-updates.'
+  }
+  $verifyScriptSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
+  if (-not $verifyScriptSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
+    throw 'Verify lost the any-registered endpoint fallback for Store auto-updates.'
+  }
+  foreach ($verifyCaller in @(
+    @{ Name = 'start-dream-skin.ps1'; Source = $startSource },
+    @{ Name = 'verify-dream-skin.ps1'; Source = $verifyScriptSource }
+  )) {
+    $verifyIndex = $verifyCaller.Source.IndexOf("'--verify'", [System.StringComparison]::Ordinal)
+    $themeDirIndex = $verifyCaller.Source.IndexOf("'--theme-dir'", [System.StringComparison]::Ordinal)
+    if ($verifyIndex -lt 0 -or $themeDirIndex -lt 0) {
+      throw "$($verifyCaller.Name) must pass --theme-dir to --verify; the injector's assets fallback compares against the wrong expected theme."
+    }
+  }
+  if (-not (Get-Command Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -CommandType Function -ErrorAction SilentlyContinue)) {
+    throw 'The any-registered CDP identity helper is missing from common-windows.ps1.'
+  }
 
   $rendererSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\renderer-inject.js')
-  foreach ($requiredRendererBehavior in @('dream-home-utility', 'artMetadata', 'detectShellAppearance')) {
+  foreach ($requiredRendererBehavior in @(
+    'adoptedStyleSheets', 'CSSStyleSheet', 'artMetadata', 'detectShellAppearance',
+    'data-dream-skin', 'data-ds-part', 'childList: true', 'subtree: true',
+    'window.navigation', 'selectorsSchema', 'codex-dream-skin-selectors/1'
+  )) {
     if (-not $rendererSource.Contains($requiredRendererBehavior)) {
       throw "Renderer adaptive behavior is missing: $requiredRendererBehavior"
     }
   }
+  foreach ($forbiddenRendererBehavior in @(
+    'getBoundingClientRect', 'ResizeObserver',
+    'classList.add', 'classList.remove', 'classList.toggle',
+    'syncRouteState', 'samplingNativeShell', 'dream-home-utility'
+  )) {
+    if ($rendererSource.Contains($forbiddenRendererBehavior)) {
+      throw "Unified renderer still contains retired behavior: $forbiddenRendererBehavior"
+    }
+  }
+  $node = Get-DreamSkinNodeRuntime
+  & (Join-Path $PSScriptRoot 'community-theme-link.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'theme-zip-import.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-renderer-readiness.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-verified-skin-preserved.tests.ps1') -Root $Root
+  $projectRoot = Split-Path -Parent $Root
+  $syncToolPath = Join-Path $projectRoot 'tools\sync-runtime-assets.mjs'
+  $syncToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($syncToolPath, '--check')
+  if ($syncToolResult.ExitCode -ne 0) {
+    # The tool names each stale file on stdout; without this the failure is
+    # indistinguishable from the tool not running at all.
+    $syncDetail = ($syncToolResult.Output -join "`n").Trim()
+    throw "Runtime contract tool failed: $syncToolPath`n$syncDetail"
+  }
+  $doctorToolPath = Join-Path $projectRoot 'tools\doctor-selectors.test.mjs'
+  $doctorToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($doctorToolPath)
+  if ($doctorToolResult.ExitCode -ne 0) { throw "Runtime contract tool failed: $doctorToolPath" }
   $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
   foreach ($requiredInjectorBehavior in @(
     'MAX_ART_BYTES', 'createHash', 'readImageMetadata', '50MP safety limit', 'STRONG_THEME_AUDIT_MS',
@@ -820,6 +1358,10 @@ try {
     '[System.IO.FileAttributes]::ReparsePoint',
     'Ensure-DreamSkinManagedDirectory',
     'Get-DreamSkinValidatedImageMetadata',
+    '[System.IO.Compression.ZipArchive]',
+    'Only ordinary .zip theme packages are supported',
+    'Theme ZIP exceeds the 64 MB expanded-size limit',
+    'theme-package-validator.mjs',
     '16384px / 50MP safety limit',
     'Assert-DreamSkinImageFile -Path $temporary',
     'Assert-DreamSkinImageFile -Path $imageArchive'
@@ -833,7 +1375,6 @@ try {
     throw 'Mismatched live injector identity does not fail closed with preserved state.'
   }
 
-  $node = Get-DreamSkinNodeRuntime
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     '-e', "process.stderr.write('dream-skin-stderr-probe\n'); process.exit(7)")
   if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
@@ -856,7 +1397,10 @@ try {
   if ($managedPayloadTest.ExitCode -ne 0) { throw 'Managed theme payload validation failed.' }
   $oversizedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $oversizedTheme)
-  if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 16 MB limit.' }
+  if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 10 MB limit.' }
+  $safeCssTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $projectRoot 'macos\tests\safe-css-validator.test.mjs'))
+  if ($safeCssTest.ExitCode -ne 0) { throw 'Safe CSS validator regression test failed.' }
   $rendererTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'renderer-inject.test.mjs'))
   if ($rendererTest.ExitCode -ne 0) { throw 'Renderer auxiliary-window regression test failed.' }
@@ -866,6 +1410,9 @@ try {
   $oneShotTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'injector-one-shot.test.mjs'))
   if ($oneShotTest.ExitCode -ne 0) { throw 'Injector one-shot Browser ID regression test failed.' }
+  $windowReadinessTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'injector-window-readiness.test.mjs'))
+  if ($windowReadinessTest.ExitCode -ne 0) { throw 'Injector native-window readiness regression test failed.' }
   $imageMetadataTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'image-metadata.test.mjs'))
   if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }

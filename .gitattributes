@@ -6,6 +6,25 @@
 *.sh text eol=lf
 *.command text eol=lf
 
+# Release-reviewed build inputs are hashed byte-for-byte.
+macos/presets/preset-gothic-void-crusade/theme.json text eol=lf
+windows/presets/preset-gothic-void-crusade/theme.json text eol=lf
+windows/installer/languages/ChineseSimplified.isl text eol=lf
+windows/installer/languages/Inno-Setup-License.txt text eol=lf
+
+# sync-runtime-assets.mjs compares generated content to what is on disk byte
+# for byte, and it emits LF. A CRLF checkout would make --check fail on Windows
+# for files nobody edited, so the shared runtime source and everything compiled
+# from it stay LF on every platform -- sources included, not just outputs.
+runtime/** text eol=lf
+tools/selectors.json text eol=lf
+macos/assets/** text eol=lf
+windows/assets/** text eol=lf
+macos/scripts/image-metadata.mjs text eol=lf
+windows/scripts/image-metadata.mjs text eol=lf
+macos/scripts/validate-safe-css-file.mjs text eol=lf
+windows/scripts/validate-safe-css-file.mjs text eol=lf
+
 # Keep artwork out of text normalization and text diffs.
 *.png binary
 *.jpg binary

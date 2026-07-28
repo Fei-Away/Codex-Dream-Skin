@@ -8,18 +8,34 @@ Codex Dream Skin loads an external theme into the official Codex Windows desktop
 
 ## Requirements
 
+- Windows 10 or newer on x64 (the installer declares Windows 10 as its minimum).
 - The official `OpenAI.Codex` app installed from Microsoft Store and registered for the current user.
-- Node.js 22 or newer, with `node.exe` available on `PATH`.
-- Windows PowerShell 5.1 or newer.
+- Release Setup.exe bundles Node.js. Only source-based use needs Node.js 22 or
+  newer on `PATH`.
+- Windows PowerShell 5.1 or newer (the installer invokes it in the background;
+  ordinary users do not open it).
+
+## Release install (recommended for users)
+
+Download `CodexDreamSkin-Setup-vX.Y.Z.exe` from
+[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) and
+follow [`docs/install-windows.md`](../docs/install-windows.md). The installer
+contains the pinned Node runtime, so users do not need a source checkout or to
+run a `.ps1` file. It installs per-user and should not request administrator
+access. An unsigned download may occasionally trigger SmartScreen; use
+**More info → Run anyway** only after checking the file came from this Release,
+and never disable Defender. Updates are new Setup.exe packages installed over
+the existing copy; themes and images are retained.
 
 Run the installer after Codex has fully exited. Normal use does not require administrator access or ownership changes under WindowsApps.
 
-## Install
+## Advanced: install from source
 
-Open PowerShell in the repository's `windows` directory and run:
+Ordinary users can skip this section. Open PowerShell in the repository's
+`windows` directory and run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-dream-skin.ps1
 ```
 
 The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
@@ -28,12 +44,12 @@ The installer validates the official Codex Store package and Node.js, saves a re
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
-`Bypass` in the install command applies only to that user-initiated installer process. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`. Daily shortcuts use `RemoteSigned` and do not override system or enterprise Group Policy.
+Source-install commands and daily shortcuts both use `RemoteSigned`, so they do not override system or enterprise Group Policy. The installer verifies the runtime copy with SHA-256, then clears download-zone markers only from managed PowerShell copies under `%LOCALAPPDATA%\CodexDreamSkin\engine`.
 
 Pass `-Port` during installation to use a fixed custom port. Valid ports range from `1024` through `65535`.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dream-skin.ps1 -Port 9444
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-dream-skin.ps1 -Port 9444
 ```
 
 ## Update
@@ -47,13 +63,13 @@ The `Codex Dream Skin` shortcut is the recommended launcher. It asks for confirm
 Command-line launch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-dream-skin.ps1 -PromptRestart
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\start-dream-skin.ps1 -PromptRestart
 ```
 
 Run verification after launch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-dream-skin.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-dream-skin.ps1 `
   -ScreenshotPath "$env:TEMP\codex-dream-skin.png"
 ```
 
@@ -72,25 +88,59 @@ Next, use the generated screenshot to check horizontal overflow and text contras
 Open `Codex Dream Skin - Tray` to:
 
 - Import a PNG, JPEG, or WebP background.
+- Import an ordinary `.zip` theme pack into Saved Themes (`.dreamskin` is not supported).
 - Save the active theme and switch through saved themes.
 - Pause or resume the skin.
 - Reapply the theme or fully restore Codex.
 
-Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 16 MB, 16384 pixels on either side, and 50 million total pixels.
+For a reviewed, compatible three-payload theme on DreamSkin.cc, choose **Apply
+in app** to open `dreamskin://apply?version=...`. Windows shows a native
+confirmation first. After confirmation, the client downloads that exact version
+only from `https://api.dreamskin.cc`, checks the reviewed metadata, actual byte
+count, and SHA-256, then runs the same manifest, image, ZIP, and Safe CSS checks
+as manual import before switching. Codex may restart when it is open without a
+usable skin session, so save unfinished input first. The link cannot provide an
+arbitrary download URL, file path, command, or silent-apply option. Incomplete
+legacy themes remain rejected by the client.
+
+Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 10 MB, 16384 pixels on either side, and 50 million total pixels.
+
+Every new official Studio ZIP contains `manifest.json`, non-empty `theme.json`,
+non-empty `theme.css`, and exactly one `background.webp|jpg|png`, with optional `LICENSE.txt` and the
+reserved `manifest.sig`. Place them at archive root or inside exactly one
+top-level theme folder. A local simplified ZIP must contain exactly `theme.json`,
+`theme.css`, and its referenced image; because it lacks manifest integrity and compatibility
+data, use that format only for trusted content. Limits are 32 MiB compressed,
+32 entries, and 64 MiB expanded. Traversal, links/reparse entries, nested
+archives, and unregistered files are rejected. Official packs also verify the
+platform, minimum client version, and each payload's declared byte length and
+SHA-256. Safe CSS is locally revalidated on import and every apply, then runs
+only against the 12 registered parts. Previously saved legacy themes without
+CSS remain switchable and inject no extra CSS. `manifest.sig` is reserved and
+not used for signature verification. Import only adds to Saved
+Themes; it does not change the active theme. Identical content is not
+duplicated, while a different pack using an existing ID receives a new safe ID.
+
+For the manual fallback, choose **Open Themes Folder** and move in the complete
+extracted directory whose immediate children are `theme.json`, `theme.css`, and
+its image:
+`%LOCALAPPDATA%\CodexDreamSkin\themes\`. Reopen the tray menu afterward; do not
+add another wrapper directory. Manual placement bypasses archive checks, so use
+trusted content only.
 
 ## Restore and remove shortcuts
 
 Restore the stock appearance. If Codex is running, confirm its closure and relaunch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-skin.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\restore-dream-skin.ps1 `
   -RestoreBaseTheme -PromptRestart
 ```
 
 Add `-Uninstall` to also remove the shortcuts created by Dream Skin:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore-dream-skin.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\restore-dream-skin.ps1 `
   -RestoreBaseTheme -PromptRestart -Uninstall
 ```
 
@@ -143,6 +193,10 @@ When `-Port` is omitted, the launcher searches for a free port beginning at `933
 ### Verification cannot find a CDP endpoint
 
 Launch Codex through the `Codex Dream Skin` shortcut, then run verification. A normal Codex launch does not open the debug session used by Dream Skin.
+
+Starting with Codex Store `26.715.10079.0`, the owl runtime may convert package-activation arguments into a `codex://` path. The launcher detects that behavior and makes one raw-argument fallback attempt against the exact `ChatGPT.exe` in the same validated Store package; it does not change files or WindowsApps permissions.
+
+Field results in issue #235 now confirm two independent failures: WindowsApps returns `access-denied` for direct launch on `26.715.10079.0`, while `26.721.3404.0` retains the raw CDP arguments but its production runtime still opens no listener. Either result means that Codex/Windows combination cannot enable the skin within the project's safety boundary. The fallback is currently a safe diagnostic and rollback path, not a compatibility guarantee for affected owl builds. Do not take ownership of WindowsApps or patch the official package; keep the complete error and follow issue #235 for upstream compatibility status.
 
 ### The skin stops working after a Codex update
 

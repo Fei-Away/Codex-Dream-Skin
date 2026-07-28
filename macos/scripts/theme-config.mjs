@@ -2,28 +2,22 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-const [mode, configPath, backupPath] = process.argv.slice(2);
-// Backup these keys so Restore can put them back. Do NOT force dark —
-// Dream Skin CSS auto-adapts to light/dark via data-dream-shell.
+const [mode, configPath, backupPath, appearanceArg] = process.argv.slice(2);
+// Backup these keys so Restore can put them back. When the active theme pins an
+// appearance (light|dark), install also pins Codex appearanceTheme to match —
+// native token surfaces (dropdown/popover, #233) follow appearanceTheme, not the
+// skin. "auto" themes restore the user's original line instead.
 const settings = new Map([
   ["appearanceTheme", null],
   ["appearanceDarkCodeThemeId", null],
 ]);
 
 if (!["install", "restore"].includes(mode) || !configPath || !backupPath) {
-  throw new Error("Usage: theme-config.mjs <install|restore> <config-path> <backup-path>");
+  throw new Error("Usage: theme-config.mjs <install|restore> <config-path> <backup-path> [appearance]");
 }
-
-function desktopSection(content) {
-  const headers = [...content.matchAll(/^[\t ]*\[[\t ]*desktop[\t ]*\][\t ]*(?:#[^\r\n]*)?(?:\r?\n|$)/gm)];
-  if (headers.length > 1) throw new Error("Refusing to rewrite multiple [desktop] tables.");
-  const header = headers[0];
-  if (!header) return null;
-  const bodyStart = header.index + header[0].length;
-  const remainder = content.slice(bodyStart);
-  const nextHeader = /^[\t ]*\[/m.exec(remainder);
-  const bodyEnd = nextHeader ? bodyStart + nextHeader.index : content.length;
-  return { bodyStart, bodyEnd, body: content.slice(bodyStart, bodyEnd) };
+const appearance = appearanceArg || "auto";
+if (!["auto", "light", "dark"].includes(appearance)) {
+  throw new Error(`Unsupported appearance "${appearanceArg}"; expected auto, light, or dark.`);
 }
 
 function tomlStructureForLine(line) {
@@ -56,26 +50,88 @@ function tomlStructureForLine(line) {
   return result;
 }
 
-function assertSupportedTomlLayout(content) {
-  for (const line of content.split(/\r?\n/)) {
-    const structure = tomlStructureForLine(line);
-    const assignment = structure.indexOf("=");
-    if (assignment < 0) continue;
-    let depth = 0;
-    for (const character of structure.slice(assignment + 1)) {
-      if (character === "[") depth += 1;
-      if (character === "]") depth -= 1;
-    }
-    if (depth > 0) {
-      throw new Error("Refusing to rewrite TOML containing multiline arrays.");
+function isTomlTableHeader(structure) {
+  const value = structure.trim();
+  if (value.startsWith("[[")) {
+    return value.endsWith("]]")
+      && !value.slice(2, -2).includes("[")
+      && !value.slice(2, -2).includes("]");
+  }
+  return value.startsWith("[")
+    && !value.startsWith("[[")
+    && value.endsWith("]")
+    && !value.slice(1, -1).includes("[")
+    && !value.slice(1, -1).includes("]");
+}
+
+function updateTomlArrayDepth(structure, initialDepth) {
+  let depth = initialDepth;
+  for (const character of structure) {
+    if (character === "[") depth += 1;
+    if (character === "]") depth -= 1;
+    if (depth < 0) {
+      throw new Error("Refusing to rewrite TOML containing an unmatched array bracket.");
     }
   }
+  return depth;
+}
+
+function tomlTableHeaders(content) {
+  const headers = [];
+  const lines = content.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  let offset = 0;
+  let arrayDepth = 0;
+
+  for (const line of lines) {
+    const structure = tomlStructureForLine(line).trim();
+    if (arrayDepth === 0 && isTomlTableHeader(structure)) {
+      headers.push({
+        index: offset,
+        bodyStart: offset + line.length,
+        desktop: /^[\t ]*\[[\t ]*desktop[\t ]*\][\t ]*(?:#[^\r\n]*)?(?:\r?\n)?$/.test(line),
+      });
+    } else {
+      const assignment = structure.indexOf("=");
+      if (arrayDepth === 0 && assignment < 0) {
+        if (structure.includes("[") || structure.includes("]")) {
+          throw new Error("Refusing to rewrite malformed TOML array syntax.");
+        }
+      } else {
+        const expression = arrayDepth > 0 ? structure : structure.slice(assignment + 1);
+        arrayDepth = updateTomlArrayDepth(expression, arrayDepth);
+      }
+    }
+    offset += line.length;
+  }
+
+  if (arrayDepth !== 0) {
+    throw new Error("Refusing to rewrite TOML containing an unterminated array.");
+  }
+  return headers;
+}
+
+function desktopSection(content) {
+  const headers = tomlTableHeaders(content);
+  const desktopHeaders = headers.filter((header) => header.desktop);
+  if (desktopHeaders.length > 1) throw new Error("Refusing to rewrite multiple [desktop] tables.");
+  const header = desktopHeaders[0];
+  if (!header) return null;
+  const position = headers.indexOf(header);
+  const bodyEnd = headers[position + 1]?.index ?? content.length;
+  return { bodyStart: header.bodyStart, bodyEnd, body: content.slice(header.bodyStart, bodyEnd) };
 }
 
 function settingLines(body, key) {
   const token = key.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
   const matches = body.match(new RegExp(`^${token}[\\t ]*=.*$`, "gm")) ?? [];
   if (matches.length > 1) throw new Error(`Refusing to rewrite duplicate ${key} settings.`);
+  if (matches.some((line) => {
+    const structure = tomlStructureForLine(line);
+    const assignment = structure.indexOf("=");
+    return updateTomlArrayDepth(structure.slice(assignment + 1), 0) !== 0;
+  })) {
+    throw new Error(`Refusing to rewrite multiline ${key} settings.`);
+  }
   return { matches, token };
 }
 
@@ -232,7 +288,6 @@ async function main() {
   if (content.includes('"""') || content.includes("'''")) {
     throw new Error("Refusing to rewrite TOML containing multiline strings.");
   }
-  assertSupportedTomlLayout(content);
   let section = desktopSection(content);
 
   if (mode === "install") {
@@ -260,20 +315,22 @@ async function main() {
       await atomicWrite(backupPath, `${JSON.stringify(backup, null, 2)}\n`, 0o600);
     }
 
-    // Only apply non-null settings. null means "backup only / leave user's appearance alone".
-    let body = section.body;
-    let changed = false;
-    for (const [key, line] of settings) {
-      if (line === null) continue;
-      body = replaceSetting(body, key, line);
-      changed = true;
-    }
-    if (changed) {
+    // Pin appearanceTheme while a fixed-appearance theme is active; "auto"
+    // writes the pre-install line back so the user's own choice returns.
+    const backup = JSON.parse(decodeStrictUtf8(await fs.readFile(backupPath), "Theme backup"));
+    validateBackup(backup);
+    const desired = appearance === "auto"
+      ? backup.values.appearanceTheme ?? null
+      : `appearanceTheme = "${appearance}"`;
+    const body = replaceSetting(section.body, "appearanceTheme", desired);
+    if (body !== section.body) {
       const updated = content.slice(0, section.bodyStart) + body + content.slice(section.bodyEnd);
       await assertConfigUnchanged(originalBytes, originalStat);
       await atomicWrite(configPath, updated, originalStat.mode & 0o777, originalBytes, originalStat);
     }
-    console.log("Saved base-theme backup; left Codex appearanceTheme unchanged (skin auto-adapts light/dark).");
+    console.log(appearance === "auto"
+      ? "Saved base-theme backup; left Codex appearanceTheme at the user's own value (auto theme adapts to either shell)."
+      : `Saved base-theme backup; pinned Codex appearanceTheme = "${appearance}" to match the theme (Restore puts the original back).`);
     return;
   }
 

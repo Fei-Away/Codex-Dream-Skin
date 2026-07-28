@@ -29,7 +29,7 @@ CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
 EXPECTED_CODEX_TEAM_ID="2DC432GLL2"
 EXPECTED_CODEX_REQUIREMENT="anchor apple generic and certificate leaf[subject.OU] = \"$EXPECTED_CODEX_TEAM_ID\""
-SKIN_VERSION="1.2.0"
+SKIN_VERSION="1.5.6"
 DREAM_SKIN_VALIDATED_RUNTIME_PID=""
 DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE=""
 DREAM_SKIN_VALIDATED_RUNTIME_EXE=""
@@ -348,6 +348,22 @@ codex_main_pids() {
 
 codex_is_running() {
   [ -n "$(codex_main_pids)" ]
+}
+
+active_theme_appearance() {
+  "$NODE" -e '
+const fs = require("node:fs");
+let appearance = "auto";
+try { appearance = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).appearance; } catch {}
+process.stdout.write(appearance === "light" || appearance === "dark" ? appearance : "auto");
+' "$THEME_DIR/theme.json"
+}
+
+# Pin Codex appearanceTheme to the staged theme's declared appearance (or put
+# the user's original line back for auto themes). Callers must only run this
+# while Codex is closed; config writes race the app's own saves otherwise.
+sync_appearance_pin() {
+  "$NODE" "$SCRIPT_DIR/theme-config.mjs" install "$CONFIG_PATH" "$THEME_BACKUP_PATH" "$(active_theme_appearance)"
 }
 
 process_started_at() {

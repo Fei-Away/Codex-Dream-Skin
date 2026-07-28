@@ -38,8 +38,9 @@ try {
     `${JSON.stringify({ schemaVersion: 1, id: "preset-race", name: "A", image: "background-a.png" })}\n`,
   );
 
-  const imageName = await runStage(source, stage);
-  assert.equal(imageName, "background-a.png");
+  const stagedIdentity = JSON.parse(await runStage(source, stage));
+  assert.equal(stagedIdentity.image, "background-a.png");
+  assert.match(stagedIdentity.contentFingerprint, /^[0-9a-f]{64}$/);
   const stagedConfig = JSON.parse(await fs.readFile(path.join(stage, "theme.json"), "utf8"));
   assert.equal(stagedConfig.image, "background-a.png");
   const stagedBeforeMutation = await fs.readFile(path.join(stage, "background-a.png"));
@@ -55,6 +56,19 @@ try {
   await fs.writeFile(path.join(source, "background-a.png"), Buffer.from("changed-after-stage"));
   assert.deepEqual(await fs.readFile(path.join(stage, "background-a.png")), stagedBeforeMutation);
   assert.equal(JSON.parse(await fs.readFile(path.join(stage, "theme.json"), "utf8")).name, "A");
+
+  const secondStage = path.join(tempRoot, "stage-second");
+  await fs.mkdir(secondStage);
+  const secondIdentity = JSON.parse(await runStage(stage, secondStage));
+  assert.equal(secondIdentity.contentFingerprint, stagedIdentity.contentFingerprint);
+  await fs.writeFile(
+    path.join(stage, "theme.css"),
+    '[data-ds-part="root"] { color: var(--ds-theme-color-text); }\n',
+  );
+  const cssStage = path.join(tempRoot, "stage-css");
+  await fs.mkdir(cssStage);
+  const cssIdentity = JSON.parse(await runStage(stage, cssStage));
+  assert.notEqual(cssIdentity.contentFingerprint, stagedIdentity.contentFingerprint);
 
   const outside = path.join(tempRoot, "outside.png");
   await fs.copyFile(fixtureAsset, outside);
@@ -79,7 +93,7 @@ try {
   await fs.mkdir(symlinkStage);
   await assert.rejects(runStage(symlink, symlinkStage), /symbolic link/);
 
-  console.log("PASS: theme staging snapshots a matched, contained config/image pair.");
+  console.log("PASS: theme staging snapshots a matched pair and binds it to a stable content fingerprint.");
 } finally {
   await fs.rm(tempRoot, { recursive: true, force: true });
 }
