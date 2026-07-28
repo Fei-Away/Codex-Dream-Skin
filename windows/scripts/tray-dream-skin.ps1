@@ -14,6 +14,7 @@ $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $paths = $null
 $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
 $startScript = Join-Path $PSScriptRoot 'start-dream-skin.ps1'
+$loginScript = Join-Path $PSScriptRoot 'login-dream-skin.ps1'
 $restoreScript = Join-Path $PSScriptRoot 'restore-dream-skin.ps1'
 $checkUpdateScript = Join-Path $PSScriptRoot 'check-update.ps1'
 $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'Codex Dream Skin.lnk'
@@ -106,9 +107,9 @@ try {
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($startupShortcut)
     $shortcut.TargetPath = $powershell
-    $shortcut.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$PSScriptRoot\tray-dream-skin.ps1`""
+    $shortcut.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$loginScript`" -Port $Port"
     $shortcut.WorkingDirectory = $SkillRoot
-    $shortcut.Description = 'Start Codex Dream Skin in the notification area'
+    $shortcut.Description = 'Start Codex with Dream Skin and open its notification-area controls'
     $shortcut.Save()
   }
 
@@ -281,7 +282,7 @@ try {
     $autoStartAction = {
       Set-DreamSkinAutoStart -Enabled:(-not $autoStartEnabled)
     }.GetNewClosure()
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '登录时启动' `
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '登录时启动皮肤和 Codex' `
       -Action $autoStartAction -Checked $autoStartEnabled
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '完全恢复 Codex' -Action {

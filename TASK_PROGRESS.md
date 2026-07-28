@@ -19,8 +19,18 @@
 - [complete] Added a 26.721+-scoped shared-runtime layout refinement for the sibling content wrapper, removed the three redundant decorative labels, and retained upstream's dark-sidebar/dark-shell menu strategy without restoring the obsolete nested `:has()` rules that caused #244.
 - [complete] Bumped the six release sources and four current-version assertions to fork version `1.5.7`; added matching Windows/macOS changelog entries while retaining the truthful upstream base of `v1.5.6`.
 - [verified] Shared runtime assets are synchronized. Windows injector/renderer syntax, 18 portable Node regressions, the complete Windows PowerShell suite, and installer static contracts pass. Forced cleanup warnings are intentional failure-injection fixtures.
-- [complete] Built local `release/CodexDreamSkin-Setup-v1.5.7.exe` with pinned Inno Setup 6.7.1 and bundled Node 22.23.1. The artifact is 24,462,494 bytes, reports product version `1.5.7`, and has SHA-256 `CC48F960D24555C8216C198AEA2C22287D617974BA8757F7341D340207E9E547`.
+- [superseded] The initial 24,462,494-byte local `v1.5.7` installer was overwritten after the login-startup defect was reproduced; it is no longer the deliverable.
 - [fact] The installer is intentionally unsigned, matching upstream's current first-run warning behavior. No installation, push, tag, PR, or public Release was performed.
+
+## Windows Login Startup Repair (2026-07-28 CST)
+
+- [reproduced] Installed engine and installer payload both report `1.5.7`, but the Inno-created startup shortcut targets `C:\Windows\Sysnative\WindowsPowerShell\...`; that alias is unavailable to 64-bit Explorer while the real `System32` executable exists. The tray mutex is not held, the recorded injector PID is dead, and its log says the original CDP browser identity closed.
+- [root cause] All persisted Inno launch surfaces used the process-only `Sysnative` alias. In addition, the Release Start-menu entry and login task launched only the tray, even though an ordinary Codex launch cannot expose the verified CDP endpoint required for injection.
+- [decision] Keep fork version `1.5.7` at the user's explicit request because it has not been published. Rebuild and overwrite only the local installer, then report a new checksum.
+- [complete] Added a login orchestrator that starts the tray and a verified skin session while respecting pause, split the Release Start-menu skin/tray entries, and use the real `System32` path for every persisted entry. Ordinary Codex launches are never silently killed; an already-open non-CDP session still requires explicit restart consent.
+- [verified] Installer static contracts, PowerShell parsing, 18 portable Node regressions, the complete Windows PowerShell suite, and `git diff --check` pass. Forced cleanup warnings remain intentional failure-injection fixtures.
+- [complete] Rebuilt and overwrote local `release/CodexDreamSkin-Setup-v1.5.7.exe` with pinned Inno Setup 6.7.1 and bundled Node 22.23.1. It is 24,463,555 bytes and reports product version `1.5.7`; the prior checksum sidecar was deleted at the user's request.
+- [fact] The repaired installer has not been installed, pushed, tagged, or publicly released.
 
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 

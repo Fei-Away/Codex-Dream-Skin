@@ -54,6 +54,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 ## 启动与验证
 
 推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。
+托盘菜单中的“登录时启动皮肤和 Codex”是显式选择：登录 Windows 后会同时启动托盘与带 CDP 的 Codex 皮肤会话；如果此前选择了“暂停皮肤”，登录时只启动托盘，不会清除暂停状态。
+普通 Codex 快捷方式本身不会携带本项目需要的 CDP 参数。启用上述登录启动后，普通快捷方式通常只会唤起已在运行的皮肤会话；未启用时仍应使用 `Codex Dream Skin` 快捷方式。
 
 命令行启动：
 

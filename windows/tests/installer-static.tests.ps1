@@ -8,10 +8,11 @@ $definitionPath = Join-Path $installerRoot 'codex-dream-skin.iss'
 $builderPath = Join-Path $installerRoot 'build-release.ps1'
 $bootstrapPath = Join-Path $installerRoot 'setup-bootstrap.ps1'
 $communityApplyPath = Join-Path $windowsRoot 'scripts\apply-community-theme.ps1'
+$loginPath = Join-Path $windowsRoot 'scripts\login-dream-skin.ps1'
 $manifestPath = Join-Path $installerRoot 'node-runtime.json'
 $builderAst = $null
 
-foreach ($scriptPath in @($builderPath, $bootstrapPath, $communityApplyPath)) {
+foreach ($scriptPath in @($builderPath, $bootstrapPath, $communityApplyPath, $loginPath)) {
   if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     throw "Required installer PowerShell does not exist: $scriptPath"
   }
@@ -59,6 +60,10 @@ foreach ($requiredDefinition in @(
   'DestDir: "{app}\payload"',
   'Flags: unchecked',
   'Flags: nowait postinstall skipifsilent',
+  '#define PersistedPowerShellPath "{win}\System32\WindowsPowerShell\v1.0\powershell.exe"',
+  '{localappdata}\CodexDreamSkin\engine\scripts\start-dream-skin.ps1"" -PromptRestart',
+  '{localappdata}\CodexDreamSkin\engine\scripts\tray-dream-skin.ps1',
+  '{localappdata}\CodexDreamSkin\engine\scripts\login-dream-skin.ps1',
   'english.ConfirmUninstall=Uninstall will close Codex',
   'Name: "chinesesimplified"; MessagesFile: "{#StageRoot}\languages\ChineseSimplified.isl"',
   'chinesesimplified.ConfirmUninstall=',
@@ -84,6 +89,14 @@ foreach ($requiredDefinition in @(
   if (-not $definition.Contains($requiredDefinition)) {
     throw "Inno Setup definition is missing a release safety contract: $requiredDefinition"
   }
+}
+$persistedLaunchLines = @($definition -split "`r?`n" | Where-Object {
+  $_ -match '^(Name: "\{(?:group|userstartup)\}|Root: HKCU; Subkey: "Software\\Classes\\dreamskin\\shell\\open\\command")'
+})
+if ($persistedLaunchLines.Count -ne 4 -or
+  @($persistedLaunchLines | Where-Object { $_.Contains('{sysnative}') -or $_.Contains('{#NativePowerShellPath}') }).Count -gt 0 -or
+  @($persistedLaunchLines | Where-Object { $_.Contains('{#PersistedPowerShellPath}') }).Count -ne 4) {
+  throw 'Persisted Windows launch surfaces must use the real System32 path, never the process-only Sysnative alias.'
 }
 if ($definition.Contains('Root: HKLM') -or
   $definition.Contains('dreamskin://apply?url=') -or
@@ -168,6 +181,7 @@ foreach ($requiredRepairContract in @(
   'scripts\apply-community-theme.ps1',
   'presets\preset-gothic-void-crusade\theme.json',
   'scripts\start-dream-skin.ps1',
+  'scripts\login-dream-skin.ps1',
   'scripts\check-update.ps1',
   'runtime\node\node.exe',
   'runtime\node\LICENSE',

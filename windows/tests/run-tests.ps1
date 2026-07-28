@@ -1032,6 +1032,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\image-metadata.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\injector.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\install-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\login-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\restore-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\start-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-windows.ps1') -Destination $releaseFixtureScripts -Force
@@ -1221,9 +1222,26 @@ try {
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
   }
-  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动')) {
+  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动皮肤和 Codex')) {
     if (-not $traySource.Contains($requiredReleaseAction)) {
       throw "Tray release action is missing: $requiredReleaseAction"
+    }
+  }
+  if (-not $traySource.Contains('login-dream-skin.ps1') -or
+    $traySource.Contains('File `"$PSScriptRoot\tray-dream-skin.ps1`"')) {
+    throw 'Tray login startup still creates a tray-only shortcut instead of a complete Dream Skin session.'
+  }
+  $loginSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\login-dream-skin.ps1')
+  foreach ($requiredLoginToken in @(
+    'Test-DreamSkinTrayActive',
+    'tray-dream-skin.ps1',
+    'start-dream-skin.ps1',
+    'Test-DreamSkinPaused',
+    '-PromptRestart',
+    '-RequireUnpaused'
+  )) {
+    if (-not $loginSource.Contains($requiredLoginToken)) {
+      throw "Login startup orchestration is missing: $requiredLoginToken"
     }
   }
   $trayTokens = $null
