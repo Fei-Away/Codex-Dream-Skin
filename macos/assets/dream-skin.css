@@ -49,6 +49,11 @@
   --ds-immersive-mid: rgb(var(--ds-bg-rgb) / .26);
   --ds-immersive-far: rgb(var(--ds-bg-rgb) / .16);
   --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / .46);
+  --ds-sidebar-block-start: var(--ds-immersive-sidebar);
+  --ds-sidebar-block-end: var(--ds-immersive-edge);
+  --ds-main-block-start: var(--ds-immersive-edge);
+  --ds-main-block-mid: var(--ds-immersive-mid);
+  --ds-main-block-end: var(--ds-immersive-far);
   --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / .70);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-composer: rgb(var(--ds-panel-rgb) / .44);
@@ -99,6 +104,11 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
   --ds-immersive-mid: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-far: rgb(var(--ds-panel-rgb) / .14);
   --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / .48);
+  --ds-sidebar-block-start: var(--ds-immersive-sidebar);
+  --ds-sidebar-block-end: var(--ds-immersive-edge);
+  --ds-main-block-start: var(--ds-immersive-edge);
+  --ds-main-block-mid: var(--ds-immersive-mid);
+  --ds-main-block-end: var(--ds-immersive-far);
   --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / .72);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / .34);
   --ds-immersive-composer: rgb(var(--ds-panel-rgb) / .46);
@@ -343,6 +353,14 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
   height: auto;
 }
 
+html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"]):not(:has(main.main-surface [role="main"])) {
+  --ds-sidebar-block-start: var(--ds-task-immersive-sidebar);
+  --ds-sidebar-block-end: var(--ds-task-immersive-edge);
+  --ds-main-block-start: var(--ds-task-immersive-edge);
+  --ds-main-block-mid: var(--ds-task-immersive-mid);
+  --ds-main-block-end: var(--ds-task-immersive-far);
+}
+
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main.main-surface):not(:has(main.main-surface [role="main"])) body {
   background-image: var(--dream-skin-art) !important;
   background-position: var(--ds-art-position) !important;
@@ -527,7 +545,7 @@ html[data-dream-skin="active"][data-dream-shell="light"] main.main-surface:not(:
 
 html[data-dream-skin="active"][data-dream-shell="light"]
   main.main-surface:has([role="main"])::after,
-html[data-dream-skin="active"][data-dream-shell="light"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"]::before {
+html[data-dream-skin="active"][data-dream-shell="light"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"]::before {
   text-shadow: none;
 }
 
@@ -554,22 +572,69 @@ html[data-dream-skin="active"][data-dream-shell="dark"]
   text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .82) !important;
 }
 
+/* Continue the sidebar through the Windows application menu while keeping the
+   unmasked home artwork clear. The renderer publishes the live split without
+   synchronous layout reads. */
+html[data-dream-skin="active"][data-dream-chrome-mode="left"]:has(aside.app-shell-left-panel)
+  [class~="group/application-menu-top-bar"] {
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg,
+    var(--ds-sidebar-block-start) 0,
+    var(--ds-sidebar-block-end) var(--ds-sidebar-extent, 0px),
+    transparent var(--ds-sidebar-extent, 0px)) !important;
+  background-position: 0 0 !important;
+  background-size: auto !important;
+  background-repeat: no-repeat !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Conversation routes mask the main surface as well. Use the exact same
+   non-home condition as that surface: during new-conversation startup the
+   main mask appears before the thread scroller, so waiting for the scroller
+   would expose a temporary bright menu strip. A single continuous gradient
+   shares one stop at the fractional sidebar edge, avoiding both a transparent
+   raster gap and double-alpha dark overlap. */
+html[data-dream-skin="active"][data-dream-chrome-mode="left"]:has(aside.app-shell-left-panel):not(:has(main.main-surface [role="main"]))
+  [class~="group/application-menu-top-bar"] {
+  background-image: linear-gradient(90deg,
+    var(--ds-sidebar-block-start) 0,
+    var(--ds-sidebar-block-end) var(--ds-sidebar-extent, 0px),
+    var(--ds-main-block-mid) calc(64% + var(--ds-sidebar-extent, 0px) * .36),
+    var(--ds-main-block-end) 100%) !important;
+}
+
+html[data-dream-skin="active"][data-dream-chrome-mode="full"]
+  [class~="group/application-menu-top-bar"] {
+  color: var(--ds-text) !important;
+  background: rgb(var(--ds-panel-rgb) / .90) !important;
+  border-bottom: 1px solid var(--ds-line) !important;
+  box-shadow: 0 1px 12px rgb(var(--ds-bg-rgb) / .42) !important;
+  backdrop-filter: blur(16px) saturate(90%) !important;
+}
+
+html[data-dream-skin="active"][data-dream-chrome-mode="full"]
+  [class~="group/application-menu-top-bar"] :is(button, svg) {
+  color: var(--ds-text) !important;
+}
+
 html[data-dream-skin="active"] main.main-surface [role="main"] {
   background: transparent !important;
   scrollbar-color: rgb(var(--ds-accent-rgb) / .38) transparent;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) {
   --thread-content-max-width: min(1180px, calc(100cqw - 44px)) !important;
   overflow-x: hidden !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child {
   min-height: 100% !important;
   padding-top: 15px !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child {
   flex: 0 0 440px !important;
   min-height: 440px !important;
   align-items: flex-start !important;
@@ -584,19 +649,19 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > di
    (see #244). Override with higher specificity only when that new slot is
    present, so pre-26.721 layouts are untouched. */
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) {
   min-height: 0 !important;
   padding-top: 0 !important;
 }
 
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) > .home-banners {
   flex: 0 1 auto !important;
   min-height: 0 !important;
 }
 
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child {
   height: auto !important;
   min-height: 0 !important;
   border: 0 !important;
@@ -606,7 +671,7 @@ html[data-dream-skin="active"]
 }
 
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child::before {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child::before {
   content: none !important;
 }
 
@@ -615,7 +680,7 @@ html[data-dream-skin="active"]
    restoring a compact, safe-area-aware composition instead of stretching
    every control across the full window. */
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div {
   box-sizing: border-box;
   width: min(1120px, calc(100% - 48px)) !important;
   max-width: 1120px !important;
@@ -623,7 +688,7 @@ html[data-dream-skin="active"]
 }
 
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
   [data-feature="game-source"] {
   box-sizing: border-box;
   width: min(48%, 520px) !important;
@@ -638,7 +703,7 @@ html[data-dream-skin="active"]
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="right"], [data-dream-art-safe-area="right"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
   [data-feature="game-source"] {
   margin-right: 0 !important;
   margin-left: auto !important;
@@ -646,7 +711,7 @@ html[data-dream-skin="active"]:is([data-dream-art-safe="right"], [data-dream-art
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="center"], [data-dream-art-safe-area="center"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
   [data-feature="game-source"] {
   width: min(62%, 640px) !important;
   margin-inline: auto !important;
@@ -654,13 +719,15 @@ html[data-dream-skin="active"]:is([data-dream-art-safe="center"], [data-dream-ar
 }
 
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div
-  .group\/home-suggestions,
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
+  [data-home-ambient-suggestions],
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div
+  [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions,
+html[data-dream-skin="active"]
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
   [class*="_homeUtilityBar_"],
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
   .composer-surface-chrome {
   box-sizing: border-box;
   width: min(980px, 100%) !important;
@@ -669,8 +736,9 @@ html[data-dream-skin="active"]
 }
 
 html[data-dream-skin="active"]
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) + div
-  .group\/home-suggestions button {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
+  [data-home-ambient-suggestions] button,
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button {
   min-height: 104px !important;
 }
 
@@ -681,7 +749,7 @@ html[data-dream-skin="active"]
    is dormant rather than misrendered. Left as-is pending a real fixture of
    the new nested shape; the critical content-invisible bug is the block
    above this one. */
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child {
   position: relative !important;
   isolation: isolate;
   width: calc(100% - 44px) !important;
@@ -701,7 +769,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > di
   box-shadow: 0 16px 38px rgb(var(--ds-bg-rgb) / .30) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child::before {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -713,25 +781,25 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > di
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="right"], [data-dream-art-safe-area="right"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child::before {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child::before {
   inset: 0 0 0 auto;
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="center"], [data-dream-art-safe-area="center"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child::before {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child::before {
   inset: 0 14%;
   width: auto;
   border-radius: 0;
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="none"], [data-dream-art-safe-area="none"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child::before {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child::before {
   inset: 0;
   width: auto;
   border-radius: 21px;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child {
   position: relative;
   z-index: 1;
   height: 100%;
@@ -741,37 +809,37 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > di
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="right"], [data-dream-art-safe-area="right"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child {
   justify-content: flex-end !important;
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="center"], [data-dream-art-safe-area="center"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child {
   justify-content: center !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
   width: min(46%, 520px) !important;
   align-items: flex-start !important;
   gap: 0 !important;
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="right"], [data-dream-art-safe-area="right"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
   align-items: flex-end !important;
   text-align: right !important;
 }
 
 html[data-dream-skin="active"]:is([data-dream-art-safe="center"], [data-dream-art-safe-area="center"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
   width: min(58%, 640px) !important;
   align-items: center !important;
   text-align: center !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-testid="home-icon"] { display: none !important; }
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-testid="home-icon"] { display: none !important; }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"] {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"] {
   display: block !important;
   max-width: 100% !important;
   color: var(--ds-text) !important;
@@ -784,7 +852,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [dat
   pointer-events: auto !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"]::before {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"]::before {
   content: var(--dream-skin-name, "Codex Dream Skin");
   display: block;
   margin-bottom: 9px;
@@ -794,7 +862,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [dat
   text-shadow: 0 0 14px rgb(var(--ds-accent-rgb) / .26);
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"]::after {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"]::after {
   content: var(--dream-skin-tagline, "把喜欢的画面变成可交互的 Codex 工作台。");
   display: block;
   margin-top: 13px;
@@ -805,7 +873,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [dat
   letter-spacing: 0;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"] button {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"] button {
   margin: 0 5px;
   padding: 2px 9px 3px;
   border: 1px solid rgb(var(--ds-accent-rgb) / .36);
@@ -816,7 +884,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [dat
   text-underline-offset: 5px;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"] button::before {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"] button::before {
   content: var(--dream-skin-project-prefix, "选择项目 · ");
   font-size: .46em;
   font-weight: 700;
@@ -824,16 +892,20 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [dat
   opacity: .86;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:nth-child(2) {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:nth-child(2) {
   left: 14px !important;
   right: 14px !important;
   top: 100% !important;
   margin-top: 13px !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions { overflow: visible !important; }
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions],
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions {
+  overflow: visible !important;
+}
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button,
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button {
   position: relative !important;
   min-height: 118px !important;
   padding: 14px 13px 12px !important;
@@ -854,17 +926,20 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
     border-color .18s cubic-bezier(.22, 1, .36, 1) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button [class~="text-token-text-primary"] {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button [class~="text-token-text-primary"],
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button [class~="text-token-text-primary"] {
   color: var(--ds-text) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button:hover {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button:hover,
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button:hover {
   transform: translateY(-2px) !important;
   border-color: rgb(var(--ds-accent-rgb) / .42) !important;
   box-shadow: 0 12px 28px rgb(var(--ds-bg-rgb) / .24) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:first-child > span:first-child {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button > span:first-child > span:first-child,
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button > span:first-child > span:first-child {
   width: 38px;
   height: 38px;
   /* Native spans carry justify-start; grid + place-items cannot override
@@ -880,7 +955,8 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
   box-shadow: 0 0 0 6px rgb(var(--ds-accent-rgb) / .05);
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button svg {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button svg,
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button svg {
   width: 21px !important;
   height: 21px !important;
   display: block !important;
@@ -889,8 +965,10 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
   color: var(--ds-accent) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:first-child { justify-content: center !important; }
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:last-child { align-items: center !important; text-align: center !important; }
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button > span:first-child,
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button > span:first-child { justify-content: center !important; }
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button > span:last-child,
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button > span:last-child { align-items: center !important; text-align: center !important; }
 
 html[data-dream-skin="active"] .composer-surface-chrome {
   overflow: visible !important;
@@ -930,10 +1008,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main.main-surface
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has([role="main"]) {
-  background: linear-gradient(90deg,
-    var(--ds-immersive-edge),
-    var(--ds-immersive-mid) 64%,
-    var(--ds-immersive-far)) !important;
+  background: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -962,7 +1037,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has([role="main"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child {
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
@@ -970,12 +1045,14 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has([role="main"])
-  [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child::before {
+  [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child::before {
   content: none !important;
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has([role="main"])
-  [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button {
+  [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button,
+html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface:has([role="main"])
+  [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button {
   background: rgb(var(--ds-panel-rgb) / .56) !important;
   box-shadow:
     0 8px 22px rgb(var(--ds-bg-rgb) / .16),
@@ -1025,7 +1102,7 @@ html[data-dream-skin="active"] [class*="_homeUtilityBar_"] {
   backdrop-filter: blur(16px) saturate(108%) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]):has([class*="_homeUtilityBar_"])
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]):has([class*="_homeUtilityBar_"])
   .composer-surface-chrome {
   border: 0 !important;
   border-radius: 0 0 22px 22px !important;
@@ -1046,7 +1123,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] [class*="_homeUtility
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"]
-  [role="main"]:has([data-testid="home-icon"]):has([class*="_homeUtilityBar_"]) .composer-surface-chrome {
+  [role="main"]:has([data-feature="game-source"]):has([class*="_homeUtilityBar_"]) .composer-surface-chrome {
   box-shadow:
     0 10px 30px rgb(var(--ds-bg-rgb) / .20),
     inset 1px 0 var(--ds-immersive-line),
@@ -1138,7 +1215,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main.main-surface
   background: transparent !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) div:has(> .horizontal-scroll-fade-mask .group\/project-selector) {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) div:has(> .horizontal-scroll-fade-mask .group\/project-selector) {
   position: relative;
   padding-top: 28px !important;
   border: 1px solid rgb(var(--ds-muted-rgb) / .16);
@@ -1146,7 +1223,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) div:
   background: rgb(var(--ds-panel-rgb) / .92) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
   content: var(--dream-skin-project-label, "选择项目");
   position: absolute;
   left: 13px;
@@ -1159,7 +1236,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) div:
   white-space: nowrap;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/project-selector > button {
+html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/project-selector > button {
   border-color: rgb(var(--ds-accent-rgb) / .22) !important;
   background: rgb(var(--ds-accent-rgb) / .08) !important;
   color: var(--ds-text) !important;
@@ -1183,27 +1260,28 @@ html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px;
 @media (max-width: 1120px) {
   html[data-dream-skin="active"]
     main.main-surface:has([role="main"])::after { content: none; }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) { --thread-content-max-width: min(940px, calc(100cqw - 30px)) !important; }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child { width: calc(100% - 28px) !important; }
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) { --thread-content-max-width: min(940px, calc(100cqw - 30px)) !important; }
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child { width: calc(100% - 28px) !important; }
 }
 
 @media (max-width: 900px) {
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child {
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child {
     flex-basis: 408px !important;
     min-height: 408px !important;
   }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child {
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child {
     height: 232px !important;
     min-height: 232px !important;
   }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child { padding: 0 26px; }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child { padding: 0 26px; }
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child > div:first-child > div:first-child {
     width: min(58%, 460px) !important;
   }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"] { font-size: 18px !important; }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"]::before { margin-bottom: 7px; font-size: 10px; }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [data-feature="game-source"]::after { margin-top: 9px; font-size: 11px; }
-  html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button { min-height: 112px !important; font-size: 12px !important; }
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"] { font-size: 18px !important; }
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"]::before { margin-bottom: 7px; font-size: 10px; }
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"]::after { margin-top: 9px; font-size: 11px; }
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions] button,
+  html[data-dream-skin="active"] [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions button { min-height: 112px !important; font-size: 12px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

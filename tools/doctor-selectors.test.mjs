@@ -11,14 +11,15 @@ const resultFor = (baseState, hits, overlay = false) => gradeDoctorResult(contra
 });
 
 const home = resultFor("home", [
-  "shell-main", "left-panel", "header-tint", "home-icon", "home-route", "home-route-css",
+  "shell-main", "left-panel", "header-tint", "home-route", "home-route-css", "game-source",
 ]);
 assert.equal(home.pass, true);
 assert.equal(home.exitCode, 0);
-assert.equal(home.tiers.L1.length, 6);
+assert.equal(home.tiers.L1.length, 5);
+assert.equal(home.tiers.L2.find(({ key }) => key === "home-icon").status, "miss");
 assert.equal(home.tiers.L2.find(({ key }) => key === "project-selector").status, "miss(config)");
 
-const brokenHome = resultFor("home", ["shell-main", "left-panel", "header-tint", "home-icon"]);
+const brokenHome = resultFor("home", ["shell-main", "left-panel", "header-tint", "game-source"]);
 assert.equal(brokenHome.pass, false);
 assert.equal(brokenHome.exitCode, 1);
 

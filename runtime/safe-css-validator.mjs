@@ -278,11 +278,9 @@ function validatePropertyValue(property, value) {
   }
   if (property === "backdrop-filter") {
     if (value.toLowerCase() === "none") return true;
-    const match = value.match(/^blur\(\s*([^\s)]+)\s*\)$/i);
-    return Boolean(match && (
-      registeredVar(match[1], new Set(["--ds-theme-surface-blur"]))
-      || zeroOrPx(match[1], 0, 20)
-    ));
+    if (/^blur\(\s*var\(\s*--ds-theme-surface-blur\s*\)\s*\)$/i.test(value)) return true;
+    const match = value.match(/^blur\(\s*([^\s()]+)\s*\)$/i);
+    return Boolean(match && zeroOrPx(match[1], 0, 20));
   }
   if (property === "font-family") return fontFamilyValue(value);
   if (property === "font-size") return numeric(value, 12, 20, "px");

@@ -13,7 +13,9 @@ const selectors = {
   shell: "main.main-surface",
   sidebar: "aside.app-shell-left-panel",
   composer: ".composer-surface-chrome",
-  home: '[role="main"]:has([data-testid="home-icon"])',
+  home: '[role="main"]:has([data-feature="game-source"])',
+  homeSuggestions: "[data-home-ambient-suggestions]",
+  homeSuggestionCards: ".group\\/home-suggestions",
   settings: 'input[name="appearance-theme"]',
   themePreview: '[data-testid="theme-preview"]',
 };
@@ -22,7 +24,13 @@ function makeRect(width = 800, height = 600, x = 0, y = 0) {
   return { x, y, width, height, right: x + width, bottom: y + height };
 }
 
-function makeElement({ rect = makeRect(), style = {}, visible = true } = {}) {
+function makeElement({
+  rect = makeRect(),
+  style = {},
+  visible = true,
+  querySelector = () => null,
+  querySelectorAll = () => [],
+} = {}) {
   return {
     isConnected: true,
     _style: {
@@ -34,12 +42,22 @@ function makeElement({ rect = makeRect(), style = {}, visible = true } = {}) {
     },
     getBoundingClientRect: () => rect,
     checkVisibility: () => visible,
-    querySelector: () => null,
+    querySelector,
+    querySelectorAll,
   };
 }
 
-function makeHome(options = {}) {
+function makeHome({ suggestionButtons = [], ...options } = {}) {
+  const suggestionHost = makeElement({ querySelectorAll: () => [] });
+  const suggestionCards = makeElement({
+    querySelectorAll: (selector) => selector === "button" ? suggestionButtons : [],
+  });
   const home = makeElement(options);
+  home.querySelector = (selector) => {
+    if (selector === selectors.homeSuggestions) return suggestionHost;
+    if (selector === selectors.homeSuggestionCards) return suggestionCards;
+    return null;
+  };
   const hero = makeElement(options.hero ?? {});
   home.firstElementChild = { firstElementChild: { firstElementChild: hero } };
   return home;
@@ -83,7 +101,7 @@ function makeDomFixture({
   };
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
-      version: "1.5.7",
+      version: "1.5.9",
       themeId: "fixture-theme",
       revision: "fixture-revision",
       styleMode: "style",
@@ -187,6 +205,39 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
   });
   assert.equal(noAnchor.result.pass, false);
   assert.equal(noAnchor.result.readiness.structurePass, false);
+});
+
+test("hidden portal-rendered starter cards do not make home verification fail", async () => {
+  const hiddenCards = Array.from({ length: 3 }, () => makeElement({
+    style: { display: "none" },
+    visible: false,
+  }));
+  const hidden = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home" },
+      home: makeHome({
+        rect: makeRect(900, 650, 20, 20),
+        suggestionButtons: hiddenCards,
+      }),
+    }),
+  });
+  assert.equal(hidden.result.suggestionsPresent, true);
+  assert.equal(hidden.result.cards.length, 3);
+  assert.equal(hidden.result.visibleCardCount, 0);
+  assert.equal(hidden.result.pass, true);
+
+  const oneVisible = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home" },
+      home: makeHome({
+        rect: makeRect(900, 650, 20, 20),
+        suggestionButtons: [makeElement()],
+      }),
+    }),
+  });
+  assert.equal(oneVisible.result.visibleCardCount, 1);
+  assert.equal(oneVisible.result.pass, false,
+    "A partially rendered starter-card layer must not be mistaken for a ready home page.");
 });
 
 // Regression for #256. The previous version of this test asserted that a

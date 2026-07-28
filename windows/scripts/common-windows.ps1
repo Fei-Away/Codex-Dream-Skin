@@ -73,6 +73,31 @@ function Get-DreamSkinRuntimeEnginePaths {
   }
 }
 
+function Get-DreamSkinChromeMode {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $path = Join-Path ([System.IO.Path]::GetFullPath($StateRoot)) 'chrome-mode'
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return 'left' }
+  try {
+    $bytes = [System.IO.File]::ReadAllBytes($path)
+    if ($bytes.Length -lt 1 -or $bytes.Length -gt 16) { return 'left' }
+    $value = (ConvertFrom-DreamSkinUtf8Bytes -Bytes $bytes -Path $path).Trim().ToLowerInvariant()
+    if ($value -eq 'full') { return 'full' }
+  } catch {}
+  return 'left'
+}
+
+function Set-DreamSkinChromeMode {
+  param(
+    [Parameter(Mandatory = $true)][ValidateSet('left', 'full')][string]$Mode,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $fullStateRoot = [System.IO.Path]::GetFullPath($StateRoot)
+  [System.IO.Directory]::CreateDirectory($fullStateRoot) | Out-Null
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $fullStateRoot 'chrome-mode') `
+    -Content "$Mode`r`n"
+  return $Mode
+}
+
 function Test-DreamSkinTrayActive {
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")

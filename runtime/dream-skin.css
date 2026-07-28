@@ -49,6 +49,11 @@
   --ds-immersive-mid: rgb(var(--ds-bg-rgb) / .26);
   --ds-immersive-far: rgb(var(--ds-bg-rgb) / .16);
   --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / .46);
+  --ds-sidebar-block-start: var(--ds-immersive-sidebar);
+  --ds-sidebar-block-end: var(--ds-immersive-edge);
+  --ds-main-block-start: var(--ds-immersive-edge);
+  --ds-main-block-mid: var(--ds-immersive-mid);
+  --ds-main-block-end: var(--ds-immersive-far);
   --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / .70);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-composer: rgb(var(--ds-panel-rgb) / .44);
@@ -99,6 +104,11 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
   --ds-immersive-mid: rgb(var(--ds-panel-rgb) / .28);
   --ds-immersive-far: rgb(var(--ds-panel-rgb) / .14);
   --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / .48);
+  --ds-sidebar-block-start: var(--ds-immersive-sidebar);
+  --ds-sidebar-block-end: var(--ds-immersive-edge);
+  --ds-main-block-start: var(--ds-immersive-edge);
+  --ds-main-block-mid: var(--ds-immersive-mid);
+  --ds-main-block-end: var(--ds-immersive-far);
   --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / .72);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / .34);
   --ds-immersive-composer: rgb(var(--ds-panel-rgb) / .46);
@@ -343,6 +353,14 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
   height: auto;
 }
 
+html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"]):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)) {
+  --ds-sidebar-block-start: var(--ds-task-immersive-sidebar);
+  --ds-sidebar-block-end: var(--ds-task-immersive-edge);
+  --ds-main-block-start: var(--ds-task-immersive-edge);
+  --ds-main-block-mid: var(--ds-task-immersive-mid);
+  --ds-main-block-end: var(--ds-task-immersive-far);
+}
+
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)) body {
   background-image: var(--dream-skin-art) !important;
   background-position: var(--ds-art-position) !important;
@@ -554,6 +572,53 @@ html[data-dream-skin="active"][data-dream-shell="dark"]
   text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .82) !important;
 }
 
+/* Continue the sidebar through the Windows application menu while keeping the
+   unmasked home artwork clear. The renderer publishes the live split without
+   synchronous layout reads. */
+html[data-dream-skin="active"][data-dream-chrome-mode="left"]:has(__DREAM_SELECTOR_LEFT_PANEL__)
+  [class~="group/application-menu-top-bar"] {
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg,
+    var(--ds-sidebar-block-start) 0,
+    var(--ds-sidebar-block-end) var(--ds-sidebar-extent, 0px),
+    transparent var(--ds-sidebar-extent, 0px)) !important;
+  background-position: 0 0 !important;
+  background-size: auto !important;
+  background-repeat: no-repeat !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Conversation routes mask the main surface as well. Use the exact same
+   non-home condition as that surface: during new-conversation startup the
+   main mask appears before the thread scroller, so waiting for the scroller
+   would expose a temporary bright menu strip. A single continuous gradient
+   shares one stop at the fractional sidebar edge, avoiding both a transparent
+   raster gap and double-alpha dark overlap. */
+html[data-dream-skin="active"][data-dream-chrome-mode="left"]:has(__DREAM_SELECTOR_LEFT_PANEL__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  [class~="group/application-menu-top-bar"] {
+  background-image: linear-gradient(90deg,
+    var(--ds-sidebar-block-start) 0,
+    var(--ds-sidebar-block-end) var(--ds-sidebar-extent, 0px),
+    var(--ds-main-block-mid) calc(64% + var(--ds-sidebar-extent, 0px) * .36),
+    var(--ds-main-block-end) 100%) !important;
+}
+
+html[data-dream-skin="active"][data-dream-chrome-mode="full"]
+  [class~="group/application-menu-top-bar"] {
+  color: var(--ds-text) !important;
+  background: rgb(var(--ds-panel-rgb) / .90) !important;
+  border-bottom: 1px solid var(--ds-line) !important;
+  box-shadow: 0 1px 12px rgb(var(--ds-bg-rgb) / .42) !important;
+  backdrop-filter: blur(16px) saturate(90%) !important;
+}
+
+html[data-dream-skin="active"][data-dream-chrome-mode="full"]
+  [class~="group/application-menu-top-bar"] :is(button, svg) {
+  color: var(--ds-text) !important;
+}
+
 html[data-dream-skin="active"] __DREAM_SELECTOR_SHELL_MAIN__ [role="main"] {
   background: transparent !important;
   scrollbar-color: rgb(var(--ds-accent-rgb) / .38) transparent;
@@ -657,6 +722,8 @@ html[data-dream-skin="active"]
   __DREAM_SELECTOR_HOME_ROUTE__ > div:first-child:has(> __DREAM_SELECTOR_HOME_BANNERS__) + div
   __DREAM_SELECTOR_HOME_SUGGESTIONS__,
 html[data-dream-skin="active"]
+  __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__,
+html[data-dream-skin="active"]
   __DREAM_SELECTOR_HOME_ROUTE__ > div:first-child:has(> __DREAM_SELECTOR_HOME_BANNERS__) + div
   __DREAM_SELECTOR_HOME_UTILITY__,
 html[data-dream-skin="active"]
@@ -670,7 +737,8 @@ html[data-dream-skin="active"]
 
 html[data-dream-skin="active"]
   __DREAM_SELECTOR_HOME_ROUTE__ > div:first-child:has(> __DREAM_SELECTOR_HOME_BANNERS__) + div
-  __DREAM_SELECTOR_HOME_SUGGESTIONS__ button {
+  __DREAM_SELECTOR_HOME_SUGGESTIONS__ button,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button {
   min-height: 104px !important;
 }
 
@@ -831,9 +899,13 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ > div:first-child >
   margin-top: 13px !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ { overflow: visible !important; }
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ {
+  overflow: visible !important;
+}
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button {
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button {
   position: relative !important;
   min-height: 118px !important;
   padding: 14px 13px 12px !important;
@@ -854,17 +926,20 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HO
     border-color .18s cubic-bezier(.22, 1, .36, 1) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button [class~="text-token-text-primary"] {
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button [class~="text-token-text-primary"],
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button [class~="text-token-text-primary"] {
   color: var(--ds-text) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button:hover {
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button:hover,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button:hover {
   transform: translateY(-2px) !important;
   border-color: rgb(var(--ds-accent-rgb) / .42) !important;
   box-shadow: 0 12px 28px rgb(var(--ds-bg-rgb) / .24) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:first-child > span:first-child {
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:first-child > span:first-child,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button > span:first-child > span:first-child {
   width: 38px;
   height: 38px;
   /* Native spans carry justify-start; grid + place-items cannot override
@@ -880,7 +955,8 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HO
   box-shadow: 0 0 0 6px rgb(var(--ds-accent-rgb) / .05);
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button svg {
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button svg,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button svg {
   width: 21px !important;
   height: 21px !important;
   display: block !important;
@@ -889,8 +965,10 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HO
   color: var(--ds-accent) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:first-child { justify-content: center !important; }
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:last-child { align-items: center !important; text-align: center !important; }
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:first-child,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button > span:first-child { justify-content: center !important; }
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:last-child,
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button > span:last-child { align-items: center !important; text-align: center !important; }
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
   overflow: visible !important;
@@ -930,10 +1008,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__) {
-  background: linear-gradient(90deg,
-    var(--ds-immersive-edge),
-    var(--ds-immersive-mid) 64%,
-    var(--ds-immersive-far)) !important;
+  background: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -975,7 +1050,9 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
-  __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button {
+  __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button,
+html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
+  __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button {
   background: rgb(var(--ds-panel-rgb) / .56) !important;
   box-shadow:
     0 8px 22px rgb(var(--ds-bg-rgb) / .16),
@@ -1203,7 +1280,8 @@ html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px;
   html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_GAME_SOURCE__ { font-size: 18px !important; }
   html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_GAME_SOURCE__::before { margin-bottom: 7px; font-size: 10px; }
   html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_GAME_SOURCE__::after { margin-top: 9px; font-size: 11px; }
-  html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button { min-height: 112px !important; font-size: 12px !important; }
+  html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button,
+  html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTION_CARDS__ button { min-height: 112px !important; font-size: 12px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

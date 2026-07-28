@@ -1,6 +1,6 @@
 // Canonical cross-platform renderer. Run tools/sync-runtime-assets.mjs after editing.
 ((cssText, artDataUrl, themeConfig) => {
-  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main.main-surface","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header.app-header-tint","tier":"L1","scope":"all","required":true},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"home-banners","selector":".home-banners","tier":"L2","scope":"home","required":false},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"composer-toolbar","selector":".composer-surface-chrome [class*=\"_footer_\"]","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"thread-surface","selector":".thread-scroll-container","tier":"L2","scope":"thread","required":false},{"key":"message","selector":"[data-message-author-role]","tier":"L2","scope":"thread","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
+  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main.main-surface","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header.app-header-tint","tier":"L1","scope":"all","required":true},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L2","scope":"home","required":false},{"key":"home-route","selector":"[role=\"main\"]:has([data-feature=\"game-source\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"home-banners","selector":".home-banners","tier":"L2","scope":"home","required":false},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"composer-toolbar","selector":".composer-surface-chrome [class*=\"_footer_\"]","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":"[data-home-ambient-suggestions]","tier":"L2","scope":"home","required":false},{"key":"home-suggestion-cards","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"thread-surface","selector":".thread-scroll-container","tier":"L2","scope":"thread","required":false},{"key":"message","selector":"[data-message-author-role]","tier":"L2","scope":"thread","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
   const STYLE_REGISTRY_KEY = "__CODEX_DREAM_SKIN_STYLE_SHEETS__";
@@ -12,6 +12,7 @@
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
     "data-dream-art-ready",
+    "data-dream-chrome-mode",
   ];
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
@@ -43,7 +44,7 @@
     "--ds-theme-surface-shadow", "--ds-theme-image-focus-x",
     "--ds-theme-image-focus-y", "--ds-theme-image-zoom",
     "--ds-theme-image-dim", "--ds-theme-image-task-intensity",
-    "--ds-theme-density-scale", "--ds-theme-motion-level",
+    "--ds-theme-density-scale", "--ds-theme-motion-level", "--ds-sidebar-extent",
   ];
   const selectorByKey = new Map(SELECTOR_CONTRACT.selectors.map((entry) => [entry.key, entry]));
   const stableTestidSelector = (testid) => SELECTOR_CONTRACT.stableTestids?.includes(testid)
@@ -57,6 +58,8 @@
   let analysisTimer = null;
   let rootObserver = null;
   let partObserver = null;
+  let sidebarResizeObserver = null;
+  let observedSidebar = null;
   let bodyReadyHandler = null;
   let styleMode = null;
   let styleNode = null;
@@ -550,6 +553,7 @@
     const shell = resolvedShell();
     setAttribute(root, "data-dream-skin", "active");
     setAttribute(root, SHELL_ATTR, shell);
+    setAttribute(root, "data-dream-chrome-mode", THEME.chromeMode === "full" ? "full" : "left");
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
@@ -581,11 +585,35 @@
       }
     }
   };
+  const setSidebarExtent = (width) => {
+    const numeric = Number(width);
+    const bounded = Number.isFinite(numeric) && numeric > 0 ? clamp(numeric, 0, 2048) : 0;
+    setStyleProperty(document.documentElement, "--ds-sidebar-extent", `${Number(bounded.toFixed(2))}px`);
+  };
+  const inlineSidebarWidth = (sidebar) => {
+    const inline = sidebar?.style?.width || sidebar?.getAttribute?.("style") || "";
+    const match = String(inline).match(/(?:^|;)\s*width\s*:\s*([\d.]+)px(?:\s*;|$)/i);
+    return match ? Number(match[1]) : null;
+  };
+  const observeSidebar = (sidebar) => {
+    if (observedSidebar === sidebar) return;
+    if (observedSidebar) sidebarResizeObserver?.unobserve?.(observedSidebar);
+    observedSidebar = sidebar || null;
+    if (!observedSidebar) {
+      setSidebarExtent(0);
+      return;
+    }
+    const inlineWidth = inlineSidebarWidth(observedSidebar);
+    if (inlineWidth !== null) setSidebarExtent(inlineWidth);
+    sidebarResizeObserver?.observe?.(observedSidebar);
+  };
   const refreshParts = () => {
     metrics.partPasses += 1;
     const desired = new Map();
     addPart(desired, "root", [document.documentElement]);
-    addPart(desired, "sidebar", selectorNodes("left-panel"));
+    const sidebars = selectorNodes("left-panel");
+    addPart(desired, "sidebar", sidebars);
+    observeSidebar(sidebars[0] || null);
     addPart(desired, "main", selectorNodes("shell-main"));
     addPart(desired, "header", selectorNodes("header-tint"));
     addPart(desired, "home", selectorNodes("home-route"));
@@ -687,6 +715,7 @@
     removeParts();
     state?.rootObserver?.disconnect();
     state?.partObserver?.disconnect();
+    state?.sidebarResizeObserver?.disconnect();
     if (bodyReadyHandler && typeof document.removeEventListener === "function") {
       document.removeEventListener("DOMContentLoaded", bodyReadyHandler);
     }
@@ -733,7 +762,21 @@
   };
   if (typeof MutationObserver === "function") {
     rootObserver = new MutationObserver(() => scheduleEnsure({ root: true }));
-    partObserver = new MutationObserver(() => scheduleEnsure({ parts: true }, 80));
+    // Some Codex sidebar transitions replace the route DOM without firing the
+    // Navigation API. Refresh scope with the same debounced pass that already
+    // remaps dynamic public parts so verification cannot retain a stale route.
+    partObserver = new MutationObserver(() => scheduleEnsure({ scope: true, parts: true }, 80));
+  }
+  if (typeof ResizeObserver === "function") {
+    sidebarResizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries || []) {
+        if (entry?.target !== observedSidebar) continue;
+        const borderBox = Array.isArray(entry.borderBoxSize)
+          ? entry.borderBoxSize[0] : entry.borderBoxSize;
+        const width = borderBox?.inlineSize ?? entry.contentRect?.width;
+        if (Number.isFinite(Number(width))) setSidebarExtent(width);
+      }
+    });
   }
 
   let mediaQuery = null;
@@ -755,6 +798,7 @@
     cleanup,
     rootObserver,
     partObserver,
+    sidebarResizeObserver,
     timer: null,
     scheduler,
     mediaQuery,
@@ -803,7 +847,7 @@
     bodyReadyHandler = () => {
       if (!window[DISABLED_KEY]) {
         observeBody();
-        scheduleEnsure({ parts: true }, 0);
+        scheduleEnsure({ scope: true, parts: true }, 0);
       }
     };
     document.addEventListener("DOMContentLoaded", bodyReadyHandler, { once: true });

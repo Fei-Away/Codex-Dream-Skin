@@ -278,6 +278,30 @@ try {
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开 DreamSkin.cc' -Action {
       Start-Process -FilePath 'https://dreamskin.cc' | Out-Null
     }
+    $chromeMode = Get-DreamSkinChromeMode -StateRoot $StateRoot
+    $chromeMenu = [System.Windows.Forms.ToolStripMenuItem]::new('菜单背景')
+    foreach ($choice in @(
+      @{ Mode = 'left'; Text = '左侧连续背景' },
+      @{ Mode = 'full'; Text = '整条菜单栏背景' }
+    )) {
+      $targetMode = $choice.Mode
+      $targetText = $choice.Text
+      $modeAction = {
+        $null = Invoke-DreamSkinTrayThemeOperation -Action {
+          Set-DreamSkinChromeMode -Mode $targetMode -StateRoot $StateRoot
+        }
+        $notify.ShowBalloonTip(
+          1800,
+          'Codex Dream Skin',
+          "已切换：$targetText",
+          [System.Windows.Forms.ToolTipIcon]::Info
+        )
+      }.GetNewClosure()
+      $null = Add-DreamSkinTrayItem -Items $chromeMenu.DropDownItems -Text $targetText `
+        -Action $modeAction -Checked:($chromeMode -ceq $targetMode) `
+        -Enabled:($chromeMode -cne $targetMode)
+    }
+    [void]$menu.Items.Add($chromeMenu)
     $autoStartEnabled = Test-Path -LiteralPath $startupShortcut -PathType Leaf
     $autoStartAction = {
       Set-DreamSkinAutoStart -Enabled:(-not $autoStartEnabled)

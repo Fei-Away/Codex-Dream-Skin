@@ -39,7 +39,7 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.7";
+const SKIN_VERSION = "1.5.9";
 const MAX_ART_BYTES = 10 * 1024 * 1024;
 const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
@@ -625,8 +625,41 @@ export async function loadTheme(themeDir) {
   };
 }
 
-export async function loadPayload(themeDir = path.join(root, "assets"), candidateTheme = null) {
+async function loadChromeModeState(themeDir) {
+  const resolvedThemeDir = path.resolve(themeDir);
+  if (path.basename(resolvedThemeDir).toLowerCase() !== "active-theme") {
+    return { mode: "left", sourceStamp: "fixed:left" };
+  }
+  const modePath = path.join(path.dirname(resolvedThemeDir), "chrome-mode");
+  try {
+    const stat = await fs.stat(modePath);
+    if (!stat.isFile() || stat.size < 1 || stat.size > 16) {
+      return { mode: "left", sourceStamp: "invalid:left" };
+    }
+    const value = (await fs.readFile(modePath, "utf8")).trim().toLowerCase();
+    const mode = value === "full" ? "full" : "left";
+    return { mode, sourceStamp: `${stat.size}:${stat.mtimeMs}:${mode}` };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { mode: "left", sourceStamp: "none:left" };
+    return { mode: "left", sourceStamp: "unreadable:left" };
+  }
+}
+
+export async function loadPayload(
+  themeDir = path.join(root, "assets"),
+  candidateTheme = null,
+  candidateChromeModeState = null,
+) {
   const loadedTheme = candidateTheme ?? await loadTheme(themeDir);
+  const chromeModeState = candidateChromeModeState ?? await loadChromeModeState(themeDir);
+  loadedTheme.theme.chromeMode = chromeModeState.mode;
+  loadedTheme.themeFingerprint = loadedTheme.fingerprint;
+  loadedTheme.fingerprint = createHash("sha256")
+    .update(loadedTheme.themeFingerprint)
+    .update("\0chrome-mode\0")
+    .update(chromeModeState.mode)
+    .digest("hex");
+  loadedTheme.sourceStamp = `${loadedTheme.sourceStamp}:chrome:${chromeModeState.sourceStamp}`;
   const [css, template] = await Promise.all([
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
@@ -687,16 +720,18 @@ async function fileExists(filePath) {
 }
 
 async function readThemeSourceStamp(loadedTheme) {
-  const [themeStat, imageStat, cssStat] = await Promise.all([
+  const [themeStat, imageStat, cssStat, chromeModeState] = await Promise.all([
     fs.stat(loadedTheme.themePath),
     fs.stat(loadedTheme.imagePath),
     fs.stat(path.join(path.dirname(loadedTheme.themePath), "theme.css")).catch((error) => {
       if (error.code === "ENOENT") return null;
       throw error;
     }),
+    loadChromeModeState(path.dirname(loadedTheme.themePath)),
   ]);
   return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}:` +
-    (cssStat ? `${cssStat.size}:${cssStat.mtimeMs}` : "none");
+    (cssStat ? `${cssStat.size}:${cssStat.mtimeMs}` : "none") +
+    `:chrome:${chromeModeState.sourceStamp}`;
 }
 
 async function probeSession(session) {
@@ -1148,8 +1183,14 @@ export async function verifySession(
     const home = document.querySelector(${selectorLiteral("home-route")});
     const settingsAnchor = document.querySelector(${selectorLiteral("appearance-radio")}) ||
       document.querySelector(${stableTestidLiteral("theme-preview")});
-    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
-    const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
+    const suggestionLayers = [
+      home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null,
+      home?.querySelector(${selectorLiteral("home-suggestion-cards")}) ?? null,
+    ].filter((node, index, nodes) => node && nodes.indexOf(node) === index);
+    const cardButtons = [...new Set(suggestionLayers.flatMap((node) =>
+      [...node.querySelectorAll('button')]))];
+    const cards = cardButtons.map(box);
+    const visibleCardCount = cards.filter((item) => item?.visible).length;
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
     const adopted = runtime?.styleMode === 'adopted' &&
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
@@ -1186,11 +1227,12 @@ export async function verifySession(
         [...node.classList].some((name) => /^(?:dream-|codex-dream-skin(?:-|$))/.test(name))
       ).length,
       homePresent: Boolean(home),
-      suggestionsPresent: Boolean(suggestions),
+      suggestionsPresent: suggestionLayers.length > 0,
       homeSurface: box(home),
       settingsAnchor: box(settingsAnchor),
       hero,
       cards,
+      visibleCardCount,
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
@@ -1236,7 +1278,8 @@ export async function verifySession(
       documentPass && viewportPass && structurePass &&
       payloadPass &&
       (!result.homePresent || (Boolean(result.homeSurface?.visible && result.hero?.visible) &&
-        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
+        (result.visibleCardCount === 0 ||
+          (result.visibleCardCount >= 2 && result.visibleCardCount <= 4))));
     return result;
   })()`);
 }
@@ -1515,12 +1558,21 @@ async function runWatch(options) {
             }
           }
           if (shouldAudit) {
-            const candidateTheme = await loadTheme(options.themeDir);
+            const [candidateTheme, candidateChromeModeState] = await Promise.all([
+              loadTheme(options.themeDir),
+              loadChromeModeState(options.themeDir),
+            ]);
             lastStrongThemeAuditAt = now;
-            if (!loadedPayload || candidateTheme.fingerprint !== loadedPayload.fingerprint) {
-              nextPayload = await loadPayload(options.themeDir, candidateTheme);
+            if (!loadedPayload || candidateTheme.fingerprint !== loadedPayload.themeFingerprint ||
+                candidateChromeModeState.mode !== loadedPayload.theme.chromeMode) {
+              nextPayload = await loadPayload(
+                options.themeDir,
+                candidateTheme,
+                candidateChromeModeState,
+              );
             } else {
-              loadedPayload.sourceStamp = candidateTheme.sourceStamp;
+              loadedPayload.sourceStamp =
+                `${candidateTheme.sourceStamp}:chrome:${candidateChromeModeState.sourceStamp}`;
             }
           }
         } catch (error) {

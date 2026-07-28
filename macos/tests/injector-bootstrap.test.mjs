@@ -110,5 +110,7 @@ assert.match(
 );
 assert.match(source, /visibleSuggestionLabels\.length >= result\.visibleCardCount/);
 assert.match(source, /result\.suggestionLabelColorsMatch/);
+assert.match(source, /selectorLiteral\("home-suggestion-cards"\)/,
+  "Live verification must inspect the separate portal-rendered starter-card layer.");
 
 console.log("PASS: early injection is L0-ready, generation-safe, and removed on shutdown.");

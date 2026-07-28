@@ -10,6 +10,18 @@ $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-t
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
+  $chromeModeStateRoot = Join-Path $temporaryRoot 'chrome-mode-state'
+  if ((Get-DreamSkinChromeMode -StateRoot $chromeModeStateRoot) -cne 'left') {
+    throw 'The default menu background mode must be the continuous left block.'
+  }
+  $null = Set-DreamSkinChromeMode -Mode full -StateRoot $chromeModeStateRoot
+  if ((Get-DreamSkinChromeMode -StateRoot $chromeModeStateRoot) -cne 'full') {
+    throw 'The full menu background mode was not persisted.'
+  }
+  $null = Set-DreamSkinChromeMode -Mode left -StateRoot $chromeModeStateRoot
+  if ((Get-DreamSkinChromeMode -StateRoot $chromeModeStateRoot) -cne 'left') {
+    throw 'The continuous left menu background mode was not restored.'
+  }
   $runtimeSourceName = 'runtime source ' + (-join @([char]0x6D4B, [char]0x8BD5))
   $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
   $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
@@ -1144,6 +1156,10 @@ try {
     'main.main-surface:has([role="main"])',
     'main.main-surface:not(:has([role="main"]))',
     '> div:first-child:has(> .home-banners) + div',
+    '[role="main"]:has([data-feature="game-source"]) [data-feature="game-source"]',
+    '[role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions]',
+    '[role="main"]:has([data-feature="game-source"]) .group\/home-suggestions',
+    'display: none !important',
     'width: min(980px, 100%)'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
@@ -1222,7 +1238,10 @@ try {
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
   }
-  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动皮肤和 Codex')) {
+  foreach ($requiredReleaseAction in @(
+    'check-update.ps1', '检查更新', '打开 DreamSkin.cc', '菜单背景',
+    '左侧连续背景', '整条菜单栏背景', '登录时启动皮肤和 Codex'
+  )) {
     if (-not $traySource.Contains($requiredReleaseAction)) {
       throw "Tray release action is missing: $requiredReleaseAction"
     }
@@ -1345,7 +1364,7 @@ try {
     }
   }
   foreach ($forbiddenRendererBehavior in @(
-    'getBoundingClientRect', 'ResizeObserver',
+    'getBoundingClientRect',
     'classList.add', 'classList.remove', 'classList.toggle',
     'syncRouteState', 'samplingNativeShell', 'dream-home-utility'
   )) {
@@ -1439,6 +1458,9 @@ try {
   $windowReadinessTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'injector-window-readiness.test.mjs'))
   if ($windowReadinessTest.ExitCode -ne 0) { throw 'Injector native-window readiness regression test failed.' }
+  $chromeModePayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    '--test', (Join-Path $PSScriptRoot 'chrome-mode-payload.test.mjs'))
+  if ($chromeModePayloadTest.ExitCode -ne 0) { throw 'Chrome mode payload regression test failed.' }
   $imageMetadataTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'image-metadata.test.mjs'))
   if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }

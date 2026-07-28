@@ -1,5 +1,25 @@
 # Windows Changelog
 
+## 1.5.9 — 2026-07-29
+
+- 修复托盘“菜单背景”切换只保存选项、运行中的页面却继续使用旧背景的问题。后台注入器现在把 `left/full` 独立偏好纳入实时变更检测与载荷身份，切换后无需重启 Codex 或重新启动整套皮肤流程即可更新菜单栏。
+- 在 Codex 26.721.4979 的新首页双层建议结构上恢复 v1.5.6/v1.5.7 的主题标题、主题副标题与玻璃建议卡风格。
+- 同时适配 `[data-home-ambient-suggestions]` 占位层和实际 `.group/home-suggestions` 卡片层，避免只改到不可见容器。
+- 保留 v1.5.8 的首页无遮罩主背景、连续左侧背景、对话页渐变及可靠的首页/对话状态刷新。
+
+> v1.5.8 follow-up: Codex 26.721.4979 home compatibility hides the native rotating headline and three new-task suggestion cards that obscure wide wallpaper, while preserving project selection, plugin controls, the real composer, and all conversation routes.
+
+## 1.5.8 — 2026-07-28
+
+### 修复
+
+- 修复 v1.5.8 新建任务首页右侧主界面仍被整块深色渐变覆盖的问题：首页只保留左侧栏及菜单栏左段背景，右侧主表面直接显示壁纸；已有对话页继续保留用于可读性的主窗口渐变。
+- 消除菜单栏与内容区之间的深浅分界：新建任务首页仍只延续左侧栏背景、右侧保持无遮罩；进入对话后，菜单栏右段会延续下方主窗口的同一组渐变遮罩。对话菜单使用单张连续渐变处理 419.66px 等小数侧栏宽度，不再出现漏底亮缝或双层透明度形成的黑缝。
+- 修复 DreamSkin.cc 一键换肤被 Chromium 规范化为 `dreamskin://apply/?version=...` 后遭客户端误拒绝的问题。仅额外接受单个根斜杠，任意附加路径、参数、片段、端口、凭据和非固定来源仍然拒绝。
+- 修复 Safe CSS 校验器无法解析已登记的 `backdrop-filter: blur(var(--ds-theme-surface-blur))`。未知变量、fallback、额外滤镜和超过上限的 blur 仍然拒绝；官方 Studio ZIP 可按既有安全合同正常导入。
+- 修正左侧背景范围：实机 Codex 26.721.4979 的侧栏从菜单栏下方开始且可拖动到约 420px，而旧规则给整条菜单栏铺色，未形成用户期望的连续左侧矩形。渲染器现在通过 `ResizeObserver` 发布侧栏实时宽度，不做同步布局读取；菜单栏左段延续与侧栏相同的渐变背景，首页右侧保持透明、对话页右侧匹配主窗口，侧栏拖动、收起和重建时同步更新。
+- 托盘新增“菜单背景”选择，可在“左侧连续背景”和“整条菜单栏背景”之间切换。选择以独立本机偏好保存，不改写主题包；切换后沿用既有安全启动流程重新应用当前主题。
+
 ## 1.5.7 — 2026-07-28
 
 ### 修复

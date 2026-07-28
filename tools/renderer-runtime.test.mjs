@@ -35,6 +35,7 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   const domNodes = new Set();
   const selectorNodes = new Map();
   const observers = [];
+  const resizeObservers = [];
   const timers = new Map();
   const intervals = new Map();
   const listeners = new Map();
@@ -76,12 +77,15 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   };
   const partFixtures = {};
   if (!settings) {
-    partFixtures.sidebar = makeDomNode("sidebar", body);
+    partFixtures.sidebar = makeDomNode("sidebar", body, new Map([["style", "width: 420px;"]]));
     partFixtures.main = makeDomNode("main", body);
     partFixtures.header = makeDomNode("header", body);
     partFixtures.home = makeDomNode("home", partFixtures.main);
     partFixtures.homeHero = makeDomNode("home-hero", partFixtures.home);
     partFixtures.homeIcon = makeDomNode("home-icon", partFixtures.homeHero);
+    partFixtures.gameSource = makeDomNode("game-source", partFixtures.homeHero);
+    partFixtures.homeSuggestions = makeDomNode("home-suggestions", partFixtures.home);
+    partFixtures.homeSuggestionCards = makeDomNode("home-suggestion-cards", partFixtures.home);
     partFixtures.projectList = makeDomNode("project-list", partFixtures.home);
     partFixtures.thread = makeDomNode("thread", partFixtures.main);
     partFixtures.message = makeDomNode("message", partFixtures.thread);
@@ -91,7 +95,10 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     register("main.main-surface", partFixtures.main);
     register("header.app-header-tint", partFixtures.header);
     register('[data-testid="home-icon"]', partFixtures.homeIcon);
-    register('[role="main"]:has([data-testid="home-icon"])', partFixtures.home);
+    register('[data-feature="game-source"]', partFixtures.gameSource);
+    register('[data-home-ambient-suggestions]', partFixtures.homeSuggestions);
+    register(".group\\/home-suggestions", partFixtures.homeSuggestionCards);
+    register('[role="main"]:has([data-feature="game-source"])', partFixtures.home);
     register('[role="main"]', partFixtures.home);
     register(".group\\/project-selector", partFixtures.projectList);
     register(".thread-scroll-container", partFixtures.thread);
@@ -141,6 +148,12 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   class MockSheet {
     replaceSync(text) { this.text = text; }
   }
+  class MockResizeObserver {
+    constructor(callback) { this.callback = callback; this.targets = new Set(); resizeObservers.push(this); }
+    observe(target) { this.targets.add(target); }
+    unobserve(target) { this.targets.delete(target); }
+    disconnect() { this.disconnected = true; this.targets.clear(); }
+  }
   const window = {
     navigation,
     matchMedia() {
@@ -157,6 +170,7 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     window,
     document,
     MutationObserver: MockMutationObserver,
+    ResizeObserver: MockResizeObserver,
     CSSStyleSheet: adopted ? MockSheet : undefined,
     Blob,
     Uint8Array,
@@ -194,7 +208,8 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   };
   return {
     addDynamicMessage, attrs, context, document, domNodes, flushTimers, intervals, listeners,
-    nodes, observers, partFixtures, payloadFor, revoked, root, rootClasses, rootStyle, timers, window,
+    nodes, observers, partFixtures, payloadFor, resizeObservers, revoked, root, rootClasses, rootStyle,
+    timers, window,
   };
 }
 
@@ -244,7 +259,8 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.doesNotMatch(template, /electron-opaque|home-suggestion-list-item/,
     "Runtime payload must not carry retired selector documentation/fossils.");
   assert.doesNotMatch(template, /classList\.(add|remove|toggle)/);
-  assert.doesNotMatch(template, /getBoundingClientRect|ResizeObserver/);
+  assert.doesNotMatch(template, /getBoundingClientRect/);
+  assert.match(template, /ResizeObserver/);
   assert.match(template, /childList:\s*true/);
   assert.match(template, /subtree:\s*true/);
   // The new contract intentionally keeps the `data-dream-*` attribute names
@@ -258,11 +274,27 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
   assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
+  // A wide-image home/new-task route must expose the wallpaper directly.
+  // Conversation routes retain their own task gradient behind this separate
+  // positive home gate.
+  assert.match(css,
+    /\[data-dream-art-wide="true"\]\s+main\.main-surface:has\(\[role="main"\]\)\s*\{\s*background:\s*transparent\s*!important;/);
   assert.doesNotMatch(css, /content:\s*var\(--dream-skin-brand-subtitle/);
   assert.doesNotMatch(css, /content:\s*var\(--dream-skin-status/);
   assert.doesNotMatch(css, /content:\s*var\(--dream-skin-quote/);
   assert.match(css, /> div:first-child:has\(> \.home-banners\) \+ div/);
+  assert.match(css, /\[role="main"\]:has\(\[data-feature="game-source"\]\) \[data-feature="game-source"\]/);
+  assert.doesNotMatch(css,
+    /\[data-feature="game-source"\]\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(css,
+    /\.group\\\/home-suggestions button\s*\{[\s\S]*?min-height:\s*104px\s*!important;/);
+  assert.match(css,
+    /\.group\\\/home-suggestions button\s*\{[\s\S]*?border-radius:\s*18px\s*!important;[\s\S]*?backdrop-filter:\s*blur\(10px\)/);
   assert.match(css, /width:\s*min\(980px, 100%\)/);
+  assert.match(css, /var\(--ds-sidebar-block-end\) var\(--ds-sidebar-extent, 0px\)/);
+  assert.match(css, /transparent var\(--ds-sidebar-extent, 0px\)/);
+  assert.match(css, /var\(--ds-main-block-mid\) calc\(64% \+ var\(--ds-sidebar-extent, 0px\) \* \.36\)/);
+  assert.doesNotMatch(css, /calc\(var\(--ds-sidebar-extent, 0px\) [+-] 1px\)/);
   assert.match(css, /--ds-task-full-veil/);
   assert.match(css, /data-dream-task-mode="full"/);
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
@@ -270,7 +302,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   // marker-class-to-:has() conversion must never leave native layout rules
   // active after pause/restore.
   const unscoped = unscopedCssRules(css).join("\n");
-  assert.doesNotMatch(unscoped, /\[role="main"\]:has\(\[data-testid="home-icon"\]\)/);
+  assert.doesNotMatch(unscoped, /\[role="main"\]:has\(\[data-feature="game-source"\]\)/);
   assert.doesNotMatch(unscoped, /\.group\\\/project-selector/);
 
   const home = makeFixture({ nativeAppearance: "dark" });
@@ -278,6 +310,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   const state = home.window.__CODEX_DREAM_SKIN_STATE__;
   assert.equal(home.attrs.get("data-dream-skin"), "active");
   assert.equal(home.attrs.get("data-dream-shell"), "dark");
+  assert.equal(home.attrs.get("data-dream-chrome-mode"), "left");
   assert.equal(home.attrs.get("data-ds-part"), "root");
   assert.equal(state.styleMode, "adopted");
   assert.equal(home.document.adoptedStyleSheets.length, 1);
@@ -288,6 +321,14 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-radius"), "12px");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-opacity"), "1");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-blur"), "0px");
+  assert.equal(home.rootStyle.values.get("--ds-sidebar-extent"), "420px");
+  const sidebarResizeObserver = home.resizeObservers[0];
+  assert.ok(sidebarResizeObserver?.targets.has(home.partFixtures.sidebar));
+  sidebarResizeObserver.callback([{
+    target: home.partFixtures.sidebar,
+    borderBoxSize: { inlineSize: 419.65625 },
+  }]);
+  assert.equal(home.rootStyle.values.get("--ds-sidebar-extent"), "419.66px");
   const publicDefaults = {
     "--ds-theme-font-family": "system",
     "--ds-theme-font-scale": "1",
@@ -332,6 +373,8 @@ export async function runRendererRuntimeTest(assetRoot) {
   partObserver.callback([{ type: "childList" }]);
   home.flushTimers(80);
   assert.equal(dynamicMessage.getAttribute("data-ds-part"), "message");
+  assert.equal(state.metrics.routePasses, 2,
+    "Route scope must refresh when Codex replaces route DOM without a navigation event");
 
   const full = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);
@@ -357,6 +400,11 @@ export async function runRendererRuntimeTest(assetRoot) {
     explicitColorKeys: Object.keys(explicitColors),
     colors: explicitColors,
   }), explicitLight.context);
+  assert.equal(explicitLight.attrs.get("data-dream-chrome-mode"), "left");
+
+  const fullChrome = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(fullChrome.payloadFor({ chromeMode: "full" }), fullChrome.context);
+  assert.equal(fullChrome.attrs.get("data-dream-chrome-mode"), "full");
   const renderedColors = {
     background: "--ds-bg",
     panel: "--ds-panel",
@@ -408,13 +456,13 @@ export async function runRendererRuntimeTest(assetRoot) {
 
   rootObserver.callback([]);
   home.flushTimers(64);
-  assert.equal(state.metrics.routePasses, 1, "Attribute safety pass must not be a route pass");
+  assert.equal(state.metrics.routePasses, 2, "Attribute safety pass must not be a route pass");
   const navigationHandler = home.listeners.get("navigation:navigate");
   assert.equal(typeof navigationHandler, "function");
   navigationHandler();
   home.flushTimers(180);
   assert.equal(state.metrics.navigationEvents, 1);
-  assert.equal(state.metrics.routePasses, 2);
+  assert.equal(state.metrics.routePasses, 3);
 
   const settings = makeFixture({ nativeAppearance: "light", settings: true });
   vm.runInNewContext(settings.payloadFor(), settings.context);

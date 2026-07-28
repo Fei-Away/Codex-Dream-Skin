@@ -56,6 +56,20 @@ const baseRenderer = {
 assert.equal(readyNativeWindow.status, "ready");
 assert.equal(assessRendererVerification(baseRenderer, readyNativeWindow, exactPayload).pass, true);
 
+const hiddenHomeSuggestions = {
+  ...baseRenderer,
+  scope: { level: "L1", baseState: "home" },
+  homeRoute: true,
+  homePresent: true,
+  hero: { visible: true, width: 900, height: 650 },
+  visibleCardCount: 0,
+};
+assert.equal(
+  assessRendererVerification(hiddenHomeSuggestions, readyNativeWindow, exactPayload).pass,
+  true,
+  "A themed home page intentionally hiding native starter cards must verify.",
+);
+
 const windowCalls = [];
 assert.equal((await inspectNativeWindow({
   target: { id: "target-main" },
@@ -171,6 +185,9 @@ assert.match(
   "Window activation must use the exact bundle without starting another instance.",
 );
 
+if (process.platform === "win32") {
+  console.log("SKIP: macOS shell startup fixture requires /bin/bash.");
+} else {
 const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "dreamskin-window-ready-test."));
 let watcherPid = null;
 try {
@@ -324,6 +341,7 @@ mark_state_active() { /usr/bin/printf 'active\\n' > "$ACTIVE_MARKER"; }
     try { process.kill(watcherPid, "SIGTERM"); } catch {}
   }
   await fs.rm(fixtureRoot, { recursive: true, force: true });
+}
 }
 
 console.log("PASS: native-window readiness commits active only after visible verification.");
