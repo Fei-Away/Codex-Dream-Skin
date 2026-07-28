@@ -1141,12 +1141,20 @@ try {
     'background-position: var(--ds-art-position)',
     'html[data-dream-skin="active"]',
     'main.main-surface:has([role="main"])',
-    'main.main-surface:not(:has([role="main"]))'
+    'main.main-surface:not(:has([role="main"]))',
+    '> div:first-child:has(> .home-banners) + div',
+    'width: min(980px, 100%)'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
-  if ($css -notmatch 'html\[data-dream-skin="active"\]\s+\[class~="group/application-menu-top-bar"\]\s*\{') {
-    throw 'The native application menu bar lacks a shell-independent readability backdrop.'
+  foreach ($removedDecoration in @(
+    'content: var(--dream-skin-brand-subtitle',
+    'content: var(--dream-skin-status',
+    'content: var(--dream-skin-quote'
+  )) {
+    if ($css.Contains($removedDecoration)) {
+      throw "Redundant decorative chrome is still rendered: $removedDecoration"
+    }
   }
   if ($css.Contains('home-suggestion-list-item') -or
     $css.Contains('.dream-skin-home') -or $css.Contains('.dream-home') -or

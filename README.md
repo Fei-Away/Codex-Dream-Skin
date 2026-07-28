@@ -1,9 +1,10 @@
 # Codex Dream Skin
 
-此分支已同步上游 `v1.5.6`，并保留以下 Windows 兼容改动：
+当前 fork 版本为 `v1.5.7`，基于上游 `v1.5.6` 继续维护 Windows 兼容性：
 
 - Windows PowerShell 5.1 托盘菜单兼容修复（现已被上游吸收）。
-- 宽屏背景延伸到原生应用菜单栏时，浅色模式缺少稳定底色，导致菜单文字对比度不足。
+- 视觉层继续采用上游的左侧栏深色蒙版，不再额外覆盖浅色原生菜单栏。
+- 适配 Codex 26.721+ 首页结构，收紧首页布局并移除三个多余的装饰文字。
 
 <p align="center">
   <strong>中文</strong> · <a href="./README.en.md">English</a>

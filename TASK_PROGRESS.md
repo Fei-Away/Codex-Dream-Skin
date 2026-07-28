@@ -10,6 +10,18 @@
 - [pending] Do not push until the user finishes testing the v1.5.6 Release and asks to publish the branch.
 - [fact] No push, pull request, tag, Release, or local Codex installation/update has been performed in this task.
 
+## Codex 26.721+ Home Layout Follow-up (2026-07-28 CST)
+
+- [reported] The user confirmed upstream v1.5.6 installs and runs successfully, but the new-task/home page layout differs from the earlier presentation.
+- [reproduced] Real Windows Codex home capture at 1920x1040 shows the 26.721+ sibling content layout is visible, but the title overlaps right-side subject art with weak contrast, four suggestion cards span too widely, and the combined project/composer surface is oversized and pinned near the bottom edge. Normal task layout remains healthy.
+- [reported] The user also identified three redundant skin-only labels: the home lower-right quote and the task page upper-left brand / upper-right online-status text. Remove these decorative pseudo-elements while preserving native controls and theme identity in the tray/library.
+- [decision] Drop the fork's shell-independent light application-menu backdrop and retain upstream's left-sidebar dark overlay plus dark-shell-only native menu treatment; the user prefers the upstream visual hierarchy.
+- [complete] Added a 26.721+-scoped shared-runtime layout refinement for the sibling content wrapper, removed the three redundant decorative labels, and retained upstream's dark-sidebar/dark-shell menu strategy without restoring the obsolete nested `:has()` rules that caused #244.
+- [complete] Bumped the six release sources and four current-version assertions to fork version `1.5.7`; added matching Windows/macOS changelog entries while retaining the truthful upstream base of `v1.5.6`.
+- [verified] Shared runtime assets are synchronized. Windows injector/renderer syntax, 18 portable Node regressions, the complete Windows PowerShell suite, and installer static contracts pass. Forced cleanup warnings are intentional failure-injection fixtures.
+- [complete] Built local `release/CodexDreamSkin-Setup-v1.5.7.exe` with pinned Inno Setup 6.7.1 and bundled Node 22.23.1. The artifact is 24,462,494 bytes, reports product version `1.5.7`, and has SHA-256 `CC48F960D24555C8216C198AEA2C22287D617974BA8757F7341D340207E9E547`.
+- [fact] The installer is intentionally unsigned, matching upstream's current first-run warning behavior. No installation, push, tag, PR, or public Release was performed.
+
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)

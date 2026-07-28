@@ -258,9 +258,11 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
   assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
-  assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
-  assert.match(css, /content:\s*var\(--dream-skin-status/);
-  assert.match(css, /content:\s*var\(--dream-skin-quote/);
+  assert.doesNotMatch(css, /content:\s*var\(--dream-skin-brand-subtitle/);
+  assert.doesNotMatch(css, /content:\s*var\(--dream-skin-status/);
+  assert.doesNotMatch(css, /content:\s*var\(--dream-skin-quote/);
+  assert.match(css, /> div:first-child:has\(> \.home-banners\) \+ div/);
+  assert.match(css, /width:\s*min\(980px, 100%\)/);
   assert.match(css, /--ds-task-full-veil/);
   assert.match(css, /data-dream-task-mode="full"/);
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
