@@ -1,15 +1,17 @@
 # Task Progress
 
-Updated: 2026-07-28 21:51 CST (Asia/Shanghai)
+Updated: 2026-07-28 21:56 CST (Asia/Shanghai)
 
 ## macOS Thread Route Verification Fix (2026-07-28)
 
-- [in progress] Branch `fix/macos-thread-route-verification` from `main@611c101`.
+- [complete] Branch `fix/macos-thread-route-verification` from `main@611c101`; committed the minimal repair as `f462f51` (`fix: verify thread routes without a home hero`).
 - [fact] On this Mac, public Dream Skin `1.5.6` injects the selected Gothic Void Crusade payload into Codex `26.721.41059`: theme ID/revision, CSS, L1 shell/sidebar, viewport and overflow checks all pass. Native `Browser.getWindowForTarget` returns the already-supported `-32000` fallback.
 - [fact] First retry also showed the renderer was hidden. Explicit app activation changed `documentVisibility` to `visible`, but the verifier still failed because runtime scope was `thread` while the legacy home probe returned `homeRoute: true`, `homePresent: false`, `hero: null`. The macOS verifier then incorrectly required a home hero on the thread route and fail-closed.
 - [complete] Added a failing regression for this exact tuple in `macos/tests/window-readiness.test.mjs`; old code failed with `false !== true`. The minimal fix gates home-hero verification and its soft diagnostic on canonical `homePresent`, matching Windows' established verifier contract. A canonical home container without a visible hero still fails.
 - [verified] Targeted window-readiness regression passes. The macOS suite reached and passed syntax, selector, shared-runtime sync, payload, injector and Safe CSS tests before unrelated host gates: the installed ChatGPT runtime fails the shell importer's code-signature validation, and the local Swift 6.3.3 compiler cannot build the Command Line Tools SDK's Swift 6.3.2 module cache. The latter also cannot write the sandboxed clang cache. These are not presented as passes or bypassed.
-- [next] Run focused static checks, inspect and commit the minimal diff, copy the verified injector into the user engine with a timestamped backup, then repeat the real frontmost Codex application/verification.
+- [complete] Static syntax, shared-runtime sync, diff hygiene and the targeted regression pass. The source-tree atomic installer deployed the committed engine with `--no-launch --no-launchers`; its native rollback path retained the prior engine until the replacement was accepted. No public tag, Release, push or installer asset was created.
+- [verified] A real explicit-frontmost Codex smoke now returns `pass: true` for the previously failing tuple: `scope.baseState=thread`, auxiliary `homeRoute=true`, canonical `homePresent=false`, `hero=null`. Exact Gothic Void Crusade ID/revision, installed CSS, visible shell/sidebar/composer, normal viewport, no horizontal overflow and the documented `-32000` native-window fallback all verify. The watcher and Codex are running on loopback `9341`.
+- [handoff] This is a local engine hotfix on the branch above, not a published `1.5.7` release. Future public distribution still requires the normal version bump, CI, DMG build and Release gates.
 
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 
