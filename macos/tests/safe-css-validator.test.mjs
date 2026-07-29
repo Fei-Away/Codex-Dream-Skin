@@ -50,7 +50,7 @@ test("accepts only the bounded public part/property/value contract", () => {
   border-style: solid;
   border-radius: 12px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(var(--ds-theme-surface-blur));
   transition-property: background-color, border-color, box-shadow;
   transition-duration: 180ms;
 }

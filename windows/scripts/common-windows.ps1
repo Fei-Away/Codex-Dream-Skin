@@ -419,12 +419,31 @@ function Invoke-DreamSkinNative {
   }
 }
 
+function Import-DreamSkinPowerShellSecurityModule {
+  $command = Get-Command Get-AuthenticodeSignature -CommandType Cmdlet -ErrorAction SilentlyContinue
+  if ($command) { return }
+  try {
+    Import-Module Microsoft.PowerShell.Security -ErrorAction Stop
+  } catch {
+    $modulePath = Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
+    if (-not (Test-Path -LiteralPath $modulePath -PathType Leaf)) {
+      throw "PowerShell security module is unavailable: $($_.Exception.Message)"
+    }
+    Import-Module $modulePath -ErrorAction Stop
+  }
+  $command = Get-Command Get-AuthenticodeSignature -CommandType Cmdlet -ErrorAction SilentlyContinue
+  if (-not $command) {
+    throw 'PowerShell security module loaded, but Get-AuthenticodeSignature is unavailable.'
+  }
+}
+
 function Assert-DreamSkinTrustedNodeImage {
   param([Parameter(Mandatory = $true)][string]$Path)
 
   # Runs BEFORE the binary is ever executed. Get-DreamSkinValidatedNodeRuntime
   # learns the version by running `node -p`, so any authenticity check placed
   # after that point would already have executed attacker-controlled code.
+  Import-DreamSkinPowerShellSecurityModule
   $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop
   if ("$($signature.Status)" -ine 'Valid') {
     throw "The Node.js runtime is not validly signed: $Path ($($signature.Status))."
