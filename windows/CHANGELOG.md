@@ -4,6 +4,7 @@
 
 ### 修复
 
+- 修复安装器遇到 Codex `config.toml` 中合法多行数组时直接拒绝写入的问题（#313）。配置编辑器现在按 TOML 结构扫描 table header，安全跨过普通多行数组并保持原字节风格；未闭合数组、括号不匹配，以及 Dream Skin 需要改写的目标 key 自身为多行值时仍会在写入前 fail-closed。
 - 修复 v1.5.6 安装器在部分 Windows 10/11 环境中校验自带 Node.js 签名时，PowerShell 自动加载 `Microsoft.PowerShell.Security` / `Get-AuthenticodeSignature` 失败而中止安装的问题（#313、#314）。签名校验现在会在执行 `node.exe` 前显式加载安全模块，并在模块名加载失败时回退到 `$PSHOME` 下的系统模块清单路径；签名状态和发行者校验仍保持 fail-closed。
 - 修复社区主题一键换肤和 ZIP 导入拒绝 `backdrop-filter: blur(var(--ds-theme-surface-blur))` 的问题（#307、#312）。Safe CSS 仍只允许 `none`、0-20px blur 或注册的主题 blur 变量，不放宽到任意 filter 函数。
 - 修复 Codex Desktop 26.721.x 首页在 `home-icon` 延迟渲染时被误判为注入校验失败的问题（#307）。Windows 校验现在与 macOS 一样复用已由首页内容信号解析出的 `[role="main"]` 容器；严格的 `home-icon` 路径仍优先，旧版行为不变。

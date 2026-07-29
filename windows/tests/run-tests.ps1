@@ -537,6 +537,26 @@ try {
     throw 'A safe single-line array containing bracket text was changed or rejected.'
   }
 
+  $multilineArrayPath = Join-Path $temporaryRoot 'config-multiline-array.toml'
+  $multilineArrayBackup = Join-Path $temporaryRoot 'config-multiline-array.before.toml'
+  $multilineArrayOriginal = "model = `"gpt-5`"`r`nfeatures = [`r`n  `"hash # stays inside the string`",`r`n  `"brackets [stay] inside the string`", # ignored comment brackets []`r`n  [`"nested`", `"array`"],`r`n]`r`n`r`n[desktop]`r`nlayout = [`r`n  [`"one`", `"two`"], # unrelated desktop array`r`n  [`"three`", `"[desktop]`"],`r`n]`r`nappearanceTheme = `"system`"`r`nappearanceLightCodeThemeId = `"github-light`"`r`nkeepMe = true`r`n`r`n[mcp_servers.example]`r`nargs = [`r`n  `"--flag`",`r`n  `"value#with-hash`",`r`n]`r`n"
+  [System.IO.File]::WriteAllText($multilineArrayPath, $multilineArrayOriginal, $utf8NoBom)
+  Install-DreamSkinBaseTheme -ConfigPath $multilineArrayPath -BackupPath $multilineArrayBackup -AppearanceTheme 'dark'
+  $multilineArrayInstalled = Read-DreamSkinUtf8File -Path $multilineArrayPath
+  if (-not $multilineArrayInstalled.Contains('layout = [')) {
+    throw 'Install removed an unrelated multiline array from the [desktop] table.'
+  }
+  if (-not $multilineArrayInstalled.Contains('[mcp_servers.example]')) {
+    throw 'Install lost a following TOML table after a multiline array.'
+  }
+  if (-not $multilineArrayInstalled.Contains('appearanceTheme = "dark"')) {
+    throw 'Install did not update appearanceTheme beside multiline arrays.'
+  }
+  Restore-DreamSkinBaseTheme -ConfigPath $multilineArrayPath -BackupPath $multilineArrayBackup
+  if ((Read-DreamSkinUtf8File -Path $multilineArrayPath) -cne $multilineArrayOriginal) {
+    throw 'Multiline arrays were not preserved exactly through install and restore.'
+  }
+
   foreach ($unsupported in @(
     'desktop.appearanceTheme = "system"',
     'desktop = { appearanceTheme = "system" }',
@@ -549,8 +569,8 @@ try {
     '["desk\u0074op"]',
     "note = `"`"`"fake`r`n[desktop]`r`nappearanceTheme = `"dark`"`r`n`"`"`"",
     "[desktop]`r`nappearanceTheme = [`r`n  `"light`"`r`n]",
-    "[desktop]`r`nlayout = [`r`n  [1, 2],`r`n  [3, 4],`r`n]`r`nappearanceTheme = `"dark`"",
-    "[desktop]`r`nlayout = [`"]`",`r`n  [`"[`", `"]`"],`r`n]`r`nappearanceTheme = `"dark`""
+    "features = ]`r`n`r`n[desktop]`r`nappearanceTheme = `"system`"",
+    "features = [`r`n  `"one`"`r`n`r`n[desktop]`r`nappearanceTheme = `"system`""
   )) {
     $unsupportedPath = Join-Path $temporaryRoot ("unsupported-$([guid]::NewGuid().ToString('N')).toml")
     $unsupportedBackup = "$unsupportedPath.before"
