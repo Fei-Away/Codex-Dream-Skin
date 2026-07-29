@@ -71,6 +71,7 @@
     rootPasses: 0,
     routePasses: 0,
     layoutReads: 0,
+    rootClassWrites: 0,
     attributeWrites: 0,
     styleWrites: 0,
     textWrites: 0,
@@ -753,7 +754,10 @@
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
-    root.classList.add("codex-dream-skin");
+    if (!root.classList.contains("codex-dream-skin")) {
+      root.classList.add("codex-dream-skin");
+      metrics.rootClassWrites += 1;
+    }
     return shell;
   };
 

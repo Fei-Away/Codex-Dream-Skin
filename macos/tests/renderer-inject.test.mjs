@@ -191,11 +191,14 @@ function createStyleDeclaration() {
   };
 }
 
-function createClassList(initial = []) {
+function createClassList(initial = [], onAdd = null) {
   const values = new Set(initial);
   return {
     values,
-    add(...names) { for (const name of names) values.add(name); },
+    add(...names) {
+      onAdd?.(names);
+      for (const name of names) values.add(name);
+    },
     remove(...names) { for (const name of names) values.delete(name); },
     contains(name) { return values.has(name); },
     toggle(name, enabled) {
@@ -224,9 +227,10 @@ function createFixture(theme, {
   let nextTimer = 1;
   let nextBlob = 1;
   const rootStyle = createStyleDeclaration();
+  const rootClassWrites = { addCalls: 0 };
   const root = {
     className: nativeShell === "dark" ? "electron-dark" : "electron-light",
-    classList: createClassList(),
+    classList: createClassList([], () => { rootClassWrites.addCalls += 1; }),
     style: rootStyle,
     appendChild(node) {
       node.parentElement = root;
@@ -570,6 +574,7 @@ function createFixture(theme, {
     revokedUrls,
     resizeObservers,
     root,
+    rootClassWrites,
     rootStyle,
     shellBox,
     suggestionGrid,
@@ -600,10 +605,22 @@ const defaultMetrics = defaults.window.__CODEX_DREAM_SKIN_STATE__.metrics;
 assert.equal(defaultMetrics.rootPasses, 1);
 assert.equal(defaultMetrics.routePasses, 1);
 assert.equal(defaultMetrics.layoutReads, 1);
+assert.equal(defaults.rootClassWrites.addCalls, 1);
+defaults.window.__CODEX_DREAM_SKIN_STATE__.ensure({ root: true, route: false, layout: false });
+assert.equal(
+  defaults.rootClassWrites.addCalls,
+  1,
+  "A repeated root pass must not rewrite the observed skin class and retrigger itself.",
+);
+const rootPassesBeforeSubtreeMutations = defaultMetrics.rootPasses;
 for (let index = 0; index < 50; index += 1) defaults.observers[0].callback([]);
 assert.equal(defaults.timers.size, 1, "Mutation bursts should coalesce into one scheduled ensure.");
 defaults.flushTimers(64);
-assert.equal(defaultMetrics.rootPasses, 1, "Subtree mutations must not recompute root theme tokens.");
+assert.equal(
+  defaultMetrics.rootPasses,
+  rootPassesBeforeSubtreeMutations,
+  "Subtree mutations must not recompute root theme tokens.",
+);
 assert.equal(defaultMetrics.routePasses, 2);
 assert.equal(defaultMetrics.layoutReads, 1, "Subtree mutations must not force shell layout reads.");
 assert.equal(defaults.resizeObservers.length, 1);

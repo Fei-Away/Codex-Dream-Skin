@@ -203,13 +203,15 @@ function validatedDebuggerUrl(target, port) {
   return url.href;
 }
 
-function isValidCdpPageTarget(item, port) {
+export function isValidCdpPageTarget(item, port) {
   if (
     item?.type !== "page" || !item.url?.startsWith("app://")
     || typeof item.id !== "string" || !CDP_ID_PATTERN.test(item.id)
     || !item.webSocketDebuggerUrl
   ) return false;
   try {
+    const targetUrl = new URL(item.url);
+    if (targetUrl.searchParams.get("initialRoute") === "/avatar-overlay") return false;
     const debuggerUrl = new URL(validatedDebuggerUrl(item, port));
     return debuggerUrl.pathname === `/devtools/page/${item.id}`;
   } catch {
@@ -217,7 +219,7 @@ function isValidCdpPageTarget(item, port) {
   }
 }
 
-class CdpSession {
+export class CdpSession {
   constructor(target, port) {
     this.target = target;
     this.ws = new WebSocket(validatedDebuggerUrl(target, port));
@@ -228,27 +230,32 @@ class CdpSession {
   }
 
   async open() {
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        try { this.ws.close(); } catch {}
-        reject(new Error("CDP WebSocket open timed out"));
-      }, 5000);
-      this.ws.addEventListener("open", () => { clearTimeout(timeout); resolve(); }, { once: true });
-      this.ws.addEventListener("error", () => { clearTimeout(timeout); reject(new Error("CDP WebSocket open failed")); }, { once: true });
-    });
-    this.ws.addEventListener("message", (event) => this.onMessage(event));
-    this.ws.addEventListener("error", () => this.close());
-    this.ws.addEventListener("close", () => {
-      this.closed = true;
-      for (const waiter of this.pending.values()) {
-        clearTimeout(waiter.timeout);
-        waiter.reject(new Error("CDP socket closed"));
-      }
-      this.pending.clear();
-    });
-    await this.send("Runtime.enable");
-    await this.send("Page.enable");
-    return this;
+    try {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          try { this.ws.close(); } catch {}
+          reject(new Error("CDP WebSocket open timed out"));
+        }, 5000);
+        this.ws.addEventListener("open", () => { clearTimeout(timeout); resolve(); }, { once: true });
+        this.ws.addEventListener("error", () => { clearTimeout(timeout); reject(new Error("CDP WebSocket open failed")); }, { once: true });
+      });
+      this.ws.addEventListener("message", (event) => this.onMessage(event));
+      this.ws.addEventListener("error", () => this.close());
+      this.ws.addEventListener("close", () => {
+        this.closed = true;
+        for (const waiter of this.pending.values()) {
+          clearTimeout(waiter.timeout);
+          waiter.reject(new Error("CDP socket closed"));
+        }
+        this.pending.clear();
+      });
+      await this.send("Runtime.enable");
+      await this.send("Page.enable");
+      return this;
+    } catch (error) {
+      this.close();
+      throw error;
+    }
   }
 
   onMessage(event) {
@@ -1111,20 +1118,46 @@ async function runOneShot(options) {
 
 export function earlyPayloadFor(payload, revision) {
   return `(() => {
+    const isAuxiliaryRoute = () =>
+      /(?:^|[?&])initialRoute=(?:%2f|\\/)avatar-overlay(?:&|$)/i.test(
+        window.location?.search || "",
+      );
+    if (window.top !== window || window.location?.protocol !== "app:" || isAuxiliaryRoute()) return;
     const generationKey = "__CODEX_DREAM_SKIN_EARLY_GENERATION__";
     const appliedKey = "__CODEX_DREAM_SKIN_EARLY_APPLIED__";
+    const bootstrapKey = "__CODEX_DREAM_SKIN_EARLY_BOOTSTRAP__";
     const generation = ${JSON.stringify(revision)};
+    const previousBootstrap = window[bootstrapKey];
+    if (typeof previousBootstrap?.stop === "function") previousBootstrap.stop();
     window[generationKey] = generation;
-    let observer = null;
+    let interval = null;
     let timeout = null;
+    let controller = null;
+    const onReady = () => install();
     const stop = () => {
-      observer?.disconnect();
-      observer = null;
+      if (interval) clearInterval(interval);
+      interval = null;
       if (timeout) clearTimeout(timeout);
       timeout = null;
+      document.removeEventListener?.("DOMContentLoaded", onReady);
+      if (window[bootstrapKey] === controller) delete window[bootstrapKey];
     };
+    controller = { stop };
+    window[bootstrapKey] = controller;
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
+      if (isAuxiliaryRoute()) { stop(); return true; }
+      const state = window.__CODEX_DREAM_SKIN_STATE__;
+      if (
+        window[appliedKey] === generation &&
+        state?.revision === generation &&
+        typeof state.ensure === "function" &&
+        typeof state.cleanup === "function" &&
+        !window.__CODEX_DREAM_SKIN_DISABLED__
+      ) {
+        stop();
+        return true;
+      }
       if (!document.documentElement) return false;
       const shell = document.querySelector('main.main-surface');
       const sidebar = document.querySelector('aside.app-shell-left-panel');
@@ -1135,10 +1168,8 @@ export function earlyPayloadFor(payload, revision) {
       return true;
     };
     if (install()) return;
-    if (typeof MutationObserver === "function" && document.documentElement) {
-      observer = new MutationObserver(install);
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-    }
+    document.addEventListener?.("DOMContentLoaded", onReady);
+    interval = setInterval(install, 250);
     timeout = setTimeout(stop, 10000);
   })()`;
 }
