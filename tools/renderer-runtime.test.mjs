@@ -264,6 +264,9 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /--ds-task-full-veil/);
   assert.match(css, /data-dream-task-mode="full"/);
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
+  assert.match(css,
+    /:is\([^\n{}]*data-dream-task-mode="full"[^\n{}]*data-dream-art-task-mode="full"[^\n{}]*\)\[data-dream-art-wide="true"\]\n\s+main\.main-surface:not\(:has\(\[role="main"\]\)\) \[class\*="_markdown"\]\s*\{\s*color:\s*var\(--ds-text\)\s*!important/,
+    "Full task mode must keep Markdown on the explicit theme text color.");
   // Every home/project selector must stay behind the root skin gate.  A
   // marker-class-to-:has() conversion must never leave native layout rules
   // active after pause/restore.
