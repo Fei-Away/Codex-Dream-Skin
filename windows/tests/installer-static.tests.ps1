@@ -8,10 +8,11 @@ $definitionPath = Join-Path $installerRoot 'codex-dream-skin.iss'
 $builderPath = Join-Path $installerRoot 'build-release.ps1'
 $bootstrapPath = Join-Path $installerRoot 'setup-bootstrap.ps1'
 $communityApplyPath = Join-Path $windowsRoot 'scripts\apply-community-theme.ps1'
+$commonPath = Join-Path $windowsRoot 'scripts\common-windows.ps1'
 $manifestPath = Join-Path $installerRoot 'node-runtime.json'
 $builderAst = $null
 
-foreach ($scriptPath in @($builderPath, $bootstrapPath, $communityApplyPath)) {
+foreach ($scriptPath in @($builderPath, $bootstrapPath, $communityApplyPath, $commonPath)) {
   if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     throw "Required installer PowerShell does not exist: $scriptPath"
   }
@@ -42,9 +43,11 @@ if ("$($manifest.version)" -cne '22.23.1' -or
 $definition = [System.IO.File]::ReadAllText($definitionPath)
 $builder = [System.IO.File]::ReadAllText($builderPath)
 $bootstrap = [System.IO.File]::ReadAllText($bootstrapPath)
+$common = [System.IO.File]::ReadAllText($commonPath)
 if ($definition.Contains('-ExecutionPolicy Bypass') -or
   $builder.Contains('-ExecutionPolicy Bypass') -or
-  $bootstrap.Contains('-ExecutionPolicy Bypass')) {
+  $bootstrap.Contains('-ExecutionPolicy Bypass') -or
+  $common.Contains('-ExecutionPolicy Bypass')) {
   throw 'The installer layer must never bypass the PowerShell execution policy.'
 }
 if ($definition.Contains('ssPostInstall')) {
@@ -194,6 +197,24 @@ foreach ($requiredUninstallBinding in @(
 }
 if ($bootstrap.Contains('@restoreArguments')) {
   throw 'Installer restore switches must not use positional array splatting.'
+}
+
+foreach ($requiredSecurityBootstrap in @(
+  'function Import-DreamSkinPowerShellSecurityModule',
+  'Import-Module Microsoft.PowerShell.Security -ErrorAction Stop',
+  "Join-Path `$PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'",
+  'Get-Command Get-AuthenticodeSignature -CommandType Cmdlet',
+  'Import-DreamSkinPowerShellSecurityModule',
+  'Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop'
+)) {
+  if (-not $common.Contains($requiredSecurityBootstrap)) {
+    throw "Node signature validation no longer explicitly loads the PowerShell security module: $requiredSecurityBootstrap"
+  }
+}
+$securityImportIndex = $common.IndexOf('Import-DreamSkinPowerShellSecurityModule', [System.StringComparison]::Ordinal)
+$authenticodeIndex = $common.IndexOf('Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop', [System.StringComparison]::Ordinal)
+if ($securityImportIndex -lt 0 -or $authenticodeIndex -le $securityImportIndex) {
+  throw 'Node signature validation can call Get-AuthenticodeSignature before the security module is loaded.'
 }
 
 $iconGenerator = $builderAst.Find({

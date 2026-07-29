@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### 修复
+
+- 修复 Codex Desktop 26.721.x 首页在 `home-icon` 延迟渲染时被误判为注入校验失败的问题（#306）。校验现在复用已由首页内容信号解析出的 `[role="main"]` 容器；严格的 `home-icon` 路径仍优先，旧版行为不变。
+- 修复显式浅色、宽幅 artwork 的 `taskMode: "full"` 任务页 Markdown 继承原生深色壳白色前景的问题（#309）。完整模式现与 ambient/banner 一样强制使用主题文本色，并保留浅色壳对比阴影。
+- 修复社区主题 ZIP 导入拒绝 `backdrop-filter: blur(var(--ds-theme-surface-blur))` 的问题（#312）。Safe CSS 仍只允许 `none`、0-20px blur 或注册的主题 blur 变量，不放宽到任意 filter 函数。
+
 ## 1.5.6 — 2026-07-26
 
 ### 安全

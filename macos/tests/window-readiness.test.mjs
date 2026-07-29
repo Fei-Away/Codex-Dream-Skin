@@ -19,6 +19,7 @@ const [startSource, commonSource] = await Promise.all([
   fs.readFile(startPath, "utf8"),
   fs.readFile(commonPath, "utf8"),
 ]);
+const injectorSource = await fs.readFile(path.join(macosRoot, "scripts", "injector.mjs"), "utf8");
 
 const exactPayload = {
   skinVersion: "test-version",
@@ -55,6 +56,25 @@ const baseRenderer = {
 
 assert.equal(readyNativeWindow.status, "ready");
 assert.equal(assessRendererVerification(baseRenderer, readyNativeWindow, exactPayload).pass, true);
+
+// Codex 26.721.x sometimes renders game-source/home suggestions before
+// home-icon. In that interval homeRoute is already a real [role=main], so
+// verification must use it when the stricter home-route selector is late.
+assert.match(
+  injectorSource,
+  /const home = document\.querySelector\(\$\{selectorLiteral\("home-route"\)\}\) \?\? homeRoute;/,
+  "Home verification must fall back to the already-resolved semantic home route (#306).",
+);
+assert.equal(
+  assessRendererVerification({
+    ...baseRenderer,
+    homeRoute: true,
+    homePresent: true,
+    hero: { visible: true, width: 800, height: 520 },
+  }, readyNativeWindow, exactPayload).pass,
+  true,
+  "A visible fallback home container must satisfy the ordinary home verification gate.",
+);
 
 const windowCalls = [];
 assert.equal((await inspectNativeWindow({

@@ -13,7 +13,10 @@ const selectors = {
   shell: "main.main-surface",
   sidebar: "aside.app-shell-left-panel",
   composer: ".composer-surface-chrome",
+  homeIcon: '[data-testid="home-icon"]',
   home: '[role="main"]:has([data-testid="home-icon"])',
+  gameSource: '[data-feature="game-source"]',
+  suggestions: ".group\\/home-suggestions",
   settings: 'input[name="appearance-theme"]',
   themePreview: '[data-testid="theme-preview"]',
 };
@@ -51,6 +54,7 @@ function makeDomFixture({
   sidebar = makeElement(),
   composer = makeElement(),
   home = null,
+  homeSignal = null,
   settings = null,
   visibilityState = "visible",
   hidden = false,
@@ -74,7 +78,9 @@ function makeDomFixture({
       if (selector === selectors.shell) return shell;
       if (selector === selectors.sidebar) return sidebar;
       if (selector === selectors.composer) return composer;
+      if (selector === selectors.homeIcon) return null;
       if (selector === selectors.home) return home;
+      if (selector === selectors.gameSource || selector === selectors.suggestions) return homeSignal;
       if (selector === selectors.settings || selector === selectors.themePreview) return settings;
       return null;
     },
@@ -83,7 +89,7 @@ function makeDomFixture({
   };
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
-      version: "1.5.6",
+      version: "1.5.7",
       themeId: "fixture-theme",
       revision: "fixture-revision",
       styleMode: "style",
@@ -177,6 +183,22 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
     }),
   });
   assert.equal(home.result.pass, true);
+
+  const fallbackHome = makeHome({ rect: makeRect(900, 650, 20, 20) });
+  const lateHomeIconSignal = {
+    closest: (selector) => selector === '[role="main"]' ? fallbackHome : null,
+  };
+  const lateHomeIcon = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L0", baseState: "home" },
+      shell: null,
+      sidebar: null,
+      home: null,
+      homeSignal: lateHomeIconSignal,
+    }),
+  });
+  assert.equal(lateHomeIcon.result.homePresent, true);
+  assert.equal(lateHomeIcon.result.pass, true);
 
   const noAnchor = await verify({
     dom: makeDomFixture({
