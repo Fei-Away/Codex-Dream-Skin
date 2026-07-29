@@ -396,6 +396,15 @@ function Write-DreamSkinTheme {
   Write-DreamSkinUtf8FileAtomically -Path $themePath -Content ($json + "`r`n")
 }
 
+function Test-DreamSkinObjectPropertyValue {
+  param(
+    [Parameter(Mandatory = $true)][object]$InputObject,
+    [Parameter(Mandatory = $true)][string]$Name
+  )
+  $property = $InputObject.PSObject.Properties[$Name]
+  return $null -ne $property -and [bool]$property.Value
+}
+
 function Get-DreamSkinActiveThemeAppearance {
   param([Parameter(Mandatory = $true)][string]$ThemeDirectory)
   try {
@@ -564,13 +573,17 @@ function Set-DreamSkinActiveTheme {
     Assert-DreamSkinImageFile -Path $target
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
-    if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
-    if (-not $Theme.appearance) { $Theme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force }
-    if (-not $Theme.art) {
+    if (-not (Test-DreamSkinObjectPropertyValue -InputObject $Theme -Name 'id')) {
+      $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force
+    }
+    if (-not (Test-DreamSkinObjectPropertyValue -InputObject $Theme -Name 'appearance')) {
+      $Theme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force
+    }
+    if (-not (Test-DreamSkinObjectPropertyValue -InputObject $Theme -Name 'art')) {
       $Theme | Add-Member -NotePropertyName art -NotePropertyValue `
         ([pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }) -Force
     }
-    if (-not $Theme.palette) {
+    if (-not (Test-DreamSkinObjectPropertyValue -InputObject $Theme -Name 'palette')) {
       $Theme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
     }
     $activeCss = Join-Path $paths.Active 'theme.css'
@@ -715,17 +728,17 @@ function Get-DreamSkinThemeRuntimeContentFingerprint {
   $loaded = Read-DreamSkinTheme -ThemeDirectory $ThemeDirectory -SkipImageMetadata
   $runtimeTheme = $loaded.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
   $runtimeTheme.image = '<runtime-image>'
-  if (-not $runtimeTheme.id) {
+  if (-not (Test-DreamSkinObjectPropertyValue -InputObject $runtimeTheme -Name 'id')) {
     $runtimeTheme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force
   }
-  if (-not $runtimeTheme.appearance) {
+  if (-not (Test-DreamSkinObjectPropertyValue -InputObject $runtimeTheme -Name 'appearance')) {
     $runtimeTheme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force
   }
-  if (-not $runtimeTheme.art) {
+  if (-not (Test-DreamSkinObjectPropertyValue -InputObject $runtimeTheme -Name 'art')) {
     $runtimeTheme | Add-Member -NotePropertyName art -NotePropertyValue `
       ([pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }) -Force
   }
-  if (-not $runtimeTheme.palette) {
+  if (-not (Test-DreamSkinObjectPropertyValue -InputObject $runtimeTheme -Name 'palette')) {
     $runtimeTheme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
   }
   $canonicalTheme = ConvertTo-DreamSkinCanonicalJsonValue -Value $runtimeTheme

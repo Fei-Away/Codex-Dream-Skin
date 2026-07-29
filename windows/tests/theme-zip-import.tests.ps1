@@ -220,8 +220,11 @@ try {
   $officialArchiveSha256 = (Get-FileHash -LiteralPath $officialArchive -Algorithm SHA256).Hash.ToLowerInvariant()
   $official = Import-DreamSkinThemeZip -ArchivePath $officialArchive -StateRoot $stateRoot `
     -ExpectedArchiveBytes $officialArchiveBytes -ExpectedArchiveSha256 $officialArchiveSha256
-  $officialRuntimeFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
-    -ThemeDirectory $official.Path
+  $officialRuntimeFingerprint = & {
+    param([string]$ThemeDirectory)
+    Set-StrictMode -Version 2.0
+    Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $ThemeDirectory
+  } $official.Path
   if ($official.Status -cne 'Imported' -or $official.Id -cne 'studio.windows-contract' -or
     $official.PackageFormat -cne 'official' -or $official.SafeCssStatus -cne 'validated' -or
     -not $official.SignatureIgnored -or $official.ContentFingerprint -cnotmatch '^[a-f0-9]{64}$' -or
@@ -251,13 +254,41 @@ try {
     -StateRoot $roundtripStateRoot
   $officialSaved = Read-DreamSkinTheme -ThemeDirectory $official.Path
   $officialTheme = $officialSaved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-  $null = Set-DreamSkinActiveTheme -ImagePath $officialSaved.ImagePath `
-    -Theme $officialTheme -SafeCssPath (Join-Path $official.Path 'theme.css') `
-    -StateRoot $roundtripStateRoot
-  $roundtripFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
-    -ThemeDirectory $roundtripPaths.Active
+  $null = & {
+    param([string]$ImagePath, [object]$Theme, [string]$SafeCssPath, [string]$StateRoot)
+    Set-StrictMode -Version 2.0
+    Set-DreamSkinActiveTheme -ImagePath $ImagePath -Theme $Theme `
+      -SafeCssPath $SafeCssPath -StateRoot $StateRoot
+  } $officialSaved.ImagePath $officialTheme (Join-Path $official.Path 'theme.css') $roundtripStateRoot
+  $roundtripFingerprint = & {
+    param([string]$ThemeDirectory)
+    Set-StrictMode -Version 2.0
+    Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $ThemeDirectory
+  } $roundtripPaths.Active
   if ($roundtripFingerprint -cne $official.ContentFingerprint) {
     throw 'Active-theme image renaming changed the imported runtime content fingerprint.'
+  }
+
+  $minimalStateRoot = Join-Path $temporaryRoot 'strict-optional-fields-state'
+  $minimalPaths = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $minimalStateRoot
+  $minimalTheme = [pscustomobject]@{ schemaVersion = 1; name = 'Strict Optional Fields' }
+  $minimalActive = & {
+    param([string]$ImagePath, [object]$Theme, [string]$StateRoot)
+    Set-StrictMode -Version 2.0
+    Set-DreamSkinActiveTheme -ImagePath $ImagePath -Theme $Theme -StateRoot $StateRoot
+  } $officialSaved.ImagePath $minimalTheme $minimalStateRoot
+  foreach ($requiredDefault in @('id', 'appearance', 'art', 'palette')) {
+    if ($null -eq $minimalActive.Theme.PSObject.Properties[$requiredDefault]) {
+      throw "Strict-mode active theme did not add optional default: $requiredDefault"
+    }
+  }
+  $minimalFingerprint = & {
+    param([string]$ThemeDirectory)
+    Set-StrictMode -Version 2.0
+    Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $ThemeDirectory
+  } $minimalPaths.Active
+  if ($minimalFingerprint -cnotmatch '^[a-f0-9]{64}$') {
+    throw 'Strict-mode optional-field theme did not produce a runtime fingerprint.'
   }
 
   $replacementSource = Join-Path $temporaryRoot 'identity-replacement-source'
