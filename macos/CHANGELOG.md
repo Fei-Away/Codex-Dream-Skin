@@ -8,6 +8,10 @@
 - 修复显式浅色、宽幅 artwork 的 `taskMode: "full"` 任务页 Markdown 继承原生深色壳白色前景的问题（#309）。完整模式现与 ambient/banner 一样强制使用主题文本色，并保留浅色壳对比阴影。
 - 修复社区主题 ZIP 导入拒绝 `backdrop-filter: blur(var(--ds-theme-surface-blur))` 的问题（#312）。Safe CSS 仍只允许 `none`、0-20px blur 或注册的主题 blur 变量，不放宽到任意 filter 函数。
 
+### 内部
+
+- 同步 v1.5.8 版本号以发布 Windows 安装器补丁；macOS 运行时代码相对 v1.5.7 无行为变化。
+
 ## 1.5.6 — 2026-07-26
 
 ### 安全
