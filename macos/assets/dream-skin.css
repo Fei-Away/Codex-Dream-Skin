@@ -735,6 +735,18 @@ html[data-dream-skin="active"]
   margin-inline: auto !important;
 }
 
+/* v1.6.0 keeps the v1.5.9 home as the upgrade default, while allowing the
+   v1.5.8 clean wallpaper-first home to hide only the title and both native
+   suggestion layers. The composer and project controls remain interactive. */
+html[data-dream-skin="active"][data-dream-home-mode="clean"]
+  [role="main"]:has([data-feature="game-source"]) [data-feature="game-source"],
+html[data-dream-skin="active"][data-dream-home-mode="clean"]
+  [role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions],
+html[data-dream-skin="active"][data-dream-home-mode="clean"]
+  [role="main"]:has([data-feature="game-source"]) .group\/home-suggestions {
+  display: none !important;
+}
+
 html[data-dream-skin="active"]
   [role="main"]:has([data-feature="game-source"]) > div:first-child:has(> .home-banners) + div
   [data-home-ambient-suggestions] button,

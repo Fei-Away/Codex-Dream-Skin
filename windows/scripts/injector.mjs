@@ -39,7 +39,7 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.9";
+const SKIN_VERSION = "1.6.0";
 const MAX_ART_BYTES = 10 * 1024 * 1024;
 const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
@@ -625,41 +625,56 @@ export async function loadTheme(themeDir) {
   };
 }
 
-async function loadChromeModeState(themeDir) {
+async function loadPreferenceState(themeDir, fileName, defaultMode, acceptedMode) {
   const resolvedThemeDir = path.resolve(themeDir);
   if (path.basename(resolvedThemeDir).toLowerCase() !== "active-theme") {
-    return { mode: "left", sourceStamp: "fixed:left" };
+    return { mode: defaultMode, sourceStamp: `fixed:${defaultMode}` };
   }
-  const modePath = path.join(path.dirname(resolvedThemeDir), "chrome-mode");
+  const modePath = path.join(path.dirname(resolvedThemeDir), fileName);
   try {
     const stat = await fs.stat(modePath);
     if (!stat.isFile() || stat.size < 1 || stat.size > 16) {
-      return { mode: "left", sourceStamp: "invalid:left" };
+      return { mode: defaultMode, sourceStamp: `invalid:${defaultMode}` };
     }
     const value = (await fs.readFile(modePath, "utf8")).trim().toLowerCase();
-    const mode = value === "full" ? "full" : "left";
+    const mode = value === acceptedMode ? acceptedMode : defaultMode;
     return { mode, sourceStamp: `${stat.size}:${stat.mtimeMs}:${mode}` };
   } catch (error) {
-    if (error?.code === "ENOENT") return { mode: "left", sourceStamp: "none:left" };
-    return { mode: "left", sourceStamp: "unreadable:left" };
+    if (error?.code === "ENOENT") {
+      return { mode: defaultMode, sourceStamp: `none:${defaultMode}` };
+    }
+    return { mode: defaultMode, sourceStamp: `unreadable:${defaultMode}` };
   }
 }
+
+const loadChromeModeState = (themeDir) =>
+  loadPreferenceState(themeDir, "chrome-mode", "left", "full");
+const loadHomeModeState = (themeDir) =>
+  loadPreferenceState(themeDir, "home-mode", "classic", "clean");
 
 export async function loadPayload(
   themeDir = path.join(root, "assets"),
   candidateTheme = null,
   candidateChromeModeState = null,
+  candidateHomeModeState = null,
 ) {
   const loadedTheme = candidateTheme ?? await loadTheme(themeDir);
-  const chromeModeState = candidateChromeModeState ?? await loadChromeModeState(themeDir);
+  const [chromeModeState, homeModeState] = await Promise.all([
+    candidateChromeModeState ?? loadChromeModeState(themeDir),
+    candidateHomeModeState ?? loadHomeModeState(themeDir),
+  ]);
   loadedTheme.theme.chromeMode = chromeModeState.mode;
+  loadedTheme.theme.homeMode = homeModeState.mode;
   loadedTheme.themeFingerprint = loadedTheme.fingerprint;
   loadedTheme.fingerprint = createHash("sha256")
     .update(loadedTheme.themeFingerprint)
     .update("\0chrome-mode\0")
     .update(chromeModeState.mode)
+    .update("\0home-mode\0")
+    .update(homeModeState.mode)
     .digest("hex");
-  loadedTheme.sourceStamp = `${loadedTheme.sourceStamp}:chrome:${chromeModeState.sourceStamp}`;
+  loadedTheme.sourceStamp = `${loadedTheme.sourceStamp}:chrome:${chromeModeState.sourceStamp}` +
+    `:home:${homeModeState.sourceStamp}`;
   const [css, template] = await Promise.all([
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
@@ -720,7 +735,7 @@ async function fileExists(filePath) {
 }
 
 async function readThemeSourceStamp(loadedTheme) {
-  const [themeStat, imageStat, cssStat, chromeModeState] = await Promise.all([
+  const [themeStat, imageStat, cssStat, chromeModeState, homeModeState] = await Promise.all([
     fs.stat(loadedTheme.themePath),
     fs.stat(loadedTheme.imagePath),
     fs.stat(path.join(path.dirname(loadedTheme.themePath), "theme.css")).catch((error) => {
@@ -728,10 +743,11 @@ async function readThemeSourceStamp(loadedTheme) {
       throw error;
     }),
     loadChromeModeState(path.dirname(loadedTheme.themePath)),
+    loadHomeModeState(path.dirname(loadedTheme.themePath)),
   ]);
   return `${themeStat.size}:${themeStat.mtimeMs}:${imageStat.size}:${imageStat.mtimeMs}:` +
     (cssStat ? `${cssStat.size}:${cssStat.mtimeMs}` : "none") +
-    `:chrome:${chromeModeState.sourceStamp}`;
+    `:chrome:${chromeModeState.sourceStamp}:home:${homeModeState.sourceStamp}`;
 }
 
 async function probeSession(session) {
@@ -1558,21 +1574,25 @@ async function runWatch(options) {
             }
           }
           if (shouldAudit) {
-            const [candidateTheme, candidateChromeModeState] = await Promise.all([
+            const [candidateTheme, candidateChromeModeState, candidateHomeModeState] = await Promise.all([
               loadTheme(options.themeDir),
               loadChromeModeState(options.themeDir),
+              loadHomeModeState(options.themeDir),
             ]);
             lastStrongThemeAuditAt = now;
             if (!loadedPayload || candidateTheme.fingerprint !== loadedPayload.themeFingerprint ||
-                candidateChromeModeState.mode !== loadedPayload.theme.chromeMode) {
+                candidateChromeModeState.mode !== loadedPayload.theme.chromeMode ||
+                candidateHomeModeState.mode !== loadedPayload.theme.homeMode) {
               nextPayload = await loadPayload(
                 options.themeDir,
                 candidateTheme,
                 candidateChromeModeState,
+                candidateHomeModeState,
               );
             } else {
               loadedPayload.sourceStamp =
-                `${candidateTheme.sourceStamp}:chrome:${candidateChromeModeState.sourceStamp}`;
+                `${candidateTheme.sourceStamp}:chrome:${candidateChromeModeState.sourceStamp}` +
+                `:home:${candidateHomeModeState.sourceStamp}`;
             }
           }
         } catch (error) {

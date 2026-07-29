@@ -302,6 +302,30 @@ try {
         -Enabled:($chromeMode -cne $targetMode)
     }
     [void]$menu.Items.Add($chromeMenu)
+    $homeMode = Get-DreamSkinHomeMode -StateRoot $StateRoot
+    $homeMenu = [System.Windows.Forms.ToolStripMenuItem]::new('首页样式')
+    foreach ($choice in @(
+      @{ Mode = 'clean'; Text = '1.5.8 简洁首页' },
+      @{ Mode = 'classic'; Text = '1.5.9 标题与建议卡' }
+    )) {
+      $targetMode = $choice.Mode
+      $targetText = $choice.Text
+      $modeAction = {
+        $null = Invoke-DreamSkinTrayThemeOperation -Action {
+          Set-DreamSkinHomeMode -Mode $targetMode -StateRoot $StateRoot
+        }
+        $notify.ShowBalloonTip(
+          1800,
+          'Codex Dream Skin',
+          "已切换：$targetText",
+          [System.Windows.Forms.ToolTipIcon]::Info
+        )
+      }.GetNewClosure()
+      $null = Add-DreamSkinTrayItem -Items $homeMenu.DropDownItems -Text $targetText `
+        -Action $modeAction -Checked:($homeMode -ceq $targetMode) `
+        -Enabled:($homeMode -cne $targetMode)
+    }
+    [void]$menu.Items.Add($homeMenu)
     $autoStartEnabled = Test-Path -LiteralPath $startupShortcut -PathType Leaf
     $autoStartAction = {
       Set-DreamSkinAutoStart -Enabled:(-not $autoStartEnabled)

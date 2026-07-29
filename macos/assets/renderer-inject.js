@@ -12,7 +12,7 @@
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
     "data-dream-art-ready",
-    "data-dream-chrome-mode",
+    "data-dream-chrome-mode", "data-dream-home-mode",
   ];
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
@@ -554,6 +554,7 @@
     setAttribute(root, "data-dream-skin", "active");
     setAttribute(root, SHELL_ATTR, shell);
     setAttribute(root, "data-dream-chrome-mode", THEME.chromeMode === "full" ? "full" : "left");
+    setAttribute(root, "data-dream-home-mode", THEME.homeMode === "clean" ? "clean" : "classic");
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);

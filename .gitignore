@@ -4,6 +4,34 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Local credentials and signing material. Commit only explicit examples.
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+.netrc
+.npmrc
+.pypirc
+credentials.json
+secrets.json
+auth.json
+service-account*.json
+*.secrets.*
+
+# Local build tools, generated artifacts, and smoke fixtures.
+.release-tools/
+.tmp-theme-repair/
 README.preview.html
 docs/readme-preview.html
 release/

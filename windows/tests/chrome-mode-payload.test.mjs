@@ -31,11 +31,12 @@ async function makeActiveTheme() {
   return { stateRoot, themeDir };
 }
 
-test("the active chrome-mode preference changes payload identity without changing theme files", async () => {
+test("active chrome and home preferences change payload identity without changing theme files", async () => {
   const fixture = await makeActiveTheme();
   try {
     const initial = await loadPayload(fixture.themeDir);
     assert.equal(initial.theme.chromeMode, "left");
+    assert.equal(initial.theme.homeMode, "classic");
 
     await fs.writeFile(path.join(fixture.stateRoot, "chrome-mode"), "full\r\n", "utf8");
     const full = await loadPayload(fixture.themeDir);
@@ -51,6 +52,22 @@ test("the active chrome-mode preference changes payload identity without changin
     assert.equal(restored.fingerprint, initial.fingerprint);
     assert.equal(restored.revision, initial.revision);
     assert.notEqual(restored.sourceStamp, full.sourceStamp);
+
+    await fs.writeFile(path.join(fixture.stateRoot, "home-mode"), "clean\r\n", "utf8");
+    const clean = await loadPayload(fixture.themeDir);
+    assert.equal(clean.theme.chromeMode, "left");
+    assert.equal(clean.theme.homeMode, "clean");
+    assert.equal(clean.themeFingerprint, initial.themeFingerprint);
+    assert.notEqual(clean.fingerprint, initial.fingerprint);
+    assert.notEqual(clean.revision, initial.revision);
+    assert.notEqual(clean.sourceStamp, restored.sourceStamp);
+
+    await fs.writeFile(path.join(fixture.stateRoot, "home-mode"), "classic\r\n", "utf8");
+    const classic = await loadPayload(fixture.themeDir);
+    assert.equal(classic.theme.homeMode, "classic");
+    assert.equal(classic.fingerprint, initial.fingerprint);
+    assert.equal(classic.revision, initial.revision);
+    assert.notEqual(classic.sourceStamp, clean.sourceStamp);
   } finally {
     await fs.rm(fixture.stateRoot, { recursive: true, force: true });
   }
@@ -62,8 +79,10 @@ test("non-active payloads keep the safe left default", async () => {
   try {
     await fs.rename(fixture.themeDir, ordinaryThemeDir);
     await fs.writeFile(path.join(fixture.stateRoot, "chrome-mode"), "full\r\n", "utf8");
+    await fs.writeFile(path.join(fixture.stateRoot, "home-mode"), "clean\r\n", "utf8");
     const loaded = await loadPayload(ordinaryThemeDir);
     assert.equal(loaded.theme.chromeMode, "left");
+    assert.equal(loaded.theme.homeMode, "classic");
   } finally {
     await fs.rm(fixture.stateRoot, { recursive: true, force: true });
   }

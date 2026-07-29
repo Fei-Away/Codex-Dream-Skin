@@ -22,6 +22,18 @@ try {
   if ((Get-DreamSkinChromeMode -StateRoot $chromeModeStateRoot) -cne 'left') {
     throw 'The continuous left menu background mode was not restored.'
   }
+  $homeModeStateRoot = Join-Path $temporaryRoot 'home-mode-state'
+  if ((Get-DreamSkinHomeMode -StateRoot $homeModeStateRoot) -cne 'classic') {
+    throw 'The default home style must preserve the v1.5.9 title and suggestion cards.'
+  }
+  $null = Set-DreamSkinHomeMode -Mode clean -StateRoot $homeModeStateRoot
+  if ((Get-DreamSkinHomeMode -StateRoot $homeModeStateRoot) -cne 'clean') {
+    throw 'The v1.5.8 clean home style was not persisted.'
+  }
+  $null = Set-DreamSkinHomeMode -Mode classic -StateRoot $homeModeStateRoot
+  if ((Get-DreamSkinHomeMode -StateRoot $homeModeStateRoot) -cne 'classic') {
+    throw 'The v1.5.9 home style was not restored.'
+  }
   $runtimeSourceName = 'runtime source ' + (-join @([char]0x6D4B, [char]0x8BD5))
   $runtimeSourceRoot = Join-Path $temporaryRoot $runtimeSourceName
   $runtimeStateRoot = Join-Path $temporaryRoot 'runtime-state'
@@ -1159,6 +1171,7 @@ try {
     '[role="main"]:has([data-feature="game-source"]) [data-feature="game-source"]',
     '[role="main"]:has([data-feature="game-source"]) [data-home-ambient-suggestions]',
     '[role="main"]:has([data-feature="game-source"]) .group\/home-suggestions',
+    '[data-dream-home-mode="clean"]',
     'display: none !important',
     'width: min(980px, 100%)'
   )) {
@@ -1240,7 +1253,8 @@ try {
   }
   foreach ($requiredReleaseAction in @(
     'check-update.ps1', '检查更新', '打开 DreamSkin.cc', '菜单背景',
-    '左侧连续背景', '整条菜单栏背景', '登录时启动皮肤和 Codex'
+    '左侧连续背景', '整条菜单栏背景', '首页样式',
+    '1.5.8 简洁首页', '1.5.9 标题与建议卡', '登录时启动皮肤和 Codex'
   )) {
     if (-not $traySource.Contains($requiredReleaseAction)) {
       throw "Tray release action is missing: $requiredReleaseAction"

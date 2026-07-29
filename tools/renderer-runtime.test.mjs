@@ -311,6 +311,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(home.attrs.get("data-dream-skin"), "active");
   assert.equal(home.attrs.get("data-dream-shell"), "dark");
   assert.equal(home.attrs.get("data-dream-chrome-mode"), "left");
+  assert.equal(home.attrs.get("data-dream-home-mode"), "classic");
   assert.equal(home.attrs.get("data-ds-part"), "root");
   assert.equal(state.styleMode, "adopted");
   assert.equal(home.document.adoptedStyleSheets.length, 1);
@@ -405,6 +406,10 @@ export async function runRendererRuntimeTest(assetRoot) {
   const fullChrome = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(fullChrome.payloadFor({ chromeMode: "full" }), fullChrome.context);
   assert.equal(fullChrome.attrs.get("data-dream-chrome-mode"), "full");
+
+  const cleanHome = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(cleanHome.payloadFor({ homeMode: "clean" }), cleanHome.context);
+  assert.equal(cleanHome.attrs.get("data-dream-home-mode"), "clean");
   const renderedColors = {
     background: "--ds-bg",
     panel: "--ds-panel",

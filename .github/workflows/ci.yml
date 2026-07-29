@@ -23,6 +23,9 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Check tracked files for secrets
+        run: node tools/check-secrets.mjs
+
       - name: Check shell syntax
         shell: bash
         run: |
