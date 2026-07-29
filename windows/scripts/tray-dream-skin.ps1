@@ -305,8 +305,8 @@ try {
     $homeMode = Get-DreamSkinHomeMode -StateRoot $StateRoot
     $homeMenu = [System.Windows.Forms.ToolStripMenuItem]::new('首页样式')
     foreach ($choice in @(
-      @{ Mode = 'clean'; Text = '1.5.8 简洁首页' },
-      @{ Mode = 'classic'; Text = '1.5.9 标题与建议卡' }
+      @{ Mode = 'clean'; Text = '简洁首页' },
+      @{ Mode = 'classic'; Text = '标题与建议卡' }
     )) {
       $targetMode = $choice.Mode
       $targetText = $choice.Text

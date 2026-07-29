@@ -292,6 +292,23 @@ function Set-DreamSkinActiveThemeFromSnapshot {
   return $activeFingerprint
 }
 
+function Wait-DreamSkinCommunityChildProcess {
+  param(
+    [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+    [ValidateRange(1000, 600000)][int]$TimeoutMilliseconds
+  )
+  try {
+    if (-not $Process.WaitForExit($TimeoutMilliseconds)) {
+      try { $Process.Kill() } catch {}
+      [void]$Process.WaitForExit(15000)
+      throw "Dream Skin start and visible verification did not finish within $TimeoutMilliseconds ms."
+    }
+    return $Process.ExitCode
+  } finally {
+    $Process.Dispose()
+  }
+}
+
 function Invoke-DreamSkinCommunityStartAndVerify {
   param(
     [ValidateRange(1000, 300000)]
@@ -308,9 +325,18 @@ function Invoke-DreamSkinCommunityStartAndVerify {
     ' -RequireUnpaused -OperationLockTimeoutMilliseconds ' +
     "$OperationLockTimeoutMilliseconds"
   $startProcess = Start-Process -FilePath $powershell -ArgumentList $argumentLine `
-    -WindowStyle Hidden -Wait -PassThru
-  if ($startProcess.ExitCode -ne 0) {
-    throw "Dream Skin could not start and visibly verify the active theme (exit code $($startProcess.ExitCode))."
+    -WindowStyle Hidden -PassThru
+  # Start-Process -Wait follows the whole descendant tree on Windows. The start
+  # script intentionally leaves the injector watcher running, so wait only for
+  # the direct start/verify child and bound that wait independently.
+  $startTimeoutMilliseconds = [Math]::Min(
+    450000,
+    ([int64]$OperationLockTimeoutMilliseconds + 180000)
+  )
+  $exitCode = Wait-DreamSkinCommunityChildProcess -Process $startProcess `
+    -TimeoutMilliseconds ([int]$startTimeoutMilliseconds)
+  if ($exitCode -ne 0) {
+    throw "Dream Skin could not start and visibly verify the active theme (exit code $exitCode)."
   }
 }
 
@@ -761,10 +787,6 @@ $previousProtocol = [System.Net.ServicePointManager]::SecurityProtocol
 try {
   [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
   $result = Invoke-DreamSkinCommunityApply -ApplyUri $Uri
-  if (-not $result.Canceled) {
-    Show-DreamSkinCommunityMessage `
-      -Message "“$($result.Name)”已通过下载、SHA-256、主题包与 Safe CSS 校验，并已应用到 Codex。"
-  }
   exit 0
 } catch {
   $recovery = "$($_.Exception.Data['DreamSkinRecovery'])"

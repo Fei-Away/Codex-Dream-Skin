@@ -1254,7 +1254,7 @@ try {
   foreach ($requiredReleaseAction in @(
     'check-update.ps1', '检查更新', '打开 DreamSkin.cc', '菜单背景',
     '左侧连续背景', '整条菜单栏背景', '首页样式',
-    '1.5.8 简洁首页', '1.5.9 标题与建议卡', '登录时启动皮肤和 Codex'
+    '简洁首页', '标题与建议卡', '登录时启动皮肤和 Codex'
   )) {
     if (-not $traySource.Contains($requiredReleaseAction)) {
       throw "Tray release action is missing: $requiredReleaseAction"

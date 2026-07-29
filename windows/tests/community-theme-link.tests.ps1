@@ -241,6 +241,7 @@ foreach ($requiredSafety in @(
   'Set-DreamSkinActiveThemeFromSnapshot',
   'Get-DreamSkinThemeRuntimeContentFingerprint',
   'Invoke-DreamSkinCommunityStartAndVerify',
+  'Wait-DreamSkinCommunityChildProcess',
   'Move-DreamSkinCommunityRollbackSnapshot',
   "['DreamSkinRecovery']",
   "Join-Path `$PSScriptRoot 'start-dream-skin.ps1'",
@@ -259,6 +260,7 @@ foreach ($forbiddenBehavior in @(
   '-ExecutionPolicy Bypass',
   '[switch]$Silent',
   'Start-Process -FilePath $Uri',
+  '-WindowStyle Hidden -Wait -PassThru',
   'Invoke-Item $Uri'
 )) {
   if ($applySource.Contains($forbiddenBehavior)) {
@@ -291,10 +293,69 @@ $moveRollbackHelperAst = $applyAst.Find({
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Move-DreamSkinCommunityRollbackSnapshot'
 }, $true)
+$waitChildHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Wait-DreamSkinCommunityChildProcess'
+}, $true)
+$startHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Invoke-DreamSkinCommunityStartAndVerify'
+}, $true)
 if ($null -eq $transactionAst -or $null -eq $exceptionHelperAst -or
   $null -eq $baselineHelperAst -or $null -eq $activeStateHelperAst -or
-  $null -eq $moveRollbackHelperAst) {
+  $null -eq $moveRollbackHelperAst -or $null -eq $waitChildHelperAst -or
+  $null -eq $startHelperAst) {
   throw 'A testable community apply transaction, baseline, state, or recovery helper is missing.'
+}
+$startHelperSource = $startHelperAst.Extent.Text
+if ($startHelperSource.Contains('-WindowStyle Hidden -Wait') -or
+  -not $startHelperSource.Contains('Wait-DreamSkinCommunityChildProcess')) {
+  throw 'Community start verification must wait only for its direct child, not the persistent injector process tree.'
+}
+if ($applySource.IndexOf('if (-not $result.Canceled)', [System.StringComparison]::Ordinal) -ge 0 -or
+  $applySource.IndexOf('Show-DreamSkinCommunityMessage `', [System.StringComparison]::Ordinal) -gt
+    $applySource.IndexOf('$result = Invoke-DreamSkinCommunityApply', [System.StringComparison]::Ordinal)) {
+  throw 'A successful protocol apply must exit automatically instead of waiting for an acknowledgement dialog.'
+}
+Invoke-Expression $waitChildHelperAst.Extent.Text
+$waitFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) `
+  ('dreamskin-community-direct-child-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $waitFixtureRoot -Force | Out-Null
+$descendantPidPath = Join-Path $waitFixtureRoot 'descendant.pid'
+$childScriptPath = Join-Path $waitFixtureRoot 'spawn-descendant.ps1'
+$descendantPid = $null
+try {
+  $childScript = @(
+    'param([string]$PidPath)',
+    '$descendant = Start-Process -FilePath powershell.exe -ArgumentList @(',
+    "  '-NoProfile', '-Command', 'Start-Sleep -Seconds 30'",
+    ') -WindowStyle Hidden -PassThru',
+    '[System.IO.File]::WriteAllText($PidPath, "$($descendant.Id)")'
+  ) -join "`r`n"
+  [System.IO.File]::WriteAllText($childScriptPath, $childScript)
+  $directChild = Start-Process -FilePath powershell.exe -ArgumentList @(
+    '-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File', $childScriptPath,
+    $descendantPidPath
+  ) -WindowStyle Hidden -PassThru
+  $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+  $directExitCode = Wait-DreamSkinCommunityChildProcess -Process $directChild `
+    -TimeoutMilliseconds 10000
+  $stopwatch.Stop()
+  if ($directExitCode -ne 0 -or $stopwatch.ElapsedMilliseconds -ge 10000 -or
+    -not (Test-Path -LiteralPath $descendantPidPath -PathType Leaf)) {
+    throw 'Direct-child waiting followed or failed to outlive the persistent descendant process.'
+  }
+  $descendantPid = [int]([System.IO.File]::ReadAllText($descendantPidPath))
+  if ($null -eq (Get-Process -Id $descendantPid -ErrorAction SilentlyContinue)) {
+    throw 'The direct-child wait fixture did not leave its descendant alive for the regression check.'
+  }
+} finally {
+  if ($null -ne $descendantPid) {
+    Stop-Process -Id $descendantPid -Force -ErrorAction SilentlyContinue
+  }
+  Remove-Item -LiteralPath $waitFixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 $transactionSource = $transactionAst.Extent.Text
 $transactionLockIndex = $transactionSource.IndexOf(
