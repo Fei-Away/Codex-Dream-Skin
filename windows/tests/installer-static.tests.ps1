@@ -93,6 +93,26 @@ if ($definition.Contains('Root: HKLM') -or
   [regex]::Matches($definition, '(?m)^Root: HKCU; Subkey: "Software\\Classes\\dreamskin').Count -ne 4) {
   throw 'The dreamskin protocol must be a four-entry current-user registration with no arbitrary URL contract.'
 }
+if (-not $definition.Contains('#define PersistentPowerShellPath "{win}\System32\WindowsPowerShell\v1.0\powershell.exe"')) {
+  throw 'Persistent shortcuts and URL handlers must use a System32 PowerShell path that 64-bit launchers can access.'
+}
+$persistentCommandEntries = @(
+  'Name: "{group}\Codex Dream Skin"',
+  'Name: "{userstartup}\Codex Dream Skin"',
+  'Subkey: "Software\Classes\dreamskin\shell\open\command"'
+)
+foreach ($entry in $persistentCommandEntries) {
+  $line = ([regex]::Match(
+      $definition,
+      '(?m)^.*' + [regex]::Escape($entry) + '.*$'
+    )).Value
+  if (-not $line.Contains('{#PersistentPowerShellPath}')) {
+    throw "Persistent command does not use the browser-accessible PowerShell path: $entry"
+  }
+  if ($line.Contains('{#PowerShellPath}') -or $line.Contains('{sysnative}')) {
+    throw "Persistent command still references sysnative, which 64-bit launchers cannot access: $entry"
+  }
+}
 
 $uninstallStepIndex = $definition.IndexOf(
   'if CurUninstallStep <> usUninstall then',
