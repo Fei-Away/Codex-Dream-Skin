@@ -1309,6 +1309,9 @@ try {
     throw 'Start lost the any-registered endpoint fallback for Store auto-updates.'
   }
   $verifyScriptSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
+  if (-not $verifyScriptSource.Contains(". (Join-Path `$PSScriptRoot 'theme-windows.ps1')")) {
+    throw 'Verify must dot-source theme-windows.ps1 before using theme store helpers such as Get-DreamSkinThemePaths.'
+  }
   if (-not $verifyScriptSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
     throw 'Verify lost the any-registered endpoint fallback for Store auto-updates.'
   }

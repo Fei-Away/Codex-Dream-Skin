@@ -308,7 +308,12 @@ function Invoke-DreamSkinCommunityStartAndVerify {
     ' -RequireUnpaused -OperationLockTimeoutMilliseconds ' +
     "$OperationLockTimeoutMilliseconds"
   $startProcess = Start-Process -FilePath $powershell -ArgumentList $argumentLine `
-    -WindowStyle Hidden -Wait -PassThru
+    -WindowStyle Hidden -PassThru
+  if (-not $startProcess.WaitForExit($OperationLockTimeoutMilliseconds)) {
+    try { Stop-Process -InputObject $startProcess -Force -ErrorAction SilentlyContinue } catch {}
+    [void]$startProcess.WaitForExit(15000)
+    throw "Dream Skin start verification did not finish within $OperationLockTimeoutMilliseconds ms."
+  }
   if ($startProcess.ExitCode -ne 0) {
     throw "Dream Skin could not start and visibly verify the active theme (exit code $($startProcess.ExitCode))."
   }

@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $PortExplicit = $PSBoundParameters.ContainsKey('Port')
 $injector = Join-Path $PSScriptRoot 'injector.mjs'
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
+. (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
 $operationLock = Enter-DreamSkinOperationLock
 $verifyExitCode = 1
