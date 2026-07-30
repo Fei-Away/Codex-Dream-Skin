@@ -535,24 +535,17 @@ export async function loadTheme(themeDir) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
-  const palette = raw.palette && typeof raw.palette === "object" && !Array.isArray(raw.palette)
-    ? raw.palette : {};
   const rawColors = raw.colors && typeof raw.colors === "object" && !Array.isArray(raw.colors)
     ? raw.colors : null;
   const colorKeys = [
     "background", "panel", "panelAlt", "accent", "accentAlt", "secondary",
     "highlight", "text", "muted", "line",
   ];
-  const paletteAccent = typeof palette.accent === "string" && palette.accent.trim()
-    ? palette.accent.trim() : "";
-  if (paletteAccent && !/^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(paletteAccent)) {
-    throw new Error("palette.accent is not a supported CSS color");
-  }
   const colors = {
     background: normalizeThemeColor(rawColors?.background, "#071116"),
     panel: normalizeThemeColor(rawColors?.panel, "#0b1a20"),
     panelAlt: normalizeThemeColor(rawColors?.panelAlt, "#10272c"),
-    accent: normalizeThemeColor(rawColors?.accent, normalizeThemeColor(paletteAccent, "#7cff46")),
+    accent: normalizeThemeColor(rawColors?.accent, "#7cff46"),
     accentAlt: normalizeThemeColor(rawColors?.accentAlt, "#b8ff3d"),
     secondary: normalizeThemeColor(rawColors?.secondary, "#36d7e8"),
     highlight: normalizeThemeColor(rawColors?.highlight, "#642a8c"),
@@ -577,14 +570,10 @@ export async function loadTheme(themeDir) {
       safeArea: normalizedChoice(art.safeArea, "art.safeArea", THEME_CHOICES.safeArea, "auto"),
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
-    colorMode: rawColors ? "explicit" : (paletteAccent ? "explicit" : "auto"),
-    explicitColorKeys: rawColors
-      ? colorKeys.filter((key) => Object.hasOwn(rawColors, key))
-      : (paletteAccent ? ["accent"] : []),
+    colorMode: rawColors ? "explicit" : "auto",
+    explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
     colors,
-    palette: {},
   };
-  if (paletteAccent) theme.palette.accent = paletteAccent;
   const [themeStat, imageStat, safeCss] = await Promise.all([
     fs.stat(themePath),
     fs.stat(realImagePath),
@@ -1153,10 +1142,27 @@ export async function verifySession(
     // already-resolved semantic home container so a healthy home session is
     // not rejected solely because the stricter home-icon selector is late.
     const home = document.querySelector(${selectorLiteral("home-route")}) ?? homeRoute;
+    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
+    const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
+    const cards = cardButtons.map(box);
+    const visibleCards = cards.filter((item) => item?.visible);
+    const suggestionLabels = cardButtons.flatMap((button) => {
+      const expectedColor = getComputedStyle(button).color;
+      return [...button.querySelectorAll('*')]
+        .filter((node) => [...node.childNodes].some((child) =>
+          child.nodeType === 3 && child.textContent.trim()))
+        .map((node) => ({
+          ...box(node),
+          text: String(node.textContent ?? "").trim().slice(0, 80),
+          color: getComputedStyle(node).color,
+          expectedColor,
+        }));
+    });
+    const visibleSuggestionLabels = suggestionLabels.filter((item) => item?.visible);
+    const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
+      item.color === item.expectedColor);
     const settingsAnchor = document.querySelector(${selectorLiteral("appearance-radio")}) ||
       document.querySelector(${stableTestidLiteral("theme-preview")});
-    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
-    const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
     const adopted = runtime?.styleMode === 'adopted' &&
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
@@ -1198,6 +1204,9 @@ export async function verifySession(
       settingsAnchor: box(settingsAnchor),
       hero,
       cards,
+      visibleCardCount: visibleCards.length,
+      suggestionLabels,
+      suggestionLabelColorsMatch,
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
@@ -1238,12 +1247,18 @@ export async function verifySession(
       windowPass, documentPass, viewportPass, structurePass,
       nativeWindowPass, fallbackWindowPass,
     };
+    const homePass = !result.homePresent || (
+      Boolean(result.homeSurface?.visible && result.hero?.visible) &&
+      result.hero.width >= 280 && result.hero.height >= 120 &&
+      (!result.suggestionsPresent || result.visibleCardCount === 0 || (
+        result.suggestionLabels.filter((item) => item?.visible).length >= result.visibleCardCount &&
+        result.suggestionLabelColorsMatch
+      ))
+    );
     result.pass = result.installed && result.version === result.expectedVersion &&
       result.stylePresent && result.businessClassPollution === 0 && windowPass &&
       documentPass && viewportPass && structurePass &&
-      payloadPass &&
-      (!result.homePresent || (Boolean(result.homeSurface?.visible && result.hero?.visible) &&
-        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
+      payloadPass && homePass;
     return result;
   })()`);
 }
@@ -1740,6 +1755,10 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
       payloadBytes: Buffer.byteLength(loaded.payload),
       themeId: loaded.theme.id,
       appearance: loaded.theme.appearance,
+      colorMode: loaded.theme.colorMode,
+      explicitColorKeys: loaded.theme.explicitColorKeys,
+      hasColors: !!loaded.theme.colors && typeof loaded.theme.colors === "object",
+      hasPalette: Object.hasOwn(loaded.theme, "palette"),
       art: loaded.theme.art,
       artMetadata: loaded.theme.artMetadata ?? null,
       safeCssStatus: loaded.safeCssStatus,

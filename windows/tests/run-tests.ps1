@@ -1018,6 +1018,7 @@ try {
     $updatedTheme.Theme.id -cne 'custom' -or
     $updatedTheme.Theme.art.safeArea -cne 'auto' -or
     $updatedTheme.Theme.art.taskMode -cne 'auto' -or
+    $updatedTheme.Theme.PSObject.Properties['palette'] -or
     -not (Test-DreamSkinThemePathWithin -Path $updatedTheme.ImagePath -Root $themePaths.Active)) {
     throw 'Imported image did not reset to the generic adaptive contract inside the managed directory.'
   }
@@ -1293,6 +1294,19 @@ try {
     -not $startSource.Contains('Start-Sleep -Seconds 3')) {
     throw 'Start lost the verification retry window; a single early-boot miss must not tear the startup down.'
   }
+  if (-not $startSource.Contains('Invoke-DreamSkinCodexWindowActivation -Codex $codex') -or
+    -not $startSource.Contains("'--once'") -or
+    -not $startSource.Contains("'--timeout-ms', '15000'")) {
+    throw 'Start no longer mirrors macOS by activating Codex and force-injecting once after an initial visible-verification miss.'
+  }
+  if (-not (Get-Command Invoke-DreamSkinCodexWindowActivation -CommandType Function -ErrorAction SilentlyContinue)) {
+    throw 'The Windows Codex activation helper is missing from common-windows.ps1.'
+  }
+  if (-not $commonSource.Contains('Stop-Process -InputObject $processHandle -Force') -or
+    -not $commonSource.Contains('[void]$processHandle.WaitForExit(15000)') -or
+    -not $commonSource.Contains('if (-not $processHandle.HasExited)')) {
+    throw 'Recorded injector shutdown must wait on the exact validated process object before startup continues.'
+  }
   if (-not $startSource.Contains('direct Store executable fallback did not expose a verified loopback CDP endpoint') -or
     -not $startSource.Contains('may disable CDP in this production runtime')) {
     throw 'A direct launch that retains CDP arguments but exposes no listener no longer reports the owl runtime failure.'
@@ -1308,6 +1322,9 @@ try {
     throw 'Start lost the any-registered endpoint fallback for Store auto-updates.'
   }
   $verifyScriptSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\verify-dream-skin.ps1')
+  if (-not $verifyScriptSource.Contains(". (Join-Path `$PSScriptRoot 'theme-windows.ps1')")) {
+    throw 'Verify must dot-source theme-windows.ps1 before using theme store helpers such as Get-DreamSkinThemePaths.'
+  }
   if (-not $verifyScriptSource.Contains('Get-DreamSkinVerifiedCdpIdentityForAnyRegistered')) {
     throw 'Verify lost the any-registered endpoint fallback for Store auto-updates.'
   }
@@ -1392,6 +1409,45 @@ try {
     throw 'Mismatched live injector identity does not fail closed with preserved state.'
   }
 
+  $recordedInjectorFixture = Join-Path $temporaryRoot 'recorded-injector-fixture.mjs'
+  [System.IO.File]::WriteAllText(
+    $recordedInjectorFixture,
+    "setInterval(() => {}, 600000);`n",
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $recordedInjectorPort = 49333
+  $recordedInjectorBrowserId = 'fixture-browser'
+  $recordedInjectorArguments = (ConvertTo-DreamSkinProcessArgument -Value $recordedInjectorFixture) +
+    " --watch --port $recordedInjectorPort --browser-id $recordedInjectorBrowserId"
+  $recordedInjectorProcess = Start-Process -FilePath $node.Path `
+    -ArgumentList $recordedInjectorArguments -WindowStyle Hidden -PassThru
+  try {
+    Start-Sleep -Milliseconds 250
+    if ($recordedInjectorProcess.HasExited) {
+      throw 'Recorded injector shutdown fixture exited before its identity could be tested.'
+    }
+    $recordedInjectorState = [pscustomobject]@{
+      injectorPid = $recordedInjectorProcess.Id
+      injectorStartedAt = $recordedInjectorProcess.StartTime.ToUniversalTime().ToString('o')
+      injectorPath = $recordedInjectorFixture
+      nodePath = $node.Path
+      port = $recordedInjectorPort
+      browserId = $recordedInjectorBrowserId
+    }
+    if (-not (Stop-DreamSkinRecordedInjector -State $recordedInjectorState)) {
+      throw 'The identity-validated recorded injector did not report a successful stop.'
+    }
+    $recordedInjectorProcess.Refresh()
+    if (-not $recordedInjectorProcess.HasExited) {
+      throw 'The identity-validated recorded injector was still running after shutdown returned.'
+    }
+  } finally {
+    if (-not $recordedInjectorProcess.HasExited) {
+      Stop-Process -InputObject $recordedInjectorProcess -Force -ErrorAction SilentlyContinue
+      [void]$recordedInjectorProcess.WaitForExit(15000)
+    }
+  }
+
   $stderrProbe = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     '-e', "process.stderr.write('dream-skin-stderr-probe\n'); process.exit(7)")
   if ($stderrProbe.ExitCode -ne 7 -or ($stderrProbe.Output -join "`n") -notmatch 'dream-skin-stderr-probe') {
@@ -1412,6 +1468,12 @@ try {
   $managedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
   if ($managedPayloadTest.ExitCode -ne 0) { throw 'Managed theme payload validation failed.' }
+  $managedPayload = ($managedPayloadTest.Output -join "`n") | ConvertFrom-Json
+  if (-not $managedPayload.pass -or $managedPayload.hasPalette -or -not $managedPayload.hasColors -or
+    $managedPayload.colorMode -notin @('auto', 'explicit') -or
+    $managedPayload.explicitColorKeys -isnot [array]) {
+    throw 'Windows payload drifted from the shared community theme contract.'
+  }
   $oversizedPayloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $oversizedTheme)
   if ($oversizedPayloadTest.ExitCode -eq 0) { throw 'Node injector accepted an image over the 10 MB limit.' }
