@@ -378,8 +378,26 @@ function Read-DreamSkinTheme {
     Directory = $directory
     ThemePath = $themePath
     ImagePath = $imagePath
-    Theme = $theme
+    Theme = Normalize-DreamSkinThemeContract -Theme $theme
   }
+}
+
+function Normalize-DreamSkinThemeContract {
+  param([Parameter(Mandatory = $true)][object]$Theme)
+  if ($null -eq $Theme -or $Theme -is [string] -or $Theme -is [array]) {
+    throw 'Theme contract must be a JSON object.'
+  }
+  if (-not $Theme.PSObject.Properties['id'] -or -not $Theme.PSObject.Properties['id'].Value) {
+    $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force
+  }
+  if (-not $Theme.PSObject.Properties['appearance'] -or -not $Theme.PSObject.Properties['appearance'].Value) {
+    $Theme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force
+  }
+  if (-not $Theme.PSObject.Properties['art'] -or -not $Theme.PSObject.Properties['art'].Value) {
+    $Theme | Add-Member -NotePropertyName art -NotePropertyValue `
+      ([pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }) -Force
+  }
+  return $Theme
 }
 
 function Write-DreamSkinTheme {
@@ -390,6 +408,7 @@ function Write-DreamSkinTheme {
   Assert-DreamSkinNoReparseComponents -Path $ThemeDirectory
   New-Item -ItemType Directory -Force -Path $ThemeDirectory | Out-Null
   Assert-DreamSkinNoReparseComponents -Path $ThemeDirectory
+  $Theme = Normalize-DreamSkinThemeContract -Theme $Theme
   $json = $Theme | ConvertTo-Json -Depth 8
   $themePath = Join-Path $ThemeDirectory 'theme.json'
   Assert-DreamSkinNoReparseComponents -Path $themePath
@@ -538,7 +557,6 @@ function Set-DreamSkinActiveTheme {
       name = '自定义主题'
       appearance = 'auto'
       art = [pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }
-      palette = [pscustomobject]@{}
     }
   }
   $imageName = New-DreamSkinThemeImageName -Extension $extension
@@ -564,15 +582,7 @@ function Set-DreamSkinActiveTheme {
     Assert-DreamSkinImageFile -Path $target
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
-    if (-not $Theme.id) { $Theme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force }
-    if (-not $Theme.appearance) { $Theme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force }
-    if (-not $Theme.art) {
-      $Theme | Add-Member -NotePropertyName art -NotePropertyValue `
-        ([pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }) -Force
-    }
-    if (-not $Theme.palette) {
-      $Theme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
-    }
+    $Theme = Normalize-DreamSkinThemeContract -Theme $Theme
     $activeCss = Join-Path $paths.Active 'theme.css'
     Assert-DreamSkinNoReparseComponents -Path $activeCss
     if ($temporaryCss) {
@@ -715,19 +725,7 @@ function Get-DreamSkinThemeRuntimeContentFingerprint {
   $loaded = Read-DreamSkinTheme -ThemeDirectory $ThemeDirectory -SkipImageMetadata
   $runtimeTheme = $loaded.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
   $runtimeTheme.image = '<runtime-image>'
-  if (-not $runtimeTheme.id) {
-    $runtimeTheme | Add-Member -NotePropertyName id -NotePropertyValue 'custom' -Force
-  }
-  if (-not $runtimeTheme.appearance) {
-    $runtimeTheme | Add-Member -NotePropertyName appearance -NotePropertyValue 'auto' -Force
-  }
-  if (-not $runtimeTheme.art) {
-    $runtimeTheme | Add-Member -NotePropertyName art -NotePropertyValue `
-      ([pscustomobject]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }) -Force
-  }
-  if (-not $runtimeTheme.palette) {
-    $runtimeTheme | Add-Member -NotePropertyName palette -NotePropertyValue ([pscustomobject]@{}) -Force
-  }
+  $runtimeTheme = Normalize-DreamSkinThemeContract -Theme $runtimeTheme
   $canonicalTheme = ConvertTo-DreamSkinCanonicalJsonValue -Value $runtimeTheme
   $themeBytes = [System.Text.Encoding]::UTF8.GetBytes(
     ($canonicalTheme | ConvertTo-Json -Depth 8 -Compress)

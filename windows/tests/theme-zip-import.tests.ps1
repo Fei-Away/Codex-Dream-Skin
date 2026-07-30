@@ -250,10 +250,19 @@ try {
   $roundtripPaths = Initialize-DreamSkinThemeStore -SkillRoot $Root `
     -StateRoot $roundtripStateRoot
   $officialSaved = Read-DreamSkinTheme -ThemeDirectory $official.Path
+  if (-not $officialSaved.Theme.PSObject.Properties['colors'] -or
+    $officialSaved.Theme.PSObject.Properties['palette']) {
+    throw 'Studio colors-only theme was not preserved as the current community theme contract.'
+  }
   $officialTheme = $officialSaved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
   $null = Set-DreamSkinActiveTheme -ImagePath $officialSaved.ImagePath `
     -Theme $officialTheme -SafeCssPath (Join-Path $official.Path 'theme.css') `
     -StateRoot $roundtripStateRoot
+  $roundtripActive = Read-DreamSkinTheme -ThemeDirectory $roundtripPaths.Active
+  if (-not $roundtripActive.Theme.PSObject.Properties['colors'] -or
+    $roundtripActive.Theme.PSObject.Properties['palette']) {
+    throw 'Applying a Studio colors-only theme added a legacy palette field.'
+  }
   $roundtripFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
     -ThemeDirectory $roundtripPaths.Active
   if ($roundtripFingerprint -cne $official.ContentFingerprint) {
