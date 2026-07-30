@@ -54,6 +54,14 @@ if /usr/bin/grep -F -q 'CODEX_EXPECTED_TEAM_ID' "$ROOT/scripts/common-macos.sh" 
   printf 'macOS runtime identity must use the fixed OpenAI signing requirement.\n' >&2
   exit 1
 fi
+SIGNED_RUNTIME_BODY="$(
+  /usr/bin/sed -n '/^require_signed_node_runtime() {/,/^}/p' "$ROOT/scripts/common-macos.sh"
+)"
+if /usr/bin/printf '%s\n' "$SIGNED_RUNTIME_BODY" |
+    /usr/bin/grep -E -q 'uname[[:space:]]+-m|/usr/bin/(file|lipo)|/usr/sbin/sysctl'; then
+  printf 'Signed Node compatibility must be proven by execution, not the launcher architecture.\n' >&2
+  exit 1
+fi
 
 # The native menu bar control plane and XCTest require a complete, matching
 # Xcode platform. CommandLineTools-only hosts report this platform blocker;
@@ -467,10 +475,27 @@ run_signed_runtime_switch_test() {
   [ -z "$(/usr/bin/find "$switch_state" -maxdepth 1 -name '.theme-switch.*' -print -quit)" ]
 }
 
+run_translated_signed_runtime_test() {
+  if [ "$(/usr/bin/uname -m)" != "arm64" ] ||
+      ! /usr/bin/arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
+    printf 'SKIP: Rosetta signed-runtime regression requires Apple Silicon with Rosetta.\n'
+    return 0
+  fi
+  /usr/bin/arch -x86_64 /bin/bash -c '
+    . "$1/scripts/common-macos.sh"
+    [ "$(/usr/bin/uname -m)" = "x86_64" ]
+    discover_codex_app
+    require_signed_node_runtime
+    [ "$NODE_VERSION" = "$("$NODE" --version)" ]
+    [ "$DREAM_SKIN_VALIDATED_RUNTIME_PID" = "$$" ]
+  ' _ "$ROOT"
+}
+
 if [ "${CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS:-0}" = "1" ]; then
   printf 'SKIP: switch-theme integration requires an installed, signed Codex app.\n'
   SWITCH_RUNTIME_RESULT="skipped"
 else
+  run_translated_signed_runtime_test
   run_signed_runtime_switch_test
   SWITCH_RUNTIME_RESULT="passed"
 fi
