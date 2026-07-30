@@ -121,7 +121,7 @@ function makeDomFixture({
   };
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
-      version: "1.5.8",
+      version: "1.5.9",
       themeId: "fixture-theme",
       revision: "fixture-revision",
       styleMode: "style",
