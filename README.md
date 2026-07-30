@@ -1,8 +1,33 @@
-# Codex Dream Skin
+# Codex Dream Skin · 泽音 Melody 主题版
 
 <p align="center">
   <strong>中文</strong> · <a href="./README.en.md">English</a>
 </p>
+
+## 🌙 泽音 Melody · 樽前月下
+
+这是为 Codex 桌面端制作的「泽音 Melody · 樽前月下」主题美化包。主题以月夜、虹彩与粉蓝色调为核心：
+新建任务首页展示泽音 Melody 插画，普通任务对话页切换为安静的深紫纯色背景，在保留原生交互的同时，
+加入粉色细描边、柔和外光晕、透明标题栏和白色装饰题字。
+
+<p align="center">
+  <img src="output/verification/zeyin-melody-home-white-quote-v15.png" alt="泽音 Melody · 樽前月下主题实机效果" width="900"><br>
+  <sub>Windows Codex 桌面端实机效果 · 新建任务首页</sub>
+</p>
+
+### 使用方法
+
+1. 安装 [Codex Dream Skin 最新版本](https://github.com/Fei-Away/Codex-Dream-Skin/releases)，首次安装后启动一次。
+2. 下载 [`zeyin-melody-home-only-v2.zip`](./output/theme-packs/zeyin-melody-home-only-v2.zip)，不要解压或修改扩展名。
+3. Windows 用户在系统托盘打开 Codex Dream Skin 菜单，选择“导入主题 ZIP…”；macOS 用户在菜单栏选择同名选项。
+4. 导入成功后，在“已保存的主题”中选择“泽音 Melody”并应用。
+5. 如果 Codex 已经打开但画面没有立即更新，请完全退出 Codex 后重新启动。
+
+主题包采用“首页插画、普通对话纯色”的显示方式。完整源文件位于
+[`custom-themes/zeyin-melody/`](./custom-themes/zeyin-melody/)，也可按下文的手动导入方式安装。
+
+> 本主题是非官方的粉丝向美化作品，不代表 OpenAI、Codex、VirtualReal 或相关艺人的官方合作与背书。
+> 请仅在符合图片来源授权及适用平台规则的范围内使用和再分发素材。
 
 <p align="center">
   <strong>给 Codex 桌面端换一张会呼吸的脸。</strong><br>
