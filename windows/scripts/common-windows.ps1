@@ -1165,3 +1165,16 @@ function Confirm-DreamSkinRestart {
   $shell = New-Object -ComObject WScript.Shell
   return $shell.Popup($Message, 0, 'Codex Dream Skin', 52) -eq 6
 }
+
+function Invoke-DreamSkinCodexWindowActivation {
+  param([Parameter(Mandatory = $true)][object]$Codex)
+  $processes = @(Get-DreamSkinCodexProcesses -Codex $Codex)
+  if ($processes.Count -eq 0) { return $false }
+  $shell = New-Object -ComObject WScript.Shell
+  foreach ($process in $processes) {
+    try {
+      if ($shell.AppActivate([int]$process.ProcessId)) { return $true }
+    } catch {}
+  }
+  return $false
+}

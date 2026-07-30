@@ -28,6 +28,7 @@ $script:daemon | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
 }
 $script:dateCall = 0
 $script:verifyCalls = 0
+$script:onceCalls = 0
 $script:removeCalls = 0
 $script:stateWritten = $false
 $script:stateRemoved = $false
@@ -81,6 +82,7 @@ function Get-DreamSkinVerifiedCdpIdentity {
 }
 function Stop-DreamSkinRecordedInjector { param([object]$State); return $true }
 function Set-DreamSkinPaused { param([bool]$Paused, [string]$StateRoot); return $true }
+function Invoke-DreamSkinCodexWindowActivation { param([object]$Codex); return $true }
 function ConvertTo-DreamSkinProcessArgument { param([string]$Value); return $Value }
 function Start-Process {
   [CmdletBinding()]
@@ -104,6 +106,10 @@ function Invoke-DreamSkinNative {
   if ($ArgumentList -contains '--verify') {
     $script:verifyCalls += 1
     return [pscustomobject]@{ ExitCode = 2; Output = @('{"pass":false}') }
+  }
+  if ($ArgumentList -contains '--once') {
+    $script:onceCalls += 1
+    return [pscustomobject]@{ ExitCode = 2; Output = @('{"mode":"once","targets":[]}') }
   }
   if ($ArgumentList -contains '--remove') {
     $script:removeCalls += 1
@@ -152,7 +158,8 @@ try {
 $announcedActive = @($script:hostMessages | Where-Object {
   $_ -like 'Codex Dream Skin is active*'
 }).Count -gt 0
-if (-not $failed -or $script:verifyCalls -ne 1 -or $script:removeCalls -ne 1 -or
+if (-not $failed -or $script:verifyCalls -ne 1 -or $script:onceCalls -ne 1 -or
+  $script:removeCalls -ne 1 -or
   -not $script:stateWritten -or -not $script:stateRemoved -or
   -not $script:daemonStopped -or -not $script:daemon.HasExited -or
   -not $script:lockExited -or $announcedActive) {

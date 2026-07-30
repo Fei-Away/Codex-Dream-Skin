@@ -1142,10 +1142,27 @@ export async function verifySession(
     // already-resolved semantic home container so a healthy home session is
     // not rejected solely because the stricter home-icon selector is late.
     const home = document.querySelector(${selectorLiteral("home-route")}) ?? homeRoute;
+    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
+    const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
+    const cards = cardButtons.map(box);
+    const visibleCards = cards.filter((item) => item?.visible);
+    const suggestionLabels = cardButtons.flatMap((button) => {
+      const expectedColor = getComputedStyle(button).color;
+      return [...button.querySelectorAll('*')]
+        .filter((node) => [...node.childNodes].some((child) =>
+          child.nodeType === 3 && child.textContent.trim()))
+        .map((node) => ({
+          ...box(node),
+          text: String(node.textContent ?? "").trim().slice(0, 80),
+          color: getComputedStyle(node).color,
+          expectedColor,
+        }));
+    });
+    const visibleSuggestionLabels = suggestionLabels.filter((item) => item?.visible);
+    const suggestionLabelColorsMatch = visibleSuggestionLabels.every((item) =>
+      item.color === item.expectedColor);
     const settingsAnchor = document.querySelector(${selectorLiteral("appearance-radio")}) ||
       document.querySelector(${stableTestidLiteral("theme-preview")});
-    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
-    const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
     const adopted = runtime?.styleMode === 'adopted' &&
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
@@ -1187,6 +1204,9 @@ export async function verifySession(
       settingsAnchor: box(settingsAnchor),
       hero,
       cards,
+      visibleCardCount: visibleCards.length,
+      suggestionLabels,
+      suggestionLabelColorsMatch,
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
@@ -1227,12 +1247,18 @@ export async function verifySession(
       windowPass, documentPass, viewportPass, structurePass,
       nativeWindowPass, fallbackWindowPass,
     };
+    const homePass = !result.homePresent || (
+      Boolean(result.homeSurface?.visible && result.hero?.visible) &&
+      result.hero.width >= 280 && result.hero.height >= 120 &&
+      (!result.suggestionsPresent || result.visibleCardCount === 0 || (
+        result.suggestionLabels.filter((item) => item?.visible).length >= result.visibleCardCount &&
+        result.suggestionLabelColorsMatch
+      ))
+    );
     result.pass = result.installed && result.version === result.expectedVersion &&
       result.stylePresent && result.businessClassPollution === 0 && windowPass &&
       documentPass && viewportPass && structurePass &&
-      payloadPass &&
-      (!result.homePresent || (Boolean(result.homeSurface?.visible && result.hero?.visible) &&
-        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
+      payloadPass && homePass;
     return result;
   })()`);
 }

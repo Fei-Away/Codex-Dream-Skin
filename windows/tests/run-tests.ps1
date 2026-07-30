@@ -1294,6 +1294,14 @@ try {
     -not $startSource.Contains('Start-Sleep -Seconds 3')) {
     throw 'Start lost the verification retry window; a single early-boot miss must not tear the startup down.'
   }
+  if (-not $startSource.Contains('Invoke-DreamSkinCodexWindowActivation -Codex $codex') -or
+    -not $startSource.Contains("'--once'") -or
+    -not $startSource.Contains("'--timeout-ms', '15000'")) {
+    throw 'Start no longer mirrors macOS by activating Codex and force-injecting once after an initial visible-verification miss.'
+  }
+  if (-not (Get-Command Invoke-DreamSkinCodexWindowActivation -CommandType Function -ErrorAction SilentlyContinue)) {
+    throw 'The Windows Codex activation helper is missing from common-windows.ps1.'
+  }
   if (-not $startSource.Contains('direct Store executable fallback did not expose a verified loopback CDP endpoint') -or
     -not $startSource.Contains('may disable CDP in this production runtime')) {
     throw 'A direct launch that retains CDP arguments but exposes no listener no longer reports the owl runtime failure.'
