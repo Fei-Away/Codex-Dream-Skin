@@ -204,8 +204,22 @@ $requestHelperAst = $applyAst.Find({
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'New-DreamSkinCommunityHttpRequest'
 }, $true)
-if ($null -eq $requestHelperAst) { throw 'The fixed-origin community request helper is missing.' }
+$successMessageHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Format-DreamSkinCommunitySuccessMessage'
+}, $true)
+if ($null -eq $requestHelperAst -or $null -eq $successMessageHelperAst) {
+  throw 'The fixed-origin request or success-message helper is missing.'
+}
 Invoke-Expression $requestHelperAst.Extent.Text
+Invoke-Expression $successMessageHelperAst.Extent.Text
+$successMessage = Format-DreamSkinCommunitySuccessMessage -Name 'Paper'
+if (-not $successMessage -or $successMessage -notmatch 'Paper' -or
+  $successMessage -notmatch 'SHA-256' -or $successMessage -notmatch 'Safe CSS' -or
+  $successMessage -notmatch 'Codex') {
+  throw 'The Windows PowerShell 5.1 community success message is empty or malformed.'
+}
 $request = New-DreamSkinCommunityHttpRequest `
   -RequestUri 'https://api.dreamskin.cc/v1/themes/ver_1234abcd' -Accept 'application/json'
 if ($request.AllowAutoRedirect -or
@@ -249,6 +263,7 @@ foreach ($requiredSafety in @(
   "Join-Path `$PSScriptRoot 'start-dream-skin.ps1'",
   "' -RestartExisting'",
   'Restore-DreamSkinActiveThemeSnapshot',
+  'Format-DreamSkinCommunitySuccessMessage -Name $result.Name',
   'Remove-Item -LiteralPath $workRoot -Recurse -Force'
 )) {
   if (-not $applySource.Contains($requiredSafety)) {

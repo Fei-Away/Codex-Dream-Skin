@@ -1052,8 +1052,13 @@ function Stop-DreamSkinRecordedInjector {
   param([AllowNull()][object]$State)
   if ($null -eq $State -or -not $State.injectorPid) { return $true }
   $processId = [int]$State.injectorPid
+  $processHandle = Get-Process -Id $processId -ErrorAction SilentlyContinue
+  if (-not $processHandle) { return $true }
   $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
-  if (-not $process) { return $true }
+  if (-not $process) {
+    if ($processHandle.HasExited) { return $true }
+    throw "The recorded injector PID $processId is running, but its identity cannot be inspected. State was preserved."
+  }
 
   $expectedInjector = if ($State.injectorPath) {
     "$($State.injectorPath)"
@@ -1083,7 +1088,12 @@ function Stop-DreamSkinRecordedInjector {
     $browserPattern = '(?:^|\s)(?i:--browser-id)(?:=|\s+)' + [regex]::Escape("$($State.browserId)") + '(?=$|\s)'
     $injectorMatches = $injectorMatches -and [regex]::IsMatch($commandLine, $browserPattern)
   }
-  $startedAt = Get-DreamSkinProcessStartedAt -ProcessId $processId
+  try {
+    $startedAt = $processHandle.StartTime.ToUniversalTime().ToString('o')
+  } catch {
+    if ($processHandle.HasExited) { return $true }
+    throw "The recorded injector PID $processId is running, but its start time cannot be inspected. State was preserved."
+  }
   $startMatches = -not $State.injectorStartedAt -or $startedAt -eq "$($State.injectorStartedAt)"
   $identityMatches = [bool]($isNodeExecutable -and $nodeMatches -and $injectorMatches -and $startMatches)
 
@@ -1091,9 +1101,9 @@ function Stop-DreamSkinRecordedInjector {
     throw "The recorded injector PID $processId is running, but its visible identity does not match the saved Dream Skin process. State was preserved."
   }
 
-  Stop-Process -Id $processId -Force -ErrorAction Stop
-  try { Wait-Process -Id $processId -Timeout 5 -ErrorAction Stop } catch {}
-  if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
+  Stop-Process -InputObject $processHandle -Force -ErrorAction Stop
+  [void]$processHandle.WaitForExit(15000)
+  if (-not $processHandle.HasExited) {
     throw "The recorded Dream Skin injector did not stop: PID $processId"
   }
   return $true

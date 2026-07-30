@@ -29,6 +29,15 @@ function Show-DreamSkinCommunityMessage {
   )
 }
 
+function Format-DreamSkinCommunitySuccessMessage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$Name
+  )
+  return "主题「$Name」已通过下载、SHA-256、主题包与 Safe CSS 校验，并已应用到 Codex。"
+}
+
 function Confirm-DreamSkinCommunityApply {
   param([Parameter(Mandatory = $true)][object]$Metadata)
   Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -768,7 +777,7 @@ try {
   $result = Invoke-DreamSkinCommunityApply -ApplyUri $Uri
   if (-not $result.Canceled) {
     Show-DreamSkinCommunityMessage `
-      -Message "“$($result.Name)”已通过下载、SHA-256、主题包与 Safe CSS 校验，并已应用到 Codex。"
+      -Message (Format-DreamSkinCommunitySuccessMessage -Name $result.Name)
   }
   exit 0
 } catch {
