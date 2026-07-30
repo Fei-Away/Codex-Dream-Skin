@@ -1,19 +1,5 @@
 # Task Progress
 
-Updated: 2026-07-30 18:00 CST (Asia/Shanghai)
-
-## PR #317 Real Windows Community Apply Follow-up
-
-- [verified] `pr-317` is at remote PR head `71c3ca9`; all four PR CI jobs pass.
-- [verified] Real `dreamskin://apply/?version=ver_6fac938806981a73cb51` handoff reaches the native confirmation, fixed production API, strict ZIP import, and rollback. The imported `axdlee / Quiet Paper` payload also passes exact live renderer verification when applied directly (`themeId`, revision, visible home/shell/sidebar/hero/cards, text colors, and overflow all pass).
-- [root cause] The transaction failed before target verification because Windows reported `The recorded Dream Skin injector did not stop` after its five-second PID-based wait. The generic transaction error incorrectly surfaced this as a visible-verification failure. The immediately following rollback start stopped the same watcher and visibly verified the prior theme.
-- [verified] The identity-validated `Process` object wait fix passes the full Windows suite, a new real watcher-process shutdown fixture, installer static checks, Setup.exe build/install, and installed standalone Verify. The rebuilt package SHA-256 is `FF7724751A3C9EB4046590CF869AE15CE41F3441D5620B28049EB6C952B375ED`.
-- [root cause] The next real transaction applied and visibly verified `Quiet Paper`, exited the handler, and cleaned its work directory, but the success dialog failed: Windows PowerShell 5.1 treats curly double quotes as string delimiters, so `"“$name”..."` bound an empty value to `Message`. The active target remained correctly applied.
-- [complete] The Windows success text now uses PowerShell-safe `「」` brackets and has an executable PowerShell 5.1 regression. Rebuilt Setup.exe SHA-256: `2489092FFBA60ABC119A1612A3076773DBEF5910EFD8BC4ECB64840A6C710B76`.
-- [verified] Final real registered-protocol apply of `ver_6fac938806981a73cb51` completed in 38.9 seconds: native confirmation, production metadata/download, strict duplicate import, active-theme transaction, exact visible renderer verification, native success message, zero remaining handler processes, and zero `.community-apply-*` directories. The target screenshot SHA-256 is `42472EBE7E7B0A73F600C159E074D547B163604AA1857A5E70F91898853A7C5E`.
-- [verified] The complete Windows suite and installer static suite pass after both fixes. The pre-test `preset-gothic-void-crusade` theme was restored and standalone Verify passes.
-- [gap] The in-app Browser plugin reported no available browser instances, so this final run started from the installed `dreamskin://` registration rather than clicking the DreamSkin.cc web button. Earlier site-to-protocol behavior was not treated as newly reverified here.
-
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
