@@ -21,6 +21,11 @@ if ($versionId -cne 'ver_1234abcd' -or
   -not (Test-DreamSkinCommunityVersionId -Value $versionId)) {
   throw 'The canonical community theme link did not resolve its version id.'
 }
+$normalizedUri = 'dreamskin://apply/?version=ver_1234abcd'
+$normalizedVersionId = Resolve-DreamSkinCommunityApplyUri -Uri $normalizedUri
+if ($normalizedVersionId -cne 'ver_1234abcd') {
+  throw 'The browser-normalized community theme link did not resolve its version id.'
+}
 $endpoints = Get-DreamSkinCommunityThemeEndpoints -VersionId $versionId
 if ($endpoints.MetadataUri -cne 'https://api.dreamskin.cc/v1/themes/ver_1234abcd' -or
   $endpoints.DownloadUri -cne 'https://api.dreamskin.cc/v1/themes/ver_1234abcd/download') {
@@ -32,6 +37,8 @@ foreach ($invalidUri in @(
   'dreamskin://apply?url=https://example.com/theme.zip',
   'dreamskin://apply?version=ver_short',
   'dreamskin://apply?version=ver_1234abcd&extra=1',
+  'dreamskin://apply/?version=ver_1234abcd&extra=1',
+  'dreamskin://apply//?version=ver_1234abcd',
   'dreamskin://apply/path?version=ver_1234abcd',
   'dreamskin://apply?version=ver_1234abcd#fragment',
   'dreamskin://user@apply?version=ver_1234abcd',

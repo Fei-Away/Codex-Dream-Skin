@@ -22,7 +22,7 @@ function Resolve-DreamSkinCommunityApplyUri {
   param([Parameter(Mandatory = $true)][string]$Uri)
   $match = [regex]::Match(
     $Uri,
-    '\Adreamskin://apply\?version=(ver_[a-z0-9]{8,64})\z',
+    '\Adreamskin://apply/?\?version=(ver_[a-z0-9]{8,64})\z',
     [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
   )
   if (-not $match.Success) {
