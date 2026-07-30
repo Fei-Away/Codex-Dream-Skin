@@ -1141,9 +1141,74 @@ try {
     'background-position: var(--ds-art-position)',
     'html[data-dream-skin="active"]',
     'main.main-surface:has([role="main"])',
+    'main.main-surface:has([role="main"] .home-banners)',
     'main.main-surface:not(:has([role="main"]))'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
+  }
+  $quietTaskChromePattern =
+    '(?s)\[data-dream-task-mode="off"\].*?header\.app-header-tint::before,.*?' +
+    '\[data-dream-task-mode="off"\].*?header\.app-header-tint::after\s*\{\s*content:\s*none;'
+  if (-not [regex]::IsMatch($css, $quietTaskChromePattern)) {
+    throw 'Task mode off no longer removes Dream Skin decorative header labels.'
+  }
+  $quietTaskMessagePattern =
+    '(?s)\[data-dream-task-mode="off"\].*?main\.main-surface:not\(:has\(\[role="main"\]\)\) article\s*\{' +
+    '[^}]*border-color:\s*rgb\(var\(--ds-accent-rgb\) / \.36\);' +
+    '[^}]*box-shadow:\s*0 0 14px rgb\(var\(--ds-accent-rgb\) / \.12\);'
+  if (-not [regex]::IsMatch($css, $quietTaskMessagePattern)) {
+    throw 'Task mode off no longer replaces dark message-card edges with theme colors.'
+  }
+  $quietTaskComposerPattern =
+    '(?s)\[data-dream-task-mode="off"\].*?main\.main-surface:not\(:has\(\[role="main"\]\)\) ' +
+    '\.composer-surface-chrome\s*\{[^}]*border-width:\s*1px !important;' +
+    '[^}]*border-style:\s*solid !important;' +
+    '[^}]*border-color:\s*rgb\(var\(--ds-accent-rgb\) / \.72\) !important;' +
+    '[^}]*border-radius:\s*22px !important;' +
+    '[^}]*background:\s*rgb\(var\(--ds-panel-2-rgb\)\) !important;' +
+    '[^}]*box-shadow:\s*0 0 18px rgb\(var\(--ds-accent-rgb\) / \.26\) !important;' +
+    '[^}]*backdrop-filter:\s*none !important;'
+  if (-not [regex]::IsMatch($css, $quietTaskComposerPattern)) {
+    throw 'Task mode off no longer replaces the dark composer edge with theme colors.'
+  }
+  $quietTaskComposerBackdropPattern =
+    '(?s)\[data-dream-task-mode="off"\].*?div\.sticky\.bottom-0 \[class\*="bg-gradient-to-t"\]' +
+    '\[class\*="via-token-main-surface-primary"\]\s*\{[^}]*' +
+    'rgb\(var\(--ds-bg-rgb\)\) 0%,[^}]*rgb\(var\(--ds-bg-rgb\)\) 50%,[^}]*' +
+    'rgb\(var\(--ds-bg-rgb\) / 0\) 100%[^}]*!important;.*?' +
+    'div\.sticky\.bottom-0 \[class\*="pointer-events-none"\]\[class\*="bg-gradient-to-t"\]' +
+    '\[class\*="from-token-main-surface-primary"\]\s*\{[^}]*' +
+    'rgb\(var\(--ds-bg-rgb\)\) 0%,[^}]*rgb\(var\(--ds-bg-rgb\) / 0\) 100%[^}]*!important;'
+  if (-not [regex]::IsMatch($css, $quietTaskComposerBackdropPattern)) {
+    throw 'Task mode off no longer recolors the native composer backdrop gradient.'
+  }
+  $squareHomeHeaderPattern =
+    '(?s)\[data-dream-art-wide="false"\].*?' +
+    'main\.main-surface:has\(\[role="main"\] \.home-banners\)\s*>\s*header\.app-header-tint\s*\{' +
+    '[^}]*background:\s*transparent !important;' +
+    '[^}]*border-bottom:\s*0 !important;' +
+    '[^}]*box-shadow:\s*none !important;' +
+    '[^}]*backdrop-filter:\s*none !important;'
+  if (-not [regex]::IsMatch($css, $squareHomeHeaderPattern)) {
+    throw 'Square-art home mode no longer reveals artwork behind the fixed header.'
+  }
+  $squareHomeTopFadePattern =
+    '(?s)\[data-dream-art-wide="false"\].*?' +
+    'main\.main-surface:has\(\[role="main"\] \.home-banners\).*?' +
+    '\[class~="app-shell-main-content-top-fade"\]\s*\{' +
+    '[^}]*background:\s*transparent !important;' +
+    '[^}]*opacity:\s*0 !important;'
+  if (-not [regex]::IsMatch($css, $squareHomeTopFadePattern)) {
+    throw 'Square-art home mode no longer suppresses the native dark top-fade band.'
+  }
+  $squareHomeQuotePattern =
+    '(?s)\[data-dream-art-wide="false"\].*?' +
+    'main\.main-surface:has\(\[role="main"\] \.home-banners\)::after\s*\{' +
+    '[^}]*color:\s*rgb\(255 255 255 / \.96\) !important;' +
+    '[^}]*0 1px 3px rgb\(var\(--ds-bg-rgb\) / \.90\),' +
+    '[^}]*0 0 12px rgb\(var\(--ds-bg-rgb\) / \.58\) !important;'
+  if (-not [regex]::IsMatch($css, $squareHomeQuotePattern)) {
+    throw 'Square-art home mode no longer keeps the decorative quote white and legible.'
   }
   if ($css.Contains('home-suggestion-list-item') -or
     $css.Contains('.dream-skin-home') -or $css.Contains('.dream-home') -or

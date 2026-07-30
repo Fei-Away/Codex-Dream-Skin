@@ -1,0 +1,30 @@
+[data-ds-part="root"] {
+  color: var(--ds-theme-color-text);
+}
+
+[data-ds-part="sidebar"] {
+  background-color: rgba(23, 24, 43, .76);
+  border-right-color: rgba(241, 127, 159, .24);
+}
+
+[data-ds-part="header"] {
+  background-color: rgba(23, 24, 43, .56);
+  border-bottom-color: rgba(124, 226, 232, .18);
+}
+
+[data-ds-part="message"] {
+  border-color: rgba(255, 212, 223, .16);
+  border-radius: 18px;
+}
+
+[data-ds-part="composer"] {
+  background-color: rgba(36, 33, 58, .82);
+  border-color: rgba(241, 127, 159, .34);
+  border-radius: 20px;
+}
+
+[data-ds-part="dialog"] {
+  background-color: rgba(23, 24, 43, .90);
+  border-color: rgba(124, 226, 232, .26);
+  border-radius: 18px;
+}

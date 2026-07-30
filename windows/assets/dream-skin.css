@@ -480,6 +480,15 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-
   content: none;
 }
 
+/* 无任务插画时保持界面安静：保留 Codex 原生标题栏控件，
+   仅移除 Dream Skin 的任务页装饰文字。 */
+html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-task-mode="off"])
+  main.main-surface:not(:has([role="main"])) > header.app-header-tint::before,
+html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-task-mode="off"])
+  main.main-surface:not(:has([role="main"])) > header.app-header-tint::after {
+  content: none;
+}
+
 html[data-dream-skin="active"] main.main-surface:not(:has([role="main"])) > :not(header.app-header-tint) {
   position: relative;
   z-index: 1;
@@ -519,6 +528,13 @@ html[data-dream-skin="active"] main.main-surface:not(:has([role="main"])) articl
   background: rgb(var(--ds-panel-rgb) / .44);
   box-shadow: 0 8px 24px rgb(var(--ds-bg-rgb) / .10);
   backdrop-filter: blur(7px) saturate(105%);
+}
+
+/* 纯色任务页使用居中的粉色柔光，不保留带位移的深色圆角投影。 */
+html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-task-mode="off"])
+  main.main-surface:not(:has([role="main"])) article {
+  border-color: rgb(var(--ds-accent-rgb) / .36);
+  box-shadow: 0 0 14px rgb(var(--ds-accent-rgb) / .12);
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"] main.main-surface:not(:has([role="main"])) article {
@@ -668,6 +684,49 @@ html[data-dream-skin="active"]
 html[data-dream-skin="active"]
   [role="main"]:has([data-testid="home-icon"]) > div:first-child:has(> .home-banners) > .home-banners > div:first-child::before {
   content: none !important;
+}
+
+/* Codex 26.721+ 已不再保留可用的紧凑 hero 插画卡片。宽图会在下方规则中铺满窗口；
+   方图和竖图则在首页主表面只绘制一次。用 banner 锚点限定新版 DOM，
+   避免旧版首页同时在主表面和原生 hero 卡片重复绘图。 */
+html[data-dream-skin="active"][data-dream-art-wide="false"]
+  main.main-surface:has([role="main"] .home-banners) {
+  background-color: var(--ds-bg) !important;
+  background-image:
+    linear-gradient(90deg,
+      rgb(var(--ds-bg-rgb) / .62) 0%,
+      rgb(var(--ds-bg-rgb) / .28) 56%,
+      rgb(var(--ds-bg-rgb) / .10) 100%),
+    var(--dream-skin-art) !important;
+  background-position: center, var(--ds-art-position) !important;
+  background-size: 100% 100%, cover !important;
+  background-repeat: no-repeat !important;
+}
+
+/* 新版首页的固定标题栏覆盖在主表面插画之上。方图回退模式下将其透明化，
+   让背景从窗口内容区顶部连续显示，避免形成深色横带。 */
+html[data-dream-skin="active"][data-dream-art-wide="false"]
+  main.main-surface:has([role="main"] .home-banners)
+  > header.app-header-tint {
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="false"]
+  main.main-surface:has([role="main"] .home-banners)
+  [class~="app-shell-main-content-top-fade"] {
+  background: transparent !important;
+  opacity: 0 !important;
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="false"]
+  main.main-surface:has([role="main"] .home-banners)::after {
+  color: rgb(255 255 255 / .96) !important;
+  text-shadow:
+    0 1px 3px rgb(var(--ds-bg-rgb) / .90),
+    0 0 12px rgb(var(--ds-bg-rgb) / .58) !important;
 }
 
 /* Codex 26.721+: this chain (3-6 first-child levels deep) targets the old
@@ -1057,6 +1116,44 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
     inset -1px 0 var(--ds-immersive-line),
     inset 0 1px rgb(var(--ds-panel-rgb) / .72) !important;
   backdrop-filter: blur(8px) saturate(102%) !important;
+}
+
+/* Codex 原生在 Tailwind utilities 层中用 !important 把输入框边框宽度归零。
+   同层覆写后，主题规则的更高特异性才能真正恢复粉色细描边。 */
+@layer utilities {
+  html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-task-mode="off"])
+    main.main-surface:not(:has([role="main"])) .composer-surface-chrome {
+    border-width: 1px !important;
+    border-style: solid !important;
+    border-color: rgb(var(--ds-accent-rgb) / .72) !important;
+    border-radius: 22px !important;
+    background: rgb(var(--ds-panel-2-rgb)) !important;
+    box-shadow: 0 0 18px rgb(var(--ds-accent-rgb) / .26) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Codex 在输入框后方另设一个深灰色滚动遮罩。保留遮挡滚动文字的渐变，
+   但让它使用任务页主题底色，避免形成独立的深色圆角底板。 */
+html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-task-mode="off"])
+  main.main-surface:not(:has([role="main"]))
+  div.sticky.bottom-0 [class*="bg-gradient-to-t"][class*="via-token-main-surface-primary"] {
+  background-image: linear-gradient(
+    to top,
+    rgb(var(--ds-bg-rgb)) 0%,
+    rgb(var(--ds-bg-rgb)) 50%,
+    rgb(var(--ds-bg-rgb) / 0) 100%
+  ) !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-task-mode="off"])
+  main.main-surface:not(:has([role="main"]))
+  div.sticky.bottom-0 [class*="pointer-events-none"][class*="bg-gradient-to-t"][class*="from-token-main-surface-primary"] {
+  background-image: linear-gradient(
+    to top,
+    rgb(var(--ds-bg-rgb)) 0%,
+    rgb(var(--ds-bg-rgb) / 0) 100%
+  ) !important;
 }
 
 html[data-dream-skin="active"] [class*="_homeUtilityBar_"] button,
