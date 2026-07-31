@@ -1,5 +1,23 @@
 # Task Progress
 
+## Client release v1.5.10 — in progress (2026-07-31)
+
+- [base] Feature PR #324 was squash-merged to `main` at
+  `a58e63c6909082706c02824622d0e902b3539065`; its exact-head CI run
+  `30638018730` passed all four jobs.
+- [scope] Branch `codex/release-v1.5.10` changes only the six required version
+  sources, version-bound assertions, dual-platform changelogs, and this durable
+  release record. Public v1.5.9 is the predecessor; v1.5.10 does not yet exist.
+- [verified locally] All six release version sources are exactly `1.5.10`.
+  Portable macOS/Windows Node regressions pass 81/81, and the complete
+  applicable macOS suite exits 0 with only its documented full-Xcode native
+  XCTest and installed signed-Codex Doctor branches skipped. Runtime asset
+  sync, all Node/Bash syntax, both payload checks, PowerShell 5.1 BOM and
+  execution-policy scans, and `git diff --check` pass.
+- [pending] Commit and push this version-only branch, open and merge its PR to
+  `main`, then verify the sole Release workflow creates tag v1.5.10 and
+  publishes non-empty DMG, Setup.exe, and SHA256SUMS.txt from the exact merge.
+
 ## PR #324 hard-interruption import recovery — in progress (2026-07-31)
 
 - [reproduced by review] Both platform importers move the existing canonical

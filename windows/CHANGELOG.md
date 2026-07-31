@@ -4,6 +4,10 @@
 
 ### 修复
 
+- 修复 Codex Desktop 26.727 更新后主区域、顶栏和顶部渐隐仍保持原生白底，或注入被错误报告为成功的问题（#320、#322、#326、#330）。共享选择器现同时识别旧结构与新版 app-shell 标记，首页和普通任务页必须达到完整 L1 可见性后才会提交成功。
+- 同 ID 社区主题再次导入时原地升级，不再生成重复的 `id-2` / `id-3` 目录；仅在身份与完整语义指纹都匹配时清理旧后缀副本，缺失或非法 ID 使用双端一致的稳定映射（#318）。
+- 主题目录替换增加持久化 journal 与 commit marker。PowerShell 进程被强制终止或系统重启后，托盘启动和下一次导入会恢复未提交的旧主题；只有已持久提交且指纹匹配的新主题会被保留，损坏或冲突证据 fail-closed。
+- 社区 Safe CSS 与网站合同对齐：保留注册壁纸、支持有界组合玻璃滤镜，并修复搜索框出现在输入框前时漏标真实 composer 的问题。
 - 修复 Windows 上从 Chrome/Edge 点击 DreamSkin.cc「一键换肤」无法稳定唤起或完成的问题（#307）。安装器持久注册项不再把 64 位浏览器不可访问的 `{sysnative}` 写入 HKCU `dreamskin://` handler；handler 同时接受网页规范链接和 Windows/浏览器归一化后的 `dreamskin://apply/?version=...` 形式；应用阶段与 macOS 对齐为 `colors` 合同、可见首页验证和首次失败后的激活 + `--once` 重试，并加固 watcher 进程关闭与成功提示。
 - 修复安装器遇到 Codex `config.toml` 中合法多行数组时直接拒绝写入的问题（#313）。配置编辑器现在按 TOML 结构扫描 table header，安全跨过普通多行数组并保持原字节风格；未闭合数组、括号不匹配，以及 Dream Skin 需要改写的目标 key 自身为多行值时仍会在写入前 fail-closed。
 - 修复 v1.5.6 安装器在部分 Windows 10/11 环境中校验自带 Node.js 签名时，PowerShell 自动加载 `Microsoft.PowerShell.Security` / `Get-AuthenticodeSignature` 失败而中止安装的问题（#313、#314）。签名校验现在会在执行 `node.exe` 前显式加载安全模块，并在模块名加载失败时回退到 `$PSHOME` 下的系统模块清单路径；签名状态和发行者校验仍保持 fail-closed。
