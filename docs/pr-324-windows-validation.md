@@ -14,9 +14,12 @@ Windows behavior aligned:
 - #320: shared Safe CSS can reach the registered main, sidebar, home, and
   composer parts on newer renderer DOMs. This applies to every community theme,
   not only colors-only themes.
-- #322: a visible current Codex `app://` renderer can pass target verification
-  when it has both Codex/ChatGPT identity evidence and the required generic
-  structure. Unrelated targets still fail closed.
+- #322/#326: Codex `26.727.40816` replaced the legacy main/header classes with
+  app-shell data attributes and CSS Module classes. The shared selector and CSS
+  contract now recognizes the current main surface, header, and top-fade while
+  retaining the legacy anchors. A visible current Codex `app://` renderer can
+  pass target verification when it has both Codex/ChatGPT identity evidence and
+  the required structure; unrelated targets still fail closed.
 
 The import repair is deliberately conservative. A legacy `id-2`/`id-3`
 directory is removed only when its stored suffix identity and semantic
@@ -107,9 +110,16 @@ Microsoft Store Codex through DreamSkin. Do not test an older Setup.exe.
 2. Check Home and a normal task view. Main content, sidebar, home surface, and
    composer must receive the intended shared styling without styling search,
    settings, modal, or unrelated textbox containers as the composer.
-3. Confirm sidebar navigation, project selection, task content, composer input,
+3. On Codex `26.727.40816` or newer, confirm the real outer main surface has the
+   theme background from the very top of the window. There must be no native
+   white strip or white top-fade left behind. The header controls must remain
+   visible and keep their native fixed position while scrolling.
+4. Confirm the installed verification output reports `scope.level` as `L1` and
+   an empty `missingL1` list on Home. A report that only says injection succeeded
+   is insufficient if `shell-main` or `header-tint` is still missing.
+5. Confirm sidebar navigation, project selection, task content, composer input,
    and send controls remain interactive and readable.
-4. Run the installed verification script and save its screenshot:
+6. Run the installed verification script and save its screenshot:
 
    ```powershell
    powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
@@ -117,9 +127,9 @@ Microsoft Store Codex through DreamSkin. Do not test an older Setup.exe.
      -ScreenshotPath "$env:TEMP\dreamskin-pr324.png"
    ```
 
-5. Restart Codex, reapply a theme, and verify again. A visible real Codex
+7. Restart Codex, reapply a theme, and verify again. A visible real Codex
    `app://` renderer must pass exact payload, theme ID, and revision checks.
-6. The automated bootstrap negative fixture must still reject an unbranded
+8. The automated bootstrap negative fixture must still reject an unbranded
    `app://` page with only generic main/input structure. Loopback endpoints not
    owned by the verified Codex package must also remain rejected.
 

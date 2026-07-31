@@ -1222,7 +1222,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__
-  .app-shell-main-content-top-fade {
+  __DREAM_SELECTOR_MAIN_CONTENT_TOP_FADE__ {
   display: none !important;
   background: transparent !important;
 }

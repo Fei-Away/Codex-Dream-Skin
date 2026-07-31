@@ -3,6 +3,25 @@ import fs from "node:fs/promises";
 import { gradeDoctorResult, selectorMatchesScope } from "./doctor-selectors.mjs";
 
 const contract = JSON.parse(await fs.readFile(new URL("./selectors.json", import.meta.url), "utf8"));
+const selectorFor = (key) => contract.selectors.find((entry) => entry.key === key)?.selector;
+assert.equal(
+  selectorFor("shell-main"),
+  "main:is(.main-surface, [data-app-shell-main-surface], [class*=\"_MainContentSurface_\"])",
+  "The shell contract must support both legacy and Codex 26.727 main surfaces.",
+);
+assert.equal(
+  selectorFor("header-tint"),
+  "header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*=\"_Header_\"])",
+  "The header contract must support both legacy and Codex 26.727 headers.",
+);
+assert.match(selectorFor("shell-main"), /\[class\*=\"_MainContentSurface_\"\]/);
+assert.match(selectorFor("header-tint"), /\[class\*=\"_Header_\"\]/);
+assert.doesNotMatch(selectorFor("shell-main"), /_[A-Za-z]+_[a-z0-9]{4,}/);
+assert.doesNotMatch(selectorFor("header-tint"), /_[A-Za-z]+_[a-z0-9]{4,}/);
+assert.equal(
+  selectorFor("main-content-top-fade"),
+  ':is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*="_MainContentTopFade_"])',
+);
 const resultFor = (baseState, hits, overlay = false) => gradeDoctorResult(contract, {
   baseState,
   overlay,

@@ -1,5 +1,49 @@
 # Task Progress
 
+## Codex 26.727 real-renderer visual follow-up — in progress (2026-07-31)
+
+- [verified] Official Codex/ChatGPT `26.727.40816` is running with this Draft
+  PR #324 engine (`1.5.9`, head `61d65e3`) and renderer injection succeeds.
+- [reproduced] The real home view remains partially white despite successful
+  injection. Screenshot: `/tmp/dreamskin-pr324-mac-26.727.png`.
+- [root cause] The live renderer has zero matches for legacy
+  `main.main-surface` and `header.app-header-tint`; it exposes
+  `main[data-app-shell-main-surface="default"]` plus new app-shell header data
+  attributes. The generic identity/part fallback added by #324 cannot replace
+  the canonical CSS selector contract, so it only themes part of the page.
+- [in progress] Add exact legacy-plus-current selectors in `tools/selectors.json`
+  and canonical runtime CSS, regenerate both macOS/Windows assets, add dual-
+  platform assertions, rerun all applicable tests, then reinstall/reinject and
+  capture real macOS visual evidence. Do not merge or release.
+
+## Codex 26.727 selector and top-fade fix — verified locally (2026-07-31)
+
+- [fixed] Shared selector contract now recognizes legacy anchors plus the
+  Codex 26.727 stable attributes and constrained CSS Module prefixes:
+  `main[data-app-shell-main-surface]` / `_MainContentSurface_`,
+  `header[data-app-shell-header-edge-scroll]` / `_Header_`, and the new
+  `data-app-shell-main-content-top-fade` / `_MainContentTopFade_` overlay.
+- [generated] `tools/sync-runtime-assets.mjs` regenerated macOS and Windows
+  selectors, renderer payloads, and canonical CSS. The three shared payload
+  files are byte-identical across platforms; `--check` passes.
+- [verified] Real official Codex `26.727.40816` with DreamSkin `1.5.9` now
+  reports renderer scope `home/L1` with `missingL1=[]`; `<main>` and `<header>`
+  receive `data-ds-part="main|header"`; the native top fade computes to
+  `display:none`; header remains `position:fixed; z-index:30`. Clean visual
+  evidence: `/tmp/dreamskin-pr324-mac-26.727-clean.png`.
+- [verified] `node --test macos/tests/*.test.mjs windows/tests/*.test.mjs`
+  passes 74/74. Focused selector/renderer/CSS tests and runtime sync check pass.
+  The macOS shell suite passes its applicable checks with signed-runtime,
+  runtime-state, and Doctor branches explicitly skipped by environment flags;
+  native Swift/XCTest remains unavailable on this host.
+- [verified] A final live CDP read at 2026-07-31 16:44 HKT still reports
+  `home/L1`, `missingL1=[]`, themed outer main, fixed header at z-index 30,
+  hidden native top-fade, and no operation overlay. The Windows handoff now
+  calls out these exact acceptance checks for Codex 26.727+.
+- [pending] Review/stage this fix, commit and push to Draft PR #324, then wait
+  for fresh CI and real Windows Codex visual acceptance. Do not merge, release,
+  comment on, or close #326/#322 yet.
+
 Updated: 2026-07-31 14:29 HKT (Asia/Hong_Kong)
 
 ## Privacy gate and legacy re-import regression — in progress (2026-07-31 14:49 HKT)

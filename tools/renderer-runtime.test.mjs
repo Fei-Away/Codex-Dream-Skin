@@ -138,8 +138,8 @@ function makeFixture({
     partFixtures.composer = makeDomNode("composer", partFixtures.main);
     partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
     register("aside.app-shell-left-panel", partFixtures.sidebar);
-    register("main.main-surface", partFixtures.main);
-    register("header.app-header-tint", partFixtures.header);
+    register("main:is(.main-surface, [data-app-shell-main-surface], [class*=\"_MainContentSurface_\"])", partFixtures.main);
+    register("header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*=\"_Header_\"])", partFixtures.header);
     register('[data-testid="home-icon"]', partFixtures.homeIcon);
     register('[role="main"]:has([data-testid="home-icon"])', partFixtures.home);
     register('[role="main"]', partFixtures.home);
@@ -305,8 +305,10 @@ export async function runRendererRuntimeTest(assetRoot) {
   // Home gating must stay single-level: CSS forbids :has() inside :has(),
   // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
-  assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
-  assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
+  assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\):has\(\[role="main"\]\)/);
+  assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\):not\(:has\(\[role="main"\]\)\)/);
+  assert.match(css, /header:is\(\.app-header-tint, \[data-app-shell-header-edge-scroll\], \[class\*=\"_Header_\"\]\)/);
+  assert.match(css, /:is\(\.app-shell-main-content-top-fade, \[data-app-shell-main-content-top-fade\], \[class\*=\"_MainContentTopFade_\"\]\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
   assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
   assert.match(css, /content:\s*var\(--dream-skin-status/);
@@ -316,17 +318,17 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
-    /:not\(:has\(main\.main-surface\)\)[\s\S]{0,120}\[data-ds-part="sidebar"\]/,
+    /:not\(:has\(main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\)\)\)[\s\S]{0,120}\[data-ds-part="sidebar"\]/,
     "Core CSS must style the validated generic sidebar when the exact shell selector is absent.",
   );
   assert.match(
     css,
-    /:not\(:has\(main\.main-surface\)\)[\s\S]{0,180}\[data-ds-part="main"\]/,
+    /:not\(:has\(main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\)\)\)[\s\S]{0,180}\[data-ds-part="main"\]/,
     "Core CSS must paint a validated generic main surface.",
   );
   assert.match(
     css,
-    /:not\(:has\(main\.main-surface\)\)[\s\S]{0,120}\[data-ds-part="composer"\]/,
+    /:not\(:has\(main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\)\)\)[\s\S]{0,120}\[data-ds-part="composer"\]/,
     "Core CSS must style the validated generic composer.",
   );
   // Every home/project selector must stay behind the root skin gate.  A

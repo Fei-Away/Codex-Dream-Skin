@@ -1154,15 +1154,17 @@ try {
   $css = Read-DreamSkinUtf8File -Path (Join-Path $Root 'assets\dream-skin.css')
   foreach ($requiredCss in @(
     'background-image: var(--dream-skin-art)',
-    'main.main-surface > header.app-header-tint',
+    'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) > header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*="_Header_"])',
     '[class~="group/application-menu-top-bar"]',
     '.app-shell-main-content-top-fade',
+    'data-app-shell-main-content-top-fade',
+    '_MainContentTopFade_',
     '.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary',
     '--ds-immersive-composer',
     'background-position: var(--ds-art-position)',
     'html[data-dream-skin="active"]',
-    'main.main-surface:has([role="main"])',
-    'main.main-surface:not(:has([role="main"]))'
+    'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])',
+    'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))'
   )) {
     if (-not $css.Contains($requiredCss)) { throw "Windows immersive CSS is missing: $requiredCss" }
   }
