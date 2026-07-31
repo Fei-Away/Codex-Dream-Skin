@@ -1063,7 +1063,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:not(:has(main:is(.mai
 
 /* A wide image can carry the home screen too. The native hero remains live,
    but the artwork is painted once on the window instead of repeated in a card. */
-html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [role="main"]) body {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]):has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [role="main"]) body {
   background-image: var(--dream-skin-art) !important;
   background-position: var(--ds-art-position) !important;
   background-size: cover !important;
@@ -1071,7 +1071,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main:is(.main-sur
   background-attachment: fixed !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [role="main"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]):has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [role="main"])
   aside.app-shell-left-panel {
   background: linear-gradient(90deg,
     var(--ds-immersive-sidebar),
@@ -1082,12 +1082,12 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main:is(.main-sur
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"]:has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [role="main"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]):has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [role="main"])
   aside.app-shell-left-panel::after {
   background: transparent !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"]) {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"]) {
   background: linear-gradient(90deg,
     var(--ds-immersive-edge),
     var(--ds-immersive-mid) 64%,
@@ -1097,7 +1097,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   box-shadow: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
   > header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*="_Header_"]) {
   background: transparent !important;
   border-bottom: 0 !important;
@@ -1105,7 +1105,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
   > header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*="_Header_"]) {
   color: var(--ds-text) !important;
   text-shadow:
@@ -1113,13 +1113,13 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
     0 0 8px rgb(var(--ds-bg-rgb) / .52) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
   > header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*="_Header_"]) svg {
   color: rgb(var(--ds-muted-rgb) / .96) !important;
   filter: drop-shadow(0 1px 2px rgb(var(--ds-bg-rgb) / .72));
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
   [role="main"] > div:first-child > div:first-child > div:first-child {
   border: 0 !important;
   border-radius: 0 !important;
@@ -1127,12 +1127,12 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   box-shadow: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
   [role="main"] > div:first-child > div:first-child > div:first-child::before {
   content: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
   [role="main"] .group\/home-suggestions button {
   background: rgb(var(--ds-panel-rgb) / .56) !important;
   box-shadow:
@@ -1141,7 +1141,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   backdrop-filter: blur(8px) saturate(104%) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] .composer-surface-chrome {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) .composer-surface-chrome {
   background: var(--ds-immersive-composer-solid) !important;
   border: 0 !important;
   box-shadow:
@@ -1151,7 +1151,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] .composer-surface-chr
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
+html[data-dream-skin="active"][data-dream-shell="light"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"])
   .composer-surface-chrome {
   box-shadow:
     0 10px 28px rgb(var(--ds-bg-rgb) / .14),
@@ -1194,7 +1194,7 @@ html[data-dream-skin="active"] [role="main"]:has([class*="_homeUtilityBar_"])
     inset 0 -1px rgb(var(--ds-muted-rgb) / .18) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] [class*="_homeUtilityBar_"] {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) [class*="_homeUtilityBar_"] {
   background: var(--ds-immersive-composer-solid) !important;
   box-shadow:
     inset 1px 0 var(--ds-immersive-line),
@@ -1203,7 +1203,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] [class*="_homeUtility
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"]
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"])
   [role="main"]:has([class*="_homeUtilityBar_"]) .composer-surface-chrome {
   box-shadow:
     0 10px 30px rgb(var(--ds-bg-rgb) / .20),
@@ -1212,7 +1212,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]
     inset 0 -1px var(--ds-immersive-line) !important;
 }
 
-html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
+html[data-dream-skin="active"][data-dream-shell="light"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"])
   [class*="_homeUtilityBar_"] {
   box-shadow:
     inset 1px 0 var(--ds-immersive-line),

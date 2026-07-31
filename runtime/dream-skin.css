@@ -1063,7 +1063,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:not(:has(__DREAM_SELE
 
 /* A wide image can carry the home screen too. The native hero remains live,
    but the artwork is painted once on the window instead of repeated in a card. */
-html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__) body {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]):has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__) body {
   background-image: var(--dream-skin-art) !important;
   background-position: var(--ds-art-position) !important;
   background-size: cover !important;
@@ -1071,7 +1071,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_
   background-attachment: fixed !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]):has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)
   __DREAM_SELECTOR_LEFT_PANEL__ {
   background: linear-gradient(90deg,
     var(--ds-immersive-sidebar),
@@ -1082,12 +1082,12 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]):has(__DREAM_SELECTOR_SHELL_MAIN__ __DREAM_SELECTOR_HOME_ROUTE_CSS__)
   __DREAM_SELECTOR_LEFT_PANEL__::after {
   background: transparent !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__) {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__) {
   background: linear-gradient(90deg,
     var(--ds-immersive-edge),
     var(--ds-immersive-mid) 64%,
@@ -1097,7 +1097,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
   box-shadow: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
   > __DREAM_SELECTOR_HEADER_TINT__ {
   background: transparent !important;
   border-bottom: 0 !important;
@@ -1105,7 +1105,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_SHELL_MAIN__
   > __DREAM_SELECTOR_HEADER_TINT__ {
   color: var(--ds-text) !important;
   text-shadow:
@@ -1113,13 +1113,13 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
     0 0 8px rgb(var(--ds-bg-rgb) / .52) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_SHELL_MAIN__
   > __DREAM_SELECTOR_HEADER_TINT__ svg {
   color: rgb(var(--ds-muted-rgb) / .96) !important;
   filter: drop-shadow(0 1px 2px rgb(var(--ds-bg-rgb) / .72));
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
   __DREAM_SELECTOR_HOME_ROUTE__ > div:first-child > div:first-child > div:first-child {
   border: 0 !important;
   border-radius: 0 !important;
@@ -1127,12 +1127,12 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
   box-shadow: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
   __DREAM_SELECTOR_HOME_ROUTE__ > div:first-child > div:first-child > div:first-child::before {
   content: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)
   __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button {
   background: rgb(var(--ds-panel-rgb) / .56) !important;
   box-shadow:
@@ -1141,7 +1141,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
   backdrop-filter: blur(8px) saturate(104%) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_COMPOSER_CHROME__ {
   background: var(--ds-immersive-composer-solid) !important;
   border: 0 !important;
   box-shadow:
@@ -1151,7 +1151,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_COMP
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
+html[data-dream-skin="active"][data-dream-shell="light"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"])
   __DREAM_SELECTOR_COMPOSER_CHROME__ {
   box-shadow:
     0 10px 28px rgb(var(--ds-bg-rgb) / .14),
@@ -1194,7 +1194,7 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__:has(__DREAM_SELECTO
     inset 0 -1px rgb(var(--ds-muted-rgb) / .18) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_HOME_UTILITY__ {
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"]) __DREAM_SELECTOR_HOME_UTILITY__ {
   background: var(--ds-immersive-composer-solid) !important;
   box-shadow:
     inset 1px 0 var(--ds-immersive-line),
@@ -1203,7 +1203,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_HOME
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"]
+html[data-dream-skin="active"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"])
   __DREAM_SELECTOR_HOME_ROUTE__:has(__DREAM_SELECTOR_HOME_UTILITY__) __DREAM_SELECTOR_COMPOSER_CHROME__ {
   box-shadow:
     0 10px 30px rgb(var(--ds-bg-rgb) / .20),
@@ -1212,7 +1212,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]
     inset 0 -1px var(--ds-immersive-line) !important;
 }
 
-html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
+html[data-dream-skin="active"][data-dream-shell="light"]:is([data-dream-art-wide="true"], [data-dream-art-aspect="wide"], [data-dream-art-aspect="ultrawide"])
   __DREAM_SELECTOR_HOME_UTILITY__ {
   box-shadow:
     inset 1px 0 var(--ds-immersive-line),
