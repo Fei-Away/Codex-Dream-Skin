@@ -27,6 +27,11 @@ assert.equal(
   ':is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])',
   "The message contract must bridge both legacy and Codex 26.727 role boundaries.",
 );
+assert.equal(
+  selectorFor("settings-panel"),
+  '[data-settings-panel-slug="general-settings"]',
+  "The Settings contract must use the stable Codex 26.727 general-settings panel marker.",
+);
 const resultFor = (baseState, hits, overlay = false) => gradeDoctorResult(contract, {
   baseState,
   overlay,
@@ -46,10 +51,12 @@ const brokenHome = resultFor("home", ["shell-main", "left-panel", "header-tint",
 assert.equal(brokenHome.pass, false);
 assert.equal(brokenHome.exitCode, 1);
 
-const settings = resultFor("settings", ["appearance-radio"]);
+const settings = resultFor("settings", ["settings-panel"]);
 assert.equal(settings.pass, true);
 assert.equal(settings.tiers.L1.length, 0, "Settings must not inherit home/all L1 requirements");
-assert.deepEqual(settings.tiers.L2.map(({ key }) => key), ["appearance-radio"]);
+assert.deepEqual(settings.tiers.L2.map(({ key }) => key), ["settings-panel", "appearance-radio"]);
+assert.equal(settings.tiers.L2.find(({ key }) => key === "settings-panel").status, "ok");
+assert.equal(settings.tiers.L2.find(({ key }) => key === "appearance-radio").status, "miss");
 
 assert.equal(selectorMatchesScope("home+thread", { baseState: "thread", overlay: false }), true);
 assert.equal(selectorMatchesScope("home config", { baseState: "home", overlay: false }), true);
