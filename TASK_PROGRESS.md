@@ -18,7 +18,7 @@
   PowerShell 5.1/7 CI and real-Windows validation from the new exact head remain
   required. Do not merge, release, comment on issues, or close issues.
 
-## PR #324 final review blockers — in progress (2026-07-31)
+## PR #324 final review blockers — pushed and CI-verified (2026-07-31)
 
 - [reviewed] Draft PR #324 head `598dd07f6831faa238230752531bc75064baa581`
   passed all four CI jobs and has real Windows Codex 26.727 renderer/import
@@ -48,9 +48,15 @@
   renderer, fallback-ID ZIP import, runtime sync, Node/shell syntax, and
   `git diff --check` pass. The complete macOS repository suite passes with only
   its documented full-Xcode and installed-app Doctor skips.
-- [pending] Commit and push this exact state to Draft PR #324, then require new
-  Windows PowerShell 5.1/7 CI plus the updated real-Windows checklist from the
-  new head. Do not merge, release, comment on issues, or close issues.
+- [committed/pushed] Fix commit
+  `8b39dcdaff5985f3a2247c13176cd4329a5186eb` is the remote code head of
+  `codex/fix-318-320-322`; Draft PR #324 remains open and unmerged.
+- [verified] GitHub Actions run `30632144001` passed all four jobs for
+  `8b39dcd`: Static checks, macOS repository regressions with Universal DMG,
+  Windows PowerShell 7, and Windows PowerShell 5.1 with Setup.exe compilation.
+- [pending] The updated real-Windows checklist must still be run from the exact
+  PR source-installed engine. Do not merge, release, comment on issues, or close
+  issues until that user acceptance result is reviewed.
 
 ## Windows Codex 26.727.4816 final worktree acceptance (2026-07-31)
 
