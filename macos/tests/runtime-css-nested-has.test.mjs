@@ -16,6 +16,14 @@ const files = [
   "windows/assets/dream-skin.css",
 ];
 
+const selectorContract = JSON.parse(readFileSync(join(root, "tools/selectors.json"), "utf8"));
+const selectorByKey = new Map(selectorContract.selectors.map(({ key, selector }) => [key, selector]));
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const generatedMarkdownSelector = [
+  `${escapeRegExp(selectorByKey.get("shell-main"))}:not\\(:has\\(${escapeRegExp(selectorByKey.get("home-route-css"))}\\)\\)`,
+  escapeRegExp(selectorByKey.get("markdown")),
+].join(" ");
+
 const findNestedHas = (css) => {
   const findings = [];
   for (let index = css.indexOf(":has("); index !== -1; index = css.indexOf(":has(", index + 1)) {
@@ -50,7 +58,7 @@ for (const file of files) {
     const css = readFileSync(join(root, file), "utf8");
     const selectorToken = file.startsWith("runtime/")
       ? "__DREAM_SELECTOR_SHELL_MAIN__:not\\(:has\\(__DREAM_SELECTOR_HOME_ROUTE_CSS__\\)\\) __DREAM_SELECTOR_MARKDOWN__"
-      : "main\\.main-surface:not\\(:has\\(\\[role=\"main\"\\]\\)\\) \\[class\\*=\"_markdown\"\\]";
+      : generatedMarkdownSelector;
     const fullMode = ':is\\([^)]*\\[data-dream-task-mode="full"\\][^)]*\\[data-dream-art-task-mode="full"\\][^)]*\\)\\[data-dream-art-wide="true"\\]';
     const markdownRule = new RegExp(`${fullMode}\\s*\\n?\\s*${selectorToken}\\s*\\{\\s*\\n?\\s*color:\\s*var\\(--ds-text\\)\\s*!important;`);
     const lightShadowRule = new RegExp(`\\[data-dream-shell="light"\\]${fullMode}\\s*\\n?\\s*${selectorToken}\\s*\\{\\s*\\n?\\s*text-shadow:`);

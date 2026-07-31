@@ -22,6 +22,15 @@ const brokenHome = resultFor("home", ["shell-main", "left-panel", "header-tint",
 assert.equal(brokenHome.pass, false);
 assert.equal(brokenHome.exitCode, 1);
 
+const currentCodexHome = resultFor("home", [
+  "shell-main", "left-panel", "header-tint", "home-route", "home-route-css",
+]);
+assert.equal(
+  currentCodexHome.pass,
+  true,
+  "Codex 26.727 removed home-icon; the remaining guarded home route must still satisfy L1.",
+);
+
 const settings = resultFor("settings", ["appearance-radio"]);
 assert.equal(settings.pass, true);
 assert.equal(settings.tiers.L1.length, 0, "Settings must not inherit home/all L1 requirements");

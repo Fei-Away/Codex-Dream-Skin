@@ -26,7 +26,7 @@ function createFixture() {
       get body() { return body; },
       addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
       querySelector(selector) {
-        if (selector === "main.main-surface") return markers.shell ? {} : null;
+        if (selector.includes("main.main-surface")) return markers.shell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
         if (selector === "[role=\"main\"]") return markers.main ? {} : null;
         if (selector.includes("appearance-theme") || selector.includes("theme-preview")) {

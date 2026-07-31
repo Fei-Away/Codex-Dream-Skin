@@ -371,12 +371,14 @@ class CdpSession {
     this.closed = false;
   }
 
-  async open() {
+  async open(timeoutMs = 25000) {
+    const deadline = Date.now() + Math.max(1, timeoutMs);
+    const remaining = (maximum) => Math.max(1, Math.min(maximum, deadline - Date.now()));
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         try { this.ws.close(); } catch {}
         reject(new Error("CDP WebSocket open timed out"));
-      }, 5000);
+      }, remaining(5000));
       this.ws.addEventListener("open", () => { clearTimeout(timeout); resolve(); }, { once: true });
       this.ws.addEventListener("error", () => { clearTimeout(timeout); reject(new Error("CDP WebSocket open failed")); }, { once: true });
     });
@@ -390,8 +392,8 @@ class CdpSession {
       }
       this.pending.clear();
     });
-    await this.send("Runtime.enable");
-    await this.send("Page.enable");
+    await this.send("Runtime.enable", {}, remaining(10000));
+    await this.send("Page.enable", {}, remaining(10000));
     return this;
   }
 
@@ -478,9 +480,9 @@ class CdpSession {
   }
 }
 
-async function listAppTargets(port) {
+async function listAppTargets(port, timeoutMs = 2000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2000);
+  const timeout = setTimeout(() => controller.abort(), Math.max(1, Math.min(2000, timeoutMs)));
   try {
     const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
       redirect: "error",
@@ -495,7 +497,7 @@ async function listAppTargets(port) {
   }
 }
 
-async function probeSession(session) {
+async function probeSession(session, timeoutMs = 10000) {
   return session.evaluate(`(() => {
     const markers = {
       shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
@@ -510,7 +512,7 @@ async function probeSession(session) {
       codex: location.protocol === 'app:' &&
         ((markers.shell && markers.sidebar) || settings || markers.main),
     };
-  })()`);
+  })()`, timeoutMs);
 }
 
 async function waitForCodexProbe(session, timeoutMs = 1800) {
@@ -524,22 +526,25 @@ async function waitForCodexProbe(session, timeoutMs = 1800) {
   return probe;
 }
 
-async function connectTarget(target, port) {
-  return new CdpSession(target, port).open();
+async function connectTarget(target, port, timeoutMs) {
+  return new CdpSession(target, port).open(timeoutMs);
 }
 
-async function connectCodexTargets(port, timeoutMs) {
+export async function connectCodexTargets(port, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
+  const remaining = (maximum = Number.POSITIVE_INFINITY) =>
+    Math.max(1, Math.min(maximum, deadline - Date.now()));
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const targets = await listAppTargets(port);
+      const targets = await listAppTargets(port, remaining(2000));
       const connected = [];
       for (const target of targets) {
+        if (Date.now() >= deadline) break;
         let session;
         try {
-          session = await connectTarget(target, port);
-          const probe = await probeSession(session);
+          session = await connectTarget(target, port, remaining());
+          const probe = await probeSession(session, remaining(10000));
           if (probe?.codex) connected.push({ target, session, probe });
           else session.close();
         } catch (error) {
@@ -552,7 +557,8 @@ async function connectCodexTargets(port, timeoutMs) {
     } catch (error) {
       lastError = error;
     }
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    const delay = Math.min(350, Math.max(0, deadline - Date.now()));
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
   }
   throw new Error(`No verified ChatGPT renderer on 127.0.0.1:${port}: ${lastError?.message ?? "timed out"}`);
 }

@@ -88,10 +88,13 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     partFixtures.composer = makeDomNode("composer", partFixtures.main);
     partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
     register("aside.app-shell-left-panel", partFixtures.sidebar);
-    register("main.main-surface", partFixtures.main);
-    register("header.app-header-tint", partFixtures.header);
+    register(':is(main.main-surface, main[class*="_MainContentSurface_"])', partFixtures.main);
+    register(':is(header.app-header-tint, header[class*="_Header_"])', partFixtures.header);
     register('[data-testid="home-icon"]', partFixtures.homeIcon);
-    register('[role="main"]:has([data-testid="home-icon"])', partFixtures.home);
+    register(
+      '[role="main"]:has([data-testid="home-icon"], [class*="_homeUtilityBar_"], .group\\/home-suggestions)',
+      partFixtures.home,
+    );
     register('[role="main"]', partFixtures.home);
     register(".group\\/project-selector", partFixtures.projectList);
     register(".thread-scroll-container", partFixtures.thread);
@@ -255,8 +258,8 @@ export async function runRendererRuntimeTest(assetRoot) {
   // Home gating must stay single-level: CSS forbids :has() inside :has(),
   // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
-  assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
-  assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
+  assert.match(css, /:is\(main\.main-surface, main\[class\*="_MainContentSurface_"\]\):has\(\[role="main"\]\)/);
+  assert.match(css, /:is\(main\.main-surface, main\[class\*="_MainContentSurface_"\]\):not\(:has\(\[role="main"\]\)\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
   assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
   assert.match(css, /content:\s*var\(--dream-skin-status/);

@@ -10,11 +10,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const startPath = path.resolve(here, "../scripts/start-dream-skin.ps1");
 
 const selectors = {
-  shell: "main.main-surface",
+  shell: ':is(main.main-surface, main[class*="_MainContentSurface_"])',
   sidebar: "aside.app-shell-left-panel",
   composer: ".composer-surface-chrome",
   homeIcon: '[data-testid="home-icon"]',
-  home: '[role="main"]:has([data-testid="home-icon"])',
+  home: '[role="main"]:has([data-testid="home-icon"], [class*="_homeUtilityBar_"], .group\\/home-suggestions)',
   gameSource: '[data-feature="game-source"]',
   suggestions: ".group\\/home-suggestions",
   settings: 'input[name="appearance-theme"]',

@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 
-function createFixture() {
+function createFixture({ shellVariant = "legacy" } = {}) {
   const domReady = [];
   const timers = new Map();
   const intervals = new Map();
@@ -24,7 +24,10 @@ function createFixture() {
       get documentElement() { return root; },
       addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
       querySelector(selector) {
-        if (selector === "main.main-surface") return markers.shell ? {} : null;
+        if (
+          (shellVariant === "legacy" && selector.includes("main.main-surface")) ||
+          (shellVariant === "css-module" && selector.includes('main[class*="_MainContentSurface_"]'))
+        ) return markers.shell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
         if (selector === "[role=\"main\"]") return markers.main ? {} : null;
         if (selector.includes("appearance-theme") || selector.includes("theme-preview")) {
@@ -67,6 +70,19 @@ assert.deepEqual(guarded.context.window.installs, [], "A shell without its sideb
 guarded.markers.sidebar = true;
 guarded.tick();
 assert.deepEqual(guarded.context.window.installs, ["guarded"]);
+
+const currentCodex = createFixture({ shellVariant: "css-module" });
+currentCodex.markers.shell = true;
+currentCodex.markers.sidebar = true;
+vm.runInNewContext(
+  earlyPayloadFor('window.installs.push("current-codex")', "current-codex"),
+  currentCodex.context,
+);
+assert.deepEqual(
+  currentCodex.context.window.installs,
+  ["current-codex"],
+  "Codex 26.727 CSS-module shell markers must be recognized without weakening sidebar identity.",
+);
 
 const generations = createFixture();
 generations.makeNotReady();
