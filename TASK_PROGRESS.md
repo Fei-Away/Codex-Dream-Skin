@@ -1,5 +1,35 @@
 # Task Progress
 
+## Client release v1.5.10 — in progress (2026-07-31)
+
+- [base] Feature PR #324 was squash-merged to `main` at
+  `a58e63c6909082706c02824622d0e902b3539065`; its exact-head CI run
+  `30638018730` passed all four jobs.
+- [scope] Branch `codex/release-v1.5.10` changes the six required version
+  sources, version-bound assertions, dual-platform changelogs, the exact-event
+  Release binding and its regression, plus this durable release record. Public
+  v1.5.9 is the predecessor; v1.5.10 does not yet exist.
+- [verified locally] All six release version sources are exactly `1.5.10`.
+  Portable macOS/Windows Node regressions pass 82/82, and the complete
+  applicable macOS suite exits 0 with only its documented full-Xcode native
+  XCTest and installed signed-Codex Doctor branches skipped. Runtime asset
+  sync, all Node/Bash syntax, both payload checks, PowerShell 5.1 BOM and
+  execution-policy scans, and `git diff --check` pass.
+- [committed locally] Version release commit
+  `7abaea700130207ab2a57cf6ae4881f9673ff93d` contains only the reviewed
+  v1.5.10 release scope above.
+- [pushed/PR open] Branch `codex/release-v1.5.10` is on `origin`; release PR
+  #332 targets `main` at
+  `https://github.com/Fei-Away/Codex-Dream-Skin/pull/332`.
+- [fixed before merge] Independent release review found the guard checked out
+  moving `main`, so a later push could retarget v1.5.10 before packaging. The
+  guard now checks out `${{ github.sha }}`, derives the release candidate from
+  that exact `HEAD`, and has a portable regression rejecting moving-main
+  release binding.
+- [pending] Require all PR CI jobs on the final head, merge #332 to `main`,
+  then verify the sole Release workflow creates tag v1.5.10 and publishes
+  non-empty DMG, Setup.exe, and SHA256SUMS.txt from the exact merge.
+
 ## PR #324 hard-interruption import recovery — in progress (2026-07-31)
 
 - [reproduced by review] Both platform importers move the existing canonical

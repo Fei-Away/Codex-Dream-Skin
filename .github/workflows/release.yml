@@ -35,7 +35,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: main
+          # Bind every release attempt to the commit that triggered it. A
+          # moving main checkout could otherwise package a later push.
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -53,7 +55,7 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          main_sha="$(git rev-parse origin/main)"
+          event_sha="$(git rev-parse HEAD)"
           version="$(tr -d '[:space:]' < macos/VERSION)"
           windows_version="$(tr -d '[:space:]' < windows/VERSION)"
           package_version="$(node -p "JSON.parse(require('fs').readFileSync('macos/package.json', 'utf8')).version")"
@@ -74,7 +76,7 @@ jobs:
           fi
 
           tag="v$version"
-          release_sha="$main_sha"
+          release_sha="$event_sha"
           should_release="true"
           version_unchanged="false"
           if [[ "$EVENT_NAME" == "push" ]]; then
