@@ -1172,7 +1172,7 @@ function Import-DreamSkinThemeZip {
         $savedThemeId = if ($saved.Theme.id) { "$($saved.Theme.id)".Trim() } else { '' }
         $contentFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
           -ThemeDirectory $savedDirectory.FullName
-        $records.Add([pscustomobject]@{
+        $null = $records.Add([pscustomobject]@{
           EntryName = $savedDirectory.Name
           Directory = $savedDirectory.FullName
           Theme = $saved.Theme
@@ -1306,7 +1306,7 @@ function Import-DreamSkinThemeZip {
           $cleanupBackup = Join-Path $paths.Saved (
             '.theme-legacy-cleanup-' + $legacy.EntryName + '-' + [guid]::NewGuid().ToString('N')
           )
-          $legacyCleanupBackups.Add([pscustomobject]@{
+          $null = $legacyCleanupBackups.Add([pscustomobject]@{
             Original = $legacy.Directory
             Backup = $cleanupBackup
             Fingerprint = $legacy.Fingerprint
@@ -1335,7 +1335,7 @@ function Import-DreamSkinThemeZip {
           Assert-DreamSkinRestoredThemeFingerprint -Path $cleanup.Original `
             -ExpectedFingerprint $cleanup.Fingerprint -Label "Legacy saved theme $($cleanup.Original)"
         } catch {
-          $rollbackErrors.Add(('{0}: {1}' -f $cleanup.Original, $_.Exception.Message))
+          $null = $rollbackErrors.Add(('{0}: {1}' -f $cleanup.Original, $_.Exception.Message))
         }
       }
       if ($publishedDestination) {
@@ -1350,7 +1350,7 @@ function Import-DreamSkinThemeZip {
             throw 'published destination remains'
           }
         } catch {
-          $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
+          $null = $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
         }
       }
       if ($backup) {
@@ -1370,7 +1370,7 @@ function Import-DreamSkinThemeZip {
           Assert-DreamSkinRestoredThemeFingerprint -Path $destination `
             -ExpectedFingerprint $canonicalFingerprint -Label 'Canonical saved theme'
         } catch {
-          $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
+          $null = $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
         }
       } else {
         try {
@@ -1378,7 +1378,7 @@ function Import-DreamSkinThemeZip {
             throw 'unexpected destination remains after rollback'
           }
         } catch {
-          $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
+          $null = $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
         }
       }
       if ($rollbackErrors.Count -gt 0) {
