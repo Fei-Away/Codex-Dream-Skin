@@ -40,9 +40,14 @@
   `home/L1`, `missingL1=[]`, themed outer main, fixed header at z-index 30,
   hidden native top-fade, and no operation overlay. The Windows handoff now
   calls out these exact acceptance checks for Codex 26.727+.
-- [pending] Review/stage this fix, commit and push to Draft PR #324, then wait
-  for fresh CI and real Windows Codex visual acceptance. Do not merge, release,
-  comment on, or close #326/#322 yet.
+- [committed] Selector/top-fade follow-up is committed as `9098060`
+  (`fix: support Codex 26.727 shell surfaces`) on branch
+  `codex/fix-318-320-322`.
+- [pushed] `9098060cd256ca4ed0aa268283d72a0481188aaa` is pushed to the remote
+  head of Draft PR #324, and the PR body documents the root cause, Mac evidence,
+  Windows checklist, and remaining real-Windows acceptance boundary.
+- [pending] Wait for fresh CI and real Windows Codex visual acceptance. Do not
+  merge, release, comment on, or close #326/#322 yet.
 
 Updated: 2026-07-31 14:29 HKT (Asia/Hong_Kong)
 
