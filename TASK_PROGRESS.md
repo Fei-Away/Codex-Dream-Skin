@@ -1,5 +1,29 @@
 # Task Progress
 
+## Client release v1.5.11 — preparing (2026-08-01)
+
+- [base/merged] Settings renderer PR #334 passed exact-head CI run
+  `30648201928` at `6d8d2c561cae1e6084bd1fd288264be7c0823907`: Static,
+  macOS with Universal DMG, Windows PowerShell 7, and Windows PowerShell 5.1
+  with Setup.exe compilation all succeeded. It was squash-merged to `main` as
+  `6e71534cd9cd55f87d1f6c9ff1cf305c7ef43893`.
+- [scope] Independent worktree `/private/tmp/dreamskin-release-v1511.KVcKVg`
+  is on `codex/release-v1.5.11` from that exact `origin/main`. The release
+  changes only the six required platform version sources, four version-bound
+  assertions, both platform changelogs, and this durable record.
+- [implemented locally] All six release version sources and four bound test
+  assertions now report `1.5.11`. Both changelogs describe the shared
+  Codex 26.727 Settings marker fix and its strict `app:` origin boundary.
+- [verified locally] The six-source consistency check passes. Portable Node
+  regressions pass 82/82 (macOS 63 and Windows 19); both platform payload
+  checks report v1.5.11; runtime asset sync and `git diff --check` pass. The
+  complete applicable macOS suite passes with only its documented full-Xcode,
+  installed signed-runtime, and Doctor branches skipped.
+- [pending] Review and commit the exact release diff, push and open a PR,
+  require four exact-head CI jobs, then merge.
+  Only the Release workflow from the resulting `main` commit may tag and build
+  the public DMG, Setup.exe, and `SHA256SUMS.txt`.
+
 ## PR #334 Windows CRLF CI follow-up — locally verified (2026-08-01)
 
 - [scope] Client worktree `/private/tmp/dreamskin-settings-fix.4tH4ld` is on
