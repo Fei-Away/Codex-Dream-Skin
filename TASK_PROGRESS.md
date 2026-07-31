@@ -14,9 +14,12 @@
   XCTest and installed signed-Codex Doctor branches skipped. Runtime asset
   sync, all Node/Bash syntax, both payload checks, PowerShell 5.1 BOM and
   execution-policy scans, and `git diff --check` pass.
-- [pending] Commit and push this version-only branch, open and merge its PR to
-  `main`, then verify the sole Release workflow creates tag v1.5.10 and
-  publishes non-empty DMG, Setup.exe, and SHA256SUMS.txt from the exact merge.
+- [committed locally] Version release commit
+  `7abaea700130207ab2a57cf6ae4881f9673ff93d` contains only the reviewed
+  v1.5.10 release scope above.
+- [pending] Push this version-only branch, open and merge its PR to `main`,
+  then verify the sole Release workflow creates tag v1.5.10 and publishes
+  non-empty DMG, Setup.exe, and SHA256SUMS.txt from the exact merge.
 
 ## PR #324 hard-interruption import recovery — in progress (2026-07-31)
 
