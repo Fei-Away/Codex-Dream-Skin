@@ -164,6 +164,26 @@ assert.equal(
   "Settings L0 must expose a visible settings control.",
 );
 
+const incompleteHomeL0 = {
+  ...baseRenderer,
+  scope: {
+    level: "L0",
+    baseState: "home",
+    missingL1: ["left-panel"],
+  },
+  shell: null,
+  sidebar: null,
+  homePresent: true,
+  homeRoute: true,
+  genericMain: { visible: true, width: 900, height: 640 },
+  hero: { visible: true, width: 800, height: 260 },
+};
+assert.equal(
+  assessRendererVerification(incompleteHomeL0, unsupported, exactPayload).pass,
+  false,
+  "Home may not verify at L0 while required shell anchors are missing.",
+);
+
 const arbitraryL0 = {
   ...baseRenderer,
   scope: { level: "L0", baseState: "thread" },

@@ -199,7 +199,7 @@ test("normal L1 renderer requires and records the exact target window binding", 
   ]);
 });
 
-test("visible settings and home anchors are the only L0 structure exceptions", async () => {
+test("visible settings is the only L0 structure exception", async () => {
   const settings = await verify({
     dom: makeDomFixture({
       scope: { level: "L0", baseState: "settings" },
@@ -212,13 +212,18 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
 
   const home = await verify({
     dom: makeDomFixture({
-      scope: { level: "L0", baseState: "home" },
+      scope: {
+        level: "L0",
+        baseState: "home",
+        missingL1: ["left-panel"],
+      },
       shell: null,
       sidebar: null,
       home: makeHome({ rect: makeRect(900, 650, 20, 20) }),
     }),
   });
-  assert.equal(home.result.pass, true);
+  assert.equal(home.result.pass, false);
+  assert.equal(home.result.readiness.structurePass, false);
 
   const fallbackHome = makeHome({ rect: makeRect(900, 650, 20, 20) });
   const lateHomeIconSignal = {
@@ -234,7 +239,8 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
     }),
   });
   assert.equal(lateHomeIcon.result.homePresent, true);
-  assert.equal(lateHomeIcon.result.pass, true);
+  assert.equal(lateHomeIcon.result.pass, false);
+  assert.equal(lateHomeIcon.result.readiness.structurePass, false);
 
   const noAnchor = await verify({
     dom: makeDomFixture({

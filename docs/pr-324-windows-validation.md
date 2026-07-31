@@ -164,8 +164,10 @@ Microsoft Store Codex through DreamSkin. Do not test an older Setup.exe.
    white strip or white top-fade left behind. The header controls must remain
    visible and keep their native fixed position while scrolling.
 4. Confirm the installed verification output reports `scope.level` as `L1` and
-   an empty `missingL1` list on Home. A report that only says injection succeeded
-   is insufficient if `shell-main` or `header-tint` is still missing.
+   an empty `missingL1` list on both Home and the normal task view. A report that
+   only says injection succeeded is insufficient if any required L1 anchor is
+   missing. `L0` is accepted only while the Settings route is visibly replacing
+   the normal shell; it is never a successful Home or task-view result.
 5. Confirm sidebar navigation, project selection, task content, composer input,
    and send controls remain interactive and readable.
 6. Include at least one full-wallpaper theme whose Safe CSS sets a root or main

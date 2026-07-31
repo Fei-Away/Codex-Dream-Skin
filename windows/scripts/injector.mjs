@@ -1244,10 +1244,8 @@ export async function verifySession(
       Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 0;
     const genericStructurePass = l1ScopePass && Boolean(result.genericMain?.visible) &&
       Boolean(result.genericInput?.visible || (homeScope && result.homeSurface?.visible));
-    const l0StructurePass = result.scope?.level === 'L0' && (
-      (result.scope?.baseState === 'settings' && Boolean(result.settingsAnchor?.visible)) ||
-      (homeScope && Boolean(result.homeSurface?.visible))
-    );
+    const l0StructurePass = result.scope?.level === 'L0' &&
+      result.scope?.baseState === 'settings' && Boolean(result.settingsAnchor?.visible);
     const structurePass = l0StructurePass || (l1ScopePass &&
       (Boolean(result.shell?.visible && result.sidebar?.visible) || genericStructurePass));
     const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;

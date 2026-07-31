@@ -235,10 +235,8 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 0;
   const genericStructurePass = l1ScopePass && Boolean(result.genericMain?.visible) &&
     (Boolean(result.genericInput?.visible) || Boolean(homeRoute && result.homePresent));
-  const l0StructurePass = result.scope?.level === "L0" && (
-    (settingsRoute && Boolean(result.settings?.visible)) ||
-    (homeRoute && Boolean(result.homePresent))
-  );
+  const l0StructurePass = result.scope?.level === "L0" &&
+    settingsRoute && Boolean(result.settings?.visible);
   const structurePass = l0StructurePass || (l1ScopePass && (
     (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible)) || genericStructurePass
   ));

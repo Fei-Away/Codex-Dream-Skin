@@ -1,5 +1,23 @@
 # Task Progress
 
+## PR #324 final L0 readiness correction — in progress (2026-07-31)
+
+- [reviewed] Remote Draft PR head `8b39dcdaff5985f3a2247c13176cd4329a5186eb`
+  correctly rejects an ordinary `thread/L0` renderer, but still accepts
+  `home/L0` when required L1 shell anchors are missing. That permits an
+  unrecognized sidebar/main/header to be reported as a successful apply or
+  rollback on both platforms.
+- [fixed locally] macOS and Windows now reserve L0 visible verification only
+  for the real cross-platform Settings exception. Home and ordinary task views
+  require `scope=L1` with an empty `missingL1`; focused dual-platform readiness
+  tests and Node syntax checks pass.
+- [verified locally] Shared runtime sync passes, portable Node regressions pass
+  80/80, and the complete macOS repository suite passes with only the documented
+  full-Xcode and installed signed-app Doctor skips. `git diff --check` passes.
+- [pending] Commit and push this correction to Draft PR #324. Fresh Windows
+  PowerShell 5.1/7 CI and real-Windows validation from the new exact head remain
+  required. Do not merge, release, comment on issues, or close issues.
+
 ## PR #324 final review blockers — in progress (2026-07-31)
 
 - [reviewed] Draft PR #324 head `598dd07f6831faa238230752531bc75064baa581`
