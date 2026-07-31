@@ -1117,11 +1117,18 @@ function Import-DreamSkinThemeZip {
       'import-' + $fingerprint.Substring(0, 12)
     }
     $id = $baseId
-    $suffix = 2
-    while (Test-Path -LiteralPath (Join-Path $paths.Saved $id)) {
-      $marker = "-$suffix"
-      $id = $baseId.Substring(0, [Math]::Min($baseId.Length, 80 - $marker.Length)) + $marker
-      $suffix += 1
+    $replaceExisting = $false
+    $baseDestination = Join-Path $paths.Saved $id
+    if (Test-Path -LiteralPath $baseDestination -PathType Container) {
+      Assert-DreamSkinNoReparseComponents -Path $baseDestination
+      $replaceExisting = $true
+    } else {
+      $suffix = 2
+      while (Test-Path -LiteralPath (Join-Path $paths.Saved $id)) {
+        $marker = "-$suffix"
+        $id = $baseId.Substring(0, [Math]::Min($baseId.Length, 80 - $marker.Length)) + $marker
+        $suffix += 1
+      }
     }
 
     $publishStage = Join-Path $paths.Saved ('.theme-import-' + [guid]::NewGuid().ToString('N'))
@@ -1149,7 +1156,23 @@ function Import-DreamSkinThemeZip {
     if ($LASTEXITCODE -ne 0) { throw 'Imported theme failed final payload validation.' }
 
     $destination = Join-Path $paths.Saved $id
-    [System.IO.Directory]::Move($publishStage, $destination)
+    if ($replaceExisting) {
+      $backup = Join-Path $paths.Saved ('.theme-replace-' + $id + '-' + [guid]::NewGuid().ToString('N'))
+      Assert-DreamSkinNoReparseComponents -Path $destination
+      [System.IO.Directory]::Move($destination, $backup)
+      try {
+        [System.IO.Directory]::Move($publishStage, $destination)
+      } catch {
+        if ((Test-Path -LiteralPath $backup -PathType Container) -and
+          -not (Test-Path -LiteralPath $destination)) {
+          [System.IO.Directory]::Move($backup, $destination)
+        }
+        throw
+      }
+      Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction SilentlyContinue
+    } else {
+      [System.IO.Directory]::Move($publishStage, $destination)
+    }
     $publishStage = $null
     $publishedFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $destination
     if ($publishedFingerprint -cne $fingerprint) {
@@ -1164,7 +1187,8 @@ function Import-DreamSkinThemeZip {
       Id = $id
       Name = $name
       Renamed = ($id -cne $requestedId)
-      NameCollision = $existingNames.Contains($name)
+      Replaced = $replaceExisting
+      NameCollision = (-not $replaceExisting -and $existingNames.Contains($name))
       PackageFormat = $packageFormat
       SafeCssStatus = $safeCssStatus
       SignatureIgnored = $signatureIgnored

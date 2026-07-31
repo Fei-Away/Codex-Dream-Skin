@@ -230,9 +230,11 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   const viewportPass = hasReasonableDimensions(viewportWidth, viewportHeight);
   const documentVisible = result.documentVisibility === "visible";
   const settingsRoute = result.scope?.baseState === "settings";
+  const genericStructurePass = Boolean(result.genericMain?.visible) &&
+    (Boolean(result.genericInput?.visible) || Boolean(result.homePresent));
   const structurePass = settingsRoute
     ? Boolean(result.settings?.visible)
-    : Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible);
+    : (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible)) || genericStructurePass;
   const nativeWindowPass = nativeWindow?.status === "ready";
   const fallbackWindowPass = nativeWindow?.status === "unsupported";
   const windowPass = documentVisible && viewportPass
@@ -244,9 +246,11 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     && (!expected.expectedRevision || result.revision === expected.expectedRevision);
   const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
     ? result.suggestionLabels.filter((item) => item?.visible) : [];
+  const homeFallbackVisible = Boolean(result.homePresent && result.genericMain?.visible);
   const homePass = !result.homeRoute || (
-    result.homePresent && result.hero?.visible && result.hero.width >= 280
-    && result.hero.height >= 120 && (result.visibleCardCount === 0 || (
+    result.homePresent && ((result.hero?.visible && result.hero.width >= 280
+      && result.hero.height >= 120) || homeFallbackVisible)
+    && (result.visibleCardCount === 0 || (
       visibleSuggestionLabels.length >= result.visibleCardCount
       && result.suggestionLabelColorsMatch
     ))
@@ -497,18 +501,29 @@ async function listAppTargets(port) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const genericCodexSurface = () => {
+      if (location.protocol !== 'app:') return false;
+      const main = document.querySelector('main, [role="main"]');
+      const input = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
+      const title = String(document.title || "");
+      const href = String(location.href || "");
+      const text = String(document.body?.innerText || "").slice(0, 1200);
+      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(title + " " + href + " " + text);
+      return Boolean((main && input) || (main && branded) || (input && branded));
+    };
     const markers = {
       shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: Boolean(document.querySelector(${selectorLiteral("left-panel")})),
       composer: Boolean(document.querySelector(${selectorLiteral("composer-chrome")})),
       main: Boolean(document.querySelector(${selectorLiteral("home-route")})),
+      generic: genericCodexSurface(),
     };
     const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       markers,
       codex: location.protocol === 'app:' &&
-        ((markers.shell && markers.sidebar) || settings || markers.main),
+        ((markers.shell && markers.sidebar) || settings || markers.main || markers.generic),
     };
   })()`);
 }
@@ -1131,6 +1146,8 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
     const composer = box(document.querySelector(${selectorLiteral("composer-chrome")}));
     const sidebar = box(document.querySelector(${selectorLiteral("left-panel")}));
+    const genericMain = box(document.querySelector('main, [role="main"]'));
+    const genericInput = box(document.querySelector('textarea, [contenteditable="true"], [role="textbox"]'));
     const settingsBoxes = [
       box(document.querySelector(${selectorLiteral("appearance-radio")})),
       box(document.querySelector(${stableTestidLiteral("theme-preview")})),
@@ -1165,6 +1182,8 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       shell,
       composer,
       sidebar,
+      genericMain,
+      genericInput,
       settings,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
@@ -1384,7 +1403,12 @@ export function earlyPayloadFor(payload, revision) {
       const main = document.querySelector(${selectorLiteral("home-route")});
       const settings = document.querySelector(${selectorLiteral("appearance-radio")}) ||
         document.querySelector(${stableTestidLiteral("theme-preview")});
-      return Boolean((shell && sidebar) || settings || main);
+      const genericMain = document.querySelector('main, [role="main"]');
+      const genericInput = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
+      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(String(document.title || "") + " " +
+        String(location.href || "") + " " + String(document.body?.innerText || "").slice(0, 1200));
+      return Boolean((shell && sidebar) || settings || main ||
+        (genericMain && genericInput) || (genericMain && branded) || (genericInput && branded));
     };
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }

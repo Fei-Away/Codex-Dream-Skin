@@ -346,8 +346,9 @@ try {
     -Name 'Studio Windows Contract' -IncludeOptionalFiles -LicenseText "MIT`r`n"
   New-TestZipFromDirectory -Source $licenseVariantSource -Archive $licenseVariantArchive
   $licenseVariant = Import-DreamSkinThemeZip -ArchivePath $licenseVariantArchive -StateRoot $stateRoot
-  if ($licenseVariant.Status -cne 'Imported' -or $licenseVariant.Id -cne 'studio.windows-contract-2') {
-    throw 'A package with distinct LICENSE.txt content was incorrectly treated as a duplicate.'
+  if ($licenseVariant.Status -cne 'Imported' -or $licenseVariant.Id -cne 'studio.windows-contract' -or
+    -not $licenseVariant.Replaced) {
+    throw 'A package with distinct LICENSE.txt content did not replace the saved theme with the same id.'
   }
   if ((Read-DreamSkinUtf8File -Path (Join-Path $licenseVariant.Path 'LICENSE.txt')) -cne "MIT`r`n") {
     throw 'The distinct imported license content was not preserved.'
@@ -380,13 +381,14 @@ try {
   Write-TestThemePack -Directory $collisionSource -Id 'import-test' -Name 'Second Theme'
   New-TestZipFromDirectory -Source $collisionSource -Archive $collisionArchive
   $collision = Import-DreamSkinThemeZip -ArchivePath $collisionArchive -StateRoot $stateRoot
-  if ($collision.Status -cne 'Imported' -or $collision.Id -cne 'import-test-2' -or -not $collision.Renamed) {
-    throw 'Conflicting theme id was not preserved under a clear unique id.'
+  if ($collision.Status -cne 'Imported' -or $collision.Id -cne 'import-test' -or
+    $collision.Renamed -or -not $collision.Replaced) {
+    throw 'Same-id theme update was not imported by replacing the saved theme.'
   }
 
   $sameNameSource = Join-Path $temporaryRoot 'same-name-source'
   $sameNameArchive = Join-Path $temporaryRoot 'same-name.zip'
-  Write-TestThemePack -Directory $sameNameSource -Id 'third-theme' -Name 'Imported Theme' -Quote 'OTHER CONTENT'
+  Write-TestThemePack -Directory $sameNameSource -Id 'third-theme' -Name 'Second Theme' -Quote 'OTHER CONTENT'
   New-TestZipFromDirectory -Source $sameNameSource -Archive $sameNameArchive
   $sameName = Import-DreamSkinThemeZip -ArchivePath $sameNameArchive -StateRoot $stateRoot
   if (-not $sameName.NameCollision) { throw 'Same-name theme import did not report the name collision.' }

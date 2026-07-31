@@ -125,6 +125,25 @@ async function writeExclusive(filePath, bytes) {
   await fs.chmod(filePath, 0o600);
 }
 
+async function assertReplaceableDirectory(directory, label) {
+  const stat = await fs.lstat(directory);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error(`${label} must be a real saved-theme directory`);
+  }
+}
+
+async function replaceDirectoryAtomically(source, destination, backup) {
+  await assertReplaceableDirectory(destination, "Existing saved theme");
+  await fs.rename(destination, backup);
+  try {
+    await fs.rename(source, destination);
+  } catch (error) {
+    await fs.rename(backup, destination).catch(() => {});
+    throw error;
+  }
+  await fs.rm(backup, { recursive: true, force: true });
+}
+
 async function acquireLock(root) {
   const lock = path.join(root, ".theme-import.lock");
   try {
@@ -186,11 +205,13 @@ async function main() {
   try {
     const entries = await fs.readdir(themesRoot, { withFileTypes: true });
     const existingNames = new Set();
+    const storedById = new Map();
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const directory = path.join(themesRoot, entry.name);
       const stored = await readStoredTheme(directory);
       if (!stored) continue;
+      storedById.set(entry.name, stored);
       existingNames.add(displayName(stored.theme));
       if (stored.fingerprint === fingerprint) {
         return {
@@ -209,11 +230,16 @@ async function main() {
 
     const baseId = safeBaseId(sourceTheme.id, fingerprint);
     let id = baseId;
-    let suffix = 2;
-    while (await fs.access(path.join(themesRoot, id)).then(() => true, () => false)) {
-      const marker = `-${suffix}`;
-      id = `${baseId.slice(0, 80 - marker.length)}${marker}`;
-      suffix += 1;
+    const existingForId = storedById.get(id) ?? null;
+    const baseDestination = path.join(themesRoot, id);
+    const replaceExisting = await fs.access(baseDestination).then(() => true, () => false);
+    if (!replaceExisting) {
+      let suffix = 2;
+      while (await fs.access(path.join(themesRoot, id)).then(() => true, () => false)) {
+        const marker = `-${suffix}`;
+        id = `${baseId.slice(0, 80 - marker.length)}${marker}`;
+        suffix += 1;
+      }
     }
     const renamed = id !== (typeof sourceTheme.id === "string" ? sourceTheme.id.trim() : "");
     const theme = { ...sourceTheme, id };
@@ -231,14 +257,23 @@ async function main() {
     );
     if (cssBytes) await writeExclusive(path.join(temporary, "theme.css"), cssBytes);
     if (licenseBytes) await writeExclusive(path.join(temporary, "LICENSE.txt"), licenseBytes);
-    await fs.rename(temporary, destination);
+    if (replaceExisting) {
+      const backup = path.join(themesRoot, `.theme-replace-${id}-${randomUUID()}`);
+      assertContained(themesRoot, backup, "Imported theme replacement backup");
+      await replaceDirectoryAtomically(temporary, destination, backup);
+    } else {
+      await fs.rename(temporary, destination);
+    }
     temporary = "";
     return {
       status: "imported",
       id,
       name,
       renamed,
-      nameCollision: existingNames.has(name),
+      replaced: replaceExisting,
+      nameCollision: existingNames.has(name) && (!replaceExisting || (
+        existingForId && displayName(existingForId.theme) !== name
+      )),
       packageFormat,
       safeCssStatus,
       signatureIgnored: Boolean(signatureBytes),

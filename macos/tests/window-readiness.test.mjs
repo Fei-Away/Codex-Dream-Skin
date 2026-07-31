@@ -163,6 +163,17 @@ assert.equal(
   "L0 may not bypass ordinary route structure.",
 );
 assert.equal(
+  assessRendererVerification({
+    ...baseRenderer,
+    shell: null,
+    sidebar: null,
+    genericMain: { visible: true, width: 900, height: 640 },
+    genericInput: { visible: true, width: 620, height: 80 },
+  }, unsupported, exactPayload).pass,
+  true,
+  "Newer Codex shells may verify through generic app main/input anchors when exact payload evidence is present.",
+);
+assert.equal(
   assessRendererVerification(
     { ...baseRenderer, viewport: { width: 1, height: 1 } },
     unsupported,

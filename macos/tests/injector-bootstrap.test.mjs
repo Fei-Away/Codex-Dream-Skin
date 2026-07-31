@@ -17,16 +17,23 @@ function createFixture() {
   let nextInterval = 1;
   const markers = { shell: false, sidebar: false, main: false, settings: false };
   let root = {};
+  let body = { innerText: "" };
   const context = {
     window: { installs: [] },
-    location: { protocol: "app:" },
+    location: { protocol: "app:", href: "app://fixture" },
     document: {
       get documentElement() { return root; },
+      get body() { return body; },
+      title: "",
       addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
       querySelector(selector) {
         if (selector === "main.main-surface") return markers.shell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
         if (selector === "[role=\"main\"]") return markers.main ? {} : null;
+        if (selector === "main, [role=\"main\"]") return markers.main ? {} : null;
+        if (selector.includes("textarea") || selector.includes("contenteditable") || selector.includes("textbox")) {
+          return markers.genericInput ? {} : null;
+        }
         if (selector.includes("appearance-theme") || selector.includes("theme-preview")) {
           return markers.settings ? {} : null;
         }
@@ -49,8 +56,9 @@ function createFixture() {
   return {
     context,
     markers,
-    makeNotReady() { root = null; },
-    makeReady() { root = {}; },
+    brandAsCodex() { context.document.title = "Codex"; body = { innerText: "Codex" }; },
+    makeNotReady() { root = null; body = null; },
+    makeReady() { root = {}; body = { innerText: "" }; },
     fireDomReady() { for (const callback of [...domReady]) callback(); },
     tick() { for (const callback of [...intervals.values()]) callback(); },
     observers: [],
@@ -67,6 +75,15 @@ assert.deepEqual(guarded.context.window.installs, [], "A shell without its sideb
 guarded.markers.sidebar = true;
 guarded.tick();
 assert.deepEqual(guarded.context.window.installs, ["guarded"]);
+
+const generic = createFixture();
+vm.runInNewContext(earlyPayloadFor('window.installs.push("generic")', "generic"), generic.context);
+generic.markers.main = true;
+generic.markers.genericInput = true;
+generic.brandAsCodex();
+generic.tick();
+assert.deepEqual(generic.context.window.installs, ["generic"],
+  "A verified app:// Codex surface with generic main/input anchors must accept newer renderer shells.");
 
 const generations = createFixture();
 generations.makeNotReady();

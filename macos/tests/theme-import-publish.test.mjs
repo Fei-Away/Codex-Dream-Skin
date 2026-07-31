@@ -66,6 +66,7 @@ try {
     id: "theme-id",
     name: "Imported Theme",
     renamed: false,
+    replaced: false,
     nameCollision: false,
     packageFormat: "simple",
     safeCssStatus: "validated",
@@ -88,16 +89,20 @@ try {
   const collisionStage = await makeStage("collision", "theme-id", { displayName: "Second Theme" });
   const collision = await publish(collisionStage);
   assert.equal(collision.status, "imported");
-  assert.equal(collision.id, "theme-id-2");
-  assert.equal(collision.renamed, true);
+  assert.equal(collision.id, "theme-id");
+  assert.equal(collision.renamed, false);
+  assert.equal(collision.replaced, true);
+  assert.equal(collision.nameCollision, false);
   assert.match(collision.contentFingerprint, /^[0-9a-f]{64}$/);
   assert.notEqual(collision.contentFingerprint, first.contentFingerprint);
   assert.equal(
-    JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id-2", "theme.json"), "utf8")).id,
-    "theme-id-2",
+    JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id", "theme.json"), "utf8")).name,
+    "Second Theme",
   );
+  assert.equal((await fs.readdir(themesRoot)).filter((name) => !name.startsWith(".")).length, 1);
 
   const nameCollisionStage = await makeStage("name-collision", "third-id", {
+    displayName: "Second Theme",
     theme: { quote: "DIFFERENT CONTENT" },
   });
   const nameCollision = await publish(nameCollisionStage);

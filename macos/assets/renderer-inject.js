@@ -574,6 +574,15 @@
     try { return [...document.querySelectorAll(selector)]; } catch { return []; }
   };
   const selectorNodes = (key) => queryAll(selectorByKey.get(key)?.selector);
+  const genericNodes = (selector) => queryAll(selector)
+    .filter((node) => node && typeof node.setAttribute === "function");
+  const fallbackMainNodes = () => selectorNodes("shell-main").length
+    ? [] : genericNodes('main, [role="main"]');
+  const fallbackSidebarNodes = () => selectorNodes("left-panel").length
+    ? [] : genericNodes('aside, nav[aria-label]');
+  const fallbackComposerNodes = () => selectorNodes("composer-chrome").length
+    ? [] : genericNodes('textarea, [contenteditable="true"], [role="textbox"]')
+      .map((node) => node.closest?.('form, [class*="composer"], [class*="prompt"], div') ?? node);
   const addPart = (desired, part, nodes) => {
     for (const node of nodes) {
       if (node && typeof node.setAttribute === "function" && !desired.has(node)) {
@@ -585,14 +594,14 @@
     metrics.partPasses += 1;
     const desired = new Map();
     addPart(desired, "root", [document.documentElement]);
-    addPart(desired, "sidebar", selectorNodes("left-panel"));
-    addPart(desired, "main", selectorNodes("shell-main"));
+    addPart(desired, "sidebar", [...selectorNodes("left-panel"), ...fallbackSidebarNodes()]);
+    addPart(desired, "main", [...selectorNodes("shell-main"), ...fallbackMainNodes()]);
     addPart(desired, "header", selectorNodes("header-tint"));
     addPart(desired, "home", selectorNodes("home-route"));
     addPart(desired, "project-list", selectorNodes("project-selector"));
     addPart(desired, "thread", selectorNodes("thread-surface"));
     addPart(desired, "message", selectorNodes("message"));
-    addPart(desired, "composer", selectorNodes("composer-chrome"));
+    addPart(desired, "composer", [...selectorNodes("composer-chrome"), ...fallbackComposerNodes()]);
     addPart(desired, "composer-toolbar", selectorNodes("composer-toolbar"));
     addPart(desired, "dialog", selectorNodes("overlay-dialog"));
     const homeHero = selectorNodes("home-icon")[0]?.parentElement;
@@ -634,7 +643,7 @@
     let baseState = "thread";
     if (selectorHit("appearance-radio") || stableTestidHit("theme-preview")) baseState = "settings";
     else if (selectorHit("home-icon") || selectorHit("home-route")) baseState = "home";
-    else if (!selectorHit("shell-main")) baseState = "settings";
+    else if (!selectorHit("shell-main") && !document.querySelector('main, [role="main"]')) baseState = "settings";
     const missingL1 = SELECTOR_CONTRACT.selectors
       .filter((entry) => entry.tier === "L1" && entry.required &&
         scopeMatches(entry.scope, baseState, overlay) && !selectorHit(entry.key))

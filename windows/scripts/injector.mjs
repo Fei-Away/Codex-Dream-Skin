@@ -690,18 +690,29 @@ async function readThemeSourceStamp(loadedTheme) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const genericCodexSurface = () => {
+      if (location.protocol !== 'app:') return false;
+      const main = document.querySelector('main, [role="main"]');
+      const input = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
+      const title = String(document.title || "");
+      const href = String(location.href || "");
+      const text = String(document.body?.innerText || "").slice(0, 1200);
+      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(title + " " + href + " " + text);
+      return Boolean((main && input) || (main && branded) || (input && branded));
+    };
     const markers = {
       shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: Boolean(document.querySelector(${selectorLiteral("left-panel")})),
       composer: Boolean(document.querySelector(${selectorLiteral("composer-chrome")})),
       main: Boolean(document.querySelector(${selectorLiteral("home-route")})),
+      generic: genericCodexSurface(),
     };
     const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       markers,
       codex: location.protocol === 'app:' &&
-        ((markers.shell && markers.sidebar) || settings || markers.main),
+        ((markers.shell && markers.sidebar) || settings || markers.main || markers.generic),
     };
   })()`);
 }
@@ -849,7 +860,12 @@ export function earlyPayloadFor(payload, revision) {
       const main = document.querySelector(${selectorLiteral("home-route")});
       const settings = document.querySelector(${selectorLiteral("appearance-radio")}) ||
         document.querySelector(${stableTestidLiteral("theme-preview")});
-      return Boolean((shell && sidebar) || settings || main);
+      const genericMain = document.querySelector('main, [role="main"]');
+      const genericInput = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
+      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(String(document.title || "") + " " +
+        String(location.href || "") + " " + String(document.body?.innerText || "").slice(0, 1200));
+      return Boolean((shell && sidebar) || settings || main ||
+        (genericMain && genericInput) || (genericMain && branded) || (genericInput && branded));
     };
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
@@ -1210,6 +1226,8 @@ export async function verifySession(
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
+      genericMain: box(document.querySelector('main, [role="main"]')),
+      genericInput: box(document.querySelector('textarea, [contenteditable="true"], [role="textbox"]')),
       nativeWindow: ${JSON.stringify(nativeWindow)},
       documentVisibility: document.visibilityState ?? null,
       documentHidden: document.hidden === true,
@@ -1220,9 +1238,12 @@ export async function verifySession(
       },
     };
     const l0AnchorPass = Boolean(result.settingsAnchor?.visible || result.homeSurface?.visible);
+    const genericStructurePass = Boolean(result.genericMain?.visible) &&
+      Boolean(result.genericInput?.visible || result.homeSurface?.visible);
     const structurePass = result.scope?.level === 'L0'
-      ? l0AnchorPass
-      : result.scope?.level === 'L1' && Boolean(result.shell?.visible && result.sidebar?.visible);
+      ? (l0AnchorPass || genericStructurePass)
+      : result.scope?.level === 'L1' &&
+        (Boolean(result.shell?.visible && result.sidebar?.visible) || genericStructurePass);
     const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;
     const viewportPass = result.viewport.width >= ${MIN_RENDERER_VIEWPORT_WIDTH} &&
       result.viewport.height >= ${MIN_RENDERER_VIEWPORT_HEIGHT};
@@ -1248,8 +1269,9 @@ export async function verifySession(
       nativeWindowPass, fallbackWindowPass,
     };
     const homePass = !result.homePresent || (
-      Boolean(result.homeSurface?.visible && result.hero?.visible) &&
-      result.hero.width >= 280 && result.hero.height >= 120 &&
+      Boolean(result.homeSurface?.visible) &&
+      ((result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120) ||
+        Boolean(result.genericMain?.visible)) &&
       (!result.suggestionsPresent || result.visibleCardCount === 0 || (
         result.suggestionLabels.filter((item) => item?.visible).length >= result.visibleCardCount &&
         result.suggestionLabelColorsMatch

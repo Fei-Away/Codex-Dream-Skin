@@ -87,6 +87,8 @@ function makeDomFixture({
   composer = makeElement(),
   home = null,
   homeSignal = null,
+  genericMain = null,
+  genericInput = null,
   settings = null,
   visibilityState = "visible",
   hidden = false,
@@ -113,6 +115,8 @@ function makeDomFixture({
       if (selector === selectors.homeIcon) return null;
       if (selector === selectors.home) return home;
       if (selector === selectors.gameSource || selector === selectors.suggestions) return homeSignal;
+      if (selector === 'main, [role="main"]') return genericMain ?? home;
+      if (selector.includes("textarea") || selector.includes("contenteditable") || selector.includes("textbox")) return genericInput;
       if (selector === selectors.settings || selector === selectors.themePreview) return settings;
       return null;
     },
@@ -241,6 +245,18 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
   });
   assert.equal(noAnchor.result.pass, false);
   assert.equal(noAnchor.result.readiness.structurePass, false);
+
+  const generic = await verify({
+    dom: makeDomFixture({
+      shell: null,
+      sidebar: null,
+      home: null,
+      genericMain: makeElement({ rect: makeRect(900, 650, 20, 20) }),
+      genericInput: makeElement({ rect: makeRect(620, 80, 180, 620) }),
+    }),
+  });
+  assert.equal(generic.result.pass, true);
+  assert.equal(generic.result.readiness.structurePass, true);
 });
 
 test("home verification matches macOS and does not require a fixed suggestion-card count", async () => {
