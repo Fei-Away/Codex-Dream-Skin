@@ -1,6 +1,6 @@
 # Task Progress
 
-Updated: 2026-07-31 14:20 CST (Asia/Shanghai)
+Updated: 2026-07-31 14:22 CST (Asia/Shanghai)
 
 ## Issue #322 Selector Contract Compatibility
 
@@ -30,8 +30,14 @@ Updated: 2026-07-31 14:20 CST (Asia/Shanghai)
   Swift compiler step, then stops because the installed Command Line Tools SDK
   was built with Swift 6.3.2 while the active compiler is 6.3.3. GitHub's
   matching Xcode runner remains the authoritative native result.
-- [in progress] Review and stage the exact diff, then commit, push, open an
-  upstream PR linked to #322, and verify GitHub CI.
+- [complete] Exact diff committed as `bd7449f`, pushed to fork branch
+  `codex/fix-322-selector-contract`, and submitted upstream as ready PR #325
+  against `main`. The PR is mergeable and links #322; no merge or release
+  action was taken.
+- [blocked upstream] GitHub created CI run `30609410102` for the exact PR head
+  but concluded `action_required` with zero jobs. A repository maintainer must
+  approve the first-time fork workflow before Static, Windows 5.1/7, and macOS
+  jobs can start.
 
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 
