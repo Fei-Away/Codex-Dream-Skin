@@ -5,9 +5,14 @@ import { createHash, randomUUID } from "node:crypto";
 import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
 import { runtimeThemeContentFingerprint } from "./theme-content-fingerprint.mjs";
 
-const [stageDirArg, themesRootArg] = process.argv.slice(2);
-if (!stageDirArg || !themesRootArg) {
-  throw new Error("Usage: publish-theme-import.mjs <validated-stage-dir> <saved-themes-root>");
+const cliArgs = process.argv.slice(2);
+const recoveryOnly = cliArgs[0] === "--recover";
+const stageDirArg = recoveryOnly ? null : cliArgs[0];
+const themesRootArg = cliArgs[1];
+if (!themesRootArg || (!recoveryOnly && !stageDirArg) || cliArgs.length !== 2) {
+  throw new Error(
+    "Usage: publish-theme-import.mjs <validated-stage-dir> <saved-themes-root> | --recover <saved-themes-root>",
+  );
 }
 
 const MAX_CONFIG_BYTES = 1024 * 1024;
@@ -17,6 +22,13 @@ const MAX_LICENSE_BYTES = 64 * 1024;
 const MAX_MANIFEST_BYTES = 64 * 1024;
 const MAX_SIGNATURE_BYTES = 4 * 1024;
 const OPEN_FLAGS = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0);
+const REPLACEMENT_TRANSACTION_PREFIX = ".theme-replace-";
+const REPLACEMENT_JOURNAL_NAME = "transaction.json";
+const REPLACEMENT_BACKUP_NAME = "backup";
+const REPLACEMENT_CANDIDATE_NAME = "candidate";
+const REPLACEMENT_COMMIT_NAME = "committed";
+const REPLACEMENT_COMMIT_TEMP_NAME = "commit.tmp";
+const MAX_REPLACEMENT_JOURNAL_BYTES = 16 * 1024;
 
 function assertContained(rootPath, candidatePath, label) {
   const relative = path.relative(rootPath, candidatePath);
@@ -50,6 +62,23 @@ async function assertStoredFingerprint(directory, expectedFingerprint, label) {
   if (stored.fingerprint !== expectedFingerprint) {
     throw new Error(`${label} fingerprint does not match the pre-import record`);
   }
+}
+
+function assertFingerprint(value, label) {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
+function assertThemeId(value, label) {
+  if (
+    typeof value !== "string"
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(value)
+    || value.endsWith(".")
+    || isWindowsReservedPathStem(value)
+  ) throw new Error(`${label} is invalid`);
+  return value;
 }
 
 function decodeTheme(bytes, label) {
@@ -227,11 +256,6 @@ async function readOptionalRegular(filePath, label, maxBytes) {
   }
 }
 
-async function writeExclusive(filePath, bytes) {
-  await fs.writeFile(filePath, bytes, { flag: "wx", mode: 0o600 });
-  await fs.chmod(filePath, 0o600);
-}
-
 async function assertReplaceableDirectory(directory, label) {
   const stat = await fs.lstat(directory);
   if (!stat.isDirectory() || stat.isSymbolicLink()) {
@@ -257,25 +281,94 @@ function isLegacySuffixRecord(record, baseId) {
     && record.themeId === record.entryName;
 }
 
+function processIsAlive(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
+
+async function readLockOwner(lock) {
+  try {
+    const bytes = await readRegular(path.join(lock, "owner.json"), "Theme import lock owner", 4096);
+    const owner = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    if (
+      !owner
+      || typeof owner !== "object"
+      || Array.isArray(owner)
+      || Object.keys(owner).sort().join("\0") !== "createdAt\0pid\0token"
+      || !Number.isSafeInteger(owner.pid)
+      || owner.pid < 1
+      || typeof owner.createdAt !== "string"
+      || !Number.isFinite(Date.parse(owner.createdAt))
+      || typeof owner.token !== "string"
+      || !/^[0-9a-f-]{36}$/.test(owner.token)
+    ) return null;
+    return owner;
+  } catch {
+    return null;
+  }
+}
+
 async function acquireLock(root) {
   const lock = path.join(root, ".theme-import.lock");
-  try {
-    await fs.mkdir(lock, { mode: 0o700 });
-  } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    const stat = await fs.lstat(lock).catch(() => null);
-    if (!stat?.isDirectory() || stat.isSymbolicLink() || Date.now() - stat.mtimeMs < 5 * 60 * 1000) {
-      throw new Error("Another theme import is still running; try again shortly");
+  const token = randomUUID();
+  while (true) {
+    try {
+      await fs.mkdir(lock, { mode: 0o700 });
+      break;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      const stat = await fs.lstat(lock).catch(() => null);
+      if (!stat?.isDirectory() || stat.isSymbolicLink()) {
+        throw new Error("Theme import lock is not a trusted directory");
+      }
+      const owner = await readLockOwner(lock);
+      if (owner && processIsAlive(owner.pid)) {
+        throw new Error("Another theme import is still running; try again shortly");
+      }
+      if (!owner && Date.now() - stat.mtimeMs < 5 * 60 * 1000) {
+        throw new Error("Another theme import is still starting; try again shortly");
+      }
+      const abandoned = path.join(root, `.theme-import-lock-stale-${randomUUID()}`);
+      try {
+        await fs.rename(lock, abandoned);
+      } catch (renameError) {
+        if (renameError.code === "ENOENT") continue;
+        throw renameError;
+      }
+      await fs.rm(abandoned, { recursive: true, force: true });
     }
-    await fs.rm(lock, { recursive: true, force: true });
-    await fs.mkdir(lock, { mode: 0o700 });
   }
-  await fs.writeFile(
-    path.join(lock, "owner.json"),
-    `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`,
-    { flag: "wx", mode: 0o600 },
-  );
-  return async () => fs.rm(lock, { recursive: true, force: true });
+
+  const owner = { pid: process.pid, token, createdAt: new Date().toISOString() };
+  try {
+    await writeDurableExclusive(
+      path.join(lock, "owner.json"),
+      Buffer.from(`${JSON.stringify(owner)}\n`, "utf8"),
+    );
+    await syncDirectory(root);
+  } catch (error) {
+    await fs.rm(lock, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+
+  return async () => {
+    const current = await readLockOwner(lock);
+    if (!current || current.token !== token || current.pid !== process.pid) return;
+    const released = path.join(root, `.theme-import-lock-release-${token}`);
+    try {
+      await fs.rename(lock, released);
+    } catch (error) {
+      if (error.code === "ENOENT") return;
+      throw error;
+    }
+    await fs.rm(released, { recursive: true, force: true });
+    await syncDirectory(root);
+  };
 }
 
 async function resolveRealDirectory(directory, label) {
@@ -291,11 +384,342 @@ async function resolveRealDirectory(directory, label) {
   return resolved;
 }
 
-async function main() {
-  const [stageRoot, themesRoot] = await Promise.all([
-    resolveRealDirectory(stageDirArg, "Theme import stage"),
-    resolveRealDirectory(themesRootArg, "Saved themes root"),
+async function syncDirectory(directory) {
+  const handle = await fs.open(directory, fsConstants.O_RDONLY);
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+async function writeDurableExclusive(filePath, bytes) {
+  const handle = await fs.open(filePath, "wx", 0o600);
+  try {
+    await handle.writeFile(bytes);
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await syncDirectory(path.dirname(filePath));
+}
+
+function replacementTransactionPath(themesRoot) {
+  return path.join(themesRoot, `${REPLACEMENT_TRANSACTION_PREFIX}${randomUUID()}`);
+}
+
+async function createReplacementTransaction(
+  themesRoot,
+  candidateSource,
+  destinationName,
+  oldFingerprint,
+  newFingerprint,
+) {
+  const journal = {
+    schemaVersion: 1,
+    destinationName: assertThemeId(destinationName, "Replacement destination"),
+    oldFingerprint: assertFingerprint(oldFingerprint, "Replacement old fingerprint"),
+    newFingerprint: assertFingerprint(newFingerprint, "Replacement new fingerprint"),
+  };
+  const transaction = replacementTransactionPath(themesRoot);
+  assertContained(themesRoot, transaction, "Theme replacement transaction");
+  await fs.mkdir(transaction, { mode: 0o700 });
+  await fs.chmod(transaction, 0o700);
+  const candidate = path.join(transaction, REPLACEMENT_CANDIDATE_NAME);
+  await fs.rename(candidateSource, candidate);
+  await syncDirectory(transaction);
+  await assertStoredFingerprint(candidate, journal.newFingerprint, "Theme replacement candidate");
+  await writeDurableExclusive(
+    path.join(transaction, REPLACEMENT_JOURNAL_NAME),
+    Buffer.from(`${JSON.stringify(journal)}\n`, "utf8"),
+  );
+  await syncDirectory(themesRoot);
+  return {
+    root: transaction,
+    backup: path.join(transaction, REPLACEMENT_BACKUP_NAME),
+    candidate,
+    committed: path.join(transaction, REPLACEMENT_COMMIT_NAME),
+    journal,
+  };
+}
+
+async function readReplacementJournal(transaction) {
+  const journalPath = path.join(transaction, REPLACEMENT_JOURNAL_NAME);
+  const bytes = await readRegular(
+    journalPath,
+    "Theme replacement journal",
+    MAX_REPLACEMENT_JOURNAL_BYTES,
+  );
+  let journal;
+  try {
+    journal = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    throw new Error("Theme replacement journal is invalid JSON");
+  }
+  if (!journal || typeof journal !== "object" || Array.isArray(journal)) {
+    throw new Error("Theme replacement journal must be an object");
+  }
+  const keys = Object.keys(journal).sort();
+  if (
+    keys.join("\0") !== [
+      "destinationName",
+      "newFingerprint",
+      "oldFingerprint",
+      "schemaVersion",
+    ].join("\0")
+    || journal.schemaVersion !== 1
+  ) throw new Error("Theme replacement journal has an unsupported schema");
+  return {
+    schemaVersion: 1,
+    destinationName: assertThemeId(journal.destinationName, "Replacement destination"),
+    oldFingerprint: assertFingerprint(journal.oldFingerprint, "Replacement old fingerprint"),
+    newFingerprint: assertFingerprint(journal.newFingerprint, "Replacement new fingerprint"),
+  };
+}
+
+async function replacementEntryState(transaction) {
+  await assertReplaceableDirectory(transaction, "Theme replacement transaction");
+  const entries = await fs.readdir(transaction, { withFileTypes: true });
+  const allowed = new Set([
+    REPLACEMENT_JOURNAL_NAME,
+    REPLACEMENT_BACKUP_NAME,
+    REPLACEMENT_CANDIDATE_NAME,
+    REPLACEMENT_COMMIT_NAME,
+    REPLACEMENT_COMMIT_TEMP_NAME,
   ]);
+  for (const entry of entries) {
+    if (!allowed.has(entry.name) || entry.isSymbolicLink()) {
+      throw new Error("Theme replacement transaction contains an unexpected entry");
+    }
+    if (
+      (entry.name === REPLACEMENT_BACKUP_NAME || entry.name === REPLACEMENT_CANDIDATE_NAME)
+        ? !entry.isDirectory()
+        : !entry.isFile()
+    ) throw new Error("Theme replacement transaction entry has the wrong type");
+  }
+  return new Set(entries.map((entry) => entry.name));
+}
+
+async function commitReplacementTransaction(transaction) {
+  const temporaryMarker = path.join(transaction.root, REPLACEMENT_COMMIT_TEMP_NAME);
+  await writeDurableExclusive(
+    temporaryMarker,
+    Buffer.from("dreamskin-theme-replace-commit/1\n", "utf8"),
+  );
+  await fs.rename(temporaryMarker, transaction.committed);
+  await syncDirectory(transaction.root);
+}
+
+async function assertReplacementCommitMarker(markerPath, label) {
+  const bytes = await readRegular(markerPath, label, 128);
+  if (bytes.toString("utf8") !== "dreamskin-theme-replace-commit/1\n") {
+    throw new Error(`${label} is invalid`);
+  }
+}
+
+async function removeReplacementTransaction(transaction, themesRoot) {
+  assertContained(themesRoot, transaction, "Theme replacement transaction cleanup");
+  await replacementEntryState(transaction);
+  await fs.rm(transaction, { recursive: true, force: false });
+  if (await pathExists(transaction)) {
+    throw new Error("Theme replacement transaction cleanup was not verified");
+  }
+  await syncDirectory(themesRoot);
+}
+
+async function recoverJournaledReplacement(themesRoot, transaction, journal) {
+  const entries = await replacementEntryState(transaction);
+  const destination = path.join(themesRoot, journal.destinationName);
+  const backup = path.join(transaction, REPLACEMENT_BACKUP_NAME);
+  const candidate = path.join(transaction, REPLACEMENT_CANDIDATE_NAME);
+  assertContained(themesRoot, destination, "Recovered theme destination");
+  const committed = entries.has(REPLACEMENT_COMMIT_NAME);
+  const commitTemporary = entries.has(REPLACEMENT_COMMIT_TEMP_NAME);
+  const backupExists = entries.has(REPLACEMENT_BACKUP_NAME);
+  const candidateExists = entries.has(REPLACEMENT_CANDIDATE_NAME);
+  const destinationExists = await pathExists(destination);
+
+  if (committed) {
+    if (commitTemporary) {
+      throw new Error("Committed theme replacement still contains a temporary commit marker");
+    }
+    await assertReplacementCommitMarker(
+      path.join(transaction, REPLACEMENT_COMMIT_NAME),
+      "Theme replacement commit marker",
+    );
+    if (!destinationExists) throw new Error("Committed theme replacement destination is missing");
+    await assertStoredFingerprint(
+      destination,
+      journal.newFingerprint,
+      "Committed theme replacement destination",
+    );
+    if (candidateExists) {
+      throw new Error("Committed theme replacement still contains a candidate directory");
+    }
+    if (backupExists) {
+      await assertStoredFingerprint(backup, journal.oldFingerprint, "Theme replacement backup");
+    }
+    await removeReplacementTransaction(transaction, themesRoot);
+    return "committed";
+  }
+
+  if (!backupExists) {
+    if (!destinationExists || !candidateExists) {
+      throw new Error("Prepared theme replacement is missing its recovery copy");
+    }
+    await assertStoredFingerprint(
+      destination,
+      journal.oldFingerprint,
+      "Prepared theme replacement destination",
+    );
+    await assertStoredFingerprint(
+      candidate,
+      journal.newFingerprint,
+      "Prepared theme replacement candidate",
+    );
+    if (commitTemporary) {
+      await assertReplacementCommitMarker(
+        path.join(transaction, REPLACEMENT_COMMIT_TEMP_NAME),
+        "Temporary theme replacement commit marker",
+      );
+    }
+    await removeReplacementTransaction(transaction, themesRoot);
+    return "unchanged";
+  }
+
+  await assertStoredFingerprint(backup, journal.oldFingerprint, "Theme replacement backup");
+
+  if (destinationExists) {
+    if (candidateExists) {
+      throw new Error("Prepared theme replacement has both a candidate and destination");
+    }
+    await assertReplaceableDirectory(destination, "Uncommitted theme replacement destination");
+    await fs.rename(destination, candidate);
+    await syncDirectory(themesRoot);
+  }
+
+  await fs.rename(backup, destination);
+  await syncDirectory(themesRoot);
+  await assertStoredFingerprint(
+    destination,
+    journal.oldFingerprint,
+    "Recovered canonical saved theme",
+  );
+  if (!(await pathExists(candidate))) {
+    throw new Error("Recovered canonical saved theme, but replacement evidence is incomplete");
+  }
+  await assertStoredFingerprint(
+    candidate,
+    journal.newFingerprint,
+    "Uncommitted theme replacement candidate",
+  );
+  if (commitTemporary) {
+    await assertReplacementCommitMarker(
+      path.join(transaction, REPLACEMENT_COMMIT_TEMP_NAME),
+      "Temporary theme replacement commit marker",
+    );
+  }
+  await removeReplacementTransaction(transaction, themesRoot);
+  return "rolled-back";
+}
+
+async function recoverLegacyReplacement(themesRoot, transaction) {
+  const stored = await readStoredTheme(transaction);
+  if (!stored) throw new Error("Legacy theme replacement backup has no valid journal or theme");
+  const destinationName = assertThemeId(stored.theme.id, "Legacy replacement destination");
+  const destination = path.join(themesRoot, destinationName);
+  assertContained(themesRoot, destination, "Legacy replacement destination");
+  if (await pathExists(destination)) return "retained-legacy";
+  await fs.rename(transaction, destination);
+  await syncDirectory(themesRoot);
+  await assertStoredFingerprint(
+    destination,
+    stored.fingerprint,
+    "Recovered legacy canonical saved theme",
+  );
+  return "rolled-back-legacy";
+}
+
+async function recoverUnjournaledReplacement(themesRoot, transaction) {
+  const stored = await readStoredTheme(transaction);
+  if (stored) return recoverLegacyReplacement(themesRoot, transaction);
+
+  const entries = await replacementEntryState(transaction);
+  if (
+    entries.size !== 1
+    || !entries.has(REPLACEMENT_CANDIDATE_NAME)
+  ) throw new Error("Theme replacement recovery journal is missing");
+  const candidate = path.join(transaction, REPLACEMENT_CANDIDATE_NAME);
+  const candidateStored = await readStoredTheme(candidate);
+  if (!candidateStored) throw new Error("Unjournaled theme replacement candidate is invalid");
+  const destinationName = assertThemeId(
+    candidateStored.theme.id,
+    "Unjournaled replacement destination",
+  );
+  const destination = path.join(themesRoot, destinationName);
+  if (!(await pathExists(destination))) {
+    throw new Error("Unjournaled theme replacement has no canonical destination");
+  }
+  const destinationStored = await readStoredTheme(destination);
+  if (!destinationStored || destinationStored.theme.id !== destinationName) {
+    throw new Error("Unjournaled theme replacement canonical identity is invalid");
+  }
+  await removeReplacementTransaction(transaction, themesRoot);
+  return "discarded-unprepared";
+}
+
+async function recoverReplacementTransactions(themesRoot) {
+  const entries = (await fs.readdir(themesRoot, { withFileTypes: true }))
+    .filter((entry) => entry.name.startsWith(REPLACEMENT_TRANSACTION_PREFIX));
+  const transactions = [];
+  const destinationNames = new Set();
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) {
+      throw new Error("Theme replacement recovery entry must be a real directory");
+    }
+    const transaction = path.join(themesRoot, entry.name);
+    assertContained(themesRoot, transaction, "Theme replacement recovery entry");
+    const journalPath = path.join(transaction, REPLACEMENT_JOURNAL_NAME);
+    if (!(await pathExists(journalPath))) {
+      const stored = await readStoredTheme(transaction)
+        ?? await readStoredTheme(path.join(transaction, REPLACEMENT_CANDIDATE_NAME));
+      if (!stored) throw new Error("Theme replacement recovery journal is missing");
+      const destinationName = assertThemeId(stored.theme.id, "Legacy replacement destination");
+      if (destinationNames.has(destinationName)) {
+        throw new Error(`Multiple theme replacement transactions target ${destinationName}`);
+      }
+      destinationNames.add(destinationName);
+      transactions.push({ transaction, journal: null });
+      continue;
+    }
+    const journal = await readReplacementJournal(transaction);
+    if (destinationNames.has(journal.destinationName)) {
+      throw new Error(`Multiple theme replacement transactions target ${journal.destinationName}`);
+    }
+    destinationNames.add(journal.destinationName);
+    transactions.push({ transaction, journal });
+  }
+  const recovered = [];
+  for (const record of transactions) {
+    recovered.push(record.journal
+      ? await recoverJournaledReplacement(themesRoot, record.transaction, record.journal)
+      : await recoverUnjournaledReplacement(themesRoot, record.transaction));
+  }
+  return recovered;
+}
+
+async function main() {
+  const themesRoot = await resolveRealDirectory(themesRootArg, "Saved themes root");
+  if (recoveryOnly) {
+    const releaseLock = await acquireLock(themesRoot);
+    try {
+      const recovered = await recoverReplacementTransactions(themesRoot);
+      return { status: "recovered", recovered };
+    } finally {
+      await releaseLock();
+    }
+  }
+  const stageRoot = await resolveRealDirectory(stageDirArg, "Theme import stage");
 
   const configBytes = await readRegular(path.join(stageRoot, "theme.json"), "Imported theme config", MAX_CONFIG_BYTES);
   const sourceTheme = decodeTheme(configBytes, "Imported theme config");
@@ -322,6 +746,7 @@ async function main() {
   const releaseLock = await acquireLock(themesRoot);
   let temporary = "";
   try {
+    await recoverReplacementTransactions(themesRoot);
     const entries = await fs.readdir(themesRoot, { withFileTypes: true });
     const records = [];
     const storedById = new Map();
@@ -420,68 +845,55 @@ async function main() {
 
     temporary = await fs.mkdtemp(path.join(themesRoot, ".theme-import-"));
     await fs.chmod(temporary, 0o700);
-    await writeExclusive(path.join(temporary, theme.image), imageBytes);
-    await writeExclusive(
+    await writeDurableExclusive(path.join(temporary, theme.image), imageBytes);
+    await writeDurableExclusive(
       path.join(temporary, "theme.json"),
       Buffer.from(`${JSON.stringify(theme, null, 2)}\n`, "utf8"),
     );
-    if (cssBytes) await writeExclusive(path.join(temporary, "theme.css"), cssBytes);
-    if (licenseBytes) await writeExclusive(path.join(temporary, "LICENSE.txt"), licenseBytes);
-    let replacementBackup = "";
+    if (cssBytes) await writeDurableExclusive(path.join(temporary, "theme.css"), cssBytes);
+    if (licenseBytes) {
+      await writeDurableExclusive(path.join(temporary, "LICENSE.txt"), licenseBytes);
+    }
+    let replacementTransaction = null;
     let publishedDestination = false;
-    const legacyCleanupBackups = [];
-    try {
-      if (replaceExisting) {
-        replacementBackup = path.join(themesRoot, `.theme-replace-${randomUUID()}`);
-        assertContained(themesRoot, replacementBackup, "Imported theme replacement backup");
-        await fs.rename(destination, replacementBackup);
-      }
-      await fs.rename(temporary, destination);
-      publishedDestination = true;
+    if (replaceExisting) {
+      replacementTransaction = await createReplacementTransaction(
+        themesRoot,
+        temporary,
+        id,
+        canonicalFingerprint,
+        fingerprint,
+      );
       temporary = "";
+    }
+    const publishSource = replacementTransaction?.candidate ?? temporary;
+    try {
+      if (replacementTransaction) {
+        await fs.rename(destination, replacementTransaction.backup);
+        await syncDirectory(themesRoot);
+        await syncDirectory(replacementTransaction.root);
+      }
+      await fs.rename(publishSource, destination);
+      publishedDestination = true;
+      if (!replacementTransaction) temporary = "";
+      await syncDirectory(themesRoot);
       const published = await readStoredTheme(destination);
       if (!published || published.fingerprint !== fingerprint) {
         throw new Error("Published theme content does not match the validated import payload");
       }
-      for (const record of legacyCleanupRecords) {
-        if (record.entryName === id) continue;
-        await assertReplaceableDirectory(record.directory, "Legacy saved theme duplicate");
-        const cleanupBackup = path.join(
-          themesRoot,
-          `.theme-legacy-cleanup-${randomUUID()}`,
-        );
-        assertContained(themesRoot, cleanupBackup, "Legacy saved theme cleanup backup");
-        legacyCleanupBackups.push({
-          original: record.directory,
-          backup: cleanupBackup,
-          fingerprint: record.fingerprint,
-        });
-        await fs.rename(record.directory, cleanupBackup);
+      if (replacementTransaction) {
+        await commitReplacementTransaction(replacementTransaction);
       }
     } catch (error) {
       const rollbackErrors = [];
-      for (const record of [...legacyCleanupBackups].reverse()) {
-        try {
-          const backupExists = await pathExists(record.backup);
-          const originalExists = await pathExists(record.original);
-          if (backupExists) {
-            if (originalExists) throw new Error("original cleanup path already exists");
-            await fs.rename(record.backup, record.original);
-          }
-          if (await pathExists(record.backup)) throw new Error("cleanup backup remains after restore");
-          if (!(await pathExists(record.original))) throw new Error("original cleanup directory was not restored");
-          await assertStoredFingerprint(
-            record.original,
-            record.fingerprint,
-            `Legacy saved theme ${record.original}`,
-          );
-        } catch (rollbackError) {
-          rollbackErrors.push(`${record.original}: ${rollbackError.message}`);
-        }
-      }
       if (publishedDestination) {
         try {
-          if (await pathExists(destination)) {
+          if (replacementTransaction) {
+            if (await pathExists(replacementTransaction.candidate)) {
+              throw new Error("replacement candidate already exists");
+            }
+            await fs.rename(destination, replacementTransaction.candidate);
+          } else if (await pathExists(destination)) {
             await assertReplaceableDirectory(destination, "Published theme rollback target");
             const quarantine = path.join(themesRoot, `.theme-failed-${randomUUID()}`);
             assertContained(themesRoot, quarantine, "Failed theme quarantine");
@@ -493,17 +905,21 @@ async function main() {
           rollbackErrors.push(`${destination}: ${rollbackError.message}`);
         }
       }
-      if (replacementBackup) {
+      if (replacementTransaction) {
         try {
-          const backupExists = await pathExists(replacementBackup);
+          const backupExists = await pathExists(replacementTransaction.backup);
           const destinationExists = await pathExists(destination);
           if (backupExists) {
             if (destinationExists) throw new Error("new destination remains");
-            await fs.rename(replacementBackup, destination);
+            await fs.rename(replacementTransaction.backup, destination);
+            await syncDirectory(themesRoot);
           }
-          if (await pathExists(replacementBackup)) throw new Error("replacement backup remains after restore");
+          if (await pathExists(replacementTransaction.backup)) {
+            throw new Error("replacement backup remains after restore");
+          }
           if (!(await pathExists(destination))) throw new Error("original directory was not restored");
           await assertStoredFingerprint(destination, canonicalFingerprint, "Canonical saved theme");
+          await removeReplacementTransaction(replacementTransaction.root, themesRoot);
         } catch (rollbackError) {
           rollbackErrors.push(`${destination}: ${rollbackError.message}`);
         }
@@ -521,21 +937,36 @@ async function main() {
       }
       throw error;
     }
+
     let cleanupWarning = null;
-    try {
-      for (const record of legacyCleanupBackups) {
-        await removeDirectoryVerified(record.backup, "Legacy duplicate cleanup backup");
+    const cleanupErrors = [];
+    if (replacementTransaction) {
+      try {
+        await removeReplacementTransaction(replacementTransaction.root, themesRoot);
+      } catch (error) {
+        cleanupErrors.push(error.message);
       }
-      // Keep the canonical backup until every legacy cleanup has succeeded. It
-      // is the last recovery copy to be discarded on a successful import.
-      if (replacementBackup) {
-        await removeDirectoryVerified(replacementBackup, "Theme replacement backup");
+    }
+    // Canonical publication is durably committed before legacy exact-duplicate
+    // cleanup. A hard stop here can only retain an identical hidden duplicate;
+    // it can no longer cause the canonical replacement to roll back.
+    for (const record of legacyCleanupRecords) {
+      if (record.entryName === id) continue;
+      const cleanupBackup = path.join(
+        themesRoot,
+        `.theme-legacy-cleanup-${randomUUID()}`,
+      );
+      try {
+        await assertReplaceableDirectory(record.directory, "Legacy saved theme duplicate");
+        assertContained(themesRoot, cleanupBackup, "Legacy saved theme cleanup backup");
+        await fs.rename(record.directory, cleanupBackup);
+        await removeDirectoryVerified(cleanupBackup, "Legacy duplicate cleanup backup");
+      } catch (error) {
+        cleanupErrors.push(error.message);
       }
-    } catch (error) {
-      // The published destination has already passed its final fingerprint
-      // check. Retain the recovery copy and report cleanup separately instead
-      // of rolling back or misreporting the committed import as a failure.
-      cleanupWarning = `Imported theme backup cleanup was not verified: ${error.message}`;
+    }
+    if (cleanupErrors.length > 0) {
+      cleanupWarning = `Imported theme backup cleanup was not verified: ${cleanupErrors.join("; ")}`;
     }
     return {
       status: "imported",

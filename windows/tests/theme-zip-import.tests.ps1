@@ -24,8 +24,22 @@ $canonicalBackupCleanupIndex = $themeStoreSource.IndexOf(
   'Remove-DreamSkinManagedDirectoryVerified -Path $backup -Root $paths.Root',
   [System.StringComparison]::Ordinal
 )
+$journalPersistenceIndex = $themeStoreSource.IndexOf(
+  'Write-DreamSkinThemeReplacementJournal -Paths $paths',
+  [System.StringComparison]::Ordinal
+)
+$firstCanonicalMoveIndex = $themeStoreSource.IndexOf(
+  '[System.IO.Directory]::Move($destination, $backup)',
+  [System.StringComparison]::Ordinal
+)
+$commitMarkerIndex = $themeStoreSource.IndexOf(
+  'Write-DreamSkinThemeReplacementCommitMarker -Transaction $replacementTransaction',
+  [System.StringComparison]::Ordinal
+)
 if ($publishedFingerprintIndex -lt 0 -or $publishedMismatchIndex -le $publishedFingerprintIndex -or
-  $canonicalBackupCleanupIndex -le $publishedMismatchIndex) {
+  $journalPersistenceIndex -lt 0 -or $firstCanonicalMoveIndex -le $journalPersistenceIndex -or
+  $commitMarkerIndex -le $publishedMismatchIndex -or
+  $canonicalBackupCleanupIndex -le $commitMarkerIndex) {
   throw 'Windows import can discard the canonical backup before final published-fingerprint validation.'
 }
 
@@ -208,6 +222,47 @@ function New-TestZipWithEntry {
     $zip.Dispose()
     $stream.Dispose()
   }
+}
+
+function New-TestReplacementJournal {
+  param(
+    [Parameter(Mandatory = $true)]$Paths,
+    [Parameter(Mandatory = $true)][string]$Destination,
+    [Parameter(Mandatory = $true)][string]$Stage,
+    [Parameter(Mandatory = $true)][string]$OldFingerprint,
+    [Parameter(Mandatory = $true)][string]$NewFingerprint,
+    [ValidateSet('prepared', 'old-moved', 'new-published', 'committed')][string]$Phase = 'prepared',
+    [switch]$CommitMarker
+  )
+  $token = [guid]::NewGuid().ToString('N')
+  $backupName = '.theme-replace-' + $token
+  $backup = Join-Path $Paths.Saved $backupName
+  $journalPath = Join-Path $Paths.Saved ($backupName + '.json')
+  $journal = [pscustomobject][ordered]@{
+    schema = 'dreamskin-theme-replacement/1'
+    destinationName = [System.IO.Path]::GetFileName($Destination)
+    backupName = $backupName
+    stageName = [System.IO.Path]::GetFileName($Stage)
+    oldFingerprint = $OldFingerprint
+    newFingerprint = $NewFingerprint
+    phase = $Phase
+  }
+  Write-DreamSkinThemeReplacementJournal -Paths $Paths `
+    -JournalPath $journalPath -Journal $journal
+  $transaction = Read-DreamSkinThemeReplacementJournal `
+    -Paths $Paths -JournalPath $journalPath
+  if ($CommitMarker) {
+    if ($Phase -cne 'committed') {
+      throw 'A test commit marker requires the committed journal phase.'
+    }
+    Write-DreamSkinThemeReplacementCommitMarker -Transaction $transaction
+  }
+  return $transaction
+}
+
+function ConvertTo-TestPowerShellLiteral {
+  param([Parameter(Mandatory = $true)][string]$Value)
+  return "'" + $Value.Replace("'", "''") + "'"
 }
 
 function Assert-TestImportRejected {
@@ -711,6 +766,430 @@ try {
     throw 'A post-publish replacement failure did not restore the exact old theme without residue.'
   }
 
+  # Recreate hard-termination states directly on disk. These are the states a
+  # killed process leaves between atomic directory renames; production code has
+  # no test-only failure hook.
+  $restartRestoreDestination = Join-Path $paths.Saved 'restart-restore-id'
+  $restartRestoreStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  Write-TestThemePack -Directory $restartRestoreDestination -Id 'restart-restore-id' `
+    -Name 'Restart Restore Theme' -Quote 'RESTART RESTORE OLD'
+  Write-TestThemePack -Directory $restartRestoreStage -Id 'restart-restore-id' `
+    -Name 'Restart Restore Theme' -Quote 'RESTART RESTORE NEW'
+  $restartRestoreOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartRestoreDestination
+  $restartRestoreNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartRestoreStage
+  $restartRestoreTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $restartRestoreDestination -Stage $restartRestoreStage `
+    -OldFingerprint $restartRestoreOldFingerprint `
+    -NewFingerprint $restartRestoreNewFingerprint
+  [System.IO.Directory]::Move(
+    $restartRestoreDestination,
+    $restartRestoreTransaction.Backup
+  )
+  $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $stateRoot
+  $restartRestored = Read-DreamSkinTheme `
+    -ThemeDirectory $restartRestoreDestination -SkipImageMetadata
+  if ("$($restartRestored.Theme.quote)" -cne 'RESTART RESTORE OLD' -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $restartRestoreDestination) -cne
+      $restartRestoreOldFingerprint -or
+    (Test-Path -LiteralPath $restartRestoreTransaction.Backup) -or
+    (Test-Path -LiteralPath $restartRestoreTransaction.Stage) -or
+    (Test-Path -LiteralPath $restartRestoreTransaction.Path)) {
+    throw 'Store startup did not restore a verified old theme after a crash between replacement renames.'
+  }
+
+  $corruptStageDestination = Join-Path $paths.Saved 'restart-corrupt-stage-id'
+  $corruptStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  Write-TestThemePack -Directory $corruptStageDestination -Id 'restart-corrupt-stage-id' `
+    -Name 'Restart Corrupt Stage Theme' -Quote 'RESTART CORRUPT OLD'
+  Write-TestThemePack -Directory $corruptStage -Id 'restart-corrupt-stage-id' `
+    -Name 'Restart Corrupt Stage Theme' -Quote 'RESTART CORRUPT EXPECTED NEW'
+  $corruptStageOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $corruptStageDestination
+  $corruptStageNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $corruptStage
+  $corruptStageTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $corruptStageDestination -Stage $corruptStage `
+    -OldFingerprint $corruptStageOldFingerprint -NewFingerprint $corruptStageNewFingerprint
+  [System.IO.Directory]::Move(
+    $corruptStageDestination,
+    $corruptStageTransaction.Backup
+  )
+  [System.IO.File]::WriteAllText(
+    (Join-Path $corruptStage 'theme.json'),
+    '{broken',
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $corruptStageRejected = $false
+  try {
+    $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $stateRoot
+  } catch {
+    $corruptStageRejected = "$($_.Exception.Message)" -match 'recovery is ambiguous'
+  }
+  if (-not $corruptStageRejected -or
+    -not (Test-Path -LiteralPath $corruptStageDestination -PathType Container) -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $corruptStageDestination) -cne
+      $corruptStageOldFingerprint -or
+    (Test-Path -LiteralPath $corruptStageTransaction.Backup) -or
+    -not (Test-Path -LiteralPath $corruptStageTransaction.Stage -PathType Container) -or
+    -not (Test-Path -LiteralPath $corruptStageTransaction.Path -PathType Leaf)) {
+    throw 'Corrupt staged replacement prevented the verified old canonical theme from being restored.'
+  }
+  Remove-DreamSkinManagedDirectoryVerified -Path $corruptStageTransaction.Stage -Root $paths.Root
+  [System.IO.File]::Delete($corruptStageTransaction.Path)
+
+  $corruptPublishedDestination = Join-Path $paths.Saved 'restart-corrupt-published-id'
+  $corruptPublishedStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  $corruptPublishedExpected = Join-Path $temporaryRoot 'restart-corrupt-published-expected'
+  Write-TestThemePack -Directory $corruptPublishedDestination `
+    -Id 'restart-corrupt-published-id' -Name 'Restart Corrupt Published Theme' `
+    -Quote 'RESTART CORRUPT PUBLISHED OLD'
+  Write-TestThemePack -Directory $corruptPublishedExpected `
+    -Id 'restart-corrupt-published-id' -Name 'Restart Corrupt Published Theme' `
+    -Quote 'RESTART CORRUPT PUBLISHED NEW'
+  $corruptPublishedOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $corruptPublishedDestination
+  $corruptPublishedNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $corruptPublishedExpected
+  $corruptPublishedTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $corruptPublishedDestination -Stage $corruptPublishedStage `
+    -OldFingerprint $corruptPublishedOldFingerprint `
+    -NewFingerprint $corruptPublishedNewFingerprint -Phase 'new-published'
+  [System.IO.Directory]::Move(
+    $corruptPublishedDestination,
+    $corruptPublishedTransaction.Backup
+  )
+  Write-TestThemePack -Directory $corruptPublishedDestination `
+    -Id 'restart-corrupt-published-id' -Name 'Restart Corrupt Published Theme' `
+    -Quote 'RESTART CORRUPT PUBLISHED CANDIDATE'
+  [System.IO.File]::WriteAllText(
+    (Join-Path $corruptPublishedDestination 'theme.json'),
+    '{broken',
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $corruptPublishedRejected = $false
+  try {
+    $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $stateRoot
+  } catch {
+    $corruptPublishedRejected = "$($_.Exception.Message)" -match 'published replacement cannot be verified'
+  }
+  if (-not $corruptPublishedRejected -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $corruptPublishedDestination) -cne
+      $corruptPublishedOldFingerprint -or
+    (Test-Path -LiteralPath $corruptPublishedTransaction.Backup) -or
+    -not (Test-Path -LiteralPath $corruptPublishedTransaction.Stage -PathType Container) -or
+    -not (Test-Path -LiteralPath $corruptPublishedTransaction.Path -PathType Leaf)) {
+    throw 'Corrupt published replacement prevented the verified old canonical theme from being restored.'
+  }
+  Remove-DreamSkinManagedDirectoryVerified -Path $corruptPublishedTransaction.Stage -Root $paths.Root
+  [System.IO.File]::Delete($corruptPublishedTransaction.Path)
+
+  $missingStageDestination = Join-Path $paths.Saved 'restart-missing-stage-id'
+  $missingStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  $missingStageExpected = Join-Path $temporaryRoot 'restart-missing-stage-expected'
+  Write-TestThemePack -Directory $missingStageDestination -Id 'restart-missing-stage-id' `
+    -Name 'Restart Missing Stage Theme' -Quote 'RESTART MISSING STAGE OLD'
+  Write-TestThemePack -Directory $missingStageExpected -Id 'restart-missing-stage-id' `
+    -Name 'Restart Missing Stage Theme' -Quote 'RESTART MISSING STAGE NEW'
+  $missingStageOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $missingStageDestination
+  $missingStageNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $missingStageExpected
+  $missingStageTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $missingStageDestination -Stage $missingStage `
+    -OldFingerprint $missingStageOldFingerprint -NewFingerprint $missingStageNewFingerprint
+  [System.IO.Directory]::Move(
+    $missingStageDestination,
+    $missingStageTransaction.Backup
+  )
+  $missingStageRejected = $false
+  try {
+    $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $stateRoot
+  } catch {
+    $missingStageRejected = "$($_.Exception.Message)" -match 'staged replacement is missing'
+  }
+  if (-not $missingStageRejected -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $missingStageDestination) -cne
+      $missingStageOldFingerprint -or
+    (Test-Path -LiteralPath $missingStageTransaction.Backup) -or
+    -not (Test-Path -LiteralPath $missingStageTransaction.Path -PathType Leaf)) {
+    throw 'Missing staged evidence was not preserved after restoring the verified old theme.'
+  }
+  [System.IO.File]::Delete($missingStageTransaction.Path)
+
+  $failFastDestination = Join-Path $paths.Saved 'restart-failfast-id'
+  $failFastStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  Write-TestThemePack -Directory $failFastDestination -Id 'restart-failfast-id' `
+    -Name 'Restart FailFast Theme' -Quote 'RESTART FAILFAST OLD'
+  Write-TestThemePack -Directory $failFastStage -Id 'restart-failfast-id' `
+    -Name 'Restart FailFast Theme' -Quote 'RESTART FAILFAST NEW'
+  $failFastOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $failFastDestination
+  $failFastNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $failFastStage
+  $failFastTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $failFastDestination -Stage $failFastStage `
+    -OldFingerprint $failFastOldFingerprint -NewFingerprint $failFastNewFingerprint
+  $themeScriptLiteral = ConvertTo-TestPowerShellLiteral `
+    -Value (Join-Path $Root 'scripts\theme-windows.ps1')
+  $destinationLiteral = ConvertTo-TestPowerShellLiteral -Value $failFastDestination
+  $backupLiteral = ConvertTo-TestPowerShellLiteral -Value $failFastTransaction.Backup
+  $failFastChildScript = @"
+`$ErrorActionPreference = 'Stop'
+. $themeScriptLiteral
+`$mutex = New-DreamSkinThemeImportMutex
+`$null = `$mutex.WaitOne()
+[System.IO.Directory]::Move($destinationLiteral, $backupLiteral)
+[System.Environment]::FailFast('DreamSkin replacement interruption test')
+"@
+  $encodedFailFastScript = [Convert]::ToBase64String(
+    [System.Text.Encoding]::Unicode.GetBytes($failFastChildScript)
+  )
+  $powerShellExecutable = (Get-Process -Id $PID -ErrorAction Stop).Path
+  if (-not $powerShellExecutable -or
+    -not (Test-Path -LiteralPath $powerShellExecutable -PathType Leaf)) {
+    throw 'Could not resolve the current PowerShell executable for the fail-fast test.'
+  }
+  $failFastProcess = Start-Process -FilePath $powerShellExecutable -ArgumentList @(
+    '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned',
+    '-EncodedCommand', $encodedFailFastScript
+  ) -Wait -PassThru
+  if ($failFastProcess.ExitCode -eq 0 -or
+    (Test-Path -LiteralPath $failFastDestination) -or
+    -not (Test-Path -LiteralPath $failFastTransaction.Backup -PathType Container)) {
+    throw 'The fail-fast child did not terminate after moving the canonical theme to its backup.'
+  }
+  $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $stateRoot
+  $failFastRestored = Read-DreamSkinTheme `
+    -ThemeDirectory $failFastDestination -SkipImageMetadata
+  if ("$($failFastRestored.Theme.quote)" -cne 'RESTART FAILFAST OLD' -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $failFastDestination) -cne
+      $failFastOldFingerprint -or
+    (Test-Path -LiteralPath $failFastTransaction.Backup) -or
+    (Test-Path -LiteralPath $failFastTransaction.Stage) -or
+    (Test-Path -LiteralPath $failFastTransaction.Path)) {
+    throw 'Abandoned-mutex recovery did not restore the exact old theme after child FailFast.'
+  }
+
+  $restartCommitDestination = Join-Path $paths.Saved 'restart-commit-id'
+  $restartCommitStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  Write-TestThemePack -Directory $restartCommitDestination -Id 'restart-commit-id' `
+    -Name 'Restart Commit Theme' -Quote 'RESTART COMMIT OLD'
+  Write-TestThemePack -Directory $restartCommitStage -Id 'restart-commit-id' `
+    -Name 'Restart Commit Theme' -Quote 'RESTART COMMIT NEW'
+  $restartCommitOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartCommitDestination
+  $restartCommitNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartCommitStage
+  $restartCommitTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $restartCommitDestination -Stage $restartCommitStage `
+    -OldFingerprint $restartCommitOldFingerprint `
+    -NewFingerprint $restartCommitNewFingerprint -Phase 'committed' -CommitMarker
+  [System.IO.Directory]::Move(
+    $restartCommitDestination,
+    $restartCommitTransaction.Backup
+  )
+  [System.IO.Directory]::Move(
+    $restartCommitStage,
+    $restartCommitDestination
+  )
+  $restartCommitThemes = @(Get-DreamSkinSavedThemes `
+    -StateRoot $stateRoot -SkipImageMetadata)
+  $restartCommitted = Read-DreamSkinTheme `
+    -ThemeDirectory $restartCommitDestination -SkipImageMetadata
+  if ("$($restartCommitted.Theme.quote)" -cne 'RESTART COMMIT NEW' -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $restartCommitDestination) -cne
+      $restartCommitNewFingerprint -or
+    @($restartCommitThemes | Where-Object { $_.Path -ceq $restartCommitDestination }).Count -ne 1 -or
+    (Test-Path -LiteralPath $restartCommitTransaction.Backup) -or
+    (Test-Path -LiteralPath $restartCommitTransaction.Path)) {
+    throw 'Saved-theme listing did not retain a verified new theme and clean its completed transaction.'
+  }
+
+  $restartUncommittedDestination = Join-Path $paths.Saved 'restart-uncommitted-id'
+  $restartUncommittedStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  Write-TestThemePack -Directory $restartUncommittedDestination -Id 'restart-uncommitted-id' `
+    -Name 'Restart Uncommitted Theme' -Quote 'RESTART UNCOMMITTED OLD'
+  Write-TestThemePack -Directory $restartUncommittedStage -Id 'restart-uncommitted-id' `
+    -Name 'Restart Uncommitted Theme' -Quote 'RESTART UNCOMMITTED NEW'
+  $restartUncommittedOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartUncommittedDestination
+  $restartUncommittedNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartUncommittedStage
+  $restartUncommittedTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $restartUncommittedDestination -Stage $restartUncommittedStage `
+    -OldFingerprint $restartUncommittedOldFingerprint `
+    -NewFingerprint $restartUncommittedNewFingerprint -Phase 'new-published'
+  [System.IO.Directory]::Move(
+    $restartUncommittedDestination,
+    $restartUncommittedTransaction.Backup
+  )
+  [System.IO.Directory]::Move(
+    $restartUncommittedStage,
+    $restartUncommittedDestination
+  )
+  $null = Get-DreamSkinSavedThemes -StateRoot $stateRoot -SkipImageMetadata
+  $restartUncommitted = Read-DreamSkinTheme `
+    -ThemeDirectory $restartUncommittedDestination -SkipImageMetadata
+  if ("$($restartUncommitted.Theme.quote)" -cne 'RESTART UNCOMMITTED OLD' -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $restartUncommittedDestination) -cne
+      $restartUncommittedOldFingerprint -or
+    (Test-Path -LiteralPath $restartUncommittedTransaction.Backup) -or
+    (Test-Path -LiteralPath $restartUncommittedTransaction.Stage) -or
+    (Test-Path -LiteralPath $restartUncommittedTransaction.Path)) {
+    throw 'A published replacement without the durable commit marker was not rolled back.'
+  }
+
+  $restartAmbiguousDestination = Join-Path $paths.Saved 'restart-ambiguous-id'
+  $restartAmbiguousStage = Join-Path $paths.Saved (
+    '.theme-import-' + [guid]::NewGuid().ToString('N')
+  )
+  $restartAmbiguousExpected = Join-Path $temporaryRoot 'restart-ambiguous-expected'
+  Write-TestThemePack -Directory $restartAmbiguousDestination -Id 'restart-ambiguous-id' `
+    -Name 'Restart Ambiguous Theme' -Quote 'RESTART AMBIGUOUS OLD'
+  Write-TestThemePack -Directory $restartAmbiguousExpected -Id 'restart-ambiguous-id' `
+    -Name 'Restart Ambiguous Theme' -Quote 'RESTART AMBIGUOUS EXPECTED NEW'
+  $restartAmbiguousOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartAmbiguousDestination
+  $restartAmbiguousNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $restartAmbiguousExpected
+  $restartAmbiguousTransaction = New-TestReplacementJournal -Paths $paths `
+    -Destination $restartAmbiguousDestination -Stage $restartAmbiguousStage `
+    -OldFingerprint $restartAmbiguousOldFingerprint `
+    -NewFingerprint $restartAmbiguousNewFingerprint -Phase 'new-published'
+  [System.IO.Directory]::Move(
+    $restartAmbiguousDestination,
+    $restartAmbiguousTransaction.Backup
+  )
+  Write-TestThemePack -Directory $restartAmbiguousDestination -Id 'restart-ambiguous-id' `
+    -Name 'Restart Ambiguous Theme' -Quote 'RESTART AMBIGUOUS UNKNOWN'
+  $restartAmbiguousRejected = $false
+  try {
+    $null = Get-DreamSkinSavedThemes -StateRoot $stateRoot -SkipImageMetadata
+  } catch {
+    $restartAmbiguousRejected = "$($_.Exception.Message)" -match 'recovery is ambiguous'
+  }
+  if (-not $restartAmbiguousRejected -or
+    -not (Test-Path -LiteralPath $restartAmbiguousDestination -PathType Container) -or
+    -not (Test-Path -LiteralPath $restartAmbiguousTransaction.Backup -PathType Container) -or
+    -not (Test-Path -LiteralPath $restartAmbiguousTransaction.Path -PathType Leaf) -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $restartAmbiguousTransaction.Backup) -cne
+      $restartAmbiguousOldFingerprint) {
+    throw 'Ambiguous replacement recovery did not fail closed while preserving its evidence.'
+  }
+  Remove-DreamSkinManagedDirectoryVerified -Path $restartAmbiguousDestination -Root $paths.Root
+  Remove-DreamSkinManagedDirectoryVerified -Path $restartAmbiguousTransaction.Backup -Root $paths.Root
+  [System.IO.File]::Delete($restartAmbiguousTransaction.Path)
+
+  $unsafeJournalToken = [guid]::NewGuid().ToString('N')
+  $unsafeJournalBackupName = '.theme-replace-' + $unsafeJournalToken
+  $unsafeJournalPath = Join-Path $paths.Saved ($unsafeJournalBackupName + '.json')
+  $unsafeJournal = [ordered]@{
+    schema = 'dreamskin-theme-replacement/1'
+    destinationName = '..\escape'
+    backupName = $unsafeJournalBackupName
+    stageName = '.theme-import-' + [guid]::NewGuid().ToString('N')
+    oldFingerprint = (('0' * 64) -join '')
+    newFingerprint = (('1' * 64) -join '')
+    phase = 'prepared'
+  }
+  [System.IO.File]::WriteAllText(
+    $unsafeJournalPath,
+    (($unsafeJournal | ConvertTo-Json -Depth 4 -Compress) + "`r`n"),
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $unsafeJournalRejected = $false
+  try {
+    $null = Get-DreamSkinSavedThemes -StateRoot $stateRoot -SkipImageMetadata
+  } catch {
+    $unsafeJournalRejected = "$($_.Exception.Message)" -match 'unsafe|invalid destination'
+  }
+  if (-not $unsafeJournalRejected -or
+    -not (Test-Path -LiteralPath $unsafeJournalPath -PathType Leaf) -or
+    (Test-Path -LiteralPath (Join-Path $paths.Root 'escape'))) {
+    throw 'Unsafe replacement-journal traversal was not rejected without side effects.'
+  }
+  [System.IO.File]::Delete($unsafeJournalPath)
+
+  $strictJournalToken = [guid]::NewGuid().ToString('N')
+  $strictJournalBackupName = '.theme-replace-' + $strictJournalToken
+  $strictJournalPath = Join-Path $paths.Saved ($strictJournalBackupName + '.json')
+  $strictJournal = [ordered]@{
+    schema = 'dreamskin-theme-replacement/1'
+    destinationName = 'strict-journal-id'
+    backupName = $strictJournalBackupName
+    stageName = '.theme-import-' + [guid]::NewGuid().ToString('N')
+    oldFingerprint = (('2' * 64) -join '')
+    newFingerprint = (('3' * 64) -join '')
+    phase = 'prepared'
+    unexpected = $true
+  }
+  [System.IO.File]::WriteAllText(
+    $strictJournalPath,
+    (($strictJournal | ConvertTo-Json -Depth 4 -Compress) + "`r`n"),
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $strictJournalRejected = $false
+  try {
+    $null = Get-DreamSkinSavedThemes -StateRoot $stateRoot -SkipImageMetadata
+  } catch {
+    $strictJournalRejected = "$($_.Exception.Message)" -match 'unsupported schema'
+  }
+  if (-not $strictJournalRejected -or
+    -not (Test-Path -LiteralPath $strictJournalPath -PathType Leaf)) {
+    throw 'Replacement recovery accepted or deleted a journal with an unknown field.'
+  }
+  [System.IO.File]::Delete($strictJournalPath)
+
+  $duplicateDestination = Join-Path $paths.Saved 'duplicate-transaction-id'
+  Write-TestThemePack -Directory $duplicateDestination -Id 'duplicate-transaction-id' `
+    -Name 'Duplicate Transaction Theme' -Quote 'DUPLICATE TRANSACTION ORIGINAL'
+  $duplicateOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $duplicateDestination
+  $duplicateNewSource = Join-Path $temporaryRoot 'duplicate-transaction-new'
+  Write-TestThemePack -Directory $duplicateNewSource -Id 'duplicate-transaction-id' `
+    -Name 'Duplicate Transaction Theme' -Quote 'DUPLICATE TRANSACTION NEW'
+  $duplicateNewFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $duplicateNewSource
+  $duplicateTransactionA = New-TestReplacementJournal -Paths $paths `
+    -Destination $duplicateDestination `
+    -Stage (Join-Path $paths.Saved ('.theme-import-' + [guid]::NewGuid().ToString('N'))) `
+    -OldFingerprint $duplicateOldFingerprint -NewFingerprint $duplicateNewFingerprint
+  $duplicateTransactionB = New-TestReplacementJournal -Paths $paths `
+    -Destination $duplicateDestination `
+    -Stage (Join-Path $paths.Saved ('.theme-import-' + [guid]::NewGuid().ToString('N'))) `
+    -OldFingerprint $duplicateOldFingerprint -NewFingerprint $duplicateNewFingerprint
+  $duplicateTransactionsRejected = $false
+  try {
+    $null = Get-DreamSkinSavedThemes -StateRoot $stateRoot -SkipImageMetadata
+  } catch {
+    $duplicateTransactionsRejected = "$($_.Exception.Message)" -match 'Multiple theme replacement transactions'
+  }
+  if (-not $duplicateTransactionsRejected -or
+    -not (Test-Path -LiteralPath $duplicateTransactionA.Path -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $duplicateTransactionB.Path -PathType Leaf) -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $duplicateDestination) -cne
+      $duplicateOldFingerprint) {
+    throw 'Duplicate replacement targets were not rejected before recovery changed canonical state.'
+  }
+  [System.IO.File]::Delete($duplicateTransactionA.Path)
+  [System.IO.File]::Delete($duplicateTransactionB.Path)
+
   $cleanupWarningSourceA = Join-Path $temporaryRoot 'cleanup-warning-source-a'
   $cleanupWarningSourceB = Join-Path $temporaryRoot 'cleanup-warning-source-b'
   $cleanupWarningArchiveA = Join-Path $temporaryRoot 'cleanup-warning-a.zip'
@@ -748,26 +1227,39 @@ try {
   }
   $cleanupWarningBackups = @(Get-ChildItem -LiteralPath $paths.Saved -Directory -Force |
     Where-Object { $_.Name -clike '.theme-replace-*' })
+  $cleanupWarningJournals = @(Get-ChildItem -LiteralPath $paths.Saved -File -Force |
+    Where-Object { $_.Name -cmatch '^\.theme-replace-[a-f0-9]{32}\.json$' })
+  $cleanupWarningBackupFingerprint = if ($cleanupWarningBackups.Count -eq 1) {
+    Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $cleanupWarningBackups[0].FullName
+  } else {
+    $null
+  }
   $cleanupWarningVisibleBackups = @(Get-DreamSkinSavedThemes `
     -StateRoot $stateRoot -SkipImageMetadata | Where-Object {
       [System.IO.Path]::GetFileName("$($_.Path)").StartsWith(
         '.theme-replace-', [System.StringComparison]::Ordinal
       )
     })
+  $cleanupWarningBackupsAfterRecovery = @(
+    Get-ChildItem -LiteralPath $paths.Saved -Directory -Force |
+      Where-Object { $_.Name -clike '.theme-replace-*' }
+  )
+  $cleanupWarningJournalsAfterRecovery = @(
+    Get-ChildItem -LiteralPath $paths.Saved -File -Force |
+      Where-Object { $_.Name -cmatch '^\.theme-replace-[a-f0-9]{32}\.json$' }
+  )
   $cleanupWarningPublished = Read-DreamSkinTheme `
     -ThemeDirectory $cleanupWarningFirst.Path -SkipImageMetadata
   if (-not $script:CleanupWarningInjectionHit -or
     $cleanupWarningResult.Status -cne 'Imported' -or -not $cleanupWarningResult.Replaced -or
     "$($cleanupWarningPublished.Theme.quote)" -cne 'CLEANUP WARNING B' -or
     $cleanupWarningResult.CleanupWarning -cnotmatch 'committed-backup cleanup failure' -or
-    $cleanupWarningBackups.Count -ne 1 -or
+    $cleanupWarningBackups.Count -ne 1 -or $cleanupWarningJournals.Count -ne 1 -or
+    $cleanupWarningBackupFingerprint -cne $cleanupWarningOldFingerprint -or
     $cleanupWarningVisibleBackups.Count -ne 0 -or
-    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $cleanupWarningBackups[0].FullName) -cne
-      $cleanupWarningOldFingerprint) {
+    $cleanupWarningBackupsAfterRecovery.Count -ne 0 -or
+    $cleanupWarningJournalsAfterRecovery.Count -ne 0) {
     throw 'A committed import was rolled back or reported failed when obsolete backup cleanup failed.'
-  }
-  foreach ($cleanupWarningBackup in $cleanupWarningBackups) {
-    Remove-DreamSkinManagedDirectoryVerified -Path $cleanupWarningBackup.FullName -Root $paths.Root
   }
 
   $wrappedRoot = Join-Path $temporaryRoot 'wrapped-source'

@@ -40,6 +40,42 @@ not evidence. Ambiguous directories, unrelated numeric-suffix themes, files,
 junctions, and reparse points must be preserved and rejected rather than
 overwritten.
 
+## Crash and restart recovery gate
+
+The replacement protocol is shared with macOS and must be checked as a
+transaction, not only through the normal `catch` rollback path:
+
+```text
+journal -> durable backup -> publish candidate -> verify fingerprint
+        -> durable committed marker -> cleanup
+```
+
+Run the complete Windows ZIP-import suite in both PowerShell 5.1 and 7. It
+contains a real process-termination/restart test for the first uncatchable
+window and deterministic restart-state coverage for all three windows:
+
+1. after the old canonical directory is moved to its backup;
+2. after the candidate is published at the canonical path; and
+3. after the durable `committed` marker is published.
+
+The first two states are uncommitted and must restore the exact old semantic
+fingerprint on the next importer/store invocation. The third state is committed
+and must retain the verified new fingerprint. Every recovery must remove its
+transaction files after successful verification and must never show dotted
+transaction directories in the tray menu.
+
+The suite also has fail-closed cases for a corrupt candidate, a malformed or
+path-conflicting journal, duplicate journals targeting one destination, and an
+impossible committed-plus-temporary marker. In those cases the verified old
+theme (when available) stays visible, the journal and suspicious payload remain
+for diagnosis, and no cleanup or overwrite is attempted. A legacy cleanup
+failure after commit is only a bounded warning; it must not roll back the new
+canonical theme.
+
+When reporting results, distinguish the exact phase tested (`prepared`,
+`old-moved`, `new-published`, or `committed`) and state whether it used the real
+FailFast child process or a deterministic restart-state fixture.
+
 ## Checkout and automated checks
 
 Record the exact commit before testing:

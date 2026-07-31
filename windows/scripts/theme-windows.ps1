@@ -8,6 +8,7 @@ $script:DreamSkinMaxThemeArchiveExpandedBytes = 64 * 1024 * 1024
 $script:DreamSkinMaxThemeArchiveEntries = 32
 $script:DreamSkinCommunityApiOrigin = 'https://api.dreamskin.cc'
 $script:DreamSkinMaxCommunityMetadataBytes = 64 * 1024
+$script:DreamSkinThemeReplacementCommitText = 'dreamskin-theme-replace-commit/1'
 
 function Test-DreamSkinCommunityVersionId {
   param([AllowNull()][string]$Value)
@@ -472,6 +473,7 @@ function Initialize-DreamSkinThemeStore {
   foreach ($directory in @($paths.Root, $paths.Active, $paths.Saved, $paths.Images)) {
     Ensure-DreamSkinManagedDirectory -Path $directory -Root $paths.Root
   }
+  Invoke-DreamSkinThemeReplacementRecovery -Paths $paths
   $assetRoot = Join-Path $SkillRoot 'assets'
   $bundledTheme = Read-DreamSkinTheme -ThemeDirectory $assetRoot
   $assetImage = $bundledTheme.ImagePath
@@ -1265,6 +1267,461 @@ function Test-DreamSkinLegacySuffixRecord {
   return $null -ne $suffix -and $Record.ThemeId -ceq $Record.EntryName
 }
 
+function New-DreamSkinThemeImportMutex {
+  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  return [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.ThemeImport")
+}
+
+function Assert-DreamSkinThemeReplacementLeafName {
+  param(
+    [Parameter(Mandatory = $true)][string]$Value,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  if (-not $Value -or [System.IO.Path]::GetFileName($Value) -cne $Value -or
+    $Value -in @('.', '..') -or $Value -match '[\\/\u0000-\u001f<>:"|?*]') {
+    throw "Theme replacement journal contains an unsafe $Label."
+  }
+}
+
+function Write-DreamSkinUtf8FileDurably {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content
+  )
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  $directory = [System.IO.Path]::GetDirectoryName($fullPath)
+  if (-not [System.IO.Directory]::Exists($directory)) {
+    throw 'Durable journal parent directory does not exist.'
+  }
+  $fileName = [System.IO.Path]::GetFileName($fullPath)
+  $operationId = "$PID.$([guid]::NewGuid().ToString('N'))"
+  $temporary = Join-Path $directory ".$fileName.$operationId.tmp"
+  $replacementBackup = Join-Path $directory ".$fileName.$operationId.replace-backup"
+  $encoding = [System.Text.UTF8Encoding]::new($false, $true)
+  $bytes = $encoding.GetBytes($Content)
+  try {
+    $stream = [System.IO.FileStream]::new(
+      $temporary,
+      [System.IO.FileMode]::CreateNew,
+      [System.IO.FileAccess]::Write,
+      [System.IO.FileShare]::None,
+      4096,
+      [System.IO.FileOptions]::WriteThrough
+    )
+    try {
+      $stream.Write($bytes, 0, $bytes.Length)
+      $stream.Flush($true)
+    } finally {
+      $stream.Dispose()
+    }
+    if ([System.IO.File]::Exists($fullPath)) {
+      [System.IO.File]::Replace($temporary, $fullPath, $replacementBackup, $true)
+    } else {
+      [System.IO.File]::Move($temporary, $fullPath)
+    }
+    # Flush the installed file as well as the staging file. This keeps the
+    # journal contents durable across a process fail-fast or system restart.
+    $installed = [System.IO.FileStream]::new(
+      $fullPath,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::ReadWrite,
+      [System.IO.FileShare]::Read,
+      4096,
+      [System.IO.FileOptions]::WriteThrough
+    )
+    try { $installed.Flush($true) } finally { $installed.Dispose() }
+  } finally {
+    foreach ($artifact in @($temporary, $replacementBackup)) {
+      try {
+        if ([System.IO.File]::Exists($artifact)) { [System.IO.File]::Delete($artifact) }
+      } catch {
+        try { Write-Warning "Could not remove durable journal artifact '$artifact': $($_.Exception.Message)" } catch {}
+      }
+    }
+  }
+}
+
+function Write-DreamSkinThemeReplacementJournal {
+  param(
+    [Parameter(Mandatory = $true)]$Paths,
+    [Parameter(Mandatory = $true)][string]$JournalPath,
+    [Parameter(Mandatory = $true)]$Journal
+  )
+  $fullSaved = [System.IO.Path]::GetFullPath($Paths.Saved).TrimEnd('\')
+  $fullJournal = [System.IO.Path]::GetFullPath($JournalPath)
+  if (-not [System.IO.Path]::GetDirectoryName($fullJournal).Equals(
+      $fullSaved, [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'Theme replacement journal escaped the saved-theme directory.'
+  }
+  Assert-DreamSkinNoReparseComponents -Path $fullJournal
+  $json = $Journal | ConvertTo-Json -Depth 4 -Compress
+  Write-DreamSkinUtf8FileDurably -Path $fullJournal -Content ($json + "`r`n")
+  Assert-DreamSkinNoReparseComponents -Path $fullJournal
+}
+
+function Read-DreamSkinThemeReplacementJournal {
+  param(
+    [Parameter(Mandatory = $true)]$Paths,
+    [Parameter(Mandatory = $true)][string]$JournalPath
+  )
+  $fullSaved = [System.IO.Path]::GetFullPath($Paths.Saved).TrimEnd('\')
+  $fullJournal = [System.IO.Path]::GetFullPath($JournalPath)
+  if (-not [System.IO.Path]::GetDirectoryName($fullJournal).Equals(
+      $fullSaved, [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'Theme replacement journal escaped the saved-theme directory.'
+  }
+  $journalName = [System.IO.Path]::GetFileName($fullJournal)
+  if ($journalName -cnotmatch '^(\.theme-replace-[a-f0-9]{32})\.json$') {
+    throw 'Theme replacement journal has an invalid file name.'
+  }
+  $expectedBackupName = $Matches[1]
+  Assert-DreamSkinNoReparseComponents -Path $fullJournal
+  if (-not (Test-Path -LiteralPath $fullJournal -PathType Leaf -ErrorAction Stop)) {
+    throw 'Theme replacement journal is not a regular file.'
+  }
+  if ((Get-Item -LiteralPath $fullJournal -Force -ErrorAction Stop).Length -gt 16KB) {
+    throw 'Theme replacement journal exceeds the 16 KiB limit.'
+  }
+  try {
+    $journal = (Read-DreamSkinUtf8File -Path $fullJournal) |
+      ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw 'Theme replacement journal is not valid UTF-8 JSON.'
+  }
+  if ($null -eq $journal -or $journal -is [string] -or $journal -is [array] -or
+    $journal -is [System.ValueType]) {
+    throw 'Theme replacement journal must be an object.'
+  }
+  [string[]]$expectedProperties = @(
+    'schema', 'destinationName', 'backupName', 'stageName',
+    'oldFingerprint', 'newFingerprint', 'phase'
+  )
+  $actualProperties = @($journal.PSObject.Properties)
+  if ($actualProperties.Count -ne $expectedProperties.Count) {
+    throw 'Theme replacement journal has an unsupported schema.'
+  }
+  foreach ($property in $expectedProperties) {
+    if (@($actualProperties | Where-Object { $_.Name -ceq $property }).Count -ne 1) {
+      throw 'Theme replacement journal has an unsupported schema.'
+    }
+  }
+  if ($journal.schema -isnot [string] -or
+    $journal.schema -cne 'dreamskin-theme-replacement/1') {
+    throw 'Theme replacement journal uses an unsupported schema.'
+  }
+  if ($journal.destinationName -isnot [string] -or
+    $journal.backupName -isnot [string] -or
+    $journal.stageName -isnot [string] -or
+    $journal.oldFingerprint -isnot [string] -or
+    $journal.newFingerprint -isnot [string] -or
+    $journal.phase -isnot [string]) {
+    throw 'Theme replacement journal contains a field with the wrong type.'
+  }
+  $destinationName = $journal.destinationName
+  $backupName = $journal.backupName
+  $stageName = $journal.stageName
+  Assert-DreamSkinThemeReplacementLeafName -Value $destinationName -Label 'destination name'
+  Assert-DreamSkinThemeReplacementLeafName -Value $backupName -Label 'backup name'
+  Assert-DreamSkinThemeReplacementLeafName -Value $stageName -Label 'stage name'
+  if ($destinationName -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' -or
+    $destinationName.EndsWith('.') -or
+    (Test-DreamSkinWindowsReservedPathStem -Name $destinationName)) {
+    throw 'Theme replacement journal contains an invalid destination name.'
+  }
+  if ($backupName -cne $expectedBackupName -or
+    $backupName -cnotmatch '^\.theme-replace-[a-f0-9]{32}$') {
+    throw 'Theme replacement journal does not match its backup name.'
+  }
+  if ($stageName -cnotmatch '^\.theme-import-[a-f0-9]{32}$') {
+    throw 'Theme replacement journal contains an invalid stage name.'
+  }
+  $oldFingerprint = $journal.oldFingerprint
+  $newFingerprint = $journal.newFingerprint
+  if ($oldFingerprint -cnotmatch '^[a-f0-9]{64}$' -or
+    $newFingerprint -cnotmatch '^[a-f0-9]{64}$') {
+    throw 'Theme replacement journal contains an invalid semantic fingerprint.'
+  }
+  $phase = $journal.phase
+  if ($phase -notin @('prepared', 'old-moved', 'new-published', 'committed')) {
+    throw 'Theme replacement journal contains an invalid phase.'
+  }
+  $destination = Join-Path $fullSaved $destinationName
+  $backup = Join-Path $fullSaved $backupName
+  $stage = Join-Path $fullSaved $stageName
+  $commitMarker = Join-Path $fullSaved ($backupName + '.committed')
+  $commitTemporary = Join-Path $fullSaved ($backupName + '.commit.tmp')
+  foreach ($path in @($destination, $backup, $stage, $commitMarker, $commitTemporary)) {
+    Assert-DreamSkinNoReparseComponents -Path $path
+  }
+  return [pscustomobject]@{
+    Path = $fullJournal
+    Destination = $destination
+    Backup = $backup
+    Stage = $stage
+    DestinationName = $destinationName
+    BackupName = $backupName
+    StageName = $stageName
+    OldFingerprint = $oldFingerprint
+    NewFingerprint = $newFingerprint
+    Phase = $phase
+    CommitMarker = $commitMarker
+    CommitTemporary = $commitTemporary
+  }
+}
+
+function Get-DreamSkinThemeReplacementPathFingerprint {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  if (-not (Test-Path -LiteralPath $Path -ErrorAction Stop)) { return $null }
+  Assert-DreamSkinNoReparseComponents -Path $Path
+  if (-not (Test-Path -LiteralPath $Path -PathType Container -ErrorAction Stop)) {
+    throw "Theme replacement recovery is ambiguous: $Label is not a directory."
+  }
+  try {
+    return (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $Path)
+  } catch {
+    throw "Theme replacement recovery is ambiguous: $Label cannot be verified."
+  }
+}
+
+function Assert-DreamSkinThemeReplacementCommitMarker {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  Assert-DreamSkinNoReparseComponents -Path $Path
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf -ErrorAction Stop) -or
+    (Get-Item -LiteralPath $Path -Force -ErrorAction Stop).Length -gt 128 -or
+    (Read-DreamSkinUtf8File -Path $Path) -cne
+      ($script:DreamSkinThemeReplacementCommitText + "`n")) {
+    throw "$Label is invalid."
+  }
+}
+
+function Write-DreamSkinThemeReplacementCommitMarker {
+  param([Parameter(Mandatory = $true)]$Transaction)
+  if (Test-Path -LiteralPath $Transaction.CommitMarker -ErrorAction Stop) {
+    throw 'Theme replacement commit marker already exists.'
+  }
+  if (Test-Path -LiteralPath $Transaction.CommitTemporary -ErrorAction Stop) {
+    throw 'Theme replacement temporary commit marker already exists.'
+  }
+  Write-DreamSkinUtf8FileDurably -Path $Transaction.CommitTemporary `
+    -Content ($script:DreamSkinThemeReplacementCommitText + "`n")
+  Assert-DreamSkinThemeReplacementCommitMarker -Path $Transaction.CommitTemporary `
+    -Label 'Temporary theme replacement commit marker'
+  [System.IO.File]::Move($Transaction.CommitTemporary, $Transaction.CommitMarker)
+  $markerStream = [System.IO.FileStream]::new(
+    $Transaction.CommitMarker,
+    [System.IO.FileMode]::Open,
+    [System.IO.FileAccess]::ReadWrite,
+    [System.IO.FileShare]::Read,
+    4096,
+    [System.IO.FileOptions]::WriteThrough
+  )
+  try { $markerStream.Flush($true) } finally { $markerStream.Dispose() }
+  Assert-DreamSkinThemeReplacementCommitMarker -Path $Transaction.CommitMarker `
+    -Label 'Theme replacement commit marker'
+}
+
+function Remove-DreamSkinThemeReplacementCommitArtifactsVerified {
+  param([Parameter(Mandatory = $true)]$Transaction)
+  foreach ($record in @(
+      @{ Path = $Transaction.CommitTemporary; Label = 'Temporary theme replacement commit marker' },
+      @{ Path = $Transaction.CommitMarker; Label = 'Theme replacement commit marker' }
+    )) {
+    if (-not (Test-Path -LiteralPath $record.Path -ErrorAction Stop)) { continue }
+    Assert-DreamSkinThemeReplacementCommitMarker -Path $record.Path -Label $record.Label
+    [System.IO.File]::Delete([System.IO.Path]::GetFullPath($record.Path))
+    if (Test-Path -LiteralPath $record.Path -ErrorAction Stop) {
+      throw "$($record.Label) cleanup was not verified."
+    }
+  }
+}
+
+function Remove-DreamSkinThemeReplacementJournalVerified {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  Assert-DreamSkinNoReparseComponents -Path $Path
+  [System.IO.File]::Delete([System.IO.Path]::GetFullPath($Path))
+  if (Test-Path -LiteralPath $Path -ErrorAction Stop) {
+    throw 'Theme replacement journal cleanup was not verified.'
+  }
+}
+
+function Repair-DreamSkinThemeReplacementTransactions {
+  param([Parameter(Mandatory = $true)]$Paths)
+  $journals = @(Get-ChildItem -LiteralPath $Paths.Saved -File -Force -ErrorAction Stop |
+    Where-Object { $_.Name -cmatch '^\.theme-replace-[a-f0-9]{32}\.json$' } |
+    Sort-Object Name)
+  $transactions = [System.Collections.Generic.List[object]]::new()
+  $destinations = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  foreach ($journalFile in $journals) {
+    $transaction = Read-DreamSkinThemeReplacementJournal `
+      -Paths $Paths -JournalPath $journalFile.FullName
+    if (-not $destinations.Add($transaction.DestinationName)) {
+      throw "Multiple theme replacement transactions target $($transaction.DestinationName)."
+    }
+    $transactions.Add($transaction)
+  }
+
+  foreach ($transaction in $transactions) {
+    $backupFingerprint = Get-DreamSkinThemeReplacementPathFingerprint `
+      -Path $transaction.Backup -Label 'the canonical backup'
+    if ($null -ne $backupFingerprint -and
+      $backupFingerprint -cne $transaction.OldFingerprint) {
+      throw 'Theme replacement recovery is ambiguous: the backup fingerprint changed.'
+    }
+
+    $destinationFingerprint = $null
+    $destinationFingerprintError = $null
+    try {
+      $destinationFingerprint = Get-DreamSkinThemeReplacementPathFingerprint `
+        -Path $transaction.Destination -Label 'the canonical destination'
+    } catch {
+      # A corrupt, uncommitted candidate must not strand the verified old theme
+      # in its hidden backup. Reparse points and non-directories remain fail-closed.
+      Assert-DreamSkinNoReparseComponents -Path $transaction.Destination
+      if (-not (Test-Path -LiteralPath $transaction.Destination `
+          -PathType Container -ErrorAction Stop)) {
+        throw
+      }
+      $destinationFingerprintError = $_.Exception
+    }
+
+    $commitMarkerExists = Test-Path -LiteralPath $transaction.CommitMarker -ErrorAction Stop
+    $commitTemporaryExists = Test-Path -LiteralPath $transaction.CommitTemporary -ErrorAction Stop
+    if ($commitMarkerExists) {
+      if ($transaction.Phase -cne 'committed') {
+        throw 'Theme replacement recovery is ambiguous: commit marker and journal phase disagree.'
+      }
+      if ($commitTemporaryExists) {
+        throw 'Theme replacement recovery is ambiguous: committed transaction retained a temporary marker.'
+      }
+      Assert-DreamSkinThemeReplacementCommitMarker -Path $transaction.CommitMarker `
+        -Label 'Theme replacement commit marker'
+      if ($destinationFingerprintError) { throw $destinationFingerprintError }
+      if ($null -eq $destinationFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: committed destination is missing.'
+      }
+      if ($destinationFingerprint -cne $transaction.NewFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: committed destination fingerprint changed.'
+      }
+      $stageFingerprint = Get-DreamSkinThemeReplacementPathFingerprint `
+        -Path $transaction.Stage -Label 'the staged replacement'
+      if ($null -ne $stageFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: committed transaction retained a staged replacement.'
+      }
+      if ($null -ne $backupFingerprint) {
+        Remove-DreamSkinManagedDirectoryVerified -Path $transaction.Backup -Root $Paths.Root
+      }
+      Remove-DreamSkinThemeReplacementJournalVerified -Path $transaction.Path
+      Remove-DreamSkinThemeReplacementCommitArtifactsVerified -Transaction $transaction
+      continue
+    }
+    if ($commitTemporaryExists) {
+      Assert-DreamSkinThemeReplacementCommitMarker -Path $transaction.CommitTemporary `
+        -Label 'Temporary theme replacement commit marker'
+    }
+
+    if ($destinationFingerprintError) {
+      if ($backupFingerprint -cne $transaction.OldFingerprint) {
+        throw $destinationFingerprintError
+      }
+      if (Test-Path -LiteralPath $transaction.Stage -ErrorAction Stop) {
+        throw 'Theme replacement recovery is ambiguous: both candidate evidence paths exist.'
+      }
+      [System.IO.Directory]::Move($transaction.Destination, $transaction.Stage)
+      [System.IO.Directory]::Move($transaction.Backup, $transaction.Destination)
+      Assert-DreamSkinRestoredThemeFingerprint -Path $transaction.Destination `
+        -ExpectedFingerprint $transaction.OldFingerprint -Label 'Canonical saved theme'
+      throw 'Theme replacement recovery is ambiguous: the published replacement cannot be verified.'
+    }
+
+    if ($null -eq $destinationFingerprint) {
+      if ($backupFingerprint -cne $transaction.OldFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: the destination and verified backup are missing.'
+      }
+      [System.IO.Directory]::Move($transaction.Backup, $transaction.Destination)
+      Assert-DreamSkinRestoredThemeFingerprint -Path $transaction.Destination `
+        -ExpectedFingerprint $transaction.OldFingerprint -Label 'Canonical saved theme'
+      # The old canonical is restored before touching the candidate. A corrupt
+      # candidate must never keep the user's verified theme missing.
+      $stageFingerprint = Get-DreamSkinThemeReplacementPathFingerprint `
+        -Path $transaction.Stage -Label 'the staged replacement'
+      if ($null -eq $stageFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: the staged replacement is missing.'
+      }
+      if ($stageFingerprint -cne $transaction.NewFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: the staged replacement fingerprint changed.'
+      }
+      Remove-DreamSkinManagedDirectoryVerified -Path $transaction.Stage -Root $Paths.Root
+      Remove-DreamSkinThemeReplacementCommitArtifactsVerified -Transaction $transaction
+      Remove-DreamSkinThemeReplacementJournalVerified -Path $transaction.Path
+      continue
+    }
+
+    if ($null -ne $backupFingerprint) {
+      if ($destinationFingerprint -cne $transaction.NewFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: canonical content does not match the journal.'
+      }
+      if (Test-Path -LiteralPath $transaction.Stage -ErrorAction Stop) {
+        Remove-DreamSkinManagedDirectoryVerified -Path $transaction.Destination -Root $Paths.Root
+      } else {
+        [System.IO.Directory]::Move($transaction.Destination, $transaction.Stage)
+      }
+      [System.IO.Directory]::Move($transaction.Backup, $transaction.Destination)
+      Assert-DreamSkinRestoredThemeFingerprint -Path $transaction.Destination `
+        -ExpectedFingerprint $transaction.OldFingerprint -Label 'Canonical saved theme'
+      $stageFingerprint = Get-DreamSkinThemeReplacementPathFingerprint `
+        -Path $transaction.Stage -Label 'the staged replacement'
+      if ($null -eq $stageFingerprint -or
+        $stageFingerprint -cne $transaction.NewFingerprint) {
+        throw 'Theme replacement recovery is ambiguous: the staged replacement fingerprint changed.'
+      }
+      Remove-DreamSkinManagedDirectoryVerified -Path $transaction.Stage -Root $Paths.Root
+      Remove-DreamSkinThemeReplacementCommitArtifactsVerified -Transaction $transaction
+      Remove-DreamSkinThemeReplacementJournalVerified -Path $transaction.Path
+      continue
+    }
+
+    if ($destinationFingerprint -ceq $transaction.OldFingerprint) {
+      $stageFingerprint = Get-DreamSkinThemeReplacementPathFingerprint `
+        -Path $transaction.Stage -Label 'the staged replacement'
+      if ($null -ne $stageFingerprint) {
+        if ($stageFingerprint -cne $transaction.NewFingerprint) {
+          throw 'Theme replacement recovery is ambiguous: the staged replacement fingerprint changed.'
+        }
+        Remove-DreamSkinManagedDirectoryVerified -Path $transaction.Stage -Root $Paths.Root
+      }
+      Remove-DreamSkinThemeReplacementCommitArtifactsVerified -Transaction $transaction
+      Remove-DreamSkinThemeReplacementJournalVerified -Path $transaction.Path
+      continue
+    }
+
+    throw 'Theme replacement recovery is ambiguous: canonical content does not match the journal.'
+  }
+}
+
+function Invoke-DreamSkinThemeReplacementRecovery {
+  param([Parameter(Mandatory = $true)]$Paths)
+  $mutex = New-DreamSkinThemeImportMutex
+  $acquired = $false
+  try {
+    try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
+    if (-not $acquired) { throw 'Another theme import is still running; replacement recovery is deferred.' }
+    Repair-DreamSkinThemeReplacementTransactions -Paths $Paths
+  } finally {
+    if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
+    $mutex.Dispose()
+  }
+}
+
 function Import-DreamSkinThemeZip {
   param(
     [Parameter(Mandatory = $true)][string]$ArchivePath,
@@ -1276,14 +1733,14 @@ function Import-DreamSkinThemeZip {
   foreach ($directory in @($paths.Root, $paths.Saved)) {
     Ensure-DreamSkinManagedDirectory -Path $directory -Root $paths.Root
   }
-  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-  $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.ThemeImport")
+  $mutex = New-DreamSkinThemeImportMutex
   $acquired = $false
   $workRoot = Join-Path $paths.Root ('.theme-import-work-' + [guid]::NewGuid().ToString('N'))
   $publishStage = $null
   try {
     try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
     if (-not $acquired) { throw 'Another theme import is still running; try again shortly.' }
+    Repair-DreamSkinThemeReplacementTransactions -Paths $paths
     Ensure-DreamSkinManagedDirectory -Path $workRoot -Root $paths.Root
     $extractRoot = Join-Path $workRoot 'extracted'
     Ensure-DreamSkinManagedDirectory -Path $extractRoot -Root $paths.Root
@@ -1477,61 +1934,57 @@ function Import-DreamSkinThemeZip {
 
     $destination = Join-Path $paths.Saved $id
     $backup = $null
+    $replacementJournalPath = $null
+    $replacementJournal = $null
+    $replacementTransaction = $null
     $publishedDestination = $false
-    $legacyCleanupBackups = [System.Collections.Generic.List[object]]::new()
     try {
       if ($replaceExisting) {
-        $backup = Join-Path $paths.Saved ('.theme-replace-' + [guid]::NewGuid().ToString('N'))
+        $replacementToken = [guid]::NewGuid().ToString('N')
+        $backupName = '.theme-replace-' + $replacementToken
+        $backup = Join-Path $paths.Saved $backupName
+        $replacementJournalPath = Join-Path $paths.Saved ($backupName + '.json')
+        $replacementJournal = [pscustomobject][ordered]@{
+          schema = 'dreamskin-theme-replacement/1'
+          destinationName = [System.IO.Path]::GetFileName($destination)
+          backupName = $backupName
+          stageName = [System.IO.Path]::GetFileName($publishStage)
+          oldFingerprint = $canonicalFingerprint
+          newFingerprint = $fingerprint
+          phase = 'prepared'
+        }
+        Write-DreamSkinThemeReplacementJournal -Paths $paths `
+          -JournalPath $replacementJournalPath -Journal $replacementJournal
+        $replacementTransaction = Read-DreamSkinThemeReplacementJournal `
+          -Paths $paths -JournalPath $replacementJournalPath
         Assert-DreamSkinNoReparseComponents -Path $destination
         [System.IO.Directory]::Move($destination, $backup)
+        $replacementJournal.phase = 'old-moved'
+        Write-DreamSkinThemeReplacementJournal -Paths $paths `
+          -JournalPath $replacementJournalPath -Journal $replacementJournal
       }
       [System.IO.Directory]::Move($publishStage, $destination)
       $publishedDestination = $true
       $publishStage = $null
+      if ($replacementJournal) {
+        $replacementJournal.phase = 'new-published'
+        Write-DreamSkinThemeReplacementJournal -Paths $paths `
+          -JournalPath $replacementJournalPath -Journal $replacementJournal
+      }
       $publishedFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $destination
       if ($publishedFingerprint -cne $fingerprint) {
         throw 'Published theme content does not match the validated import payload.'
       }
       $contentFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $destination
-      foreach ($legacy in $legacyCleanupRecords) {
-        if ($legacy.EntryName -ceq $id) { continue }
-        Assert-DreamSkinNoReparseComponents -Path $legacy.Directory
-        if (Test-Path -LiteralPath $legacy.Directory -PathType Container) {
-          $cleanupBackup = Join-Path $paths.Saved (
-            '.theme-legacy-cleanup-' + [guid]::NewGuid().ToString('N')
-          )
-          $null = $legacyCleanupBackups.Add([pscustomobject]@{
-            Original = $legacy.Directory
-            Backup = $cleanupBackup
-            Fingerprint = $legacy.Fingerprint
-          })
-          [System.IO.Directory]::Move($legacy.Directory, $cleanupBackup)
-        }
+      if ($replacementJournal) {
+        $replacementJournal.phase = 'committed'
+        Write-DreamSkinThemeReplacementJournal -Paths $paths `
+          -JournalPath $replacementJournalPath -Journal $replacementJournal
+        Write-DreamSkinThemeReplacementCommitMarker -Transaction $replacementTransaction
       }
     } catch {
       $publishError = $_.Exception
       $rollbackErrors = [System.Collections.Generic.List[string]]::new()
-      for ($cleanupIndex = $legacyCleanupBackups.Count - 1; $cleanupIndex -ge 0; $cleanupIndex--) {
-        $cleanup = $legacyCleanupBackups[$cleanupIndex]
-        try {
-          $backupExists = Test-Path -LiteralPath $cleanup.Backup -PathType Container -ErrorAction Stop
-          $originalExists = Test-Path -LiteralPath $cleanup.Original -ErrorAction Stop
-          if ($backupExists) {
-            if ($originalExists) { throw 'original cleanup path already exists' }
-            [System.IO.Directory]::Move($cleanup.Backup, $cleanup.Original)
-          }
-          if (Test-Path -LiteralPath $cleanup.Backup -ErrorAction Stop) {
-            throw 'cleanup backup remains after restore'
-          }
-          if (-not (Test-Path -LiteralPath $cleanup.Original -PathType Container -ErrorAction Stop)) {
-            throw 'original cleanup directory was not restored'
-          }
-          Assert-DreamSkinRestoredThemeFingerprint -Path $cleanup.Original `
-            -ExpectedFingerprint $cleanup.Fingerprint -Label "Legacy saved theme $($cleanup.Original)"
-        } catch {
-          $null = $rollbackErrors.Add(('{0}: {1}' -f $cleanup.Original, $_.Exception.Message))
-        }
-      }
       if ($publishedDestination) {
         try {
           if (Test-Path -LiteralPath $destination -ErrorAction Stop) {
@@ -1575,26 +2028,56 @@ function Import-DreamSkinThemeZip {
           $null = $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
         }
       }
+      if ($replacementJournalPath -and $rollbackErrors.Count -eq 0) {
+        try {
+          if ($replacementTransaction) {
+            Remove-DreamSkinThemeReplacementCommitArtifactsVerified `
+              -Transaction $replacementTransaction
+          }
+          Remove-DreamSkinThemeReplacementJournalVerified -Path $replacementJournalPath
+        } catch {
+          $null = $rollbackErrors.Add("replacement journal: $($_.Exception.Message)")
+        }
+      }
       if ($rollbackErrors.Count -gt 0) {
         throw "$($publishError.Message); import rollback was not verified: $($rollbackErrors -join '; ')"
       }
       throw $publishError
     }
+    $cleanupErrors = [System.Collections.Generic.List[string]]::new()
+    if ($replacementTransaction) {
+      try {
+        # The commit marker remains until the verified old backup is gone. If
+        # cleanup stops here, the next locked recovery retains the new theme.
+        if ($backup) {
+          Remove-DreamSkinManagedDirectoryVerified -Path $backup -Root $paths.Root
+        }
+        Remove-DreamSkinThemeReplacementJournalVerified -Path $replacementJournalPath
+        Remove-DreamSkinThemeReplacementCommitArtifactsVerified `
+          -Transaction $replacementTransaction
+      } catch {
+        $null = $cleanupErrors.Add($_.Exception.Message)
+      }
+    }
+    # Legacy exact-duplicate cleanup is post-commit and warning-only. It cannot
+    # roll back a canonical replacement that already passed final validation.
+    foreach ($legacy in $legacyCleanupRecords) {
+      if ($legacy.EntryName -ceq $id) { continue }
+      $cleanupBackup = Join-Path $paths.Saved (
+        '.theme-legacy-cleanup-' + [guid]::NewGuid().ToString('N')
+      )
+      try {
+        Assert-DreamSkinNoReparseComponents -Path $legacy.Directory
+        if (-not (Test-Path -LiteralPath $legacy.Directory -PathType Container)) { continue }
+        [System.IO.Directory]::Move($legacy.Directory, $cleanupBackup)
+        Remove-DreamSkinManagedDirectoryVerified -Path $cleanupBackup -Root $paths.Root
+      } catch {
+        $null = $cleanupErrors.Add($_.Exception.Message)
+      }
+    }
     $cleanupWarning = $null
-    try {
-      foreach ($cleanup in $legacyCleanupBackups) {
-        Remove-DreamSkinManagedDirectoryVerified -Path $cleanup.Backup -Root $paths.Root
-      }
-      # Keep the canonical backup until every legacy cleanup has succeeded. It
-      # is the last recovery copy to be discarded on a successful import.
-      if ($backup) {
-        Remove-DreamSkinManagedDirectoryVerified -Path $backup -Root $paths.Root
-      }
-    } catch {
-      # The destination has already passed its final fingerprint check and the
-      # publish transaction is committed. A stale recovery copy is a cleanup
-      # warning, not grounds to roll back or report the import itself as failed.
-      $cleanupWarning = "Imported theme backup cleanup was not verified: $($_.Exception.Message)"
+    if ($cleanupErrors.Count -gt 0) {
+      $cleanupWarning = "Imported theme backup cleanup was not verified: $($cleanupErrors -join '; ')"
     }
     $name = if ($theme.name) { "$($theme.name)" } else { $id }
     $nameCollision = $false
@@ -1641,19 +2124,29 @@ function Get-DreamSkinSavedThemes {
   Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
   Ensure-DreamSkinManagedDirectory -Path $paths.Saved -Root $paths.Root
   if (-not (Test-Path -LiteralPath $paths.Saved -PathType Container)) { return @() }
-  $themes = @()
-  foreach ($directory in Get-ChildItem -LiteralPath $paths.Saved -Directory -ErrorAction SilentlyContinue) {
-    if ($directory.Name.StartsWith('.')) { continue }
-    try {
-      $loaded = Read-DreamSkinTheme -ThemeDirectory $directory.FullName -SkipImageMetadata:$SkipImageMetadata
-      $themes += [pscustomobject]@{
-        Id = "$($loaded.Theme.id)"
-        Name = if ($loaded.Theme.name) { "$($loaded.Theme.name)" } else { $directory.Name }
-        Path = $directory.FullName
-      }
-    } catch {}
+  $mutex = New-DreamSkinThemeImportMutex
+  $acquired = $false
+  try {
+    try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
+    if (-not $acquired) { throw 'Another theme import is still running; saved themes cannot be scanned safely.' }
+    Repair-DreamSkinThemeReplacementTransactions -Paths $paths
+    $themes = @()
+    foreach ($directory in Get-ChildItem -LiteralPath $paths.Saved -Directory -ErrorAction SilentlyContinue) {
+      if ($directory.Name.StartsWith('.')) { continue }
+      try {
+        $loaded = Read-DreamSkinTheme -ThemeDirectory $directory.FullName -SkipImageMetadata:$SkipImageMetadata
+        $themes += [pscustomobject]@{
+          Id = "$($loaded.Theme.id)"
+          Name = if ($loaded.Theme.name) { "$($loaded.Theme.name)" } else { $directory.Name }
+          Path = $directory.FullName
+        }
+      } catch {}
+    }
+    return @($themes | Sort-Object Name)
+  } finally {
+    if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
+    $mutex.Dispose()
   }
-  return @($themes | Sort-Object Name)
 }
 
 function Use-DreamSkinSavedTheme {
