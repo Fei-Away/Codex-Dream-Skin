@@ -3,6 +3,12 @@ import fs from "node:fs/promises";
 import { gradeDoctorResult, selectorMatchesScope } from "./doctor-selectors.mjs";
 
 const contract = JSON.parse(await fs.readFile(new URL("./selectors.json", import.meta.url), "utf8"));
+const shellMain = contract.selectors.find(({ key }) => key === "shell-main");
+assert.equal(
+  shellMain?.selector,
+  "main:is(.main-surface, [data-app-shell-main-surface])",
+  "The shell contract must support both legacy and Codex 26.727 main surfaces without a broad tag fallback.",
+);
 const resultFor = (baseState, hits, overlay = false) => gradeDoctorResult(contract, {
   baseState,
   overlay,

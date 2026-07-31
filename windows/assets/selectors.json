@@ -1,16 +1,17 @@
 {
   "schema": "codex-dream-skin-selectors/1",
-  "description": "双端统一选择器契约（初稿）。scope 与 required 均来自 2026-07-21 双端 DOM 快照实测，非猜测。doctor / CI 应逐条 querySelector 并按 tier 判级：L1 缺失=皮肤主行为受损，L2 缺失=精修静默降级。",
+  "description": "双端统一选择器契约。scope 与 required 来自 2026-07-21 双端 DOM 快照实测；shell-main 另由 2026-07-31 Codex 26.727.40816 签名安装包静态复核。doctor / CI 应逐条 querySelector 并按 tier 判级：L1 缺失=皮肤主行为受损，L2 缺失=精修静默降级。",
   "verifiedAgainst": {
-    "date": "2026-07-21",
-    "chromium": "150.0.7871.124",
-    "codexVersionMac": "26.715.61943",
+    "date": "2026-07-31",
+    "chromium": "150.0.7871.124（实机快照）；150.0.7871.182（签名安装包 shell-main 静态复核）",
+    "codexVersionMac": "26.715.61943（实机快照）；26.727.40816（签名安装包 shell-main 静态复核）",
     "codexVersionWindows": "版本号未记录；bundle hash 与 mac 不同（ModelPickerTrigger mac=1fm6a win=1w4ob），确认存在版本错位",
     "fixtures": [
       "runtime/dom-fixtures/codex-dom-fixture-darwin-watch.json (15 状态)",
-      "runtime/dom-fixtures/codex-dom-fixture-win32-watch.json (7 状态)"
+      "runtime/dom-fixtures/codex-dom-fixture-win32-watch.json (7 状态)",
+      "Codex 26.727.40816 signed macOS app.asar (shell-main attribute contract)"
     ],
-    "verdict": "双端 DOM 同源：锚点语义、状态作用域、testid、模块命名一致；差异均可归因于版本错位或用户配置，非平台分叉"
+    "verdict": "双端 DOM 同源。26.727.40816 将主表面类改为 CSS Module，同时新增 data-app-shell-main-surface；shell-main 兼容旧类和新稳定属性，其余锚点仍以实机快照为准"
   },
   "appearanceSignal": {
     "dark": "html.electron-dark",
@@ -26,7 +27,7 @@
     "config": "依赖用户配置才出现（如未配置项目则无项目选择器）"
   },
   "selectors": [
-    { "key": "shell-main", "selector": "main.main-surface", "tier": "L1", "scope": "all", "required": true, "notes": "全局主表面。mac 设置页缺失（win 存在），缺失时整页仅 L0" },
+    { "key": "shell-main", "selector": "main:is(.main-surface, [data-app-shell-main-surface])", "tier": "L1", "scope": "all", "required": true, "notes": "全局主表面。26.727.40816 将旧 main-surface 类改为 CSS Module，但提供 data-app-shell-main-surface 稳定属性；保留旧类兼容历史版本。mac 设置页缺失（win 存在），缺失时整页仅 L0" },
     { "key": "left-panel", "selector": "aside.app-shell-left-panel", "tier": "L1", "scope": "all", "required": true, "notes": "左侧栏；收起/重建时会移除节点，勿在其消失时清皮" },
     { "key": "header-tint", "selector": "header.app-header-tint", "tier": "L1", "scope": "all", "required": true, "notes": "顶栏；皮肤不得覆盖其 position/z-index（既有回归约束）" },
     { "key": "home-icon", "selector": "[data-testid=\"home-icon\"]", "tier": "L1", "scope": "home", "required": true, "notes": "首页判定信号，双端一致" },

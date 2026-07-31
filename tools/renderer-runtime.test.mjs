@@ -88,7 +88,7 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     partFixtures.composer = makeDomNode("composer", partFixtures.main);
     partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
     register("aside.app-shell-left-panel", partFixtures.sidebar);
-    register("main.main-surface", partFixtures.main);
+    register("main:is(.main-surface, [data-app-shell-main-surface])", partFixtures.main);
     register("header.app-header-tint", partFixtures.header);
     register('[data-testid="home-icon"]', partFixtures.homeIcon);
     register('[role="main"]:has([data-testid="home-icon"])', partFixtures.home);
@@ -255,8 +255,8 @@ export async function runRendererRuntimeTest(assetRoot) {
   // Home gating must stay single-level: CSS forbids :has() inside :has(),
   // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
-  assert.match(css, /main\.main-surface:has\(\[role="main"\]\)/);
-  assert.match(css, /main\.main-surface:not\(:has\(\[role="main"\]\)\)/);
+  assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\]\):has\(\[role="main"\]\)/);
+  assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\]\):not\(:has\(\[role="main"\]\)\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
   assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
   assert.match(css, /content:\s*var\(--dream-skin-status/);

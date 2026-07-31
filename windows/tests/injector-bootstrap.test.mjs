@@ -8,6 +8,7 @@ import { earlyPayloadFor } from "../scripts/injector.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
+const shellSelector = "main:is(.main-surface, [data-app-shell-main-surface])";
 
 function createFixture() {
   const domReady = [];
@@ -15,7 +16,15 @@ function createFixture() {
   const intervals = new Map();
   let nextTimer = 1;
   let nextInterval = 1;
-  const markers = { shell: false, sidebar: false, main: false, settings: false };
+  const markers = {
+    shell: false,
+    currentShell: false,
+    sidebar: false,
+    main: false,
+    settings: false,
+    genericMain: false,
+    genericInput: false,
+  };
   let root = {};
   let body = {};
   const context = {
@@ -26,9 +35,12 @@ function createFixture() {
       get body() { return body; },
       addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
       querySelector(selector) {
-        if (selector === "main.main-surface") return markers.shell ? {} : null;
+        if (selector === shellSelector) return markers.shell || markers.currentShell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
         if (selector === "[role=\"main\"]") return markers.main ? {} : null;
+        if (selector === "main, [role=\"main\"]") return markers.genericMain ? {} : null;
+        if (selector.includes("textarea") || selector.includes("contenteditable") ||
+          selector.includes("textbox")) return markers.genericInput ? {} : null;
         if (selector.includes("appearance-theme") || selector.includes("theme-preview")) {
           return markers.settings ? {} : null;
         }
@@ -51,6 +63,7 @@ function createFixture() {
   return {
     context,
     markers,
+    brandAsCodex() { body = { innerText: "Codex" }; },
     makeNotReady() { root = null; body = null; },
     makeReady() { root = {}; body = {}; },
     fireDomReady() { for (const callback of [...domReady]) callback(); },
@@ -69,6 +82,26 @@ assert.deepEqual(guarded.context.window.installs, [], "A shell without its sideb
 guarded.markers.sidebar = true;
 guarded.tick();
 assert.deepEqual(guarded.context.window.installs, ["guarded"]);
+
+const currentShell = createFixture();
+vm.runInNewContext(earlyPayloadFor('window.installs.push("current")', "current"), currentShell.context);
+currentShell.markers.currentShell = true;
+currentShell.tick();
+assert.deepEqual(currentShell.context.window.installs, [],
+  "The 26.727 shell attribute alone must not bypass sidebar identity.");
+currentShell.markers.sidebar = true;
+currentShell.tick();
+assert.deepEqual(currentShell.context.window.installs, ["current"],
+  "The 26.727 stable shell attribute plus the native sidebar must identify Codex.");
+
+const auxiliary = createFixture();
+vm.runInNewContext(earlyPayloadFor('window.installs.push("auxiliary")', "auxiliary"), auxiliary.context);
+auxiliary.markers.genericMain = true;
+auxiliary.markers.genericInput = true;
+auxiliary.brandAsCodex();
+auxiliary.tick();
+assert.deepEqual(auxiliary.context.window.installs, [],
+  "Generic app:// main/input surfaces must remain outside the injection boundary.");
 
 const generations = createFixture();
 generations.makeNotReady();
@@ -103,5 +136,10 @@ assert.match(source, /if \(!fallbackTargets\.get\(id\)\) return;/,
   "Fallback listeners must stay inert after a successful early registration.");
 assert.match(source, /Page\.removeScriptToEvaluateOnNewDocument/,
   "Watcher shutdown and theme refresh must unregister persistent Page scripts.");
+const probeStartBoundary = source.indexOf("async function probeSession");
+const probeEndBoundary = source.indexOf("async function waitForCodexProbe", probeStartBoundary);
+const probeSource = source.slice(probeStartBoundary, probeEndBoundary);
+assert.doesNotMatch(probeSource, /textarea|contenteditable|role=.textbox|genericCodexSurface/,
+  "Renderer identity probing must not fall back to arbitrary main/input surfaces.");
 
 console.log("PASS: Windows early injection is L0-ready, generation-safe, ordered before probing, and fallback-scoped.");

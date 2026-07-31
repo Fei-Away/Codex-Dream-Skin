@@ -1,5 +1,38 @@
 # Task Progress
 
+Updated: 2026-07-31 14:20 CST (Asia/Shanghai)
+
+## Issue #322 Selector Contract Compatibility
+
+- [complete] Created fork `alucard210319/Codex-Dream-Skin` and branch
+  `codex/fix-322-selector-contract` from `origin/main@cd71dfd`.
+- [complete] Confirmed the signed macOS Codex 26.727.40816 bundle replaced the
+  legacy `main.main-surface` class with a CSS-module class while exposing the
+  stable `data-app-shell-main-surface="default"` attribute. Sidebar, composer,
+  and home identity markers remain present.
+- [complete] Updated the canonical `shell-main` selector to the single,
+  composable selector
+  `main:is(.main-surface, [data-app-shell-main-surface])`. This retains older
+  Codex compatibility without accepting arbitrary `main + input` app targets.
+- [complete] Added macOS and Windows bootstrap coverage for the 26.727 shell
+  attribute and a negative auxiliary `app://` target with generic main/input
+  structure.
+- [complete] Synchronized the shared runtime assets. macOS selector doctor,
+  renderer/bootstrap/readiness, nested-`:has()` and portable shell checks pass;
+  the complete portable Windows Node suite passes 18/18. Static shell/Node
+  syntax, payload, version, encoding, runtime-safety, asset-sync, and
+  `git diff --check` checks pass.
+- [verified] GitNexus reports LOW upstream risk for both platform
+  `probeSession` flows: two direct callers per platform, limited to one scripts
+  module and the existing one-shot/watch paths. Regression coverage exercises
+  both current-shell acceptance and auxiliary-target rejection.
+- [blocked locally] The remaining full macOS runner reaches an unrelated native
+  Swift compiler step, then stops because the installed Command Line Tools SDK
+  was built with Swift 6.3.2 while the active compiler is 6.3.3. GitHub's
+  matching Xcode runner remains the authoritative native result.
+- [in progress] Review and stage the exact diff, then commit, push, open an
+  upstream PR linked to #322, and verify GitHub CI.
+
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
