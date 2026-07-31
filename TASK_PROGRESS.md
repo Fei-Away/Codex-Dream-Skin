@@ -1,5 +1,18 @@
 # Task Progress
 
+## Codex 26.727 Selector Compatibility (2026-07-31)
+
+- [complete] Reproduced on macOS Codex `26.727.40816`: the renderer uses
+  `_MainContentSurface_*` and `_Header_*` CSS Module classes instead of the
+  legacy `main.main-surface` and `header.app-header-tint` anchors.
+- [complete] Updated the shared selector contract with prefix-only fallbacks,
+  regenerated both platform assets, and added renderer/doctor/Windows assertions.
+- [verified] Asset synchronization/check, selector doctor, renderer runtime,
+  nested-`:has()` CSS coverage, and both platform payload checks pass locally.
+  The full portable suites reach unrelated Node 24 bootstrap timing failures;
+  Windows one-shot coverage also cannot bind `127.0.0.1` in this sandbox.
+- [in progress] Review the final diff, commit, push, and open a draft PR.
+
 Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)

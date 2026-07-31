@@ -3,6 +3,17 @@ import fs from "node:fs/promises";
 import { gradeDoctorResult, selectorMatchesScope } from "./doctor-selectors.mjs";
 
 const contract = JSON.parse(await fs.readFile(new URL("./selectors.json", import.meta.url), "utf8"));
+const selectorFor = (key) => contract.selectors.find((entry) => entry.key === key)?.selector;
+assert.equal(
+  selectorFor("shell-main"),
+  ':is(main.main-surface, main[class*="_MainContentSurface_"])',
+);
+assert.equal(
+  selectorFor("header-tint"),
+  ':is(header.app-header-tint, header[class*="_Header_"])',
+);
+assert.doesNotMatch(selectorFor("shell-main"), /_[A-Za-z]+_[a-z0-9]{4,}/);
+assert.doesNotMatch(selectorFor("header-tint"), /_[A-Za-z]+_[a-z0-9]{4,}/);
 const resultFor = (baseState, hits, overlay = false) => gradeDoctorResult(contract, {
   baseState,
   overlay,
