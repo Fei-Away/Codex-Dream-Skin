@@ -18,6 +18,10 @@
   const PAYLOAD_REVISION = __DREAM_SKIN_PAYLOAD_REVISION_JSON__;
   const THEME = themeConfig && typeof themeConfig === "object" ? themeConfig : {};
   const ART = THEME.art && typeof THEME.art === "object" ? THEME.art : {};
+  const UI = THEME.ui && typeof THEME.ui === "object" ? THEME.ui : {};
+  const SIDEBAR_UI = UI.sidebar && typeof UI.sidebar === "object" ? UI.sidebar : {};
+  const PROJECT_ICONS = UI.projectIcons && typeof UI.projectIcons === "object"
+    ? UI.projectIcons : {};
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
     ? THEME.artMetadata : null;
   const ANALYSIS_CACHE_KEY = "__CODEX_DREAM_SKIN_ANALYSIS_CACHE__";
@@ -569,6 +573,15 @@
   };
 
   const partNodes = new Set();
+  const uiNodes = new Set();
+  const UI_ATTRIBUTES = [
+    "data-dream-ui-role",
+    "data-dream-ui-button",
+    "data-dream-label",
+    "data-dream-glyph",
+    "data-dream-icon-kind",
+    "data-dream-project-state",
+  ];
   const queryAll = (selector) => {
     if (!selector) return [];
     try { return [...document.querySelectorAll(selector)]; } catch { return []; }
@@ -580,6 +593,137 @@
         desired.set(node, part);
       }
     }
+  };
+  const clearVisualNode = (node) => {
+    for (const attribute of UI_ATTRIBUTES) node.removeAttribute?.(attribute);
+    node.style?.removeProperty("--dream-skin-nav-image");
+    node.style?.removeProperty("--dream-skin-project-image");
+  };
+  const markVisualNode = (desired, node, attributes = {}, styles = {}) => {
+    if (!node) return;
+    desired.add(node);
+    for (const [name, value] of Object.entries(attributes)) {
+      if (typeof value === "string" && value) setAttribute(node, name, value);
+    }
+    for (const [name, value] of Object.entries(styles)) {
+      if (typeof value === "string" && value) setStyleProperty(node, name, value);
+    }
+  };
+  const normalizedNativeLabel = (value) => String(value || "").replace(/\s+/g, " ").trim();
+  const findButtonByNativeLabel = (buttons, labels) => buttons.find((button) =>
+    labels.includes(normalizedNativeLabel(button.textContent)));
+  const applySidebarButtonOverride = (desired, button, role, spec, workspace = false) => {
+    if (!button || !spec || typeof spec !== "object") return;
+    markVisualNode(desired, button, { "data-dream-ui-button": role });
+    const label = workspace
+      ? button.querySelector?.("span.truncate") || button.querySelector?.("span")
+      : button.querySelector?.(".text-fade-truncate");
+    if (spec.label) {
+      markVisualNode(desired, label, {
+        "data-dream-ui-role": workspace ? "workspace-label" : "nav-label",
+        "data-dream-label": spec.label,
+      });
+    }
+    if (spec.iconDataUrl) {
+      if (workspace) {
+        markVisualNode(desired, label, {
+          "data-dream-ui-role": "workspace-label",
+          "data-dream-icon-kind": "image",
+        }, {
+          "--dream-skin-nav-image": `url("${spec.iconDataUrl}")`,
+        });
+        return;
+      }
+      const icon = button.querySelector?.("svg")?.parentElement;
+      markVisualNode(desired, icon, {
+        "data-dream-ui-role": "nav-icon",
+        "data-dream-icon-kind": "image",
+      }, {
+        "--dream-skin-nav-image": `url("${spec.iconDataUrl}")`,
+      });
+      return;
+    }
+    if (!spec.glyph) return;
+    if (workspace) {
+      markVisualNode(desired, label, {
+        "data-dream-ui-role": "workspace-label",
+        "data-dream-glyph": spec.glyph,
+      });
+      return;
+    }
+    const icon = button.querySelector?.("svg")?.parentElement;
+    markVisualNode(desired, icon, {
+      "data-dream-ui-role": "nav-icon",
+      "data-dream-glyph": spec.glyph,
+    });
+  };
+  const refreshVisualOverrides = () => {
+    const desired = new Set();
+    const sidebar = selectorNodes("left-panel")[0];
+    if (sidebar && Object.keys(SIDEBAR_UI).length) {
+      const buttons = [...(sidebar.querySelectorAll?.("button") || [])];
+      const workspaceButton = buttons.find((button) => {
+        const label = normalizedNativeLabel(button.getAttribute?.("aria-label"));
+        return label.startsWith("切换模式") || label.toLowerCase().startsWith("switch mode");
+      });
+      applySidebarButtonOverride(
+        desired, workspaceButton, "workspace", SIDEBAR_UI.workspace, true,
+      );
+      for (const [role, labels] of [
+        ["newTask", ["新建任务", "New task", "New thread"]],
+        ["pullRequests", ["拉取请求", "Pull requests"]],
+        ["sites", ["站点", "Sites"]],
+        ["scheduled", ["已安排", "Scheduled"]],
+        ["plugins", ["插件", "Plugins"]],
+      ]) {
+        applySidebarButtonOverride(
+          desired,
+          findButtonByNativeLabel(buttons, labels),
+          role,
+          SIDEBAR_UI[role],
+        );
+      }
+      if (SIDEBAR_UI.pinned?.label) {
+        const toggles = [
+          ...(sidebar.querySelectorAll?.("button[data-app-action-sidebar-section-toggle]") || []),
+        ];
+        const pinnedLabel = findButtonByNativeLabel(toggles, ["置顶", "Pinned"])
+          ?.querySelector?.("span");
+        markVisualNode(desired, pinnedLabel, {
+          "data-dream-ui-role": "section-label",
+          "data-dream-label": SIDEBAR_UI.pinned.label,
+        });
+      }
+    }
+    if (sidebar && Object.keys(PROJECT_ICONS).length) {
+      for (const row of sidebar.querySelectorAll?.("[data-app-action-sidebar-project-row]") || []) {
+        const icon = row.querySelector?.('[data-sidebar-project-drop-zone="project-icon"]')
+          || row.querySelector?.(":scope > span:first-child");
+        if (!icon?.querySelector?.("svg")) continue;
+        const state = row.getAttribute?.("aria-expanded") === "true" ? "open" : "closed";
+        const spec = PROJECT_ICONS[state];
+        if (!spec?.iconDataUrl) continue;
+        markVisualNode(desired, icon, {
+          "data-dream-ui-role": "project-icon",
+          "data-dream-icon-kind": "image",
+          "data-dream-project-state": state,
+        }, {
+          "--dream-skin-project-image": `url("${spec.iconDataUrl}")`,
+        });
+      }
+    }
+    if (typeof UI.composerPlaceholder === "string" && UI.composerPlaceholder) {
+      const placeholder = selectorNodes("composer-chrome")[0]?.querySelector?.("p.placeholder");
+      markVisualNode(desired, placeholder, {
+        "data-dream-ui-role": "composer-placeholder",
+        "data-dream-label": UI.composerPlaceholder,
+      });
+    }
+    for (const node of uiNodes) {
+      if (!desired.has(node)) clearVisualNode(node);
+    }
+    uiNodes.clear();
+    for (const node of desired) uiNodes.add(node);
   };
   const refreshParts = () => {
     metrics.partPasses += 1;
@@ -612,12 +756,20 @@
       }
       partNodes.add(node);
     }
+    refreshVisualOverrides();
   };
 
   const removeParts = () => {
     for (const node of partNodes) node.removeAttribute?.(PART_ATTR);
     partNodes.clear();
     for (const node of queryAll(`[${PART_ATTR}]`)) node.removeAttribute?.(PART_ATTR);
+  };
+  const removeVisualOverrides = () => {
+    for (const node of uiNodes) clearVisualNode(node);
+    uiNodes.clear();
+    for (const node of queryAll("[data-dream-ui-role], [data-dream-ui-button]")) {
+      clearVisualNode(node);
+    }
   };
 
   const scopeMatches = (scope, baseState, overlay) => {
@@ -685,6 +837,7 @@
       }
     }
     removeParts();
+    removeVisualOverrides();
     state?.rootObserver?.disconnect();
     state?.partObserver?.disconnect();
     if (bodyReadyHandler && typeof document.removeEventListener === "function") {
@@ -791,7 +944,12 @@
   };
   const observePartTree = (node) => {
     if (!partObserver || !node) return;
-    partObserver.observe(node, { childList: true, subtree: true });
+    partObserver.observe(node, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-expanded"],
+    });
   };
   observeAttributes(document.documentElement);
   const observeBody = () => {

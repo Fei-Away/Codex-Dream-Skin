@@ -161,6 +161,61 @@ test("a benign theme name is unaffected by the substitution fix", async () => {
   assert.doesNotThrow(() => new vm.Script(loaded.payload));
 });
 
+test("theme-local UI icons are validated, deduplicated, and embedded in the payload", async () => {
+  const { directory } = await makeThemeDir({
+    ui: {
+      composerPlaceholder: "财神在此，有求必应…",
+      sidebar: {
+        newTask: { label: "开工接财", icon: "icon-ui.png" },
+        sites: { glyph: "🏮" },
+      },
+      projectIcons: {
+        closed: { icon: "icon-ui.png" },
+        open: { icon: "icon-open.png" },
+      },
+    },
+  });
+  const sharedIcon = tinyPng(32, 32);
+  const openIcon = tinyPng(48, 48);
+  await fs.writeFile(path.join(directory, "icon-ui.png"), sharedIcon);
+  await fs.writeFile(path.join(directory, "icon-open.png"), openIcon);
+
+  const loaded = await loadPayload(directory);
+  const captured = readPayloadArguments(loaded.payload);
+  assert.equal(loaded.uiIconBytes, sharedIcon.length + openIcon.length);
+  assert.equal(captured.themeConfig.ui.sidebar.newTask.label, "开工接财");
+  assert.match(
+    captured.themeConfig.ui.sidebar.newTask.iconDataUrl,
+    /^data:image\/png;base64,/,
+  );
+  assert.equal(
+    captured.themeConfig.ui.sidebar.newTask.iconDataUrl,
+    captured.themeConfig.ui.projectIcons.closed.iconDataUrl,
+    "one referenced PNG must be loaded once and reused",
+  );
+  assert.match(captured.themeConfig.ui.projectIcons.open.iconDataUrl, /^data:image\/png;base64,/);
+  assert.equal(captured.themeConfig.ui.sidebar.sites.glyph, "🏮");
+  assert.equal(captured.themeConfig.ui.composerPlaceholder, "财神在此，有求必应…");
+});
+
+test("theme-local UI icon paths and dimensions fail closed", async () => {
+  const traversal = await makeThemeDir({
+    ui: { sidebar: { newTask: { icon: "../outside.png" } } },
+  });
+  await assert.rejects(loadPayload(traversal.directory), /must be a PNG filename/);
+
+  const missing = await makeThemeDir({
+    ui: { sidebar: { newTask: { icon: "missing.png" } } },
+  });
+  await assert.rejects(loadPayload(missing.directory), /Theme UI icon is missing/);
+
+  const oversized = await makeThemeDir({
+    ui: { projectIcons: { closed: { icon: "oversized.png" } } },
+  });
+  await fs.writeFile(path.join(oversized.directory, "oversized.png"), tinyPng(513, 1));
+  await assert.rejects(loadPayload(oversized.directory), /no larger than 512px per side/);
+});
+
 test("payload byte length does not drift with $ constructs", async () => {
   // Corruption showed up as a payload that grew by the whole template or lost
   // bytes. Identical-length names must produce identical-length payloads.

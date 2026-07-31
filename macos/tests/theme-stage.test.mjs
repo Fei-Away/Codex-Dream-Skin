@@ -33,9 +33,21 @@ try {
   await fs.mkdir(source, { recursive: true });
   await fs.mkdir(stage);
   await fs.copyFile(fixtureAsset, path.join(source, "background-a.png"));
+  const iconBytes = Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489", "hex");
+  await fs.writeFile(path.join(source, "icon-new-task.png"), iconBytes);
+  await fs.writeFile(path.join(source, "icon-folder.png"), iconBytes);
   await fs.writeFile(
     path.join(source, "theme.json"),
-    `${JSON.stringify({ schemaVersion: 1, id: "preset-race", name: "A", image: "background-a.png" })}\n`,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      id: "preset-race",
+      name: "A",
+      image: "background-a.png",
+      ui: {
+        sidebar: { newTask: { icon: "icon-new-task.png" } },
+        projectIcons: { closed: { icon: "icon-folder.png" } },
+      },
+    })}\n`,
   );
 
   const stagedIdentity = JSON.parse(await runStage(source, stage));
@@ -44,6 +56,8 @@ try {
   const stagedConfig = JSON.parse(await fs.readFile(path.join(stage, "theme.json"), "utf8"));
   assert.equal(stagedConfig.image, "background-a.png");
   const stagedBeforeMutation = await fs.readFile(path.join(stage, "background-a.png"));
+  assert.deepEqual(await fs.readFile(path.join(stage, "icon-new-task.png")), iconBytes);
+  assert.deepEqual(await fs.readFile(path.join(stage, "icon-folder.png")), iconBytes);
 
   // A source edit after staging must not change the pair that is about to be
   // published. This is the regression for switch-theme's old copy-after-
@@ -54,7 +68,9 @@ try {
     `${JSON.stringify({ schemaVersion: 1, id: "preset-race", name: "B", image: "background-b.png" })}\n`,
   );
   await fs.writeFile(path.join(source, "background-a.png"), Buffer.from("changed-after-stage"));
+  await fs.writeFile(path.join(source, "icon-new-task.png"), Buffer.from("changed-after-stage"));
   assert.deepEqual(await fs.readFile(path.join(stage, "background-a.png")), stagedBeforeMutation);
+  assert.deepEqual(await fs.readFile(path.join(stage, "icon-new-task.png")), iconBytes);
   assert.equal(JSON.parse(await fs.readFile(path.join(stage, "theme.json"), "utf8")).name, "A");
 
   const secondStage = path.join(tempRoot, "stage-second");
@@ -69,6 +85,21 @@ try {
   await fs.mkdir(cssStage);
   const cssIdentity = JSON.parse(await runStage(stage, cssStage));
   assert.notEqual(cssIdentity.contentFingerprint, stagedIdentity.contentFingerprint);
+
+  const changedIconSource = path.join(tempRoot, "changed-icon");
+  const changedIconStage = path.join(tempRoot, "changed-icon-stage");
+  await fs.cp(stage, changedIconSource, { recursive: true });
+  await fs.mkdir(changedIconStage);
+  await fs.writeFile(path.join(changedIconSource, "icon-new-task.png"), Buffer.concat([
+    iconBytes,
+    Buffer.from("different"),
+  ]));
+  const changedIconIdentity = JSON.parse(await runStage(changedIconSource, changedIconStage));
+  assert.notEqual(
+    changedIconIdentity.contentFingerprint,
+    stagedIdentity.contentFingerprint,
+    "theme icon bytes must be part of the switch fingerprint",
+  );
 
   const outside = path.join(tempRoot, "outside.png");
   await fs.copyFile(fixtureAsset, outside);
@@ -92,6 +123,23 @@ try {
   const symlinkStage = path.join(tempRoot, "symlink-stage");
   await fs.mkdir(symlinkStage);
   await assert.rejects(runStage(symlink, symlinkStage), /symbolic link/);
+
+  const linkedIcon = path.join(tempRoot, "linked-icon");
+  const linkedIconStage = path.join(tempRoot, "linked-icon-stage");
+  await fs.mkdir(linkedIcon);
+  await fs.mkdir(linkedIconStage);
+  await fs.copyFile(fixtureAsset, path.join(linkedIcon, "background.png"));
+  await fs.symlink(outside, path.join(linkedIcon, "icon.png"));
+  await fs.writeFile(
+    path.join(linkedIcon, "theme.json"),
+    `${JSON.stringify({
+      schemaVersion: 1,
+      id: "bad-icon-link",
+      image: "background.png",
+      ui: { sidebar: { newTask: { icon: "icon.png" } } },
+    })}\n`,
+  );
+  await assert.rejects(runStage(linkedIcon, linkedIconStage), /symbolic link/);
 
   console.log("PASS: theme staging snapshots a matched pair and binds it to a stable content fingerprint.");
 } finally {

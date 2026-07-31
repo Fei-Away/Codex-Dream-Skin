@@ -12,6 +12,7 @@ if (!sourceDirArg || !stageDirArg) {
 const MAX_CONFIG_BYTES = 1024 * 1024;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CSS_BYTES = 256 * 1024;
+const MAX_UI_ICON_BYTES = 256 * 1024;
 const OPEN_FLAGS = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0);
 
 function assertContained(rootPath, candidatePath, label) {
@@ -106,6 +107,38 @@ async function main() {
     throw new Error("Theme image contains control characters");
   }
 
+  const iconNames = new Set();
+  const addIcon = (entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) || entry.icon === undefined) return;
+    if (
+      typeof entry.icon !== "string"
+      || path.basename(entry.icon) !== entry.icon
+      || !/\.png$/i.test(entry.icon)
+      || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(entry.icon)
+    ) {
+      throw new Error("Theme UI icons must be PNG filenames inside the theme directory");
+    }
+    if (entry.icon.toLowerCase() === theme.image.toLowerCase()) {
+      throw new Error("Theme UI icons must not replace the theme image");
+    }
+    iconNames.add(entry.icon);
+  };
+  const sidebar = theme.ui?.sidebar;
+  if (sidebar !== undefined && (!sidebar || typeof sidebar !== "object" || Array.isArray(sidebar))) {
+    throw new Error("Theme ui.sidebar must be an object");
+  }
+  for (const role of [
+    "workspace", "newTask", "pullRequests", "sites", "scheduled", "plugins", "pinned",
+  ]) addIcon(sidebar?.[role]);
+  const projectIcons = theme.ui?.projectIcons;
+  if (
+    projectIcons !== undefined
+    && (!projectIcons || typeof projectIcons !== "object" || Array.isArray(projectIcons))
+  ) {
+    throw new Error("Theme ui.projectIcons must be an object");
+  }
+  for (const state of ["closed", "open"]) addIcon(projectIcons?.[state]);
+
   const imagePath = path.resolve(sourceRoot, theme.image);
   assertContained(sourceRoot, imagePath, "Theme image");
   const [image, safeCss] = await Promise.all([
@@ -114,22 +147,39 @@ async function main() {
   ]);
   if (image.bytes.length < 1) throw new Error("Theme image is empty");
   if (safeCss) decodeAndValidateSafeCss(safeCss.bytes);
+  const icons = [];
+  for (const iconName of [...iconNames].sort()) {
+    const iconPath = path.resolve(sourceRoot, iconName);
+    assertContained(sourceRoot, iconPath, "Theme UI icon");
+    const icon = await readStableFile(iconPath, `Theme UI icon ${iconName}`, MAX_UI_ICON_BYTES);
+    if (icon.bytes.length < 1) throw new Error(`Theme UI icon ${iconName} is empty`);
+    icons.push({ name: iconName, bytes: icon.bytes });
+  }
 
   const stageRoot = await fs.realpath(stageDirArg);
   const stageStat = await fs.stat(stageRoot);
   if (!stageStat.isDirectory()) throw new Error("Theme stage must be a directory");
   assertContained(stageRoot, path.join(stageRoot, "theme.json"), "Staged theme config");
   assertContained(stageRoot, path.join(stageRoot, theme.image), "Staged theme image");
+  for (const icon of icons) {
+    assertContained(stageRoot, path.join(stageRoot, icon.name), "Staged theme UI icon");
+  }
 
-  // Write both files from the already-open, stable descriptors. The caller
-  // publishes the image first and theme.json last, so the watcher only ever
-  // observes a complete pair; subsequent source edits cannot race the copy.
+  // Write every file from already-open, stable descriptors. The caller
+  // publishes assets first and theme.json last, so the watcher only ever
+  // observes a complete pack; subsequent source edits cannot race the copy.
   await writeExclusive(path.join(stageRoot, theme.image), image.bytes);
+  for (const icon of icons) await writeExclusive(path.join(stageRoot, icon.name), icon.bytes);
   if (safeCss) await writeExclusive(path.join(stageRoot, "theme.css"), safeCss.bytes);
   await writeExclusive(path.join(stageRoot, "theme.json"), config.bytes);
   process.stdout.write(JSON.stringify({
     image: theme.image,
-    contentFingerprint: runtimeThemeContentFingerprint(theme, image.bytes, safeCss?.bytes ?? null),
+    contentFingerprint: runtimeThemeContentFingerprint(
+      theme,
+      image.bytes,
+      safeCss?.bytes ?? null,
+      icons,
+    ),
   }));
 }
 

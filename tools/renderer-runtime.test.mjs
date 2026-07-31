@@ -43,14 +43,24 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   let nextBlob = 0;
   const attributesFor = (values) => [...values].map(([name, value]) => ({ name, value }));
   const makeDomNode = (name, parentElement = null, values = new Map()) => {
+    const localSelectors = new Map();
     const node = {
       name,
       parentElement,
+      textContent: "",
+      style: styleDeclaration(),
+      children: [],
       get attributes() { return attributesFor(values); },
       getAttribute(attribute) { return values.get(attribute) ?? null; },
       setAttribute(attribute, value) { values.set(attribute, String(value)); },
       removeAttribute(attribute) { values.delete(attribute); },
-      appendChild(child) { child.parentElement = node; return child; },
+      appendChild(child) { child.parentElement = node; node.children.push(child); return child; },
+      querySelector(selector) { return (localSelectors.get(selector) || [])[0] || null; },
+      querySelectorAll(selector) { return [...(localSelectors.get(selector) || [])]; },
+      registerSelector(selector, ...registered) {
+        localSelectors.set(selector, registered);
+        return node;
+      },
     };
     domNodes.add(node);
     return node;
@@ -87,6 +97,55 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     partFixtures.message = makeDomNode("message", partFixtures.thread);
     partFixtures.composer = makeDomNode("composer", partFixtures.main);
     partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
+    partFixtures.workspaceButton = makeDomNode(
+      "workspace-button",
+      partFixtures.sidebar,
+      new Map([["aria-label", "切换模式"]]),
+    );
+    partFixtures.workspaceLabel = makeDomNode("workspace-label", partFixtures.workspaceButton);
+    partFixtures.workspaceButton
+      .registerSelector("span.truncate", partFixtures.workspaceLabel)
+      .registerSelector("span", partFixtures.workspaceLabel);
+    partFixtures.newTaskButton = makeDomNode("new-task-button", partFixtures.sidebar);
+    partFixtures.newTaskButton.textContent = "新建任务";
+    partFixtures.newTaskLabel = makeDomNode("new-task-label", partFixtures.newTaskButton);
+    partFixtures.newTaskIcon = makeDomNode("new-task-icon", partFixtures.newTaskButton);
+    partFixtures.newTaskSvg = makeDomNode("new-task-svg", partFixtures.newTaskIcon);
+    partFixtures.newTaskButton
+      .registerSelector(".text-fade-truncate", partFixtures.newTaskLabel)
+      .registerSelector("svg", partFixtures.newTaskSvg);
+    partFixtures.pinnedButton = makeDomNode("pinned-button", partFixtures.sidebar);
+    partFixtures.pinnedButton.textContent = "置顶";
+    partFixtures.pinnedLabel = makeDomNode("pinned-label", partFixtures.pinnedButton);
+    partFixtures.pinnedButton.registerSelector("span", partFixtures.pinnedLabel);
+    partFixtures.projectRow = makeDomNode(
+      "project-row",
+      partFixtures.sidebar,
+      new Map([["aria-expanded", "false"]]),
+    );
+    partFixtures.projectIcon = makeDomNode("project-icon", partFixtures.projectRow);
+    partFixtures.projectSvg = makeDomNode("project-svg", partFixtures.projectIcon);
+    partFixtures.projectIcon.registerSelector("svg", partFixtures.projectSvg);
+    partFixtures.projectRow
+      .registerSelector(
+        '[data-sidebar-project-drop-zone="project-icon"]',
+        partFixtures.projectIcon,
+      )
+      .registerSelector(":scope > span:first-child", partFixtures.projectIcon);
+    partFixtures.placeholder = makeDomNode("composer-placeholder", partFixtures.composer);
+    partFixtures.composer.registerSelector("p.placeholder", partFixtures.placeholder);
+    partFixtures.sidebar
+      .registerSelector(
+        "button",
+        partFixtures.workspaceButton,
+        partFixtures.newTaskButton,
+        partFixtures.pinnedButton,
+      )
+      .registerSelector(
+        "button[data-app-action-sidebar-section-toggle]",
+        partFixtures.pinnedButton,
+      )
+      .registerSelector("[data-app-action-sidebar-project-row]", partFixtures.projectRow);
     register("aside.app-shell-left-panel", partFixtures.sidebar);
     register("main.main-surface", partFixtures.main);
     register("header.app-header-tint", partFixtures.header);
@@ -125,6 +184,11 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     querySelectorAll(selector) {
       if (selector === "[data-ds-part]") {
         return [...domNodes].filter((node) => node.getAttribute?.("data-ds-part") !== null);
+      }
+      if (selector === "[data-dream-ui-role], [data-dream-ui-button]") {
+        return [...domNodes].filter((node) =>
+          node.getAttribute?.("data-dream-ui-role") !== null
+          || node.getAttribute?.("data-dream-ui-button") !== null);
       }
       return [...(selectorNodes.get(selector) || [])];
     },
@@ -330,6 +394,59 @@ export async function runRendererRuntimeTest(assetRoot) {
   partObserver.callback([{ type: "childList" }]);
   home.flushTimers(80);
   assert.equal(dynamicMessage.getAttribute("data-ds-part"), "message");
+
+  const themedUi = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(themedUi.payloadFor({
+    ui: {
+      composerPlaceholder: "财神在此，有求必应…",
+      sidebar: {
+        workspace: { label: "财神工位", iconDataUrl: "data:image/png;base64,d29ya3NwYWNl" },
+        newTask: { label: "开工接财", iconDataUrl: "data:image/png;base64,bmV3LXRhc2s=" },
+        pinned: { label: "财神置顶" },
+      },
+      projectIcons: {
+        closed: { iconDataUrl: "data:image/png;base64,Y2xvc2Vk" },
+        open: { iconDataUrl: "data:image/png;base64,b3Blbg==" },
+      },
+    },
+  }), themedUi.context);
+  const themedParts = themedUi.partFixtures;
+  assert.equal(themedParts.workspaceButton.getAttribute("data-dream-ui-button"), "workspace");
+  assert.equal(themedParts.workspaceLabel.getAttribute("data-dream-label"), "财神工位");
+  assert.equal(themedParts.workspaceLabel.getAttribute("data-dream-icon-kind"), "image");
+  assert.match(
+    themedParts.workspaceLabel.style.values.get("--dream-skin-nav-image"),
+    /d29ya3NwYWNl/,
+  );
+  assert.equal(themedParts.newTaskButton.getAttribute("data-dream-ui-button"), "newTask");
+  assert.equal(themedParts.newTaskLabel.getAttribute("data-dream-label"), "开工接财");
+  assert.equal(themedParts.newTaskIcon.getAttribute("data-dream-ui-role"), "nav-icon");
+  assert.equal(themedParts.pinnedLabel.getAttribute("data-dream-label"), "财神置顶");
+  assert.equal(themedParts.projectIcon.getAttribute("data-dream-project-state"), "closed");
+  assert.match(
+    themedParts.projectIcon.style.values.get("--dream-skin-project-image"),
+    /Y2xvc2Vk/,
+  );
+  assert.equal(themedParts.placeholder.getAttribute("data-dream-label"), "财神在此，有求必应…");
+
+  const themedPartObserver = themedUi.observers.find((observer) => observer.options?.childList);
+  assert.equal(
+    Array.from(themedPartObserver.options.attributeFilter).join(","),
+    "aria-expanded",
+    "project folder artwork must follow the native expanded state",
+  );
+  themedParts.projectRow.setAttribute("aria-expanded", "true");
+  themedPartObserver.callback([{ type: "attributes", attributeName: "aria-expanded" }]);
+  themedUi.flushTimers(80);
+  assert.equal(themedParts.projectIcon.getAttribute("data-dream-project-state"), "open");
+  assert.match(
+    themedParts.projectIcon.style.values.get("--dream-skin-project-image"),
+    /b3Blbg/,
+  );
+  assert.equal(themedUi.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+  assert.equal(themedParts.newTaskLabel.getAttribute("data-dream-label"), null);
+  assert.equal(themedParts.projectIcon.getAttribute("data-dream-ui-role"), null);
+  assert.equal(themedParts.projectIcon.style.values.get("--dream-skin-project-image"), undefined);
 
   const full = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);

@@ -198,6 +198,48 @@ the same priority over automatic inference. The home route remains expressive;
 task routes keep native content, cards, composer, and code readable above the
 image layer.
 
+### Visual navigation copy and icons
+
+Local macOS theme folders can visually relabel Codex's fixed sidebar navigation
+and replace its fixed navigation or project-folder icons with theme-local PNG
+artwork. These overrides never change native button text, accessibility labels,
+event handlers, project names, task names, ordering, or expansion state.
+Unsupported or newly renamed Codex controls keep their native appearance.
+
+```json
+{
+  "ui": {
+    "composerPlaceholder": "财神在此，有求必应…",
+    "sidebar": {
+      "workspace": { "icon": "icon-workspace.png" },
+      "newTask": { "icon": "icon-new-task.png" },
+      "pullRequests": { "icon": "icon-pull-requests.png" },
+      "sites": { "icon": "icon-sites.png" },
+      "scheduled": { "icon": "icon-scheduled.png" },
+      "plugins": { "icon": "icon-plugins.png" },
+      "pinned": { "label": "财神置顶" }
+    },
+    "projectIcons": {
+      "closed": { "icon": "icon-folder-closed.png" },
+      "open": { "icon": "icon-folder-open.png" }
+    }
+  }
+}
+```
+
+Supported sidebar roles are `workspace`, `newTask`, `pullRequests`, `sites`,
+`scheduled`, `plugins`, and `pinned`. Each role accepts a visual `label`, a
+short Unicode `glyph`, or an `icon`; an icon takes precedence over a glyph.
+Labels are limited to 48 Unicode characters, glyphs to 8, and the composer
+placeholder to 120. Icons must be PNG files beside `theme.json`, no larger than
+256 KB or 512 px per side.
+
+`ui.projectIcons.closed` and `ui.projectIcons.open` follow the native project
+row's `aria-expanded` state. The switcher snapshots these referenced files with
+the theme, so switching away and back restores the whole visual pack in one
+operation. Theme ZIP imports remain on the published three-file Safe CSS
+contract; add visual icon packs directly to a local saved theme folder.
+
 CLI example:
 
 ```bash

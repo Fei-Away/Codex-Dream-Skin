@@ -48,6 +48,8 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const CDP_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 const MAX_ART_BYTES = 10 * 1024 * 1024;
 const MAX_SAFE_CSS_BYTES = 256 * 1024;
+const MAX_UI_ICON_BYTES = 256 * 1024;
+const MAX_UI_ICON_SIDE = 512;
 const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
@@ -650,6 +652,18 @@ export async function loadTheme(themeDir) {
     }
     return value;
   };
+  const iconFile = (value, name) => {
+    if (value === undefined) return "";
+    if (typeof value !== "string" || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) {
+      throw new Error(`${configPath} has an invalid ${name} field`);
+    }
+    const normalized = value.trim();
+    if (!normalized) return "";
+    if (path.basename(normalized) !== normalized || !/\.png$/i.test(normalized)) {
+      throw new Error(`${configPath} ${name} must be a PNG filename inside its theme directory`);
+    }
+    return normalized;
+  };
   const rawColors = raw.colors && typeof raw.colors === "object" && !Array.isArray(raw.colors)
     ? raw.colors : null;
   const colorKeys = [
@@ -667,6 +681,64 @@ export async function loadTheme(themeDir) {
     safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"]),
     taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "full", "off"]),
   };
+  if (raw.ui !== undefined && (!raw.ui || typeof raw.ui !== "object" || Array.isArray(raw.ui))) {
+    throw new Error(`${configPath} has an invalid ui field`);
+  }
+  const rawUi = raw.ui || {};
+  if (
+    rawUi.sidebar !== undefined
+    && (!rawUi.sidebar || typeof rawUi.sidebar !== "object" || Array.isArray(rawUi.sidebar))
+  ) {
+    throw new Error(`${configPath} has an invalid ui.sidebar field`);
+  }
+  if (
+    rawUi.projectIcons !== undefined
+    && (!rawUi.projectIcons || typeof rawUi.projectIcons !== "object"
+      || Array.isArray(rawUi.projectIcons))
+  ) {
+    throw new Error(`${configPath} has an invalid ui.projectIcons field`);
+  }
+  const sidebar = {};
+  for (const role of [
+    "workspace", "newTask", "pullRequests", "sites", "scheduled", "plugins", "pinned",
+  ]) {
+    const rawEntry = rawUi.sidebar?.[role];
+    if (rawEntry === undefined) continue;
+    if (!rawEntry || typeof rawEntry !== "object" || Array.isArray(rawEntry)) {
+      throw new Error(`${configPath} has an invalid ui.sidebar.${role} field`);
+    }
+    const entry = {
+      label: normalizeThemeText(
+        rawEntry.label, "", 48, `ui.sidebar.${role}.label`, configPath,
+      ),
+      glyph: normalizeThemeText(
+        rawEntry.glyph, "", 8, `ui.sidebar.${role}.glyph`, configPath,
+      ),
+      icon: iconFile(rawEntry.icon, `ui.sidebar.${role}.icon`),
+    };
+    if (entry.label || entry.glyph || entry.icon) sidebar[role] = entry;
+  }
+  const projectIcons = {};
+  for (const state of ["closed", "open"]) {
+    const rawEntry = rawUi.projectIcons?.[state];
+    if (rawEntry === undefined) continue;
+    if (!rawEntry || typeof rawEntry !== "object" || Array.isArray(rawEntry)) {
+      throw new Error(`${configPath} has an invalid ui.projectIcons.${state} field`);
+    }
+    const icon = iconFile(rawEntry.icon, `ui.projectIcons.${state}.icon`);
+    if (icon) projectIcons[state] = { icon };
+  }
+  const ui = {};
+  const composerPlaceholder = normalizeThemeText(
+    rawUi.composerPlaceholder,
+    "",
+    120,
+    "ui.composerPlaceholder",
+    configPath,
+  );
+  if (Object.keys(sidebar).length) ui.sidebar = sidebar;
+  if (Object.keys(projectIcons).length) ui.projectIcons = projectIcons;
+  if (composerPlaceholder) ui.composerPlaceholder = composerPlaceholder;
   const theme = {
     schemaVersion: 1,
     id: normalizeThemeText(raw.id, "custom", 80, "id", configPath),
@@ -697,6 +769,7 @@ export async function loadTheme(themeDir) {
   if (Object.values(art).some((value) => value !== undefined)) {
     theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
   }
+  if (Object.keys(ui).length) theme.ui = ui;
   const requestedImagePath = path.join(assetsRoot, theme.image);
   let imagePath;
   try {
@@ -735,6 +808,61 @@ export async function loadTheme(themeDir) {
       throw new Error(`Theme image must be a non-empty file no larger than ${MAX_ART_BYTES} bytes`);
     }
     const safeCss = await loadSafeCss(assetsRoot);
+    let uiIconBytes = 0;
+    const loadedIcons = new Map();
+    const loadUiIcon = async (iconName, label) => {
+      let iconData = loadedIcons.get(iconName);
+      if (iconData) return iconData;
+      const requestedIconPath = path.join(assetsRoot, iconName);
+      let iconPath;
+      try {
+        iconPath = await fs.realpath(requestedIconPath);
+      } catch (error) {
+        if (error.code === "ENOENT") throw new Error(`Theme UI icon is missing: ${requestedIconPath}`);
+        throw error;
+      }
+      assertContainedPath(assetsRoot, iconPath, label);
+      let iconHandle;
+      try {
+        iconHandle = await fs.open(iconPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+      } catch (error) {
+        if (error.code === "ELOOP") throw new Error(`${label} changed into a symbolic link while loading`);
+        throw error;
+      }
+      try {
+        const before = await iconHandle.stat();
+        if (!before.isFile() || before.size < 1 || before.size > MAX_UI_ICON_BYTES) {
+          throw new Error(`${label} must be a non-empty PNG no larger than ${MAX_UI_ICON_BYTES} bytes`);
+        }
+        const bytes = await iconHandle.readFile();
+        const after = await iconHandle.stat();
+        if (!sameFileStat(before, after) || bytes.length !== after.size) {
+          throw new Error(`${label} changed while being loaded`);
+        }
+        const metadata = readImageMetadata(bytes, ".png");
+        if (
+          !metadata
+          || metadata.width < 1
+          || metadata.height < 1
+          || metadata.width > MAX_UI_ICON_SIDE
+          || metadata.height > MAX_UI_ICON_SIDE
+        ) {
+          throw new Error(`${label} must be a valid PNG no larger than ${MAX_UI_ICON_SIDE}px per side`);
+        }
+        iconData = `data:image/png;base64,${bytes.toString("base64")}`;
+        loadedIcons.set(iconName, iconData);
+        uiIconBytes += bytes.length;
+        return iconData;
+      } finally {
+        await iconHandle.close();
+      }
+    };
+    for (const [role, entry] of Object.entries(theme.ui?.sidebar || {})) {
+      if (entry.icon) entry.iconDataUrl = await loadUiIcon(entry.icon, `Theme UI icon ${role}`);
+    }
+    for (const [state, entry] of Object.entries(theme.ui?.projectIcons || {})) {
+      entry.iconDataUrl = await loadUiIcon(entry.icon, `Theme project icon ${state}`);
+    }
     return {
       art,
       assetsRoot,
@@ -744,6 +872,7 @@ export async function loadTheme(themeDir) {
       safeCssPath: safeCss?.path ?? null,
       safeCssStatus: safeCss ? "validated" : "none",
       theme,
+      uiIconBytes,
     };
   } finally {
     await imageHandle.close();
@@ -776,7 +905,7 @@ export async function loadPayload(themeDir) {
     loadTheme(themeDir),
   ]);
   const { css, template } = staticAssets;
-  const { art, extension, safeCss, safeCssStatus, theme } = loaded;
+  const { art, extension, safeCss, safeCssStatus, theme, uiIconBytes = 0 } = loaded;
   const combinedCss = safeCss ? `${css}\n${safeCss}\n` : css;
   const styleRevision = createHash("sha256").update(combinedCss).digest("hex").slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
@@ -810,6 +939,7 @@ export async function loadPayload(themeDir) {
   assertPayloadIntegrity(payload);
   return {
     imageBytes: art.length,
+    uiIconBytes,
     payload,
     revision,
     safeCssStatus,
@@ -2073,6 +2203,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         themeId: loaded.theme.id,
         themeName: loaded.theme.name,
         imageBytes: loaded.imageBytes,
+        uiIconBytes: loaded.uiIconBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
         safeCssStatus: loaded.safeCssStatus,
         artMetadata: loaded.theme.artMetadata ?? null,

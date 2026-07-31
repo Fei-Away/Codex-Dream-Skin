@@ -1,6 +1,20 @@
 # Task Progress
 
-Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
+Updated: 2026-07-31 CST (Asia/Shanghai)
+
+## Theme UI Overrides on v1.5.9 (2026-07-31)
+
+- [complete] Started the work scope from `origin/main@cd71dfd` (v1.5.9)
+  without restoring the obsolete pre-v1.5 runtime architecture. The upstream
+  26.721+ home/composer visibility repair remains authoritative.
+- [complete] Ported the macOS theme-local sidebar labels, navigation artwork,
+  project-folder artwork, and composer placeholder into the shared
+  attribute-only renderer contract. Native text, accessibility metadata,
+  project/task names, ordering, and event handlers remain unchanged.
+- [verified] Shared assets are synchronized byte-for-byte. Both platform
+  renderer/payload suites, 76 portable Node tests, the macOS Swift build/XCTest,
+  and the complete macOS repository regression suite passed; signed-runtime
+  integrations and Doctor were explicitly skipped in the repository test mode.
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
 

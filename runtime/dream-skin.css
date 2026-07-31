@@ -262,6 +262,148 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ a:hover svg {
   color: var(--ds-accent) !important;
 }
 
+/* Theme navigation overrides remain visual-only: native text, aria labels,
+   click handlers, project names, and task names are never rewritten. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="nav-label"][data-dream-label],
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="section-label"][data-dream-label],
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="workspace-label"][data-dream-label] {
+  font-size: 0 !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="nav-label"][data-dream-label]::after {
+  content: attr(data-dream-label);
+  color: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 590;
+  letter-spacing: 0;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="workspace-label"] {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="workspace-label"][data-dream-glyph]::before {
+  content: attr(data-dream-glyph);
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="workspace-label"][data-dream-icon-kind="image"]::before {
+  content: "";
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  background: var(--dream-skin-nav-image) center / contain no-repeat;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="workspace-label"][data-dream-label]::after {
+  content: attr(data-dream-label);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text);
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="nav-icon"] {
+  display: grid !important;
+  flex: 0 0 18px;
+  width: 18px !important;
+  height: 18px !important;
+  place-items: center;
+  line-height: 0 !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="nav-icon"] svg,
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="project-icon"] svg {
+  display: none !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="nav-icon"][data-dream-glyph]::after {
+  content: attr(data-dream-glyph);
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: var(--ds-accent);
+  font-size: 15px;
+  line-height: 18px;
+  text-align: center;
+  transform: translateZ(0);
+  transition: transform .16s ease, filter .16s ease;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="nav-icon"][data-dream-icon-kind="image"]::after {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: var(--dream-skin-nav-image) center / contain no-repeat;
+  transform: translateZ(0);
+  transition: transform .16s ease, filter .16s ease;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="project-icon"] {
+  display: grid !important;
+  flex: 0 0 18px;
+  width: 18px !important;
+  height: 18px !important;
+  place-items: center;
+  line-height: 0 !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="project-icon"]::after {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: var(--dream-skin-project-image) center / 150% no-repeat;
+  filter: drop-shadow(0 1px 2px rgb(var(--ds-accent-rgb) / .18));
+  transform: translateZ(0);
+  transition: transform .16s ease, filter .16s ease;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-app-action-sidebar-project-row]:hover [data-dream-ui-role="project-icon"]::after,
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-button]:hover [data-dream-ui-role="nav-icon"]::after {
+  filter: drop-shadow(0 2px 4px rgb(var(--ds-accent-rgb) / .32));
+  transform: translateY(-1px);
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__
+  [data-dream-ui-role="section-label"][data-dream-label]::after {
+  content: attr(data-dream-label);
+  color: rgb(var(--ds-muted-rgb) / .92);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 720;
+  letter-spacing: .02em;
+}
+
 html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ button[aria-label^="切换模式"] {
   background: transparent !important;
   border: 0 !important;
@@ -1083,6 +1225,18 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ button:not([cl
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ p.placeholder::after {
   color: rgb(var(--ds-muted-rgb) / .82) !important;
   opacity: 1 !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__
+  p.placeholder[data-dream-ui-role="composer-placeholder"][data-dream-label] {
+  font-size: 0 !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__
+  p.placeholder[data-dream-ui-role="composer-placeholder"][data-dream-label]::after {
+  content: attr(data-dream-label);
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 /* Search routes ship an opaque sticky band and input surface. Keep the
