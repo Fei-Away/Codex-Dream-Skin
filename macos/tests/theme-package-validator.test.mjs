@@ -390,7 +390,8 @@ try {
       env: { ...process.env, HOME: importHome, LC_ALL: "C", LANG: "C" },
     })).stdout);
     assert.equal(licenseImport.status, "imported");
-    assert.equal(licenseImport.id, "studio.contract-theme-2");
+    assert.equal(licenseImport.id, "studio.contract-theme");
+    assert.equal(licenseImport.replaced, true);
     assert.equal(await fs.readFile(path.join(
       importHome,
       "Library",

@@ -220,6 +220,12 @@ if (-not $successMessage -or $successMessage -notmatch 'Paper' -or
   $successMessage -notmatch 'Codex') {
   throw 'The Windows PowerShell 5.1 community success message is empty or malformed.'
 }
+$cleanupWarningMessage = Format-DreamSkinCommunitySuccessMessage -Name 'Paper' `
+  -CleanupWarning 'simulated private path that must not be shown'
+if ($cleanupWarningMessage.Length -le $successMessage.Length -or
+  $cleanupWarningMessage -match 'simulated private path') {
+  throw 'The community success warning is missing or leaks the raw cleanup failure.'
+}
 $request = New-DreamSkinCommunityHttpRequest `
   -RequestUri 'https://api.dreamskin.cc/v1/themes/ver_1234abcd' -Accept 'application/json'
 if ($request.AllowAutoRedirect -or
@@ -264,6 +270,7 @@ foreach ($requiredSafety in @(
   "' -RestartExisting'",
   'Restore-DreamSkinActiveThemeSnapshot',
   'Format-DreamSkinCommunitySuccessMessage -Name $result.Name',
+  '-CleanupWarning $result.CleanupWarning',
   'Remove-Item -LiteralPath $workRoot -Recurse -Force'
 )) {
   if (-not $applySource.Contains($requiredSafety)) {

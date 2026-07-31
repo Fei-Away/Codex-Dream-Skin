@@ -135,7 +135,10 @@ themes without CSS remain switchable and inject no additional CSS.
 
 An import only adds to **已保存的主题**. It never replaces or applies the
 active/last-known-good copy. Reimporting identical content reports a duplicate;
-a different pack using an existing ID is saved under a new safe ID.
+a newer pack with the same ID replaces the saved copy in place after its stored
+identity is confirmed. Only a legacy suffix directory (`-2`, `-3`, and so on)
+with an identical semantic fingerprint is consolidated; names alone never prove
+that a directory is a duplicate, so ambiguous entries are preserved.
 
 Manual fallback: choose **打开主题文件夹**, or open
 `~/Library/Application Support/CodexDreamSkinStudio/themes/`, then move in the

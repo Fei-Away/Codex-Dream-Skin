@@ -8,6 +8,7 @@ import { earlyPayloadFor } from "../scripts/injector.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
+const shellSelector = 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])';
 
 function createFixture() {
   const domReady = [];
@@ -15,7 +16,14 @@ function createFixture() {
   const intervals = new Map();
   let nextTimer = 1;
   let nextInterval = 1;
-  const markers = { shell: false, sidebar: false, main: false, settings: false };
+  const markers = {
+    shell: false,
+    sidebar: false,
+    main: false,
+    settings: false,
+    genericInput: false,
+    branding: false,
+  };
   let root = {};
   const context = {
     window: { installs: [] },
@@ -24,11 +32,18 @@ function createFixture() {
       get documentElement() { return root; },
       addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
       querySelector(selector) {
-        if (selector === "main.main-surface") return markers.shell ? {} : null;
+        if (selector === shellSelector) return markers.shell ? {} : null;
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
         if (selector === "[role=\"main\"]") return markers.main ? {} : null;
+        if (selector === "main, [role=\"main\"]") return markers.main ? {} : null;
+        if (selector.includes("textarea") || selector.includes("contenteditable") || selector.includes("textbox")) {
+          return markers.genericInput ? {} : null;
+        }
         if (selector.includes("appearance-theme") || selector.includes("theme-preview")) {
           return markers.settings ? {} : null;
+        }
+        if (selector.includes("app-shell-header-context-menu-surface")) {
+          return markers.branding ? {} : null;
         }
         return null;
       },
@@ -49,6 +64,7 @@ function createFixture() {
   return {
     context,
     markers,
+    brandAsCodex() { markers.branding = true; },
     makeNotReady() { root = null; },
     makeReady() { root = {}; },
     fireDomReady() { for (const callback of [...domReady]) callback(); },
@@ -67,6 +83,18 @@ assert.deepEqual(guarded.context.window.installs, [], "A shell without its sideb
 guarded.markers.sidebar = true;
 guarded.tick();
 assert.deepEqual(guarded.context.window.installs, ["guarded"]);
+
+const generic = createFixture();
+vm.runInNewContext(earlyPayloadFor('window.installs.push("generic")', "generic"), generic.context);
+generic.markers.main = true;
+generic.markers.genericInput = true;
+generic.tick();
+assert.deepEqual(generic.context.window.installs, [],
+  "An unbranded app:// page with generic main/input anchors must remain untouched.");
+generic.brandAsCodex();
+generic.tick();
+assert.deepEqual(generic.context.window.installs, ["generic"],
+  "A verified app:// Codex surface with generic main/input anchors must accept newer renderer shells.");
 
 const generations = createFixture();
 generations.makeNotReady();
@@ -88,8 +116,20 @@ const earlySource = source.slice(earlyStart, earlyStart + 2200);
 assert.ok(earlyStart >= 0, "Early payload helper must remain exported for bootstrap tests.");
 assert.doesNotMatch(earlySource, /MutationObserver|childList|subtree/,
   "Early bootstrap must not observe the entire renderer DOM.");
+assert.doesNotMatch(earlySource, /document\.title|document\.body\?\.innerText|location\.href/,
+  "The early bootstrap must not read page title, body text, or URL.");
 assert.match(earlySource, /DOMContentLoaded/);
 assert.match(earlySource, /setInterval\(install, 250\)/);
+const identityProbeStart = source.indexOf("async function probeSession");
+const identityProbeSource = source.slice(identityProbeStart, identityProbeStart + 1800);
+assert.ok(identityProbeStart >= 0, "The live target probe must remain covered by the identity test.");
+assert.match(identityProbeSource, /return Boolean\(main && input && branded\)/,
+  "The live target probe must require branding together with both generic anchors.");
+assert.match(identityProbeSource, /app-shell-header-context-menu-surface/,
+  "The live target probe must use a structural Codex branding marker.");
+assert.doesNotMatch(identityProbeSource, /document\.title|document\.body\?\.innerText|location\.href/,
+  "The live target probe must not read page title, body text, or URL.");
+assert.doesNotMatch(identityProbeSource, /\(main && input\) \|\||\(main && branded\) \|\||\(input && branded\)/);
 const discoveryStart = source.indexOf("record.earlyScriptId = await registerEarly");
 const probeStart = source.indexOf("const probe = await waitForCodexProbe", discoveryStart);
 assert.ok(discoveryStart >= 0 && probeStart > discoveryStart, "Early registration must happen before full shell probing.");

@@ -1,6 +1,414 @@
 # Task Progress
 
-Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
+## PR #324 hard-interruption import recovery — in progress (2026-07-31)
+
+- [reproduced by review] Both platform importers move the existing canonical
+  theme to a hidden replacement backup before publishing the new directory.
+  An uncatchable process termination or system restart between those two atomic
+  moves leaves the canonical saved theme missing; neither platform currently
+  recovers the hidden backup on the next import/startup.
+- [scope] Add a persisted, contained replacement journal before the first move.
+  Under the existing import lock, recovery must restore the verified old
+  fingerprint when the canonical destination is absent, keep a verified new
+  destination when publication committed, and fail closed without deleting
+  evidence on identity/path/fingerprint ambiguity.
+- [ownership] Root owns only macOS publisher/test changes; the Windows agent
+  owns only `windows/scripts/theme-windows.ps1` and
+  `windows/tests/theme-zip-import.tests.ps1`; the protocol-review agent is
+  read-only. Root will run the combined gates before any push.
+- [fixed locally/macOS] Replacement candidates and journals are durably synced
+  before the first canonical move. Prepared recovery now restores the verified
+  old canonical theme before inspecting a suspect candidate, retains malformed
+  evidence, rejects conflicting `committed` plus `commit.tmp` markers, and
+  preflights duplicate destination journals before any recovery mutation.
+- [verified locally/macOS] `node --test
+  macos/tests/theme-import-publish.test.mjs` passes (1/1, 12.8 s), including
+  real child-process `SIGKILL` after backup rename, candidate publication and
+  commit-marker rename, plus corrupt-candidate, conflicting-marker and
+  duplicate-transaction recovery cases. `node --check` and
+  `git diff --check` also pass at this checkpoint.
+- [verified locally/macOS app] An x86_64 menu-bar app build and strict deep
+  code-signature verification passed before the final wrapper correction.
+  Packaging included the new executable wrapper and publisher, but that build
+  is now superseded and must be repeated before push.
+- [fixed locally/macOS wrapper] Packaging review caught the wrapper calling the
+  nonexistent `discover_codex_bundle`; it now uses the established
+  `ensure_node_runtime` path. A source regression guards that call, and the
+  focused publish suite, wrapper Bash syntax, and `git diff --check` pass after
+  the correction. Startup recovery failure cancels any pending one-click apply
+  and reports a bounded repair instruction instead of silently continuing.
+- [verified locally/macOS final app] The corrected source builds as
+  `/tmp/CodexDreamSkin-pr324-recovery-final.app` (x86_64 Mach-O). Strict deep
+  code-signature verification passes; the packaged recovery wrapper is
+  executable, and its bytes plus the publisher bytes match the current
+  worktree exactly.
+- [verified locally/macOS full gate] `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash
+  macos/tests/run-tests.sh` passes on the integrated macOS files, including the
+  publish hard-kill regression, ZIP/archive bounds, community apply rollback,
+  installer rollback, signed-runtime switch, and runtime-state integration.
+  Only the documented full-Xcode native XCTest and installed signed-Codex
+  Doctor branches skipped on this host.
+- [fixed locally/Windows] Only a durable `committed` journal plus marker retains
+  the new theme. Earlier phases restore the verified old fingerprint first;
+  corrupt or missing candidate evidence is retained with the journal and fails
+  closed. Duplicate destinations and unsafe/unknown journal fields are rejected
+  before mutation, cleanup order is crash-safe, and legacy cleanup is outside
+  rollback. A corrupt published candidate is moved back to its contained stage
+  before the exact old canonical theme is restored.
+- [covered/Windows] The focused suite now includes a real child `FailFast` after
+  the first rename plus deterministic restart states for published and committed
+  phases, corrupt/missing candidates, duplicate targets, unsafe journals, and
+  committed-marker conflicts. Native PowerShell execution is unavailable on
+  this Mac and remains a fresh PR CI gate.
+- [verified locally/final] Portable macOS/Windows Node regressions pass 81/81.
+  The complete applicable macOS suite passes with only its documented full-
+  Xcode native XCTest and installed signed-Codex Doctor branches skipped.
+  Runtime asset sync, all Node and changed Bash syntax, Windows PowerShell BOM,
+  execution-policy safety, and `git diff --check` gates pass.
+- [committed locally] Recovery implementation and Windows validation document
+  are commit `dd19005e8a37ad7a80f1b957cf9759743b50d7e7` on branch
+  `codex/pr324-final-review-fixes`, intended for remote PR head branch
+  `origin/codex/fix-318-320-322` (Draft PR #324).
+- [pending] Commit this durable progress record, push both commits to the Draft
+  PR branch, and require fresh PowerShell 5.1/7 CI. Do not merge, release,
+  comment on issues, or close issues.
+
+## PR #324 final L0 readiness correction — pushed and CI-verified (2026-07-31)
+
+- [reviewed] Remote Draft PR head `8b39dcdaff5985f3a2247c13176cd4329a5186eb`
+  correctly rejects an ordinary `thread/L0` renderer, but still accepts
+  `home/L0` when required L1 shell anchors are missing. That permits an
+  unrecognized sidebar/main/header to be reported as a successful apply or
+  rollback on both platforms.
+- [fixed] macOS and Windows now reserve L0 visible verification only
+  for the real cross-platform Settings exception. Home and ordinary task views
+  require `scope=L1` with an empty `missingL1`; focused dual-platform readiness
+  tests and Node syntax checks pass.
+- [verified locally] Shared runtime sync passes, portable Node regressions pass
+  80/80, and the complete macOS repository suite passes with only the documented
+  full-Xcode and installed signed-app Doctor skips. `git diff --check` passes.
+- [committed/pushed] Code fix `0884be7c34cbbd62974d1ce8669a139ffbe81be2`
+  and progress commit `1a693364db0086afed30fa9a4e5991d1c61f9237`
+  are on remote Draft PR #324. The PR remains open, Draft, and unmerged.
+- [verified] GitHub Actions run `30632592756` passed all four jobs at exact head
+  `1a693364`: Static checks, macOS repository regressions with Universal DMG,
+  Windows PowerShell 7, and Windows PowerShell 5.1 with Setup.exe compilation.
+- [verified locally] Root repeated the portable Node suite (80/80), complete
+  applicable macOS suite, runtime asset sync, and `git diff --check` at the
+  exact remote head; all passed. Only documented full-Xcode and installed-app
+  Doctor branches were skipped.
+- [correlated] New issue #330 reports the same Codex `26.727.40816` app-shell
+  selector migration already reproduced for #322/#326 and covered by this PR's
+  shared macOS/Windows selector contract. It is not evidence of a separate
+  unresolved root cause.
+- [pending] Real Windows Codex validation must be repeated from exact head
+  `1a693364` using `docs/pr-324-windows-validation.md`. Do not merge, release,
+  tell issue users to retry a public version, or close issues before that result
+  is reviewed.
+
+## PR #324 final review blockers — pushed and CI-verified (2026-07-31)
+
+- [reviewed] Draft PR #324 head `598dd07f6831faa238230752531bc75064baa581`
+  passed all four CI jobs and has real Windows Codex 26.727 renderer/import
+  evidence, but that evidence exposed follow-up behavior and does not waive
+  review of the resulting shared-runtime/import changes.
+- [reproduced] The head can clear the registered wallpaper whenever validated
+  Safe CSS sets `background-color`; its client Safe CSS parser also diverges
+  from the website/server glass-filter contract. A preceding search textbox can
+  prevent the real prompt composer from receiving its public part marker.
+- [reproduced] macOS validates the extracted payload before a missing or
+  non-string source ID is normalized, while Windows normalizes first. Windows
+  saved-theme enumeration also permits dotted recovery directories to leak into
+  the tray menu.
+- [fixed] Root/background colors preserve the registered body wallpaper;
+  surface image clearing is limited to registered core surfaces. The client
+  accepts the same bounded composite glass filters as Studio/server, and a
+  preceding search input no longer hides the real semantic composer.
+- [fixed] Missing/non-string IDs pass a private pre-publish payload check only
+  after temporary normalization, then receive the stable cross-platform ID and
+  pass the mandatory final check before any old theme moves. Windows saved-theme
+  enumeration filters every dotted transaction/recovery directory.
+- [fixed] Generic parts can verify an ordinary route only with `scope=L1` and
+  an empty `missingL1`; an L0 thread missing shell/sidebar/header can no longer
+  make apply or rollback report false visible success. Explicit settings/home
+  L0 anchors remain supported on both platforms.
+- [verified locally] Portable Node regressions pass 80/80; focused Safe CSS,
+  renderer, fallback-ID ZIP import, runtime sync, Node/shell syntax, and
+  `git diff --check` pass. The complete macOS repository suite passes with only
+  its documented full-Xcode and installed-app Doctor skips.
+- [committed/pushed] Fix commit
+  `8b39dcdaff5985f3a2247c13176cd4329a5186eb` is the remote code head of
+  `codex/fix-318-320-322`; Draft PR #324 remains open and unmerged.
+- [verified] GitHub Actions run `30632144001` passed all four jobs for
+  `8b39dcd`: Static checks, macOS repository regressions with Universal DMG,
+  Windows PowerShell 7, and Windows PowerShell 5.1 with Setup.exe compilation.
+- [pending] The updated real-Windows checklist must still be run from the exact
+  PR source-installed engine. Do not merge, release, comment on issues, or close
+  issues until that user acceptance result is reviewed.
+
+## Windows Codex 26.727.4816 final worktree acceptance (2026-07-31)
+
+- [verified] The official Store package is `OpenAI.Codex_26.727.4816.0`; the
+  installed DreamSkin engine was replaced from this exact worktree under
+  `RemoteSigned`, and its CSS, renderer, selector, validator, and importer
+  hashes match the repository copies.
+- [verified] A real `dreamskin://apply` transaction downloaded and applied
+  Lyn-in's complete `juzizhoutou` package through the native confirmation UI.
+  The result confirmed size/SHA-256, ZIP, manifest, and Safe CSS validation.
+- [verified] Three current complete community themes from different creators
+  (`juzizhoutou`, `taishan-wuyue-duzun`, and `cecilylove002`) render in the real
+  Codex Home/task UI. Home reports `L1` with `missingL1=[]`; task navigation
+  refreshes to `thread/L1`; sidebar, header, message region, composer, toolbar,
+  background, and controls remain visible and interactive with no overflow.
+- [fixed] Real rendering exposed two final shared-runtime gaps. A root Safe CSS
+  background color now also clears the body's canonical image, and Codex
+  26.727's user/assistant conversation anchors now map to the public `message`
+  part while retaining the legacy selector. Real task inspection found 8/8
+  message anchors inside the thread and zero sidebar matches.
+- [verified] Final real screenshots are under
+  `%TEMP%\dreamskin-pr324-final-live`. Focused 34/34 Node regressions, selector
+  doctor, renderer runtime, asset sync, PowerShell 5.1/7 parsing, installer
+  static checks, and `git diff --check` pass. Full dual-PowerShell CI remains
+  the post-push gate; no merge, Release, or Issue mutation is authorized.
+
+## Windows continuation after macOS 26.727 fix — in progress (2026-07-31)
+
+- [verified] Draft PR #324 and the local branch are both at `98e308a`; the
+  macOS follow-up commits `9098060`/`98e308a` are present. The shared selector
+  change keeps the legacy anchors and adds Codex 26.727 app-shell attributes,
+  so its compatibility direction is appropriate for Windows as well. Real
+  Windows 26.727 acceptance is still pending.
+- [verified] On real Windows Codex `26.721.11231.0`, the updated selector
+  contract still reaches Home at `L1` with `missingL1=[]`. The new CSS parses
+  in the Windows Chromium 150 renderer, and shared macOS/Windows selector,
+  renderer, and CSS assets are byte-identical.
+- [reproduced] Full community-theme Safe CSS loads but loses the cascade for
+  sidebar, header, composer, home typography, and toolbar colors because the
+  canonical runtime uses `!important` while the untrusted Safe CSS contract
+  correctly rejects author-supplied `!important`. Root font-family is one of
+  the few declarations that currently wins.
+- [in progress] Keep the Safe CSS input contract unchanged, compile only the
+  already-validated declarations to a controlled runtime priority, synchronize
+  both platform assets, and add cascade regressions. Also tighten generic
+  composer/Home verification false positives before reinstalling the exact
+  worktree engine and repeating real Windows community-theme checks.
+- [fixed] The shared parser now recompiles only validated part/property/value
+  rules into the `dreamskin-community` cascade layer with client-owned
+  priority. Author CSS still rejects `!important`; original bytes remain the
+  semantic/fingerprint input. A higher-priority accessibility layer preserves
+  `prefers-reduced-motion` behavior.
+- [fixed] Generic composer fallback now requires an explicit composer/prompt
+  semantic owner and never marks a plain form or bare textbox. Home verification
+  fails when runtime scope claims Home but the real Home identity/surface is
+  absent; thread/settings routes retain their existing acceptance boundaries.
+- [verified] Shared runtime sync, renderer fixture, Windows readiness 10/10,
+  Safe CSS 9/9, and macOS/Windows payload tests 12/12 pass. macOS and Windows
+  generated CSS, renderer, and validator assets remain synchronized.
+- [in progress] Run the complete Node and Windows PowerShell 5.1/7 suites,
+  including the preserved same-ID, reserved-ID, long-path, legacy-suffix, and
+  rollback import cases. Then deploy the exact worktree engine and repeat real
+  Windows Codex computed-style and community-theme interaction checks.
+- [preserved] Existing uncommitted cross-platform importer changes remain in
+  the four macOS/Windows import implementation/test files. They are not being
+  reverted or overwritten. No merge, Release, Issue edit, or publish is in
+  scope until explicit authorization.
+- [fixed] A theme whose destination passed the final semantic fingerprint is
+  now treated as committed on both platforms even when obsolete backup cleanup
+  fails. The import returns `cleanupWarning`/`CleanupWarning`; manual import and
+  one-click apply show a bounded local warning without exposing the raw path or
+  rolling back the new theme.
+- [fixed] Invalid or Windows-reserved source IDs use one cross-platform stable
+  identity mapping. The fixed `con.theme` vector is
+  `import-931599c2985393be807cf0ed` on macOS and Windows, so a later package with
+  the same source ID updates in place instead of creating another directory.
+- [verified] Windows PowerShell 5.1 completed the full focused ZIP-import suite,
+  including same-ID replacement, exact duplicate, conservative legacy cleanup,
+  unrelated suffix preservation, file collision, pre-commit rollback,
+  committed cleanup warning and long-path cases. Focused macOS publisher,
+  community-link, Safe CSS, dual payload, renderer-runtime, readiness and asset
+  sync checks pass; the macOS immutable-backup cleanup case remains a macOS CI
+  execution because this worktree is on Windows.
+- [fixed] The trusted Safe CSS compiler now clears a core background image when
+  a validated part supplies `background-color`, bridges bounded root typography
+  and color to `body`, passes composer-toolbar color to its registered buttons,
+  and marks the real `game-source` node as `home-hero` when present. SPA DOM
+  mutations refresh both public parts and verification scope.
+
+## Codex 26.727 real-renderer visual follow-up — in progress (2026-07-31)
+
+- [verified] Official Codex/ChatGPT `26.727.40816` is running with this Draft
+  PR #324 engine (`1.5.9`, head `61d65e3`) and renderer injection succeeds.
+- [reproduced] The real home view remains partially white despite successful
+  injection. Screenshot: `/tmp/dreamskin-pr324-mac-26.727.png`.
+- [root cause] The live renderer has zero matches for legacy
+  `main.main-surface` and `header.app-header-tint`; it exposes
+  `main[data-app-shell-main-surface="default"]` plus new app-shell header data
+  attributes. The generic identity/part fallback added by #324 cannot replace
+  the canonical CSS selector contract, so it only themes part of the page.
+- [in progress] Add exact legacy-plus-current selectors in `tools/selectors.json`
+  and canonical runtime CSS, regenerate both macOS/Windows assets, add dual-
+  platform assertions, rerun all applicable tests, then reinstall/reinject and
+  capture real macOS visual evidence. Do not merge or release.
+
+## Codex 26.727 selector and top-fade fix — verified locally (2026-07-31)
+
+- [fixed] Shared selector contract now recognizes legacy anchors plus the
+  Codex 26.727 stable attributes and constrained CSS Module prefixes:
+  `main[data-app-shell-main-surface]` / `_MainContentSurface_`,
+  `header[data-app-shell-header-edge-scroll]` / `_Header_`, and the new
+  `data-app-shell-main-content-top-fade` / `_MainContentTopFade_` overlay.
+- [generated] `tools/sync-runtime-assets.mjs` regenerated macOS and Windows
+  selectors, renderer payloads, and canonical CSS. The three shared payload
+  files are byte-identical across platforms; `--check` passes.
+- [verified] Real official Codex `26.727.40816` with DreamSkin `1.5.9` now
+  reports renderer scope `home/L1` with `missingL1=[]`; `<main>` and `<header>`
+  receive `data-ds-part="main|header"`; the native top fade computes to
+  `display:none`; header remains `position:fixed; z-index:30`. Clean visual
+  evidence: `/tmp/dreamskin-pr324-mac-26.727-clean.png`.
+- [verified] `node --test macos/tests/*.test.mjs windows/tests/*.test.mjs`
+  passes 74/74. Focused selector/renderer/CSS tests and runtime sync check pass.
+  The macOS shell suite passes its applicable checks with signed-runtime,
+  runtime-state, and Doctor branches explicitly skipped by environment flags;
+  native Swift/XCTest remains unavailable on this host.
+- [verified] A final live CDP read at 2026-07-31 16:44 HKT still reports
+  `home/L1`, `missingL1=[]`, themed outer main, fixed header at z-index 30,
+  hidden native top-fade, and no operation overlay. The Windows handoff now
+  calls out these exact acceptance checks for Codex 26.727+.
+- [committed] Selector/top-fade follow-up is committed as `9098060`
+  (`fix: support Codex 26.727 shell surfaces`) on branch
+  `codex/fix-318-320-322`.
+- [pushed] `9098060cd256ca4ed0aa268283d72a0481188aaa` is pushed to the remote
+  head of Draft PR #324, and the PR body documents the root cause, Mac evidence,
+  Windows checklist, and remaining real-Windows acceptance boundary.
+- [pending] Wait for fresh CI and real Windows Codex visual acceptance. Do not
+  merge, release, comment on, or close #326/#322 yet.
+
+Updated: 2026-07-31 14:29 HKT (Asia/Hong_Kong)
+
+## Privacy gate and legacy re-import regression — in progress (2026-07-31 14:49 HKT)
+
+- [fixed] Both platform injectors now use the registered Codex structural marker
+  `data-testid="app-shell-header-context-menu-surface"` for generic `app://`
+  identity. They no longer read page title, body text, or URL; the strict
+  `app:` protocol and generic main/input requirements remain in place.
+- [added] macOS and Windows bootstrap fixtures now cover an unbranded generic
+  `app:` rejection, a branded structural-marker acceptance, and source guards
+  against title/body/URL reads.
+- [added] macOS and Windows ZIP import suites explicitly cover an existing
+  canonical theme plus an exact `-2` legacy duplicate. Re-import must return
+  `Imported`, retain only canonical, and leave no transaction directories.
+- [added] Windows ZIP import suite statically verifies published semantic
+  fingerprint validation and mismatch handling precede canonical backup
+  deletion; no runtime failure-injection backdoor was introduced.
+- [verified] Both bootstrap fixtures pass under Node 22 and Node 24; the macOS
+  legacy re-import suite, injector syntax, runtime sync, renderer fixture,
+  static privacy/PowerShell-policy scan, and `git diff --check` pass.
+- [verified] Full portable suite: 74/74 passed. The complete macOS suite passed
+  with only the documented full-Xcode and installed-app Doctor branches
+  skipped; the current host does not provide those prerequisites.
+- [blocked] PowerShell 5.1/7 and real Windows renderer validation remain
+  unavailable on this macOS host and must be run by CI/user Windows machine.
+
+## Pre-push verification — PR #324 (2026-07-31)
+
+- [fixed] Import replacement rollback is fail-closed on both platforms. A
+  post-publish failure first quarantines the new directory, restores legacy
+  cleanup backups and the original canonical directory, and verifies every
+  move. Backup and quarantine cleanup errors are surfaced instead of being
+  silently ignored; the old theme is never discarded before the replacement
+  fingerprint is verified.
+- [added] `docs/pr-324-windows-validation.md` is the Windows AI handoff. It
+  covers #318/#320/#322, all-theme (not only colors-only) renderer checks,
+  legacy suffix safety, rollback expectations, exact commands, and the
+  `RemoteSigned`/no-`ExecutionPolicy Bypass` requirement.
+- [verified] Portable client regressions: `node --test macos/tests/*.test.mjs
+  windows/tests/*.test.mjs` — 74 passed; `NODE=$(command -v node)
+  CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash macos/tests/run-tests.sh` passed with
+  only the documented full-Xcode/Doctor skips; runtime asset sync, Node syntax,
+  renderer runtime, and `git diff --check` also pass.
+- [verified] Focused import, package-validator, injector, readiness, and
+  generic-renderer fixture checks pass after the rollback hardening.
+- [blocked] This macOS host has no `powershell.exe` or `pwsh`; Windows
+  PowerShell 5.1/7, Setup.exe compilation, and a real Windows Codex renderer
+  still require the user's Windows host or PR CI.
+- [pending] Commit and push the final client branch, update draft PR #324, and
+  wait for fresh CI on the new head. Do not merge, publish a Release, close an
+  issue, or post a user-facing fix comment.
+
+## Final review correction — legacy import cleanup (2026-07-31)
+
+- [fixed] Both platform importers now consolidate a legacy suffix directory
+  only when its stored identity matches the suffix and its semantic fingerprint
+  exactly matches the incoming package. Display-name equality is no longer
+  treated as lineage evidence, so an independent `family-2` with the same name
+  is preserved and ambiguous replacement remains fail-closed.
+- [fixed] Legacy suffix detection mirrors the old 80-character ID truncation,
+  including max-length IDs, and rejects numeric overflow rather than throwing.
+- [fixed] macOS and Windows import notifications distinguish an in-place saved
+  theme update from a first import; platform README/docs now describe the same
+  behavior and the exact-fingerprint cleanup boundary.
+- [pending] Rerun all portable/macOS suites, inspect staged diffs, commit and
+  push only after local checks pass. Windows PowerShell 5.1 remains a required
+  user/CI validation because this host has no PowerShell runtime.
+
+## Read-only deep review checkpoint — PR #324 / site PR #13 (2026-07-31)
+
+- [reviewed] Client draft PR #324 remains at `ee3b64f`; its four GitHub CI jobs
+  pass. Root reran shared-asset sync, the focused macOS/Windows import,
+  bootstrap and readiness tests, plus `git diff --check`; all passed.
+- [blocked] The generic `app://` gate is broader than the PR description:
+  `(main && input)` passes with no Codex/ChatGPT identity marker. A minimal
+  negative fixture independently executed the early payload on both platforms.
+- [blocked] Generic renderer parts do not complete #320/#322: canonical
+  `dream-skin.css` still has no `[data-ds-part]` fallback for the core
+  main/sidebar/composer rules, generic part selection is over-broad, and a
+  home `[role=main]` can keep the earlier `main` part instead of `home`.
+- [blocked] The #318 import change repairs only a clean future library. An
+  already-created `theme-id-2` exact duplicate returns early as `duplicate`,
+  leaving both old directories. Replacement is also selected by destination
+  directory existence rather than confirmed stored identity, and the Windows
+  post-publish mismatch path deletes the old backup before final verification.
+- [blocked] Site PR #13 has a validated-package CAS regression and no backfill
+  for the already-reset live count; see the site repository progress file.
+- [fact] No PR code, commit, push, merge, Release, issue comment, or issue
+  closure was performed during this review.
+
+## In Progress — Issues #318/#320/#322 community client/site fixes (2026-07-31)
+
+- [complete] Work is isolated in clean temporary worktrees:
+  client branch `codex/fix-318-320-322` at `/tmp/dreamskin-client-fix.O9D3Vw`
+  and site branch `codex/fix-318-download-inheritance` at
+  `/tmp/dreamskin-site-fix.pHtykF`. Main worktrees were left untouched.
+- [complete] Client implements same-id theme ZIP imports as in-place version
+  replacement on both macOS and Windows instead of suffixing `-2`, while exact
+  duplicate content remains `duplicate` and different-id same-name imports still
+  report `nameCollision`.
+- [complete] Client keeps dual-platform renderer behavior aligned: generic
+  `main`/sidebar/composer part fallbacks are generated from shared runtime
+  source and synced byte-for-byte into macOS and Windows assets.
+- [complete] Client injector verification now accepts newer `app://` Codex
+  renderer shells with generic visible main/input structure and Codex/ChatGPT
+  branding, while preserving exact payload/theme/revision checks and loopback
+  CDP target rejection.
+- [complete] Site moderation service now inherits the maximum prior same-theme
+  approved/downloaded version counter into a pending version before approval,
+  so newly approved community versions do not reset visible downloads to zero.
+- [verified] Site backend checks in `/tmp/dreamskin-site-fix.pHtykF/server`:
+  `go test ./internal/moderation ./internal/upload ./internal/httpapi`,
+  `go vet ./...`, `go build ./...`, and repo `git diff --check` all pass.
+- [verified] Client checks in `/tmp/dreamskin-client-fix.O9D3Vw`:
+  `node tools/sync-runtime-assets.mjs --check`,
+  `node macos/tests/theme-import-publish.test.mjs`,
+  `node macos/tests/theme-package-validator.test.mjs`,
+  `node macos/tests/injector-bootstrap.test.mjs`,
+  `node windows/tests/injector-bootstrap.test.mjs`,
+  `node macos/tests/window-readiness.test.mjs`,
+  `node windows/tests/injector-window-readiness.test.mjs`,
+  `NODE=$(command -v node) bash macos/tests/run-tests.sh`, and
+  `git diff --check` all pass. Native SwiftPM/XCTest was the existing local
+  environment skip; no local `pwsh` is installed for Windows PowerShell tests.
+- [pending] Commit, push, and open draft PRs. No merge, Release publication,
+  issue closure, or user-facing "fixed/retry" comment has been made.
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
 
@@ -287,3 +695,19 @@ Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
   approved `applyCompatible: true` package. Existing approved legacy
   production packages are intentionally preview/download-only.
 - Real Windows PowerShell 5.1 and Setup.exe protocol install require Windows CI/host verification.
+## Codex 26.727.4816 Message Bridge (2026-07-31)
+
+- [complete] Read-only inspection of the real Windows Codex 26.727.4816 task
+  renderer found zero `[data-message-author-role]` nodes. The current semantic
+  boundaries are four `[data-local-conversation-user-anchor]` nodes and four
+  `[data-local-conversation-final-assistant]` nodes; all eight are inside the
+  thread surface and none is in the sidebar.
+- [complete] The shared selector contract now retains the legacy message role
+  attribute and adds those two current semantic attributes. Core styling uses
+  the existing public `data-ds-part="message"` bridge, and generated macOS and
+  Windows selector/renderer/CSS assets are synchronized.
+- [verified] Selector doctor, both renderer runtime suites, both payload
+  integrity suites, runtime asset sync, JavaScript syntax, focused
+  `git diff --check`, and a second real-DOM read-only cardinality check pass.
+  No installed runtime, Codex process, active theme, PR, issue, commit, or push
+  was changed by this focused task.

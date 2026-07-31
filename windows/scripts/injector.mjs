@@ -503,8 +503,8 @@ async function loadSafeCss(themeRoot) {
     if (!sameFileStat(before, after) || bytes.length !== after.size) {
       throw new Error("Theme Safe CSS changed while being loaded");
     }
-    const { source, validation } = decodeAndValidateSafeCss(bytes);
-    return { path: cssPath, source, stat: after, validation };
+    const { source, runtimeSource, validation } = decodeAndValidateSafeCss(bytes);
+    return { path: cssPath, runtimeSource, source, stat: after, validation };
   } finally {
     await handle.close();
   }
@@ -606,6 +606,7 @@ export async function loadTheme(themeDir) {
     imagePath: realImagePath,
     imageBytes,
     safeCss: safeCss?.source ?? "",
+    safeCssRuntime: safeCss?.runtimeSource ?? "",
     safeCssPath: safeCss?.path ?? null,
     safeCssStatus: safeCss ? "validated" : "none",
     fingerprint,
@@ -620,7 +621,8 @@ export async function loadPayload(themeDir = path.join(root, "assets"), candidat
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
   ]);
-  const combinedCss = loadedTheme.safeCss ? `${css}\n${loadedTheme.safeCss}\n` : css;
+  const combinedCss = loadedTheme.safeCssRuntime
+    ? `${css}\n${loadedTheme.safeCssRuntime}\n` : css;
   const extension = path.extname(loadedTheme.imagePath).toLowerCase();
   const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
     : extension === ".webp" ? "image/webp" : "image/png";
@@ -690,18 +692,28 @@ async function readThemeSourceStamp(loadedTheme) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const genericCodexSurface = () => {
+      if (location.protocol !== 'app:') return false;
+      const main = document.querySelector('main, [role="main"]');
+      const input = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
+      const branded = Boolean(document.querySelector(
+        ${stableTestidLiteral("app-shell-header-context-menu-surface")},
+      ));
+      return Boolean(main && input && branded);
+    };
     const markers = {
       shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: Boolean(document.querySelector(${selectorLiteral("left-panel")})),
       composer: Boolean(document.querySelector(${selectorLiteral("composer-chrome")})),
       main: Boolean(document.querySelector(${selectorLiteral("home-route")})),
+      generic: genericCodexSurface(),
     };
     const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       markers,
       codex: location.protocol === 'app:' &&
-        ((markers.shell && markers.sidebar) || settings || markers.main),
+        ((markers.shell && markers.sidebar) || settings || markers.main || markers.generic),
     };
   })()`);
 }
@@ -849,7 +861,13 @@ export function earlyPayloadFor(payload, revision) {
       const main = document.querySelector(${selectorLiteral("home-route")});
       const settings = document.querySelector(${selectorLiteral("appearance-radio")}) ||
         document.querySelector(${stableTestidLiteral("theme-preview")});
-      return Boolean((shell && sidebar) || settings || main);
+      const genericMain = document.querySelector('main, [role="main"]');
+      const genericInput = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
+      const branded = Boolean(document.querySelector(
+        ${stableTestidLiteral("app-shell-header-context-menu-surface")},
+      ));
+      return Boolean((shell && sidebar) || settings || main ||
+        (genericMain && genericInput && branded));
     };
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
@@ -1210,6 +1228,8 @@ export async function verifySession(
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
+      genericMain: box(document.querySelector('[data-ds-part="main"], [data-ds-part="home"]')),
+      genericInput: box(document.querySelector('[data-ds-part="composer"]')),
       nativeWindow: ${JSON.stringify(nativeWindow)},
       documentVisibility: document.visibilityState ?? null,
       documentHidden: document.hidden === true,
@@ -1219,10 +1239,15 @@ export async function verifySession(
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    const l0AnchorPass = Boolean(result.settingsAnchor?.visible || result.homeSurface?.visible);
-    const structurePass = result.scope?.level === 'L0'
-      ? l0AnchorPass
-      : result.scope?.level === 'L1' && Boolean(result.shell?.visible && result.sidebar?.visible);
+    const homeScope = result.scope?.baseState === 'home' || result.homePresent;
+    const l1ScopePass = result.scope?.level === 'L1' &&
+      Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 0;
+    const genericStructurePass = l1ScopePass && Boolean(result.genericMain?.visible) &&
+      Boolean(result.genericInput?.visible || (homeScope && result.homeSurface?.visible));
+    const l0StructurePass = result.scope?.level === 'L0' &&
+      result.scope?.baseState === 'settings' && Boolean(result.settingsAnchor?.visible);
+    const structurePass = l0StructurePass || (l1ScopePass &&
+      (Boolean(result.shell?.visible && result.sidebar?.visible) || genericStructurePass));
     const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;
     const viewportPass = result.viewport.width >= ${MIN_RENDERER_VIEWPORT_WIDTH} &&
       result.viewport.height >= ${MIN_RENDERER_VIEWPORT_HEIGHT};
@@ -1247,9 +1272,10 @@ export async function verifySession(
       windowPass, documentPass, viewportPass, structurePass,
       nativeWindowPass, fallbackWindowPass,
     };
-    const homePass = !result.homePresent || (
-      Boolean(result.homeSurface?.visible && result.hero?.visible) &&
-      result.hero.width >= 280 && result.hero.height >= 120 &&
+    const homePass = !homeScope || (
+      result.homePresent && Boolean(result.homeSurface?.visible) &&
+      ((result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120) ||
+        Boolean(result.genericMain?.visible)) &&
       (!result.suggestionsPresent || result.visibleCardCount === 0 || (
         result.suggestionLabels.filter((item) => item?.visible).length >= result.visibleCardCount &&
         result.suggestionLabelColorsMatch

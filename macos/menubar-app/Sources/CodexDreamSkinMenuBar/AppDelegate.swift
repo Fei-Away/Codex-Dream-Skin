@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var statusRefreshRunning = false
   private var operationInFlight = false
   private var engineInstallInFlight = false
+  private var themeRecoveryInFlight = false
   private var pendingCommunityVersionID: String?
   private var communityBaselineThemeID = ""
   private var communityStageMessage = ""
@@ -56,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     "scripts/load-image-theme-macos.sh",
     "scripts/pause-dream-skin-macos.sh",
     "scripts/publish-theme-import.mjs",
+    "scripts/recover-theme-imports-macos.sh",
     "scripts/restore-dream-skin-macos.sh",
     "scripts/snapshot-active-theme-macos.sh",
     "scripts/snapshot-theme-zip.mjs",
@@ -125,7 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    guard !operationInFlight, !engineInstallInFlight, !snapshot.busy else {
+    guard !operationInFlight, !engineInstallInFlight, !themeRecoveryInFlight, !snapshot.busy else {
       showError(
         title: "操作仍在进行",
         message: "请等待当前下载、导入、应用或恢复完成后再退出，以免留下未完成的主题状态。"
@@ -260,7 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     addDisabledItem("版本：v\(appVersion)")
 
     menu.addItem(.separator())
-    let busy = operationInFlight || engineInstallInFlight || snapshot.busy
+    let busy = operationInFlight || engineInstallInFlight || themeRecoveryInFlight || snapshot.busy
     let needsEngineInstall = engineNeedsInstall()
     if engineInstallInFlight {
       addDisabledItem("正在安装引擎…")
@@ -731,6 +733,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       let id = self.cleanMenuText(rawID)
       let safeCssStatus = value["safeCssStatus"] as? String ?? "none"
       let signatureIgnored = value["signatureIgnored"] as? Bool ?? false
+      let cleanupWarning = !(value["cleanupWarning"] as? String ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       if applyAfterImport {
         guard (status == "imported" || status == "duplicate"),
               safeCssStatus == "validated",
@@ -751,7 +755,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
           name: name,
           expectedContentFingerprint: contentFingerprint,
           cleanupRoot: cleanupRoot,
-          metadata: communityMetadata
+          metadata: communityMetadata,
+          cleanupWarning: cleanupWarning
         )
         return
       }
@@ -771,8 +776,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return
       }
       let renamed = value["renamed"] as? Bool ?? false
+      let replaced = value["replaced"] as? Bool ?? false
       let nameCollision = value["nameCollision"] as? Bool ?? false
-      var details = "已把“\(name)”加入“已保存的主题”，当前正在使用的主题没有改变。"
+      var details = replaced
+        ? "已更新“\(name)”的已保存版本，当前正在使用的主题没有改变。"
+        : "已把“\(name)”加入“已保存的主题”，当前正在使用的主题没有改变。"
       if renamed {
         details += "\n为避免覆盖同 ID 主题，已使用新标识：\(id)。"
       }
@@ -785,6 +793,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       if signatureIgnored {
         details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
       }
+      if cleanupWarning {
+        details += "\n主题已成功保存，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。"
+      }
       self.finishThemeOperation(cleanupRoot: cleanupRoot)
       self.showInfo(title: "主题导入完成", message: details)
     }
@@ -795,7 +806,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     name: String,
     expectedContentFingerprint: String,
     cleanupRoot: URL?,
-    metadata: CommunityThemeMetadata?
+    metadata: CommunityThemeMetadata?,
+    cleanupWarning: Bool
   ) {
     guard CommunityThemeContract.isVersionID(metadata?.id ?? ""),
           id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#, options: .regularExpression) != nil,
@@ -832,9 +844,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         cleanupRoot: rollbackRetention.requiresOperationRoot ? nil : cleanupRoot
       )
       if result.succeeded {
+        var details = "“\(name)”已通过下载、SHA-256、主题包、Safe CSS 和可见渲染校验，并已切换到客户端。"
+        if cleanupWarning {
+          details += "\n\n主题已成功应用，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。"
+        }
         self.showInfo(
           title: "主题已应用",
-          message: "“\(name)”已通过下载、SHA-256、主题包、Safe CSS 和可见渲染校验，并已切换到客户端。"
+          message: details
         )
       } else if result.exitCode == 20 {
         self.showError(
@@ -1114,9 +1130,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func installBundledEngineIfNeeded(force: Bool) {
-    guard !engineInstallInFlight, !operationInFlight, !snapshot.busy else { return }
+    guard !engineInstallInFlight, !operationInFlight, !themeRecoveryInFlight, !snapshot.busy else { return }
     if !force && !engineNeedsInstall() {
-      resumePendingCommunityApply()
+      recoverInterruptedThemeImports { [weak self] recovered in
+        guard let self else { return }
+        if recovered {
+          self.resumePendingCommunityApply()
+        } else {
+          self.pendingCommunityVersionID = nil
+        }
+      }
       return
     }
     guard let bundledVersion = version(at: bundledEngineURL?.appendingPathComponent("VERSION")) else {
@@ -1149,7 +1172,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       self.rebuildMenu()
       if result.succeeded {
         self.refreshStatus()
-        self.resumePendingCommunityApply()
+        self.recoverInterruptedThemeImports { [weak self] recovered in
+          guard let self else { return }
+          if recovered {
+            self.resumePendingCommunityApply()
+          } else {
+            self.pendingCommunityVersionID = nil
+          }
+        }
       } else {
         self.pendingCommunityVersionID = nil
         self.showError(
@@ -1160,6 +1190,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
           )
         )
       }
+    }
+  }
+
+  private func recoverInterruptedThemeImports(completion: ((Bool) -> Void)? = nil) {
+    guard !themeRecoveryInFlight else {
+      completion?(false)
+      return
+    }
+    guard let script = installedScript(named: "recover-theme-imports-macos.sh") else {
+      showError(
+        title: "主题恢复组件缺失",
+        message: "本地引擎不完整，未继续待执行的换肤操作。请先选择“修复 / 重新安装引擎…”。"
+      )
+      completion?(false)
+      return
+    }
+    themeRecoveryInFlight = true
+    rebuildMenu()
+    ScriptRunner.run(script: script) { [weak self] result in
+      guard let self else { return }
+      self.themeRecoveryInFlight = false
+      if !result.succeeded {
+        NSLog(
+          "[DreamSkin] interrupted theme import recovery failed: %@",
+          self.conciseOutput(result.output, fallback: "unknown recovery failure")
+        )
+        self.showError(
+          title: "主题恢复未完成",
+          message: "已保留恢复记录，未继续待执行的换肤操作。请先选择“修复 / 重新安装引擎…”；如果仍失败，请附上日志反馈。"
+        )
+      }
+      self.rebuildMenu()
+      completion?(result.succeeded)
     }
   }
 

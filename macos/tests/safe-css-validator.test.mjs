@@ -68,6 +68,94 @@ test("accepts only the bounded public part/property/value contract", () => {
   }
 });
 
+test("matches the public glass-filter contract used by approved themes", () => {
+  const accepted = [
+    `none`,
+    `blur(22px) saturate(1.15)`,
+    `blur(var(--ds-theme-surface-blur)) saturate(1.15)`,
+    `blur(30px) brightness(1.5) contrast(0.8) saturate(0.5)`,
+  ];
+  for (const value of accepted) {
+    const source = `[data-ds-part="sidebar"] { backdrop-filter: ${value}; }`;
+    for (const validator of validators) {
+      assert.equal(validator.validateSafeCss(source).status, "validated");
+      assert.match(validator.compileSafeCss(source), new RegExp(
+        `backdrop-filter: ${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} !important;`,
+      ));
+    }
+  }
+});
+
+test("compiles validated declarations into the controlled community cascade layer", () => {
+  const source = `[data-ds-part="sidebar"] {
+  background-color: var(--ds-theme-color-panel);
+  border-radius: 12px;
+}
+[data-ds-part="composer"]:focus-visible {
+  border-color: #abcdef;
+}`;
+  const expected = `@layer dreamskin-community {
+  [data-ds-part="sidebar"] {
+    background-color: var(--ds-theme-color-panel) !important;
+    background-image: none !important;
+    border-radius: 12px !important;
+  }
+  [data-ds-part="composer"]:focus-visible {
+    border-color: #abcdef !important;
+  }
+}
+`;
+  for (const validator of validators) {
+    assert.equal(validator.compileSafeCss(source), expected);
+    const decoded = validator.decodeAndValidateSafeCss(new TextEncoder().encode(source));
+    assert.equal(decoded.source, source);
+    assert.equal(decoded.runtimeSource, expected);
+    assert.equal(decoded.validation.status, "validated");
+  }
+});
+
+test("compiles bounded root and toolbar bridges for visible inherited styling", () => {
+  const source = `[data-ds-part="root"] {
+  background-color: #112233;
+  color: #ddeeff;
+  font-family: system-ui, sans-serif;
+}
+[data-ds-part="composer-toolbar"] {
+  color: var(--ds-theme-color-muted);
+}`;
+  for (const validator of validators) {
+    const runtime = validator.compileSafeCss(source);
+    assert.match(runtime, /\[data-ds-part="root"\] body \{/);
+    assert.match(runtime, /background-color: #112233 !important;/);
+    assert.doesNotMatch(runtime, /background-image:/,
+      "Root color bridging must preserve the canonical body wallpaper.");
+    assert.match(runtime, /font-family: system-ui, sans-serif !important;/);
+    assert.match(runtime, /composer-toolbar[^\n]+:where\(button:not/);
+    assert.match(runtime, /color: var\(--ds-theme-color-muted\) !important;/);
+  }
+});
+
+test("clears only registered core surface background images", () => {
+  const surfaceParts = ["sidebar", "main", "home"];
+  const otherParts = validators[0].SAFE_CSS_PARTS.filter((part) =>
+    part !== "root" && !surfaceParts.includes(part),
+  );
+  for (const validator of validators) {
+    for (const part of surfaceParts) {
+      const runtime = validator.compileSafeCss(
+        `[data-ds-part="${part}"] { background-color: #112233; }`,
+      );
+      assert.match(runtime, /background-image: none !important;/, part);
+    }
+    for (const part of ["root", ...otherParts]) {
+      const runtime = validator.compileSafeCss(
+        `[data-ds-part="${part}"] { background-color: #112233; }`,
+      );
+      assert.doesNotMatch(runtime, /background-image:/, part);
+    }
+  }
+});
+
 test("rejects selector escape, global reach, DOM coupling, and unregistered parts", () => {
   for (const source of [
     `:root { color: #fff; }`,
@@ -131,7 +219,25 @@ test("rejects layout, concealment, interaction, animation, and unbounded values"
   assertRejected(`[data-ds-part="main"] { opacity: 0; }`, "value/unsupported");
   assertRejected(`[data-ds-part="main"] { border-width: 99px; }`, "value/unsupported");
   assertRejected(`[data-ds-part="main"] { border-radius: 999px; }`, "value/unsupported");
-  assertRejected(`[data-ds-part="main"] { backdrop-filter: blur(21px); }`, "value/unsupported");
+  for (const value of [
+    "blur(31px)",
+    "blur(12px) saturate(0.49)",
+    "blur(12px) saturate(2.01)",
+    "blur(12px) brightness(0.79)",
+    "blur(12px) brightness(1.51)",
+    "blur(12px) contrast(0.79)",
+    "blur(12px) contrast(1.51)",
+    "saturate(1.15) blur(12px)",
+    "blur(12px) blur(13px)",
+    "blur(12px) saturate(1.1) saturate(1.2)",
+    "blur(12px) opacity(0.9)",
+    "blur(12px) drop-shadow(0 2px 4px #000)",
+  ]) {
+    assertRejected(
+      `[data-ds-part="main"] { backdrop-filter: ${value}; }`,
+      "value/unsupported",
+    );
+  }
   assertRejected(`[data-ds-part="main"] { transition-duration: 10s; }`, "value/unsupported");
 });
 

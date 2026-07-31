@@ -119,7 +119,10 @@ only against the 12 registered parts. Previously saved legacy themes without
 CSS remain switchable and inject no extra CSS. `manifest.sig` is reserved and
 not used for signature verification. Import only adds to Saved
 Themes; it does not change the active theme. Identical content is not
-duplicated, while a different pack using an existing ID receives a new safe ID.
+duplicated. A newer pack with the same ID updates the saved copy in place after
+the stored identity is confirmed; only a legacy `-2`/`-3` suffix directory with
+an identical semantic fingerprint is consolidated. Names alone never prove a
+duplicate, so ambiguous entries are preserved and replacement fails closed.
 
 For the manual fallback, choose **Open Themes Folder** and move in the complete
 extracted directory whose immediate children are `theme.json`, `theme.css`, and
