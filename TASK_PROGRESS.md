@@ -17,7 +17,10 @@
 - [committed locally] Version release commit
   `7abaea700130207ab2a57cf6ae4881f9673ff93d` contains only the reviewed
   v1.5.10 release scope above.
-- [pending] Push this version-only branch, open and merge its PR to `main`,
+- [pushed/PR open] Branch `codex/release-v1.5.10` is on `origin`; release PR
+  #332 targets `main` at
+  `https://github.com/Fei-Away/Codex-Dream-Skin/pull/332`.
+- [pending] Require all PR CI jobs on the final head, merge #332 to `main`,
   then verify the sole Release workflow creates tag v1.5.10 and publishes
   non-empty DMG, Setup.exe, and SHA256SUMS.txt from the exact merge.
 
