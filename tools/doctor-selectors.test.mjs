@@ -27,6 +27,16 @@ assert.equal(
   ':is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])',
   "The message contract must bridge both legacy and Codex 26.727 role boundaries.",
 );
+assert.equal(
+  selectorFor("home-route"),
+  '[role="main"]',
+  "The home route must not depend on the home-icon testid removed in ChatGPT-mode 26.727 home.",
+);
+assert.equal(
+  selectorFor("home-icon"),
+  ':is([data-testid="home-icon"], [role="main"] .heading-xl)',
+  "The home signal must bridge Codex-mode home-icon and ChatGPT-mode heading-xl.",
+);
 const resultFor = (baseState, hits, overlay = false) => gradeDoctorResult(contract, {
   baseState,
   overlay,

@@ -890,6 +890,43 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HO
 html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:first-child { justify-content: center !important; }
 html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button > span:last-child { align-items: center !important; text-align: center !important; }
 
+/* Codex 26.727 ChatGPT-mode home (chat and Work sub-modes): the native grid
+   centers the composer and stacks suggestion cards vertically beneath it.
+   Re-flow the second grid row so the composer docks to the bottom and
+   ChatGPT-mode cards render as a horizontal row above it, matching the
+   Codex-mode/gallery layout. The selectors are deliberately narrow to the
+   ChatGPT-mode structure; Codex mode already docks the composer and uses a
+   native auto-fit card grid. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ > div.grid.grid-rows-2 > div:last-child {
+  justify-content: flex-end !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ > div.grid.grid-rows-2 > div:last-child > div.relative.z-20 {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ > div.grid.grid-rows-2 > div:last-child > div.relative.z-20 > div > div.order-last {
+  order: -1 !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ section.group\/home-suggestions > div > div.flex.min-h-32.flex-col.py-2.ps-6.justify-start {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+  padding-inline: 0 !important;
+}
+
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ section.group\/home-suggestions > div > div.flex.min-h-32.flex-col.py-2.ps-6.justify-start > button {
+  flex: 0 1 clamp(200px, 30%, 280px) !important;
+  width: auto !important;
+  max-width: 100% !important;
+}
+
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
   overflow: visible !important;
   border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
@@ -900,6 +937,28 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
 }
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__::before { content: none !important; }
+
+/* Hide the native Codex usage-limit upsell card that renders above the
+   composer on home and task routes. The banner is the only aside inside the
+   composer root; scoping keeps unrelated asides (sidebar/thread) intact. */
+html[data-dream-skin="active"] [data-codex-composer-root] aside {
+  display: none !important;
+}
+
+/* Codex 26.727 ChatGPT+Work home renders the same upsell card in an absolute
+   bottom overlay above the composer instead of inside the composer root.
+   The home route (role=main) carries no other asides, so scope there too. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ aside {
+  display: none !important;
+}
+
+/* 26.727 can render the usage-limit upsell as an aside in different slots
+   (composer root, home route, thread bottom overlay). Match its distinctive
+   native card classes so every placement is hidden without touching other
+   aside surfaces. */
+html[data-dream-skin="active"] aside[class*="rounded-2xl"][class*="bg-token-main-surface-primary"][class*="shadow-xs"] {
+  display: none !important;
+}
 
 /* Newer app shells may no longer expose the selector contract above. The
    renderer assigns these parts only from one coherent main/composer/sidebar

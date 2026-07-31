@@ -134,8 +134,8 @@ function makeFixture({
     register(sidebarSelector, partFixtures.unrelatedAside);
     if (genericHome) {
       partFixtures.homeIcon = makeDomNode("generic-home-icon", partFixtures.main);
-      register('[data-testid="home-icon"]', partFixtures.homeIcon);
-      register('[role="main"]:has([data-testid="home-icon"])', partFixtures.main);
+      register(':is([data-testid="home-icon"], [role="main"] .heading-xl)', partFixtures.homeIcon);
+      register('[role="main"]', partFixtures.main);
       register('[role="main"]', partFixtures.main);
     }
   } else if (!settings) {
@@ -155,9 +155,9 @@ function makeFixture({
     register("aside.app-shell-left-panel", partFixtures.sidebar);
     register("main:is(.main-surface, [data-app-shell-main-surface], [class*=\"_MainContentSurface_\"])", partFixtures.main);
     register("header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*=\"_Header_\"])", partFixtures.header);
-    register('[data-testid="home-icon"]', partFixtures.homeIcon);
+    register(':is([data-testid="home-icon"], [role="main"] .heading-xl)', partFixtures.homeIcon);
     register('[data-feature="game-source"]', partFixtures.homeHero);
-    register('[role="main"]:has([data-testid="home-icon"])', partFixtures.home);
+    register('[role="main"]', partFixtures.home);
     register('[role="main"]', partFixtures.home);
     register(".group\\/project-selector", partFixtures.projectList);
     register(".thread-scroll-container", partFixtures.thread);

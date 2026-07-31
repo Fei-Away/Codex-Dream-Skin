@@ -4,6 +4,8 @@
 
 ### 修复
 
+- 适配 ChatGPT 顶层模式的 chat / Work 子模式首页（26.727）：输入框不再垂直居中，改为固定到底部；chat 模式建议卡由输入框下方的纵向堆叠改为输入框上方的横向排列，与 Codex 模式/官网画廊布局一致。`home-route` 不再依赖 26.727 ChatGPT 模式已移除的 `home-icon` testid，`home-icon` 信号同时兼容 Codex 模式的 testid 与 ChatGPT 模式的 `.heading-xl` 问候标题。
+- 隐藏原生“Codex 和工作使用额度已用完”upsell 卡片：同一卡片会出现在输入框容器内、首页容器内和 ChatGPT+Work 首页底部浮层三种位置，按容器 + 卡片特征类名双重兜底隐藏，不影响侧栏等其他 aside。
 - 修复 Codex Desktop 26.721.x 首页在 `home-icon` 延迟渲染时被误判为注入校验失败的问题（#306）。校验现在复用已由首页内容信号解析出的 `[role="main"]` 容器；严格的 `home-icon` 路径仍优先，旧版行为不变。
 - 修复显式浅色、宽幅 artwork 的 `taskMode: "full"` 任务页 Markdown 继承原生深色壳白色前景的问题（#309）。完整模式现与 ambient/banner 一样强制使用主题文本色，并保留浅色壳对比阴影。
 - 修复社区主题 ZIP 导入拒绝 `backdrop-filter: blur(var(--ds-theme-surface-blur))` 的问题（#312）。Safe CSS 仍只允许 `none`、0-20px blur 或注册的主题 blur 变量，不放宽到任意 filter 函数。

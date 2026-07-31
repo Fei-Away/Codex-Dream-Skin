@@ -692,13 +692,13 @@ async function readThemeSourceStamp(loadedTheme) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const branded = Boolean(document.querySelector(
+      ${stableTestidLiteral("app-shell-header-context-menu-surface")},
+    ));
     const genericCodexSurface = () => {
       if (location.protocol !== 'app:') return false;
       const main = document.querySelector('main, [role="main"]');
       const input = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
-      const branded = Boolean(document.querySelector(
-        ${stableTestidLiteral("app-shell-header-context-menu-surface")},
-      ));
       return Boolean(main && input && branded);
     };
     const markers = {
@@ -713,7 +713,7 @@ async function probeSession(session) {
     return {
       markers,
       codex: location.protocol === 'app:' &&
-        ((markers.shell && markers.sidebar) || settings || markers.main || markers.generic),
+        ((markers.shell && markers.sidebar) || settings || (markers.main && branded) || markers.generic),
     };
   })()`);
 }
@@ -866,7 +866,7 @@ export function earlyPayloadFor(payload, revision) {
       const branded = Boolean(document.querySelector(
         ${stableTestidLiteral("app-shell-header-context-menu-surface")},
       ));
-      return Boolean((shell && sidebar) || settings || main ||
+      return Boolean((shell && sidebar) || settings || (main && branded) ||
         (genericMain && genericInput && branded));
     };
     const install = () => {
