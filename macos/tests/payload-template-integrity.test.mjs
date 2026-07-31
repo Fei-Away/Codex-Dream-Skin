@@ -86,6 +86,10 @@ async function makeThemeDir(overrides) {
   return { directory, theme };
 }
 
+async function addSafeCss(directory, source) {
+  await fs.writeFile(path.join(directory, "theme.css"), source, "utf8");
+}
+
 // The payload is an IIFE. Injecting a `return` as the first statement of its
 // body recovers exactly the arguments the renderer would have received, without
 // running any renderer logic. If substitution corrupted the payload the values
@@ -159,6 +163,42 @@ test("a benign theme name is unaffected by the substitution fix", async () => {
   assert.equal(captured.themeConfig.name, name);
   assert.ok(!/__DREAM_SKIN_[A-Z0-9_]+_JSON__/.test(loaded.payload));
   assert.doesNotThrow(() => new vm.Script(loaded.payload));
+});
+
+test("payload injects only the compiled Safe CSS cascade, on both clients", async () => {
+  const source = `[data-ds-part="sidebar"] {
+  background-color: #123456;
+}
+[data-ds-part="header"] {
+  color: var(--ds-theme-color-text);
+}
+[data-ds-part="home-hero"] {
+  font-weight: 700;
+}
+[data-ds-part="composer"] {
+  border-radius: 17px;
+}
+[data-ds-part="composer-toolbar"] {
+  color: #abcdef;
+}`;
+  const { directory } = await makeThemeDir({ name: "Safe CSS cascade" });
+  await addSafeCss(directory, source);
+  const loaded = await loadPayload(directory);
+  const captured = readPayloadArguments(loaded.payload);
+  assert.equal(loaded.safeCssStatus, "validated");
+  assert.match(captured.cssText, /@layer dreamskin-accessibility, dreamskin-community;/);
+  assert.match(captured.cssText, /@layer dreamskin-community\s*\{/);
+  for (const declaration of [
+    "background-color: #123456 !important;",
+    "color: var(--ds-theme-color-text) !important;",
+    "font-weight: 700 !important;",
+    "border-radius: 17px !important;",
+    "color: #abcdef !important;",
+  ]) assert.ok(captured.cssText.includes(declaration), declaration);
+  assert.ok(captured.cssText.includes("background-image: none !important;"));
+  assert.match(captured.cssText, /composer-toolbar[^\n]+:where\(button:not/);
+  assert.ok(!captured.cssText.includes("background-color: #123456;\n"),
+    "The original unprioritized author source must not be appended to the payload.");
 });
 
 test("payload byte length does not drift with $ constructs", async () => {

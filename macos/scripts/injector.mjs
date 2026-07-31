@@ -230,8 +230,9 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   const viewportPass = hasReasonableDimensions(viewportWidth, viewportHeight);
   const documentVisible = result.documentVisibility === "visible";
   const settingsRoute = result.scope?.baseState === "settings";
+  const homeRoute = result.scope?.baseState === "home" || result.homeRoute || result.homePresent;
   const genericStructurePass = Boolean(result.genericMain?.visible) &&
-    (Boolean(result.genericInput?.visible) || Boolean(result.homePresent));
+    (Boolean(result.genericInput?.visible) || Boolean(homeRoute && result.homePresent));
   const structurePass = settingsRoute
     ? Boolean(result.settings?.visible)
     : (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible)) || genericStructurePass;
@@ -246,8 +247,8 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     && (!expected.expectedRevision || result.revision === expected.expectedRevision);
   const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
     ? result.suggestionLabels.filter((item) => item?.visible) : [];
-  const homeFallbackVisible = Boolean(result.homePresent && result.genericMain?.visible);
-  const homePass = !result.homeRoute || (
+  const homeFallbackVisible = Boolean(homeRoute && result.homePresent && result.genericMain?.visible);
+  const homePass = !homeRoute || (
     result.homePresent && ((result.hero?.visible && result.hero.width >= 280
       && result.hero.height >= 120) || homeFallbackVisible)
     && (result.visibleCardCount === 0 || (
@@ -272,7 +273,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   result.softNotes = {
     projectButtonOptional: !result.projectButton?.visible,
     composerOptionalOnNonTaskRoutes: !result.composer?.visible,
-    suggestionCardsOptional: result.homeRoute && result.visibleCardCount === 0,
+    suggestionCardsOptional: homeRoute && result.visibleCardCount === 0,
   };
   return result;
 }
@@ -609,8 +610,8 @@ async function loadSafeCss(assetsRoot) {
     if (!sameFileStat(before, after) || bytes.length !== after.size) {
       throw new Error("Theme Safe CSS changed while being loaded");
     }
-    const { source, validation } = decodeAndValidateSafeCss(bytes);
-    return { path: cssPath, source, stat: after, validation };
+    const { source, runtimeSource, validation } = decodeAndValidateSafeCss(bytes);
+    return { path: cssPath, runtimeSource, source, stat: after, validation };
   } finally {
     await handle.close();
   }
@@ -755,6 +756,7 @@ export async function loadTheme(themeDir) {
       extension,
       imagePath,
       safeCss: safeCss?.source ?? "",
+      safeCssRuntime: safeCss?.runtimeSource ?? "",
       safeCssPath: safeCss?.path ?? null,
       safeCssStatus: safeCss ? "validated" : "none",
       theme,
@@ -790,8 +792,8 @@ export async function loadPayload(themeDir) {
     loadTheme(themeDir),
   ]);
   const { css, template } = staticAssets;
-  const { art, extension, safeCss, safeCssStatus, theme } = loaded;
-  const combinedCss = safeCss ? `${css}\n${safeCss}\n` : css;
+  const { art, extension, safeCssRuntime, safeCssStatus, theme } = loaded;
+  const combinedCss = safeCssRuntime ? `${css}\n${safeCssRuntime}\n` : css;
   const styleRevision = createHash("sha256").update(combinedCss).digest("hex").slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
   if (!artMetadata) {

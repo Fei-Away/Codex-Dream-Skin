@@ -1,4 +1,6 @@
 /* Canonical cross-platform skin. Run tools/sync-runtime-assets.mjs after editing. */
+@layer dreamskin-accessibility, dreamskin-community;
+
 :root[data-dream-skin="active"] {
   color-scheme: dark !important;
   --ds-bg: #111318;
@@ -1275,7 +1277,7 @@ html[data-dream-skin="active"] button[class~="bg-token-foreground"] {
 }
 
 html[data-dream-skin="active"] article,
-html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px; }
+html[data-dream-skin="active"] [data-ds-part="message"] { border-radius: 16px; }
 
 @media (max-width: 1120px) {
   html[data-dream-skin="active"]
@@ -1303,13 +1305,15 @@ html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px;
   html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button { min-height: 112px !important; font-size: 12px !important; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-dream-skin="active"] *,
-  html[data-dream-skin="active"] *::before,
-  html[data-dream-skin="active"] *::after {
-    scroll-behavior: auto !important;
-    transition-duration: .01ms !important;
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
+@layer dreamskin-accessibility {
+  @media (prefers-reduced-motion: reduce) {
+    html[data-dream-skin="active"] *,
+    html[data-dream-skin="active"] *::before,
+    html[data-dream-skin="active"] *::after {
+      scroll-behavior: auto !important;
+      transition-duration: .01ms !important;
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+    }
   }
 }

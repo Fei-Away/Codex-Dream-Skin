@@ -257,6 +257,19 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
   });
   assert.equal(generic.result.pass, true);
   assert.equal(generic.result.readiness.structurePass, true);
+
+  const falseHome = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home" },
+      home: null,
+      homeSignal: null,
+      genericMain: makeElement({ rect: makeRect(900, 650, 20, 20) }),
+      genericInput: makeElement({ rect: makeRect(620, 80, 180, 620) }),
+    }),
+  });
+  assert.equal(falseHome.result.homePresent, false);
+  assert.equal(falseHome.result.pass, false,
+    "A renderer that claims Home must expose a real Home identity signal.");
 });
 
 test("home verification matches macOS and does not require a fixed suggestion-card count", async () => {

@@ -253,7 +253,10 @@ function Remove-DreamSkinManagedDirectoryVerified {
   if (-not (Test-Path -LiteralPath $fullPath -PathType Container -ErrorAction Stop)) {
     throw "Managed Dream Skin cleanup target is not a directory: $fullPath"
   }
-  Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
+  # Windows PowerShell 5.1's FileSystem provider cannot reliably recurse past
+  # MAX_PATH. Directory.Delete uses the framework's long-path support after the
+  # containment and reparse checks above have bound the exact managed target.
+  [System.IO.Directory]::Delete($fullPath, $true)
   if (Test-Path -LiteralPath $fullPath -ErrorAction Stop) {
     throw "Managed Dream Skin cleanup was not verified: $fullPath"
   }
@@ -724,6 +727,23 @@ function Get-DreamSkinThemeSemanticFingerprint {
   }
 }
 
+function Test-DreamSkinThemeDirectoryHasOnlyRuntimeFiles {
+  param([Parameter(Mandatory = $true)][string]$ThemeDirectory)
+  $loaded = Read-DreamSkinTheme -ThemeDirectory $ThemeDirectory -SkipImageMetadata
+  $allowed = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  foreach ($name in @('theme.json', [System.IO.Path]::GetFileName($loaded.ImagePath),
+      'theme.css', 'LICENSE.txt')) {
+    $null = $allowed.Add($name)
+  }
+  foreach ($entry in Get-ChildItem -LiteralPath $loaded.Directory -Force -ErrorAction Stop) {
+    Assert-DreamSkinNoReparseComponents -Path $entry.FullName
+    if ($entry.PSIsContainer -or -not $allowed.Contains($entry.Name)) { return $false }
+  }
+  return $true
+}
+
 function ConvertTo-DreamSkinCanonicalJsonValue {
   param([AllowNull()][object]$Value)
   if ($null -eq $Value -or $Value -is [string] -or $Value -is [char] -or
@@ -754,6 +774,154 @@ function ConvertTo-DreamSkinCanonicalJsonValue {
       -Value $Value.PSObject.Properties[$propertyName].Value
   }
   return [pscustomobject]$canonicalObject
+}
+
+function Write-DreamSkinCanonicalLength {
+  param(
+    [Parameter(Mandatory = $true)][System.IO.Stream]$Stream,
+    [Parameter(Mandatory = $true)][uint64]$Length
+  )
+  [byte[]]$bytes = [System.BitConverter]::GetBytes($Length)
+  if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($bytes) }
+  $Stream.Write($bytes, 0, $bytes.Length)
+}
+
+function Write-DreamSkinCanonicalString {
+  param(
+    [Parameter(Mandatory = $true)][System.IO.Stream]$Stream,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value
+  )
+  $Stream.WriteByte(4)
+  [byte[]]$bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+  Write-DreamSkinCanonicalLength -Stream $Stream -Length $bytes.Length
+  $Stream.Write($bytes, 0, $bytes.Length)
+}
+
+function Write-DreamSkinCanonicalJsonValue {
+  param(
+    [Parameter(Mandatory = $true)][System.IO.Stream]$Stream,
+    [Parameter(Mandatory = $true)][AllowNull()][object]$Value
+  )
+  if ($null -eq $Value) {
+    $Stream.WriteByte(0)
+    return
+  }
+  if ($Value -is [bool]) {
+    $Stream.WriteByte($(if ($Value) { 2 } else { 1 }))
+    return
+  }
+  if ($Value -is [string] -or $Value -is [char]) {
+    Write-DreamSkinCanonicalString -Stream $Stream -Value "$Value"
+    return
+  }
+  if ($Value -is [System.ValueType]) {
+    $Stream.WriteByte(3)
+    [double]$number = $Value
+    if ($number -eq 0) { $number = 0.0 }
+    [byte[]]$bytes = [System.BitConverter]::GetBytes($number)
+    if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($bytes) }
+    $Stream.Write($bytes, 0, $bytes.Length)
+    return
+  }
+  if ($Value -is [System.Collections.IDictionary]) {
+    [string[]]$keys = @($Value.Keys | ForEach-Object { "$_" })
+    [System.Array]::Sort($keys, [System.StringComparer]::Ordinal)
+    $Stream.WriteByte(6)
+    Write-DreamSkinCanonicalLength -Stream $Stream -Length $keys.Length
+    foreach ($key in $keys) {
+      Write-DreamSkinCanonicalString -Stream $Stream -Value $key
+      Write-DreamSkinCanonicalJsonValue -Stream $Stream -Value $Value[$key]
+    }
+    return
+  }
+  if ($Value -is [System.Collections.IEnumerable]) {
+    [object[]]$items = @($Value)
+    $Stream.WriteByte(5)
+    Write-DreamSkinCanonicalLength -Stream $Stream -Length $items.Length
+    foreach ($item in $items) {
+      Write-DreamSkinCanonicalJsonValue -Stream $Stream -Value $item
+    }
+    return
+  }
+  [string[]]$propertyNames = @($Value.PSObject.Properties | ForEach-Object Name)
+  [System.Array]::Sort($propertyNames, [System.StringComparer]::Ordinal)
+  $Stream.WriteByte(6)
+  Write-DreamSkinCanonicalLength -Stream $Stream -Length $propertyNames.Length
+  foreach ($propertyName in $propertyNames) {
+    Write-DreamSkinCanonicalString -Stream $Stream -Value $propertyName
+    Write-DreamSkinCanonicalJsonValue -Stream $Stream `
+      -Value $Value.PSObject.Properties[$propertyName].Value
+  }
+}
+
+function Get-DreamSkinCanonicalJsonFingerprint {
+  param([Parameter(Mandatory = $true)][AllowNull()][object]$Value)
+  $stream = [System.IO.MemoryStream]::new()
+  try {
+    [byte[]]$prefix = [System.Text.Encoding]::UTF8.GetBytes("dreamskin-canonical-json/1`0")
+    $stream.Write($prefix, 0, $prefix.Length)
+    Write-DreamSkinCanonicalJsonValue -Stream $stream -Value $Value
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      return ([System.BitConverter]::ToString(
+        $hasher.ComputeHash($stream.ToArray())
+      )).Replace('-', '').ToLowerInvariant()
+    } finally {
+      $hasher.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
+function Get-DreamSkinSourceThemeIdentity {
+  param([Parameter(Mandatory = $true)]$LoadedTheme)
+  try {
+    $sourceTheme = (Read-DreamSkinUtf8File -Path $LoadedTheme.ThemePath) |
+      ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "Theme metadata is invalid JSON: $($LoadedTheme.ThemePath)"
+  }
+  if ($null -eq $sourceTheme -or $sourceTheme -is [string] -or $sourceTheme -is [array]) {
+    throw 'Theme metadata must be a JSON object.'
+  }
+  $idProperty = $sourceTheme.PSObject.Properties['id']
+  $requestedId = if ($null -ne $idProperty -and $idProperty.Value -is [string]) {
+    "$($idProperty.Value)".Trim()
+  } else {
+    ''
+  }
+  $sourceTheme.PSObject.Properties.Remove('id')
+  $themeHash = Get-DreamSkinCanonicalJsonFingerprint -Value $sourceTheme
+  $imageHash = (Get-FileHash -LiteralPath $LoadedTheme.ImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  $cssPath = Join-Path $LoadedTheme.Directory 'theme.css'
+  $cssIdentity = 'absent'
+  if (Test-Path -LiteralPath $cssPath -PathType Leaf) {
+    Assert-DreamSkinNoReparseComponents -Path $cssPath
+    $cssIdentity = (Get-FileHash -LiteralPath $cssPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  $licensePath = Join-Path $LoadedTheme.Directory 'LICENSE.txt'
+  $licenseIdentity = 'absent'
+  if (Test-Path -LiteralPath $licensePath -PathType Leaf) {
+    Assert-DreamSkinNoReparseComponents -Path $licensePath
+    $licenseIdentity = (Get-FileHash -LiteralPath $licensePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  $identity = "dreamskin-source-theme-fallback/1`0theme.json`0$themeHash" +
+    "`0image`0$imageHash`0theme.css`0$cssIdentity`0LICENSE.txt`0$licenseIdentity"
+  $identityBytes = [System.Text.Encoding]::UTF8.GetBytes($identity)
+  $identityHasher = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $semanticFingerprint = ([System.BitConverter]::ToString(
+      $identityHasher.ComputeHash($identityBytes)
+    )).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $identityHasher.Dispose()
+  }
+  return [pscustomobject]@{
+    RequestedId = $requestedId
+    SourceIdIsString = $null -ne $idProperty -and $idProperty.Value -is [string]
+    SemanticFingerprint = $semanticFingerprint
+  }
 }
 
 function Get-DreamSkinThemeRuntimeContentFingerprint {
@@ -803,6 +971,27 @@ function Test-DreamSkinWindowsReservedPathStem {
   param([Parameter(Mandatory = $true)][string]$Name)
   $stem = ($Name -split '\.', 2)[0]
   return $stem -match '^(?i:CON|PRN|AUX|NUL|COM[1-9\u00B9\u00B2\u00B3]|LPT[1-9\u00B9\u00B2\u00B3])$'
+}
+
+function Get-DreamSkinStableWindowsThemeId {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$RequestedId,
+    [Parameter(Mandatory = $true)][string]$SemanticFingerprint
+  )
+  if ($RequestedId -cmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' -and
+    -not $RequestedId.EndsWith('.') -and
+    -not (Test-DreamSkinWindowsReservedPathStem -Name $RequestedId)) {
+    return $RequestedId
+  }
+  if (-not $RequestedId) { return 'import-' + $SemanticFingerprint.Substring(0, 24) }
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes("dreamskin-source-theme-id/1`0$RequestedId")
+  $hasher = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $hash = ([System.BitConverter]::ToString($hasher.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+    return 'import-' + $hash.Substring(0, 24)
+  } finally {
+    $hasher.Dispose()
+  }
 }
 
 function Assert-DreamSkinZipPathComponent {
@@ -1147,21 +1336,19 @@ function Import-DreamSkinThemeZip {
       throw 'Theme ZIP image must be beside theme.json.'
     }
 
+    $sourceIdentity = Get-DreamSkinSourceThemeIdentity -LoadedTheme $source
+    $requestedId = $sourceIdentity.RequestedId
     $injector = Join-Path $PSScriptRoot 'injector.mjs'
-    $payloadCheck = @(& $node.Path $injector '--check-payload' '--theme-dir' $sourceRoot 2>&1)
-    if ($LASTEXITCODE -ne 0) {
-      throw 'Theme ZIP failed theme.json or image payload validation.'
+    if ($sourceIdentity.SourceIdIsString) {
+      $payloadCheck = @(& $node.Path $injector '--check-payload' '--theme-dir' $sourceRoot 2>&1)
+      if ($LASTEXITCODE -ne 0) {
+        throw 'Theme ZIP failed theme.json or image payload validation.'
+      }
     }
 
     $fingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $sourceRoot
-    $requestedId = "$($source.Theme.id)".Trim()
-    $baseId = if ($requestedId -cmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' -and
-      -not $requestedId.EndsWith('.') -and
-      -not (Test-DreamSkinWindowsReservedPathStem -Name $requestedId)) {
-      $requestedId
-    } else {
-      'import-' + $fingerprint.Substring(0, 12)
-    }
+    $baseId = Get-DreamSkinStableWindowsThemeId -RequestedId $requestedId `
+      -SemanticFingerprint $sourceIdentity.SemanticFingerprint
     $records = [System.Collections.Generic.List[object]]::new()
     foreach ($savedDirectory in Get-ChildItem -LiteralPath $paths.Saved -Directory -Force -ErrorAction SilentlyContinue) {
       if ($savedDirectory.Name.StartsWith('.')) { continue }
@@ -1169,6 +1356,8 @@ function Import-DreamSkinThemeZip {
         $saved = Read-DreamSkinTheme -ThemeDirectory $savedDirectory.FullName -SkipImageMetadata
         $savedName = if ($saved.Theme.name) { "$($saved.Theme.name)" } else { $savedDirectory.Name }
         $savedFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $savedDirectory.FullName
+        $savedHasOnlyRuntimeFiles = Test-DreamSkinThemeDirectoryHasOnlyRuntimeFiles `
+          -ThemeDirectory $savedDirectory.FullName
         $savedThemeId = if ($saved.Theme.id) { "$($saved.Theme.id)".Trim() } else { '' }
         $contentFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
           -ThemeDirectory $savedDirectory.FullName
@@ -1179,6 +1368,7 @@ function Import-DreamSkinThemeZip {
           ThemeId = $savedThemeId
           Name = $savedName
           Fingerprint = $savedFingerprint
+          HasOnlyRuntimeFiles = $savedHasOnlyRuntimeFiles
           ContentFingerprint = $contentFingerprint
         })
       } catch {}
@@ -1220,7 +1410,8 @@ function Import-DreamSkinThemeZip {
     # theme may intentionally use an ID such as <base>-2. Only an identical
     # semantic fingerprint makes cleanup safe and reversible.
     $legacyCleanupRecords = @($legacySuffixRecords | Where-Object {
-      $_.EntryName -cne $baseId -and $_.Fingerprint -ceq $fingerprint
+      $_.EntryName -cne $baseId -and $_.Fingerprint -ceq $fingerprint -and
+        $_.HasOnlyRuntimeFiles
     })
     if ($exactCanonical -and $legacyCleanupRecords.Count -eq 0) {
       return [pscustomobject]@{
@@ -1278,6 +1469,9 @@ function Import-DreamSkinThemeZip {
       }
     }
     $null = Read-DreamSkinTheme -ThemeDirectory $publishStage
+    # Missing/non-string source IDs cannot pass the injector until the stable
+    # fallback ID has been written. This private-stage check remains mandatory
+    # and completes before any existing saved theme is moved or replaced.
     $stagedPayloadCheck = @(& $node.Path $injector '--check-payload' '--theme-dir' $publishStage 2>&1)
     if ($LASTEXITCODE -ne 0) { throw 'Imported theme failed final payload validation.' }
 
@@ -1287,7 +1481,7 @@ function Import-DreamSkinThemeZip {
     $legacyCleanupBackups = [System.Collections.Generic.List[object]]::new()
     try {
       if ($replaceExisting) {
-        $backup = Join-Path $paths.Saved ('.theme-replace-' + $id + '-' + [guid]::NewGuid().ToString('N'))
+        $backup = Join-Path $paths.Saved ('.theme-replace-' + [guid]::NewGuid().ToString('N'))
         Assert-DreamSkinNoReparseComponents -Path $destination
         [System.IO.Directory]::Move($destination, $backup)
       }
@@ -1304,7 +1498,7 @@ function Import-DreamSkinThemeZip {
         Assert-DreamSkinNoReparseComponents -Path $legacy.Directory
         if (Test-Path -LiteralPath $legacy.Directory -PathType Container) {
           $cleanupBackup = Join-Path $paths.Saved (
-            '.theme-legacy-cleanup-' + $legacy.EntryName + '-' + [guid]::NewGuid().ToString('N')
+            '.theme-legacy-cleanup-' + [guid]::NewGuid().ToString('N')
           )
           $null = $legacyCleanupBackups.Add([pscustomobject]@{
             Original = $legacy.Directory
@@ -1342,7 +1536,7 @@ function Import-DreamSkinThemeZip {
         try {
           if (Test-Path -LiteralPath $destination -ErrorAction Stop) {
             Assert-DreamSkinNoReparseComponents -Path $destination
-            $quarantine = Join-Path $paths.Saved ('.theme-failed-' + $id + '-' + [guid]::NewGuid().ToString('N'))
+            $quarantine = Join-Path $paths.Saved ('.theme-failed-' + [guid]::NewGuid().ToString('N'))
             [System.IO.Directory]::Move($destination, $quarantine)
             Remove-DreamSkinManagedDirectoryVerified -Path $quarantine -Root $paths.Root
           }
@@ -1386,6 +1580,7 @@ function Import-DreamSkinThemeZip {
       }
       throw $publishError
     }
+    $cleanupWarning = $null
     try {
       foreach ($cleanup in $legacyCleanupBackups) {
         Remove-DreamSkinManagedDirectoryVerified -Path $cleanup.Backup -Root $paths.Root
@@ -1396,7 +1591,10 @@ function Import-DreamSkinThemeZip {
         Remove-DreamSkinManagedDirectoryVerified -Path $backup -Root $paths.Root
       }
     } catch {
-      throw "Imported theme backup cleanup was not verified: $($_.Exception.Message)"
+      # The destination has already passed its final fingerprint check and the
+      # publish transaction is committed. A stale recovery copy is a cleanup
+      # warning, not grounds to roll back or report the import itself as failed.
+      $cleanupWarning = "Imported theme backup cleanup was not verified: $($_.Exception.Message)"
     }
     $name = if ($theme.name) { "$($theme.name)" } else { $id }
     $nameCollision = $false
@@ -1419,6 +1617,7 @@ function Import-DreamSkinThemeZip {
       SafeCssStatus = $safeCssStatus
       SignatureIgnored = $signatureIgnored
       ContentFingerprint = $contentFingerprint
+      CleanupWarning = $cleanupWarning
       Path = $destination
     }
   } finally {

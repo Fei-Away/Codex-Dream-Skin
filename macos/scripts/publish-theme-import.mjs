@@ -105,10 +105,87 @@ function normalizedFingerprint(theme, imageBytes, cssBytes = null, licenseBytes 
   return hash.digest("hex");
 }
 
+function updateCanonicalLength(hash, value) {
+  const bytes = Buffer.allocUnsafe(8);
+  bytes.writeBigUInt64BE(BigInt(value));
+  hash.update(bytes);
+}
+
+function updateCanonicalString(hash, value) {
+  const bytes = Buffer.from(value, "utf8");
+  hash.update(Buffer.from([4]));
+  updateCanonicalLength(hash, bytes.length);
+  hash.update(bytes);
+}
+
+function updateCanonicalJsonValue(hash, value) {
+  if (value === null) {
+    hash.update(Buffer.from([0]));
+  } else if (value === false) {
+    hash.update(Buffer.from([1]));
+  } else if (value === true) {
+    hash.update(Buffer.from([2]));
+  } else if (typeof value === "number") {
+    const bytes = Buffer.allocUnsafe(8);
+    bytes.writeDoubleBE(Object.is(value, -0) ? 0 : value);
+    hash.update(Buffer.from([3])).update(bytes);
+  } else if (typeof value === "string") {
+    updateCanonicalString(hash, value);
+  } else if (Array.isArray(value)) {
+    hash.update(Buffer.from([5]));
+    updateCanonicalLength(hash, value.length);
+    for (const item of value) updateCanonicalJsonValue(hash, item);
+  } else if (value && typeof value === "object") {
+    const keys = Object.keys(value).sort();
+    hash.update(Buffer.from([6]));
+    updateCanonicalLength(hash, keys.length);
+    for (const key of keys) {
+      updateCanonicalString(hash, key);
+      updateCanonicalJsonValue(hash, value[key]);
+    }
+  } else {
+    throw new TypeError("Theme JSON contains a value that cannot be canonicalized");
+  }
+}
+
+function canonicalJsonFingerprint(value) {
+  const hash = createHash("sha256").update("dreamskin-canonical-json/1\0", "utf8");
+  updateCanonicalJsonValue(hash, value);
+  return hash.digest("hex");
+}
+
+function sourceIdFallbackFingerprint(theme, imageBytes, cssBytes = null, licenseBytes = null) {
+  const semanticTheme = { ...theme };
+  delete semanticTheme.id;
+  const hashBytes = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const identity = [
+    "dreamskin-source-theme-fallback/1",
+    "theme.json", canonicalJsonFingerprint(semanticTheme),
+    "image", hashBytes(imageBytes),
+    "theme.css", cssBytes ? hashBytes(cssBytes) : "absent",
+    "LICENSE.txt", licenseBytes ? hashBytes(licenseBytes) : "absent",
+  ].join("\0");
+  return createHash("sha256").update(identity, "utf8").digest("hex");
+}
+
+function isWindowsReservedPathStem(value) {
+  const stem = value.split(".", 1)[0];
+  return /^(?:CON|PRN|AUX|NUL|COM[1-9\u00b9\u00b2\u00b3]|LPT[1-9\u00b9\u00b2\u00b3])$/i.test(stem);
+}
+
 function safeBaseId(value, fingerprint) {
   const candidate = typeof value === "string" ? value.trim() : "";
-  if (/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(candidate)) return candidate;
-  return `import-${fingerprint.slice(0, 12)}`;
+  if (
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(candidate)
+    && !candidate.endsWith(".")
+    && !isWindowsReservedPathStem(candidate)
+  ) return candidate;
+  if (!candidate) return `import-${fingerprint.slice(0, 24)}`;
+  const identity = createHash("sha256")
+    .update("dreamskin-source-theme-id/1\0")
+    .update(candidate)
+    .digest("hex");
+  return `import-${identity.slice(0, 24)}`;
 }
 
 function displayName(theme) {
@@ -126,10 +203,15 @@ async function readStoredTheme(directory) {
       readOptionalRegular(path.join(directory, "LICENSE.txt"), "Saved theme license", MAX_LICENSE_BYTES),
     ]);
     if (cssBytes) decodeAndValidateSafeCss(cssBytes);
+    const allowedFiles = new Set(["theme.json", theme.image, "theme.css", "LICENSE.txt"]);
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+    const hasOnlyRuntimeFiles = entries.every((entry) =>
+      entry.isFile() && !entry.isSymbolicLink() && allowedFiles.has(entry.name));
     return {
       theme,
       fingerprint: normalizedFingerprint(theme, imageBytes, cssBytes, licenseBytes),
       contentFingerprint: runtimeThemeContentFingerprint(theme, imageBytes, cssBytes),
+      hasOnlyRuntimeFiles,
     };
   } catch {
     return null;
@@ -231,6 +313,12 @@ async function main() {
   decodeAndValidateSafeCss(cssBytes);
   const safeCssStatus = "validated";
   const fingerprint = normalizedFingerprint(sourceTheme, imageBytes, cssBytes, licenseBytes);
+  const fallbackFingerprint = sourceIdFallbackFingerprint(
+    sourceTheme,
+    imageBytes,
+    cssBytes,
+    licenseBytes,
+  );
   const releaseLock = await acquireLock(themesRoot);
   let temporary = "";
   try {
@@ -256,7 +344,7 @@ async function main() {
       storedById.set(entry.name, record);
     }
 
-    const baseId = safeBaseId(sourceTheme.id, fingerprint);
+    const baseId = safeBaseId(sourceTheme.id, fallbackFingerprint);
     let id = baseId;
     const existingForId = storedById.get(id) ?? null;
     const canonicalFingerprint = existingForId?.entryName === baseId
@@ -287,7 +375,9 @@ async function main() {
     // theme may intentionally use an ID such as `${baseId}-2`. Only an
     // identical semantic fingerprint makes cleanup safe and reversible.
     const legacyCleanupRecords = legacySuffixRecords.filter((record) =>
-      record.entryName !== baseId && record.fingerprint === fingerprint);
+      record.entryName !== baseId
+      && record.fingerprint === fingerprint
+      && record.stored.hasOnlyRuntimeFiles);
     if (exactCanonical && legacyCleanupRecords.length === 0) {
       return {
         status: "duplicate",
@@ -342,7 +432,7 @@ async function main() {
     const legacyCleanupBackups = [];
     try {
       if (replaceExisting) {
-        replacementBackup = path.join(themesRoot, `.theme-replace-${id}-${randomUUID()}`);
+        replacementBackup = path.join(themesRoot, `.theme-replace-${randomUUID()}`);
         assertContained(themesRoot, replacementBackup, "Imported theme replacement backup");
         await fs.rename(destination, replacementBackup);
       }
@@ -358,7 +448,7 @@ async function main() {
         await assertReplaceableDirectory(record.directory, "Legacy saved theme duplicate");
         const cleanupBackup = path.join(
           themesRoot,
-          `.theme-legacy-cleanup-${record.entryName}-${randomUUID()}`,
+          `.theme-legacy-cleanup-${randomUUID()}`,
         );
         assertContained(themesRoot, cleanupBackup, "Legacy saved theme cleanup backup");
         legacyCleanupBackups.push({
@@ -393,7 +483,7 @@ async function main() {
         try {
           if (await pathExists(destination)) {
             await assertReplaceableDirectory(destination, "Published theme rollback target");
-            const quarantine = path.join(themesRoot, `.theme-failed-${id}-${randomUUID()}`);
+            const quarantine = path.join(themesRoot, `.theme-failed-${randomUUID()}`);
             assertContained(themesRoot, quarantine, "Failed theme quarantine");
             await fs.rename(destination, quarantine);
             await removeDirectoryVerified(quarantine, "Failed theme quarantine");
@@ -431,6 +521,7 @@ async function main() {
       }
       throw error;
     }
+    let cleanupWarning = null;
     try {
       for (const record of legacyCleanupBackups) {
         await removeDirectoryVerified(record.backup, "Legacy duplicate cleanup backup");
@@ -441,7 +532,10 @@ async function main() {
         await removeDirectoryVerified(replacementBackup, "Theme replacement backup");
       }
     } catch (error) {
-      throw new Error(`Imported theme backup cleanup was not verified: ${error.message}`);
+      // The published destination has already passed its final fingerprint
+      // check. Retain the recovery copy and report cleanup separately instead
+      // of rolling back or misreporting the committed import as a failure.
+      cleanupWarning = `Imported theme backup cleanup was not verified: ${error.message}`;
     }
     return {
       status: "imported",
@@ -457,6 +551,7 @@ async function main() {
       safeCssStatus,
       signatureIgnored: Boolean(signatureBytes),
       contentFingerprint,
+      cleanupWarning,
     };
   } finally {
     if (temporary) await fs.rm(temporary, { recursive: true, force: true }).catch(() => {});

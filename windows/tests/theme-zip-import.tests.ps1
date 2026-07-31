@@ -63,6 +63,36 @@ function Write-TestThemePack {
   )
 }
 
+function Write-TestFallbackIdThemePack {
+  param(
+    [Parameter(Mandatory = $true)][string]$Directory,
+    [Parameter(Mandatory = $true)][ValidateSet('Missing', 'NonString')][string]$IdKind
+  )
+  New-Item -ItemType Directory -Path $Directory -Force | Out-Null
+  $projectRoot = Split-Path -Parent $Root
+  Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\images\gallery\skin-01.jpg') `
+    -Destination (Join-Path $Directory 'background.jpg') -Force
+  $theme = [ordered]@{
+    schemaVersion = 1
+    name = "Cross-platform & ' Fallback ID"
+    image = 'background.jpg'
+    appearance = 'auto'
+    art = [ordered]@{ focusX = 1e-7; safeArea = 'auto'; taskMode = 'auto' }
+    quote = 'CROSS PLATFORM FALLBACK'
+  }
+  if ($IdKind -ceq 'NonString') { $theme.Insert(1, 'id', 42) }
+  [System.IO.File]::WriteAllText(
+    (Join-Path $Directory 'theme.json'),
+    (($theme | ConvertTo-Json -Depth 8) + "`n"),
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  [System.IO.File]::WriteAllText(
+    (Join-Path $Directory 'theme.css'),
+    '[data-ds-part="root"] { color: var(--ds-theme-color-text); }' + "`n",
+    [System.Text.UTF8Encoding]::new($false)
+  )
+}
+
 function Write-TestOfficialThemePack {
   param(
     [Parameter(Mandatory = $true)][string]$Directory,
@@ -337,6 +367,26 @@ try {
   New-TestZipFromDirectory -Source $simpleWithoutCssSource -Archive $simpleWithoutCssArchive
   Assert-TestImportRejected -Archive $simpleWithoutCssArchive -Label 'simplified package without theme.css'
 
+  $missingIdSource = Join-Path $temporaryRoot 'missing-id-source'
+  $missingIdArchive = Join-Path $temporaryRoot 'missing-id.zip'
+  Write-TestFallbackIdThemePack -Directory $missingIdSource -IdKind Missing
+  New-TestZipFromDirectory -Source $missingIdSource -Archive $missingIdArchive
+  $missingId = Import-DreamSkinThemeZip -ArchivePath $missingIdArchive -StateRoot $stateRoot
+  if ($missingId.Status -cne 'Imported' -or
+    $missingId.Id -cne 'import-b009c788e6a9307c35ed281e' -or -not $missingId.Renamed) {
+    throw 'A missing source theme id did not use the stable cross-platform semantic fallback id.'
+  }
+
+  $nonStringIdSource = Join-Path $temporaryRoot 'non-string-id-source'
+  $nonStringIdArchive = Join-Path $temporaryRoot 'non-string-id.zip'
+  Write-TestFallbackIdThemePack -Directory $nonStringIdSource -IdKind NonString
+  New-TestZipFromDirectory -Source $nonStringIdSource -Archive $nonStringIdArchive
+  $nonStringId = Import-DreamSkinThemeZip `
+    -ArchivePath $nonStringIdArchive -StateRoot $stateRoot
+  if ($nonStringId.Status -cne 'Duplicate' -or $nonStringId.Id -cne $missingId.Id) {
+    throw 'A non-string source theme id diverged from the stable cross-platform semantic fallback id.'
+  }
+
   foreach ($reservedId in @(
     'con.theme',
     'aux',
@@ -351,14 +401,30 @@ try {
     New-TestZipFromDirectory -Source $reservedSource -Archive $reservedArchive
     $reserved = Import-DreamSkinThemeZip -ArchivePath $reservedArchive -StateRoot $stateRoot
     if ($reserved.Status -cne 'Imported' -or
-      $reserved.Id -cnotmatch '^import-[0-9a-f]{12}$' -or
+      $reserved.Id -cnotmatch '^import-[0-9a-f]{24}$' -or
       -not $reserved.Renamed -or
       [System.IO.Path]::GetFileName($reserved.Path) -cne $reserved.Id) {
       throw "Studio theme id $reservedId was not mapped to a safe Windows directory id."
     }
+    if ($reservedId -ceq 'con.theme' -and
+      $reserved.Id -cne 'import-931599c2985393be807cf0ed') {
+      throw 'The con.theme Windows-safe id mapping changed from its stable vector.'
+    }
     $reservedDuplicate = Import-DreamSkinThemeZip -ArchivePath $reservedArchive -StateRoot $stateRoot
     if ($reservedDuplicate.Status -cne 'Duplicate' -or $reservedDuplicate.Id -cne $reserved.Id) {
       throw "Studio theme id $reservedId was duplicated after its safe Windows id mapping."
+    }
+    if ($reservedId -ceq 'con.theme') {
+      $reservedUpdateSource = Join-Path $temporaryRoot 'official-reserved-con-theme-update-source'
+      $reservedUpdateArchive = Join-Path $temporaryRoot 'official-reserved-con-theme-update.zip'
+      Write-TestOfficialThemePack -Directory $reservedUpdateSource -Id $reservedId `
+        -Name 'Reserved Windows ID con.theme updated'
+      New-TestZipFromDirectory -Source $reservedUpdateSource -Archive $reservedUpdateArchive
+      $reservedUpdate = Import-DreamSkinThemeZip -ArchivePath $reservedUpdateArchive -StateRoot $stateRoot
+      if ($reservedUpdate.Status -cne 'Imported' -or -not $reservedUpdate.Replaced -or
+        $reservedUpdate.Id -cne $reserved.Id) {
+        throw 'A newer Windows-reserved source theme id was not updated in place.'
+      }
     }
   }
 
@@ -486,6 +552,25 @@ try {
     throw 'Exact canonical/legacy consolidation left hidden transaction directories.'
   }
 
+  $legacyExtraDirectory = Join-Path $paths.Saved 'legacy-extra-2'
+  Write-TestThemePack -Directory $legacyExtraDirectory -Id 'legacy-extra-2' `
+    -Name 'Legacy Extra' -Quote 'LEGACY EXTRA CONTENT'
+  [System.IO.File]::WriteAllText(
+    (Join-Path $legacyExtraDirectory 'KEEP.txt'),
+    "preserve this independent file`r`n",
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  $legacyExtraSource = Join-Path $temporaryRoot 'legacy-extra-source'
+  $legacyExtraArchive = Join-Path $temporaryRoot 'legacy-extra.zip'
+  Write-TestThemePack -Directory $legacyExtraSource -Id 'legacy-extra' `
+    -Name 'Legacy Extra' -Quote 'LEGACY EXTRA CONTENT'
+  New-TestZipFromDirectory -Source $legacyExtraSource -Archive $legacyExtraArchive
+  $legacyExtra = Import-DreamSkinThemeZip -ArchivePath $legacyExtraArchive -StateRoot $stateRoot
+  if ($legacyExtra.Status -cne 'Imported' -or
+    -not (Test-Path -LiteralPath (Join-Path $legacyExtraDirectory 'KEEP.txt') -PathType Leaf)) {
+    throw 'A suffix directory with extra content was incorrectly consolidated.'
+  }
+
   $unrelatedSuffixDirectory = Join-Path $paths.Saved 'import-test-2'
   Write-TestThemePack -Directory $unrelatedSuffixDirectory -Id 'unrelated-theme' `
     -Name 'Unrelated Suffix' -Quote 'UNRELATED SUFFIX CONTENT'
@@ -572,6 +657,110 @@ try {
     Where-Object { $_.Name -like '.theme-*file-collision*' })
   if ($fileCollisionResidue.Count -gt 0) {
     throw 'A canonical file collision left hidden import or replacement state.'
+  }
+
+  $rollbackSourceA = Join-Path $temporaryRoot 'rollback-source-a'
+  $rollbackSourceB = Join-Path $temporaryRoot 'rollback-source-b'
+  $rollbackArchiveA = Join-Path $temporaryRoot 'rollback-a.zip'
+  $rollbackArchiveB = Join-Path $temporaryRoot 'rollback-b.zip'
+  Write-TestThemePack -Directory $rollbackSourceA -Id 'rollback-id' `
+    -Name 'Rollback Theme' -Quote 'ROLLBACK A'
+  Write-TestThemePack -Directory $rollbackSourceB -Id 'rollback-id' `
+    -Name 'Rollback Theme' -Quote 'ROLLBACK B'
+  New-TestZipFromDirectory -Source $rollbackSourceA -Archive $rollbackArchiveA
+  New-TestZipFromDirectory -Source $rollbackSourceB -Archive $rollbackArchiveB
+  $rollbackFirst = Import-DreamSkinThemeZip -ArchivePath $rollbackArchiveA -StateRoot $stateRoot
+  $rollbackFingerprintBefore = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $rollbackFirst.Path
+  $rollbackFilesBefore = @(Get-ChildItem -LiteralPath $rollbackFirst.Path -File | Sort-Object Name |
+    ForEach-Object { "$($_.Name):$($_.Length):$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)" })
+  $activeBeforeRollback = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $paths.Active
+  $script:RollbackOriginalFingerprint = (Get-Item Function:\Get-DreamSkinThemeSemanticFingerprint).ScriptBlock
+  $script:RollbackCanonical = [System.IO.Path]::GetFullPath($rollbackFirst.Path)
+  $script:RollbackInjectionHit = $false
+  function Get-DreamSkinThemeSemanticFingerprint {
+    param([Parameter(Mandatory = $true)][string]$ThemeDirectory)
+    $full = [System.IO.Path]::GetFullPath($ThemeDirectory)
+    $actual = & $script:RollbackOriginalFingerprint -ThemeDirectory $full
+    if (-not $script:RollbackInjectionHit -and
+      $full.Equals($script:RollbackCanonical, [System.StringComparison]::OrdinalIgnoreCase)) {
+      $loaded = Read-DreamSkinTheme -ThemeDirectory $full -SkipImageMetadata
+      if ("$($loaded.Theme.quote)" -ceq 'ROLLBACK B') {
+        $script:RollbackInjectionHit = $true
+        return ('0' * 64)
+      }
+    }
+    return $actual
+  }
+  $rollbackRejected = $false
+  try {
+    $null = Import-DreamSkinThemeZip -ArchivePath $rollbackArchiveB -StateRoot $stateRoot
+  } catch {
+    $rollbackRejected = "$($_.Exception.Message)" -match 'Published theme content does not match'
+  } finally {
+    Set-Item Function:\Get-DreamSkinThemeSemanticFingerprint -Value $script:RollbackOriginalFingerprint
+  }
+  $rollbackFilesAfter = @(Get-ChildItem -LiteralPath $rollbackFirst.Path -File | Sort-Object Name |
+    ForEach-Object { "$($_.Name):$($_.Length):$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)" })
+  $rollbackResidue = @(Get-ChildItem -LiteralPath $paths.Saved -Force -ErrorAction Stop |
+    Where-Object { $_.Name -match '^\.theme-(?:failed|import-|legacy-cleanup-|replace-)' })
+  if (-not $rollbackRejected -or -not $script:RollbackInjectionHit -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $rollbackFirst.Path) -cne $rollbackFingerprintBefore -or
+    (Compare-Object -ReferenceObject $rollbackFilesBefore -DifferenceObject $rollbackFilesAfter) -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $paths.Active) -cne $activeBeforeRollback -or
+    $rollbackResidue.Count -gt 0) {
+    throw 'A post-publish replacement failure did not restore the exact old theme without residue.'
+  }
+
+  $cleanupWarningSourceA = Join-Path $temporaryRoot 'cleanup-warning-source-a'
+  $cleanupWarningSourceB = Join-Path $temporaryRoot 'cleanup-warning-source-b'
+  $cleanupWarningArchiveA = Join-Path $temporaryRoot 'cleanup-warning-a.zip'
+  $cleanupWarningArchiveB = Join-Path $temporaryRoot 'cleanup-warning-b.zip'
+  Write-TestThemePack -Directory $cleanupWarningSourceA -Id 'cleanup-warning-id' `
+    -Name 'Cleanup Warning Theme' -Quote 'CLEANUP WARNING A'
+  Write-TestThemePack -Directory $cleanupWarningSourceB -Id 'cleanup-warning-id' `
+    -Name 'Cleanup Warning Theme' -Quote 'CLEANUP WARNING B'
+  New-TestZipFromDirectory -Source $cleanupWarningSourceA -Archive $cleanupWarningArchiveA
+  New-TestZipFromDirectory -Source $cleanupWarningSourceB -Archive $cleanupWarningArchiveB
+  $cleanupWarningFirst = Import-DreamSkinThemeZip `
+    -ArchivePath $cleanupWarningArchiveA -StateRoot $stateRoot
+  $cleanupWarningOldFingerprint = Get-DreamSkinThemeSemanticFingerprint `
+    -ThemeDirectory $cleanupWarningFirst.Path
+  $script:CleanupWarningOriginalRemove =
+    (Get-Item Function:\Remove-DreamSkinManagedDirectoryVerified).ScriptBlock
+  $script:CleanupWarningInjectionHit = $false
+  function Remove-DreamSkinManagedDirectoryVerified {
+    param(
+      [Parameter(Mandatory = $true)][string]$Path,
+      [Parameter(Mandatory = $true)][string]$Root
+    )
+    if ([System.IO.Path]::GetFileName($Path) -clike '.theme-replace-*') {
+      $script:CleanupWarningInjectionHit = $true
+      throw 'simulated committed-backup cleanup failure'
+    }
+    & $script:CleanupWarningOriginalRemove -Path $Path -Root $Root
+  }
+  try {
+    $cleanupWarningResult = Import-DreamSkinThemeZip `
+      -ArchivePath $cleanupWarningArchiveB -StateRoot $stateRoot
+  } finally {
+    Set-Item Function:\Remove-DreamSkinManagedDirectoryVerified `
+      -Value $script:CleanupWarningOriginalRemove
+  }
+  $cleanupWarningBackups = @(Get-ChildItem -LiteralPath $paths.Saved -Directory -Force |
+    Where-Object { $_.Name -clike '.theme-replace-*' })
+  $cleanupWarningPublished = Read-DreamSkinTheme `
+    -ThemeDirectory $cleanupWarningFirst.Path -SkipImageMetadata
+  if (-not $script:CleanupWarningInjectionHit -or
+    $cleanupWarningResult.Status -cne 'Imported' -or -not $cleanupWarningResult.Replaced -or
+    "$($cleanupWarningPublished.Theme.quote)" -cne 'CLEANUP WARNING B' -or
+    $cleanupWarningResult.CleanupWarning -cnotmatch 'committed-backup cleanup failure' -or
+    $cleanupWarningBackups.Count -ne 1 -or
+    (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $cleanupWarningBackups[0].FullName) -cne
+      $cleanupWarningOldFingerprint) {
+    throw 'A committed import was rolled back or reported failed when obsolete backup cleanup failed.'
+  }
+  foreach ($cleanupWarningBackup in $cleanupWarningBackups) {
+    Remove-DreamSkinManagedDirectoryVerified -Path $cleanupWarningBackup.FullName -Root $paths.Root
   }
 
   $wrappedRoot = Join-Path $temporaryRoot 'wrapped-source'

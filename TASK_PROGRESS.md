@@ -1,5 +1,93 @@
 # Task Progress
 
+## Windows Codex 26.727.4816 final worktree acceptance (2026-07-31)
+
+- [verified] The official Store package is `OpenAI.Codex_26.727.4816.0`; the
+  installed DreamSkin engine was replaced from this exact worktree under
+  `RemoteSigned`, and its CSS, renderer, selector, validator, and importer
+  hashes match the repository copies.
+- [verified] A real `dreamskin://apply` transaction downloaded and applied
+  Lyn-in's complete `juzizhoutou` package through the native confirmation UI.
+  The result confirmed size/SHA-256, ZIP, manifest, and Safe CSS validation.
+- [verified] Three current complete community themes from different creators
+  (`juzizhoutou`, `taishan-wuyue-duzun`, and `cecilylove002`) render in the real
+  Codex Home/task UI. Home reports `L1` with `missingL1=[]`; task navigation
+  refreshes to `thread/L1`; sidebar, header, message region, composer, toolbar,
+  background, and controls remain visible and interactive with no overflow.
+- [fixed] Real rendering exposed two final shared-runtime gaps. A root Safe CSS
+  background color now also clears the body's canonical image, and Codex
+  26.727's user/assistant conversation anchors now map to the public `message`
+  part while retaining the legacy selector. Real task inspection found 8/8
+  message anchors inside the thread and zero sidebar matches.
+- [verified] Final real screenshots are under
+  `%TEMP%\dreamskin-pr324-final-live`. Focused 34/34 Node regressions, selector
+  doctor, renderer runtime, asset sync, PowerShell 5.1/7 parsing, installer
+  static checks, and `git diff --check` pass. Full dual-PowerShell CI remains
+  the post-push gate; no merge, Release, or Issue mutation is authorized.
+
+## Windows continuation after macOS 26.727 fix — in progress (2026-07-31)
+
+- [verified] Draft PR #324 and the local branch are both at `98e308a`; the
+  macOS follow-up commits `9098060`/`98e308a` are present. The shared selector
+  change keeps the legacy anchors and adds Codex 26.727 app-shell attributes,
+  so its compatibility direction is appropriate for Windows as well. Real
+  Windows 26.727 acceptance is still pending.
+- [verified] On real Windows Codex `26.721.11231.0`, the updated selector
+  contract still reaches Home at `L1` with `missingL1=[]`. The new CSS parses
+  in the Windows Chromium 150 renderer, and shared macOS/Windows selector,
+  renderer, and CSS assets are byte-identical.
+- [reproduced] Full community-theme Safe CSS loads but loses the cascade for
+  sidebar, header, composer, home typography, and toolbar colors because the
+  canonical runtime uses `!important` while the untrusted Safe CSS contract
+  correctly rejects author-supplied `!important`. Root font-family is one of
+  the few declarations that currently wins.
+- [in progress] Keep the Safe CSS input contract unchanged, compile only the
+  already-validated declarations to a controlled runtime priority, synchronize
+  both platform assets, and add cascade regressions. Also tighten generic
+  composer/Home verification false positives before reinstalling the exact
+  worktree engine and repeating real Windows community-theme checks.
+- [fixed] The shared parser now recompiles only validated part/property/value
+  rules into the `dreamskin-community` cascade layer with client-owned
+  priority. Author CSS still rejects `!important`; original bytes remain the
+  semantic/fingerprint input. A higher-priority accessibility layer preserves
+  `prefers-reduced-motion` behavior.
+- [fixed] Generic composer fallback now requires an explicit composer/prompt
+  semantic owner and never marks a plain form or bare textbox. Home verification
+  fails when runtime scope claims Home but the real Home identity/surface is
+  absent; thread/settings routes retain their existing acceptance boundaries.
+- [verified] Shared runtime sync, renderer fixture, Windows readiness 10/10,
+  Safe CSS 9/9, and macOS/Windows payload tests 12/12 pass. macOS and Windows
+  generated CSS, renderer, and validator assets remain synchronized.
+- [in progress] Run the complete Node and Windows PowerShell 5.1/7 suites,
+  including the preserved same-ID, reserved-ID, long-path, legacy-suffix, and
+  rollback import cases. Then deploy the exact worktree engine and repeat real
+  Windows Codex computed-style and community-theme interaction checks.
+- [preserved] Existing uncommitted cross-platform importer changes remain in
+  the four macOS/Windows import implementation/test files. They are not being
+  reverted or overwritten. No merge, Release, Issue edit, or publish is in
+  scope until explicit authorization.
+- [fixed] A theme whose destination passed the final semantic fingerprint is
+  now treated as committed on both platforms even when obsolete backup cleanup
+  fails. The import returns `cleanupWarning`/`CleanupWarning`; manual import and
+  one-click apply show a bounded local warning without exposing the raw path or
+  rolling back the new theme.
+- [fixed] Invalid or Windows-reserved source IDs use one cross-platform stable
+  identity mapping. The fixed `con.theme` vector is
+  `import-931599c2985393be807cf0ed` on macOS and Windows, so a later package with
+  the same source ID updates in place instead of creating another directory.
+- [verified] Windows PowerShell 5.1 completed the full focused ZIP-import suite,
+  including same-ID replacement, exact duplicate, conservative legacy cleanup,
+  unrelated suffix preservation, file collision, pre-commit rollback,
+  committed cleanup warning and long-path cases. Focused macOS publisher,
+  community-link, Safe CSS, dual payload, renderer-runtime, readiness and asset
+  sync checks pass; the macOS immutable-backup cleanup case remains a macOS CI
+  execution because this worktree is on Windows.
+- [fixed] The trusted Safe CSS compiler now clears a core background image when
+  a validated part supplies `background-color`, bridges bounded root typography
+  and color to `body`, passes composer-toolbar color to its registered buttons,
+  and marks the real `game-source` node as `home-hero` when present. SPA DOM
+  mutations refresh both public parts and verification scope.
+
 ## Codex 26.727 real-renderer visual follow-up — in progress (2026-07-31)
 
 - [verified] Official Codex/ChatGPT `26.727.40816` is running with this Draft
@@ -461,3 +549,19 @@ Updated: 2026-07-31 14:29 HKT (Asia/Hong_Kong)
   approved `applyCompatible: true` package. Existing approved legacy
   production packages are intentionally preview/download-only.
 - Real Windows PowerShell 5.1 and Setup.exe protocol install require Windows CI/host verification.
+## Codex 26.727.4816 Message Bridge (2026-07-31)
+
+- [complete] Read-only inspection of the real Windows Codex 26.727.4816 task
+  renderer found zero `[data-message-author-role]` nodes. The current semantic
+  boundaries are four `[data-local-conversation-user-anchor]` nodes and four
+  `[data-local-conversation-final-assistant]` nodes; all eight are inside the
+  thread surface and none is in the sidebar.
+- [complete] The shared selector contract now retains the legacy message role
+  attribute and adds those two current semantic attributes. Core styling uses
+  the existing public `data-ds-part="message"` bridge, and generated macOS and
+  Windows selector/renderer/CSS assets are synchronized.
+- [verified] Selector doctor, both renderer runtime suites, both payload
+  integrity suites, runtime asset sync, JavaScript syntax, focused
+  `git diff --check`, and a second real-DOM read-only cardinality check pass.
+  No installed runtime, Codex process, active theme, PR, issue, commit, or push
+  was changed by this focused task.

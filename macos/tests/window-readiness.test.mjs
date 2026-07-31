@@ -68,12 +68,25 @@ assert.match(
 assert.equal(
   assessRendererVerification({
     ...baseRenderer,
+    scope: { level: "L1", baseState: "home" },
     homeRoute: true,
     homePresent: true,
     hero: { visible: true, width: 800, height: 520 },
   }, readyNativeWindow, exactPayload).pass,
   true,
   "A visible fallback home container must satisfy the ordinary home verification gate.",
+);
+assert.equal(
+  assessRendererVerification({
+    ...baseRenderer,
+    scope: { level: "L1", baseState: "home" },
+    homeRoute: false,
+    homePresent: false,
+    genericMain: { visible: true, width: 900, height: 640 },
+    genericInput: { visible: true, width: 620, height: 80 },
+  }, readyNativeWindow, exactPayload).pass,
+  false,
+  "A renderer that claims Home must expose a real Home identity signal.",
 );
 
 const windowCalls = [];

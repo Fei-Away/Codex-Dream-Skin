@@ -610,9 +610,10 @@
       const input = genericInputNodes().find((node) => !main || main.contains?.(node));
       if (!input) return [];
       const owner = input.closest?.(
-        'form, [data-testid*="composer" i], [class*="composer" i], [class*="prompt" i]',
+        '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
+        '[class*="composer" i], [class*="prompt" i]',
       );
-      return [owner && (!main || main.contains?.(owner)) ? owner : input];
+      return owner && (!main || main.contains?.(owner)) ? [owner] : [];
     })();
   const addPart = (desired, part, nodes) => {
     for (const node of nodes) {
@@ -637,7 +638,8 @@
     addPart(desired, "composer", [...selectorNodes("composer-chrome"), ...fallbackComposerNodes()]);
     addPart(desired, "composer-toolbar", selectorNodes("composer-toolbar"));
     addPart(desired, "dialog", selectorNodes("overlay-dialog"));
-    const homeHero = selectorNodes("home-icon")[0]?.parentElement;
+    const homeHero = selectorNodes("game-source")[0] ??
+      selectorNodes("home-icon")[0]?.parentElement;
     addPart(desired, "home-hero", homeHero ? [homeHero] : []);
 
     for (const node of partNodes) {
@@ -775,7 +777,10 @@
   };
   if (typeof MutationObserver === "function") {
     rootObserver = new MutationObserver(() => scheduleEnsure({ root: true }));
-    partObserver = new MutationObserver(() => scheduleEnsure({ parts: true }, 80));
+    // SPA route changes are observable as DOM mutations even when Chromium's
+    // Navigation API emits no event. Keep verification scope and public parts
+    // derived from the same post-mutation tree.
+    partObserver = new MutationObserver(() => scheduleEnsure({ scope: true, parts: true }, 80));
   }
 
   let mediaQuery = null;
@@ -845,7 +850,7 @@
     bodyReadyHandler = () => {
       if (!window[DISABLED_KEY]) {
         observeBody();
-        scheduleEnsure({ parts: true }, 0);
+        scheduleEnsure({ scope: true, parts: true }, 0);
       }
     };
     document.addEventListener("DOMContentLoaded", bodyReadyHandler, { once: true });

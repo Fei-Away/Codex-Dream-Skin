@@ -6,8 +6,16 @@ import { spawn } from "node:child_process";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const macosRoot = path.resolve(here, "..");
+const projectRoot = path.resolve(macosRoot, "..");
 const publisher = path.join(macosRoot, "scripts", "publish-theme-import.mjs");
 const fixtureImage = path.join(macosRoot, "assets", "portal-hero.png");
+const crossPlatformFixtureImage = path.join(
+  projectRoot,
+  "docs",
+  "images",
+  "gallery",
+  "skin-01.jpg",
+);
 const tempRoot = await fs.mkdtemp(path.join("/tmp", "codex-dream-skin-publish-"));
 const themesRoot = path.join(tempRoot, "themes");
 const activeRoot = path.join(tempRoot, "theme");
@@ -44,15 +52,16 @@ function runCommand(command, args) {
 
 async function makeStage(name, id, extra = {}) {
   const stage = path.join(tempRoot, name);
+  const imageName = extra.imageName ?? "background.png";
   await fs.mkdir(stage);
-  await fs.copyFile(fixtureImage, path.join(stage, "background.png"));
+  await fs.copyFile(extra.fixtureImage ?? fixtureImage, path.join(stage, imageName));
   await fs.writeFile(
     path.join(stage, "theme.json"),
     `${JSON.stringify({
       schemaVersion: 1,
       id,
       name: extra.displayName ?? "Imported Theme",
-      image: "background.png",
+      image: imageName,
       appearance: "auto",
       art: { safeArea: "auto", taskMode: "auto" },
       ...extra.theme,
@@ -118,6 +127,7 @@ try {
     safeCssStatus: "validated",
     signatureIgnored: false,
     contentFingerprint: undefined,
+    cleanupWarning: null,
   });
   assert.match(first.contentFingerprint, /^[0-9a-f]{64}$/);
 
@@ -208,6 +218,20 @@ try {
   );
   assert.deepEqual(await transactionResidue(), []);
 
+  const legacyExtraDirectory = await writeSavedTheme("legacy-extra-2", "legacy-extra-2", {
+    displayName: "Legacy Extra",
+    theme: { quote: "LEGACY EXTRA CONTENT" },
+  });
+  await fs.writeFile(path.join(legacyExtraDirectory, "KEEP.txt"), "preserve this independent file\n");
+  const legacyExtraStage = await makeStage("legacy-extra-stage", "legacy-extra", {
+    displayName: "Legacy Extra",
+    theme: { quote: "LEGACY EXTRA CONTENT" },
+  });
+  const legacyExtra = await publish(legacyExtraStage);
+  assert.equal(legacyExtra.status, "imported");
+  assert.equal(await fs.readFile(path.join(legacyExtraDirectory, "KEEP.txt"), "utf8"),
+    "preserve this independent file\n");
+
   await writeSavedTheme("theme-id-2", "unrelated-theme", {
     displayName: "Unrelated Suffix",
     theme: { quote: "UNRELATED SUFFIX CONTENT" },
@@ -224,6 +248,8 @@ try {
   assert.equal(preserveSuffix.status, "imported");
   assert.equal(preserveSuffix.id, "theme-id");
   assert.deepEqual(await savedThemeNames(), [
+    "legacy-extra",
+    "legacy-extra-2",
     "legacy-reimport",
     "theme-id",
     "theme-id-2",
@@ -319,14 +345,94 @@ try {
       "ROLLBACK INCOMING CONTENT",
     );
     assert.deepEqual(await transactionResidue(), []);
+
+    const cleanupCanonical = await writeSavedTheme("cleanup-warning-id", "cleanup-warning-id", {
+      displayName: "Cleanup Warning Theme",
+      theme: { quote: "CLEANUP WARNING A" },
+    });
+    const cleanupStage = await makeStage("cleanup-warning-stage", "cleanup-warning-id", {
+      displayName: "Cleanup Warning Theme",
+      theme: { quote: "CLEANUP WARNING B" },
+    });
+    await runCommand("/usr/bin/chflags", ["uchg", path.join(cleanupCanonical, "theme.json")]);
+    let cleanupResult;
+    try {
+      cleanupResult = await publish(cleanupStage);
+      assert.equal(cleanupResult.status, "imported");
+      assert.equal(cleanupResult.replaced, true);
+      assert.match(cleanupResult.cleanupWarning, /backup cleanup was not verified/i);
+      assert.equal(
+        JSON.parse(await fs.readFile(path.join(cleanupCanonical, "theme.json"), "utf8")).quote,
+        "CLEANUP WARNING B",
+      );
+      const cleanupBackups = (await fs.readdir(themesRoot))
+        .filter((name) => name.startsWith(".theme-replace-"));
+      assert.equal(cleanupBackups.length, 1);
+      assert.equal(
+        JSON.parse(await fs.readFile(
+          path.join(themesRoot, cleanupBackups[0], "theme.json"),
+          "utf8",
+        )).quote,
+        "CLEANUP WARNING A",
+      );
+    } finally {
+      const cleanupBackups = (await fs.readdir(themesRoot))
+        .filter((name) => name.startsWith(".theme-replace-"));
+      for (const entry of cleanupBackups) {
+        const backup = path.join(themesRoot, entry);
+        await runCommand("/usr/bin/chflags", ["-R", "nouchg", backup]);
+        await fs.rm(backup, { recursive: true, force: true });
+      }
+    }
+    assert.deepEqual(await transactionResidue(), []);
   }
 
   const unsafeIdStage = await makeStage("unsafe-id", "../../escape", {
     displayName: "Unsafe ID Theme",
   });
   const unsafeId = await publish(unsafeIdStage);
-  assert.match(unsafeId.id, /^import-[0-9a-f]{12}$/);
+  assert.match(unsafeId.id, /^import-[0-9a-f]{24}$/);
   assert.equal(path.dirname(path.join(themesRoot, unsafeId.id)), themesRoot);
+
+  const fallbackVectorOptions = {
+    displayName: "Cross-platform & ' Fallback ID",
+    fixtureImage: crossPlatformFixtureImage,
+    imageName: "background.jpg",
+    theme: {
+      art: { focusX: 1e-7, safeArea: "auto", taskMode: "auto" },
+      quote: "CROSS PLATFORM FALLBACK",
+    },
+  };
+  const missingIdStage = await makeStage("missing-id", undefined, fallbackVectorOptions);
+  const missingId = await publish(missingIdStage);
+  assert.equal(missingId.status, "imported");
+  assert.equal(missingId.id, "import-b009c788e6a9307c35ed281e");
+  assert.equal(missingId.renamed, true);
+
+  const nonStringIdStage = await makeStage("non-string-id", 42, fallbackVectorOptions);
+  const nonStringId = await publish(nonStringIdStage);
+  assert.equal(nonStringId.status, "duplicate");
+  assert.equal(nonStringId.id, missingId.id);
+
+  const reservedStageA = await makeStage("reserved-a", "con.theme", {
+    displayName: "Reserved Cross-platform ID",
+    theme: { quote: "RESERVED A" },
+  });
+  const reservedA = await publish(reservedStageA);
+  assert.match(reservedA.id, /^import-[0-9a-f]{24}$/);
+  assert.equal(reservedA.id, "import-931599c2985393be807cf0ed");
+  assert.equal(reservedA.renamed, true);
+  const reservedStageB = await makeStage("reserved-b", "con.theme", {
+    displayName: "Reserved Cross-platform ID",
+    theme: { quote: "RESERVED B" },
+  });
+  const reservedB = await publish(reservedStageB);
+  assert.equal(reservedB.id, reservedA.id);
+  assert.equal(reservedB.replaced, true);
+  assert.equal(
+    (await savedThemeNames()).filter((name) => name === reservedA.id).length,
+    1,
+  );
 
   const linkedStageTarget = await makeStage("linked-stage-target", "linked-stage");
   const linkedStageRoot = path.join(tempRoot, "linked-stage-root");
@@ -350,7 +456,10 @@ try {
     `${JSON.stringify({ schemaVersion: 1, id: "linked", image: "background.png" })}\n`,
   );
   await fs.symlink(fixtureImage, path.join(linkedStage, "background.png"));
-  await assert.rejects(publish(linkedStage), /symbolic link/);
+  await assert.rejects(
+    publish(linkedStage),
+    process.platform === "win32" ? /require non-empty theme\.css/ : /symbolic link/,
+  );
 
   const badSchema = await makeStage("bad-schema", "bad-schema");
   const badConfig = JSON.parse(await fs.readFile(path.join(badSchema, "theme.json"), "utf8"));

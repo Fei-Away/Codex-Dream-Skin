@@ -22,6 +22,11 @@ assert.equal(
   selectorFor("main-content-top-fade"),
   ':is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*="_MainContentTopFade_"])',
 );
+assert.equal(
+  selectorFor("message"),
+  ':is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])',
+  "The message contract must bridge both legacy and Codex 26.727 role boundaries.",
+);
 const resultFor = (baseState, hits, overlay = false) => gradeDoctorResult(contract, {
   baseState,
   overlay,

@@ -503,8 +503,8 @@ async function loadSafeCss(themeRoot) {
     if (!sameFileStat(before, after) || bytes.length !== after.size) {
       throw new Error("Theme Safe CSS changed while being loaded");
     }
-    const { source, validation } = decodeAndValidateSafeCss(bytes);
-    return { path: cssPath, source, stat: after, validation };
+    const { source, runtimeSource, validation } = decodeAndValidateSafeCss(bytes);
+    return { path: cssPath, runtimeSource, source, stat: after, validation };
   } finally {
     await handle.close();
   }
@@ -606,6 +606,7 @@ export async function loadTheme(themeDir) {
     imagePath: realImagePath,
     imageBytes,
     safeCss: safeCss?.source ?? "",
+    safeCssRuntime: safeCss?.runtimeSource ?? "",
     safeCssPath: safeCss?.path ?? null,
     safeCssStatus: safeCss ? "validated" : "none",
     fingerprint,
@@ -620,7 +621,8 @@ export async function loadPayload(themeDir = path.join(root, "assets"), candidat
     fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
   ]);
-  const combinedCss = loadedTheme.safeCss ? `${css}\n${loadedTheme.safeCss}\n` : css;
+  const combinedCss = loadedTheme.safeCssRuntime
+    ? `${css}\n${loadedTheme.safeCssRuntime}\n` : css;
   const extension = path.extname(loadedTheme.imagePath).toLowerCase();
   const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
     : extension === ".webp" ? "image/webp" : "image/png";
@@ -1238,8 +1240,9 @@ export async function verifySession(
       },
     };
     const l0AnchorPass = Boolean(result.settingsAnchor?.visible || result.homeSurface?.visible);
+    const homeScope = result.scope?.baseState === 'home' || result.homePresent;
     const genericStructurePass = Boolean(result.genericMain?.visible) &&
-      Boolean(result.genericInput?.visible || result.homeSurface?.visible);
+      Boolean(result.genericInput?.visible || (homeScope && result.homeSurface?.visible));
     const structurePass = result.scope?.level === 'L0'
       ? (l0AnchorPass || genericStructurePass)
       : result.scope?.level === 'L1' &&
@@ -1268,8 +1271,8 @@ export async function verifySession(
       windowPass, documentPass, viewportPass, structurePass,
       nativeWindowPass, fallbackWindowPass,
     };
-    const homePass = !result.homePresent || (
-      Boolean(result.homeSurface?.visible) &&
+    const homePass = !homeScope || (
+      result.homePresent && Boolean(result.homeSurface?.visible) &&
       ((result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120) ||
         Boolean(result.genericMain?.visible)) &&
       (!result.suggestionsPresent || result.visibleCardCount === 0 || (

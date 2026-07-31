@@ -731,6 +731,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       let id = self.cleanMenuText(rawID)
       let safeCssStatus = value["safeCssStatus"] as? String ?? "none"
       let signatureIgnored = value["signatureIgnored"] as? Bool ?? false
+      let cleanupWarning = !(value["cleanupWarning"] as? String ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       if applyAfterImport {
         guard (status == "imported" || status == "duplicate"),
               safeCssStatus == "validated",
@@ -751,7 +753,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
           name: name,
           expectedContentFingerprint: contentFingerprint,
           cleanupRoot: cleanupRoot,
-          metadata: communityMetadata
+          metadata: communityMetadata,
+          cleanupWarning: cleanupWarning
         )
         return
       }
@@ -788,6 +791,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       if signatureIgnored {
         details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
       }
+      if cleanupWarning {
+        details += "\n主题已成功保存，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。"
+      }
       self.finishThemeOperation(cleanupRoot: cleanupRoot)
       self.showInfo(title: "主题导入完成", message: details)
     }
@@ -798,7 +804,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     name: String,
     expectedContentFingerprint: String,
     cleanupRoot: URL?,
-    metadata: CommunityThemeMetadata?
+    metadata: CommunityThemeMetadata?,
+    cleanupWarning: Bool
   ) {
     guard CommunityThemeContract.isVersionID(metadata?.id ?? ""),
           id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#, options: .regularExpression) != nil,
@@ -835,9 +842,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         cleanupRoot: rollbackRetention.requiresOperationRoot ? nil : cleanupRoot
       )
       if result.succeeded {
+        var details = "“\(name)”已通过下载、SHA-256、主题包、Safe CSS 和可见渲染校验，并已切换到客户端。"
+        if cleanupWarning {
+          details += "\n\n主题已成功应用，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。"
+        }
         self.showInfo(
           title: "主题已应用",
-          message: "“\(name)”已通过下载、SHA-256、主题包、Safe CSS 和可见渲染校验，并已切换到客户端。"
+          message: details
         )
       } else if result.exitCode == 20 {
         self.showError(

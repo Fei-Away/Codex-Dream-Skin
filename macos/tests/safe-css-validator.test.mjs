@@ -68,6 +68,57 @@ test("accepts only the bounded public part/property/value contract", () => {
   }
 });
 
+test("compiles validated declarations into the controlled community cascade layer", () => {
+  const source = `[data-ds-part="sidebar"] {
+  background-color: var(--ds-theme-color-panel);
+  border-radius: 12px;
+}
+[data-ds-part="composer"]:focus-visible {
+  border-color: #abcdef;
+}`;
+  const expected = `@layer dreamskin-community {
+  [data-ds-part="sidebar"] {
+    background-color: var(--ds-theme-color-panel) !important;
+    background-image: none !important;
+    border-radius: 12px !important;
+  }
+  [data-ds-part="composer"]:focus-visible {
+    border-color: #abcdef !important;
+  }
+}
+`;
+  for (const validator of validators) {
+    assert.equal(validator.compileSafeCss(source), expected);
+    const decoded = validator.decodeAndValidateSafeCss(new TextEncoder().encode(source));
+    assert.equal(decoded.source, source);
+    assert.equal(decoded.runtimeSource, expected);
+    assert.equal(decoded.validation.status, "validated");
+  }
+});
+
+test("compiles bounded root and toolbar bridges for visible inherited styling", () => {
+  const source = `[data-ds-part="root"] {
+  background-color: #112233;
+  color: #ddeeff;
+  font-family: system-ui, sans-serif;
+}
+[data-ds-part="composer-toolbar"] {
+  color: var(--ds-theme-color-muted);
+}`;
+  for (const validator of validators) {
+    const runtime = validator.compileSafeCss(source);
+    assert.match(runtime, /\[data-ds-part="root"\] body \{/);
+    assert.match(runtime, /background-color: #112233 !important;/);
+    assert.match(
+      runtime,
+      /\[data-ds-part="root"\] body \{[^}]*background-image: none !important;/s,
+    );
+    assert.match(runtime, /font-family: system-ui, sans-serif !important;/);
+    assert.match(runtime, /composer-toolbar[^\n]+:where\(button:not/);
+    assert.match(runtime, /color: var\(--ds-theme-color-muted\) !important;/);
+  }
+});
+
 test("rejects selector escape, global reach, DOM coupling, and unregistered parts", () => {
   for (const source of [
     `:root { color: #fff; }`,

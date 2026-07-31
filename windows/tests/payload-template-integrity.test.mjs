@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import { loadPayload } from "../scripts/injector.mjs";
 
@@ -106,6 +107,16 @@ function extractThemeArgument(payload) {
   return JSON.parse(tail.slice(start, end + 1));
 }
 
+function extractPayloadArguments(payload) {
+  const marker = "((cssText, artDataUrl, themeConfig) => {";
+  const at = payload.indexOf(marker);
+  assert.notEqual(at, -1, "payload must keep the canonical renderer IIFE signature");
+  const probe = `${payload.slice(0, at + marker.length)}
+return { cssText, artDataUrl, themeConfig };
+${payload.slice(at + marker.length)}`;
+  return vm.runInNewContext(probe, Object.create(null), { timeout: 10_000 });
+}
+
 const DOLLAR_NAMES = [
   ["dollar-dollar", "a$$b"],
   ["dollar-ampersand", "a$&b"],
@@ -165,6 +176,37 @@ test("an ordinary theme name is unaffected by the fix", async () => {
     shipped.theme.name,
     "The shipped theme must round-trip through the payload unchanged.",
   );
+});
+
+test("Windows payload uses the same compiled Safe CSS cascade as macOS", async () => {
+  const themeDir = await fs.mkdtemp(path.join(os.tmpdir(), "dream-skin-safe-css-payload-"));
+  try {
+    await fs.copyFile(
+      path.join(assetsDir, "dream-reference.jpg"),
+      path.join(themeDir, "dream-reference.jpg"),
+    );
+    await fs.writeFile(path.join(themeDir, "theme.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "safe-css-cascade-fixture",
+      name: "Safe CSS cascade",
+      image: "dream-reference.jpg",
+      appearance: "auto",
+    }), "utf8");
+    const source = `[data-ds-part="sidebar"] { background-color: #123456; }
+[data-ds-part="composer"] { border-radius: 17px; }`;
+    await fs.writeFile(path.join(themeDir, "theme.css"), source, "utf8");
+    const loaded = await loadPayload(themeDir);
+    const captured = extractPayloadArguments(loaded.payload);
+    assert.equal(loaded.safeCssStatus, "validated");
+    assert.match(captured.cssText, /@layer dreamskin-accessibility, dreamskin-community;/);
+    assert.match(captured.cssText, /@layer dreamskin-community\s*\{/);
+    assert.ok(captured.cssText.includes("background-color: #123456 !important;"));
+    assert.ok(captured.cssText.includes("background-image: none !important;"));
+    assert.ok(captured.cssText.includes("border-radius: 17px !important;"));
+    assert.ok(!captured.cssText.includes("background-color: #123456; }"));
+  } finally {
+    await fs.rm(themeDir, { recursive: true, force: true });
+  }
 });
 
 test("the payload build refuses to emit a corrupted script", async () => {

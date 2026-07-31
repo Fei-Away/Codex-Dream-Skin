@@ -2,6 +2,7 @@ const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const MAX_RULES = 128;
 const MAX_DECLARATIONS = 512;
 const MAX_VALUE_CHARACTERS = 512;
+const RUNTIME_CASCADE_LAYER = "dreamskin-community";
 
 export const SAFE_CSS_PARTS = Object.freeze([
   "root",
@@ -300,6 +301,7 @@ class Parser {
     this.index = 0;
     this.ruleCount = 0;
     this.declarationCount = 0;
+    this.rules = [];
     this.lineStarts = [0];
     for (let index = 0; index < source.length; index += 1) {
       if (source[index] === "\n") this.lineStarts.push(index + 1);
@@ -333,7 +335,6 @@ class Parser {
     if (selectors.length !== 1) {
       this.fail("selector/list", "Safe CSS rules must contain exactly one registered selector", offset);
     }
-    const parts = [];
     for (const rawSelector of selectors) {
       const selector = rawSelector.trim();
       const match = selector.match(SIMPLE_SELECTOR);
@@ -344,9 +345,13 @@ class Parser {
           offset + Math.max(0, prelude.indexOf(rawSelector)),
         );
       }
-      parts.push(match[1]);
+      return {
+        part: match[1],
+        selector,
+        state: match[2] ?? null,
+      };
     }
-    return parts;
+    return null;
   }
 
   parseRule() {
@@ -361,15 +366,17 @@ class Parser {
     if (this.index >= this.source.length) this.fail("syntax/block", "Safe CSS rule is missing an opening brace", selectorOffset);
     const prelude = this.source.slice(selectorOffset, this.index).trim();
     if (!prelude) this.fail("selector/empty", "Safe CSS rule has an empty selector", selectorOffset);
-    this.parseSelector(prelude, selectorOffset);
+    const selector = this.parseSelector(prelude, selectorOffset);
     this.index += 1;
     this.ruleCount += 1;
     if (this.ruleCount > MAX_RULES) this.fail("limit/rules", `Safe CSS exceeds ${MAX_RULES} rules`, selectorOffset);
-    this.parseDeclarations();
+    const declarations = this.parseDeclarations();
+    this.rules.push({ selector, declarations });
   }
 
   parseDeclarations() {
     const seen = new Set();
+    const declarations = [];
     let count = 0;
     while (true) {
       this.skipWhitespace();
@@ -377,7 +384,7 @@ class Parser {
       if (this.source[this.index] === "}") {
         if (count === 0) this.fail("declaration/empty", "Safe CSS rules must contain at least one declaration");
         this.index += 1;
-        return;
+        return declarations;
       }
       const propertyOffset = this.index;
       while (this.index < this.source.length && this.source[this.index] !== ":") {
@@ -421,6 +428,7 @@ class Parser {
       if (!validatePropertyValue(property, value)) {
         this.fail("value/unsupported", `Safe CSS value is not allowed for ${property}`, valueOffset);
       }
+      declarations.push({ property, value });
       count += 1;
       this.declarationCount += 1;
       if (this.declarationCount > MAX_DECLARATIONS) {
@@ -437,11 +445,15 @@ class Parser {
       this.skipWhitespace();
     }
     if (this.ruleCount === 0) this.fail("stylesheet/empty", "Safe CSS must contain at least one rule", 0);
-    return { ruleCount: this.ruleCount, declarationCount: this.declarationCount };
+    return {
+      ruleCount: this.ruleCount,
+      declarationCount: this.declarationCount,
+      rules: this.rules,
+    };
   }
 }
 
-export function validateSafeCss(source, options = {}) {
+function parseSafeCss(source, options = {}) {
   if (typeof source !== "string") {
     throw new TypeError("Safe CSS source must be a string");
   }
@@ -471,13 +483,73 @@ export function validateSafeCss(source, options = {}) {
     parser.fail("syntax/escape", "Safe CSS escapes are not allowed", escape);
   }
   const parser = new Parser(source);
-  const result = parser.parse();
+  return { bytes, ...parser.parse() };
+}
+
+function validationResult(parsed) {
   return Object.freeze({
     contract: "dreamskin-safe-css/1",
     status: "validated",
-    bytes,
-    ...result,
+    bytes: parsed.bytes,
+    ruleCount: parsed.ruleCount,
+    declarationCount: parsed.declarationCount,
   });
+}
+
+function compileRuntimeCss(parsed) {
+  const compiledRules = [];
+  for (const { selector: selectorRecord, declarations } of parsed.rules) {
+    const { part, selector } = selectorRecord;
+    const runtimeDeclarations = [];
+    for (const declaration of declarations) {
+      runtimeDeclarations.push(declaration);
+      if (declaration.property === "background-color") {
+        runtimeDeclarations.push({ property: "background-image", value: "none" });
+      }
+    }
+    const body = runtimeDeclarations
+      .map(({ property, value }) => `    ${property}: ${value} !important;`)
+      .join("\n");
+    compiledRules.push(`  ${selector} {\n${body}\n  }`);
+
+    if (part === "root") {
+      const bodyDeclarations = [];
+      for (const declaration of declarations) {
+        if (![
+          "background-color", "color", "font-family", "font-size", "font-weight",
+          "letter-spacing", "line-height",
+        ].includes(declaration.property)) continue;
+        bodyDeclarations.push(declaration);
+        if (declaration.property === "background-color") {
+          bodyDeclarations.push({ property: "background-image", value: "none" });
+        }
+      }
+      if (bodyDeclarations.length > 0) {
+        const bodyBridge = bodyDeclarations
+          .map(({ property, value }) => `    ${property}: ${value} !important;`)
+          .join("\n");
+        compiledRules.push(`  ${selector} body {\n${bodyBridge}\n  }`);
+      }
+    }
+
+    const toolbarColor = part === "composer-toolbar"
+      ? declarations.find(({ property }) => property === "color") : null;
+    if (toolbarColor) {
+      const controls = `${selector} :where(button:not([class~="bg-token-foreground"]), ` +
+        `button:not([class~="bg-token-foreground"]) *)`;
+      compiledRules.push(`  ${controls} {\n    color: ${toolbarColor.value} !important;\n  }`);
+    }
+  }
+  const rules = compiledRules.join("\n");
+  return `@layer ${RUNTIME_CASCADE_LAYER} {\n${rules}\n}\n`;
+}
+
+export function validateSafeCss(source, options = {}) {
+  return validationResult(parseSafeCss(source, options));
+}
+
+export function compileSafeCss(source, options = {}) {
+  return compileRuntimeCss(parseSafeCss(source, options));
 }
 
 export function decodeAndValidateSafeCss(bytes, options = {}) {
@@ -488,7 +560,12 @@ export function decodeAndValidateSafeCss(bytes, options = {}) {
   } catch {
     throw new SafeCssValidationError("syntax/utf8", "Safe CSS is not valid UTF-8", 1, 1);
   }
-  return { source, validation: validateSafeCss(source, options) };
+  const parsed = parseSafeCss(source, options);
+  return {
+    source,
+    runtimeSource: compileRuntimeCss(parsed),
+    validation: validationResult(parsed),
+  };
 }
 
 export const SAFE_CSS_CONTRACT = Object.freeze({
