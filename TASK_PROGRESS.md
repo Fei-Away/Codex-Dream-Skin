@@ -19,7 +19,10 @@
   checks report v1.5.11; runtime asset sync and `git diff --check` pass. The
   complete applicable macOS suite passes with only its documented full-Xcode,
   installed signed-runtime, and Doctor branches skipped.
-- [pending] Review and commit the exact release diff, push and open a PR,
+- [committed locally] Reviewed release commit
+  `7d87e6e5ab14256ce6a44a2b7c327bfa6afef878` contains exactly the 12-file
+  v1.5.11 scope above.
+- [pending] Commit this progress checkpoint, push the branch and open a PR,
   require four exact-head CI jobs, then merge.
   Only the Release workflow from the resulting `main` commit may tag and build
   the public DMG, Setup.exe, and `SHA256SUMS.txt`.
