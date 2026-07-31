@@ -66,6 +66,13 @@ pwsh.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
 
 All commands must exit `0`. Keep the complete failure output if one does not.
 
+The automated generic renderer fixture is deliberately minimal: it contains
+only structural anchors such as main, sidebar, composer, and the registered
+Codex identity marker. Its typography, native form controls, placeholder copy,
+and layout are not product UI and are not visual acceptance evidence. Do not
+return a screenshot of that fixture as proof that #320 or #322 is fixed; the
+manual checks below must use the real current Codex app.
+
 ## Manual import checks (#318)
 
 Use ZIPs that contain non-empty `theme.json`, `theme.css`, and one registered
@@ -131,5 +138,7 @@ Report all of the following:
   suffix preservation, file-collision, and rollback results;
 - the names of the three non-colors-only themes used for renderer testing;
 - verification output, screenshot path, and whether restart/reapply passed;
+- confirmation that the screenshot came from the real Codex app, not the
+  generic renderer fixture;
 - sanitized `injector.log`, `injector-error.log`, and `verify.log` excerpts for
   any failure. Remove tokens, private paths, and conversation content.

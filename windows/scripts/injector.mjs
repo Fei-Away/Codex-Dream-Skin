@@ -694,9 +694,9 @@ async function probeSession(session) {
       if (location.protocol !== 'app:') return false;
       const main = document.querySelector('main, [role="main"]');
       const input = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
-      const text = [document.title, document.body?.innerText]
-        .map((value) => String(value || "")).join("\\n").slice(0, 1600);
-      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(text);
+      const branded = Boolean(document.querySelector(
+        ${stableTestidLiteral("app-shell-header-context-menu-surface")},
+      ));
       return Boolean(main && input && branded);
     };
     const markers = {
@@ -861,9 +861,9 @@ export function earlyPayloadFor(payload, revision) {
         document.querySelector(${stableTestidLiteral("theme-preview")});
       const genericMain = document.querySelector('main, [role="main"]');
       const genericInput = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
-      const identityText = [document.title, document.body?.innerText]
-        .map((value) => String(value || "")).join("\\n").slice(0, 1600);
-      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(identityText);
+      const branded = Boolean(document.querySelector(
+        ${stableTestidLiteral("app-shell-header-context-menu-surface")},
+      ));
       return Boolean((shell && sidebar) || settings || main ||
         (genericMain && genericInput && branded));
     };

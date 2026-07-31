@@ -7,6 +7,28 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression -ErrorAction Stop
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
 
+# A runtime failure injection is not deterministic across PowerShell 5.1 file
+# providers. Keep this source-order guard as a portable regression: the old
+# canonical backup must survive until the newly published semantic fingerprint
+# has been calculated and compared.
+$themeStoreSource = [System.IO.File]::ReadAllText((Join-Path $Root 'scripts\theme-windows.ps1'))
+$publishedFingerprintIndex = $themeStoreSource.IndexOf(
+  '$publishedFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $destination',
+  [System.StringComparison]::Ordinal
+)
+$publishedMismatchIndex = $themeStoreSource.IndexOf(
+  "if (`$publishedFingerprint -cne `$fingerprint) {",
+  [System.StringComparison]::Ordinal
+)
+$canonicalBackupCleanupIndex = $themeStoreSource.IndexOf(
+  'Remove-DreamSkinManagedDirectoryVerified -Path $backup -Root $paths.Root',
+  [System.StringComparison]::Ordinal
+)
+if ($publishedFingerprintIndex -lt 0 -or $publishedMismatchIndex -le $publishedFingerprintIndex -or
+  $canonicalBackupCleanupIndex -le $publishedMismatchIndex) {
+  throw 'Windows import can discard the canonical backup before final published-fingerprint validation.'
+}
+
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-zip-tests-$PID-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
@@ -434,6 +456,34 @@ try {
   $canonicalLegacyTheme = Read-DreamSkinTheme -ThemeDirectory (Join-Path $paths.Saved 'import-test') -SkipImageMetadata
   if ("$($canonicalLegacyTheme.Theme.name)" -cne 'Legacy Exact') {
     throw 'Legacy exact suffix repair did not publish the canonical replacement content.'
+  }
+
+  # Re-importing an exact package must still consolidate a pre-existing
+  # canonical/legacy pair; an early duplicate return would leave both dirs.
+  $legacyReimportDirectory = Join-Path $paths.Saved 'legacy-reimport'
+  $legacyReimportSuffixDirectory = Join-Path $paths.Saved 'legacy-reimport-2'
+  Write-TestThemePack -Directory $legacyReimportDirectory -Id 'legacy-reimport' `
+    -Name 'Legacy Re-import' -Quote 'LEGACY REIMPORT CONTENT'
+  Write-TestThemePack -Directory $legacyReimportSuffixDirectory -Id 'legacy-reimport-2' `
+    -Name 'Legacy Re-import' -Quote 'LEGACY REIMPORT CONTENT'
+  $legacyReimportSource = Join-Path $temporaryRoot 'legacy-reimport-source'
+  $legacyReimportArchive = Join-Path $temporaryRoot 'legacy-reimport.zip'
+  Write-TestThemePack -Directory $legacyReimportSource -Id 'legacy-reimport' `
+    -Name 'Legacy Re-import' -Quote 'LEGACY REIMPORT CONTENT'
+  New-TestZipFromDirectory -Source $legacyReimportSource -Archive $legacyReimportArchive
+  $legacyReimport = Import-DreamSkinThemeZip -ArchivePath $legacyReimportArchive -StateRoot $stateRoot
+  if ($legacyReimport.Status -cne 'Imported' -or $legacyReimport.Id -cne 'legacy-reimport' -or
+    -not $legacyReimport.Replaced -or (Test-Path -LiteralPath $legacyReimportSuffixDirectory)) {
+    throw 'An exact canonical/legacy pair returned duplicate instead of consolidating the canonical theme.'
+  }
+  $legacyReimportCanonical = Read-DreamSkinTheme -ThemeDirectory $legacyReimportDirectory -SkipImageMetadata
+  if ("$($legacyReimportCanonical.Theme.id)" -cne 'legacy-reimport') {
+    throw 'Exact legacy consolidation did not preserve the canonical internal theme id.'
+  }
+  $legacyReimportResidue = @(Get-ChildItem -LiteralPath $paths.Saved -Force -ErrorAction Stop |
+    Where-Object { $_.Name -match '^\.theme-(?:failed|import-|legacy-cleanup-|replace-)' })
+  if ($legacyReimportResidue.Count -gt 0) {
+    throw 'Exact canonical/legacy consolidation left hidden transaction directories.'
   }
 
   $unrelatedSuffixDirectory = Join-Path $paths.Saved 'import-test-2'

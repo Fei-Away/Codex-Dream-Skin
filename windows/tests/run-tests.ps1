@@ -1485,7 +1485,10 @@ try {
   if ($rendererTest.ExitCode -ne 0) { throw 'Renderer auxiliary-window regression test failed.' }
   $bootstrapTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'injector-bootstrap.test.mjs'))
-  if ($bootstrapTest.ExitCode -ne 0) { throw 'Injector early-bootstrap regression test failed.' }
+  if ($bootstrapTest.ExitCode -ne 0) {
+    $bootstrapDetail = ($bootstrapTest.Output -join "`n").Trim()
+    throw "Injector early-bootstrap regression test failed.`n$bootstrapDetail"
+  }
   $oneShotTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'injector-one-shot.test.mjs'))
   if ($oneShotTest.ExitCode -ne 0) { throw 'Injector one-shot Browser ID regression test failed.' }

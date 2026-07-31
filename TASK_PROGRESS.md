@@ -2,6 +2,30 @@
 
 Updated: 2026-07-31 14:29 HKT (Asia/Hong_Kong)
 
+## Privacy gate and legacy re-import regression — in progress (2026-07-31 14:49 HKT)
+
+- [fixed] Both platform injectors now use the registered Codex structural marker
+  `data-testid="app-shell-header-context-menu-surface"` for generic `app://`
+  identity. They no longer read page title, body text, or URL; the strict
+  `app:` protocol and generic main/input requirements remain in place.
+- [added] macOS and Windows bootstrap fixtures now cover an unbranded generic
+  `app:` rejection, a branded structural-marker acceptance, and source guards
+  against title/body/URL reads.
+- [added] macOS and Windows ZIP import suites explicitly cover an existing
+  canonical theme plus an exact `-2` legacy duplicate. Re-import must return
+  `Imported`, retain only canonical, and leave no transaction directories.
+- [added] Windows ZIP import suite statically verifies published semantic
+  fingerprint validation and mismatch handling precede canonical backup
+  deletion; no runtime failure-injection backdoor was introduced.
+- [verified] Both bootstrap fixtures pass under Node 22 and Node 24; the macOS
+  legacy re-import suite, injector syntax, runtime sync, renderer fixture,
+  static privacy/PowerShell-policy scan, and `git diff --check` pass.
+- [verified] Full portable suite: 74/74 passed. The complete macOS suite passed
+  with only the documented full-Xcode and installed-app Doctor branches
+  skipped; the current host does not provide those prerequisites.
+- [blocked] PowerShell 5.1/7 and real Windows renderer validation remain
+  unavailable on this macOS host and must be run by CI/user Windows machine.
+
 ## Pre-push verification — PR #324 (2026-07-31)
 
 - [fixed] Import replacement rollback is fail-closed on both platforms. A

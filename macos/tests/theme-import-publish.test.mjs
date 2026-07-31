@@ -183,6 +183,31 @@ try {
     "Legacy Exact",
   );
 
+  // Re-importing an exact package must still consolidate a pre-existing
+  // canonical/legacy pair; an early duplicate return would leave both dirs.
+  await writeSavedTheme("legacy-reimport", "legacy-reimport", {
+    displayName: "Legacy Re-import",
+    theme: { quote: "LEGACY REIMPORT CONTENT" },
+  });
+  await writeSavedTheme("legacy-reimport-2", "legacy-reimport-2", {
+    displayName: "Legacy Re-import",
+    theme: { quote: "LEGACY REIMPORT CONTENT" },
+  });
+  const legacyReimportStage = await makeStage("legacy-reimport-stage", "legacy-reimport", {
+    displayName: "Legacy Re-import",
+    theme: { quote: "LEGACY REIMPORT CONTENT" },
+  });
+  const legacyReimport = await publish(legacyReimportStage);
+  assert.equal(legacyReimport.status, "imported");
+  assert.equal(legacyReimport.id, "legacy-reimport");
+  assert.equal(legacyReimport.replaced, true);
+  assert.deepEqual(await savedThemeNames(), ["legacy-reimport", "theme-id", "third-id"]);
+  assert.equal(
+    await fs.access(path.join(themesRoot, "legacy-reimport-2")).then(() => true, () => false),
+    false,
+  );
+  assert.deepEqual(await transactionResidue(), []);
+
   await writeSavedTheme("theme-id-2", "unrelated-theme", {
     displayName: "Unrelated Suffix",
     theme: { quote: "UNRELATED SUFFIX CONTENT" },
@@ -198,7 +223,13 @@ try {
   const preserveSuffix = await publish(preserveSuffixStage);
   assert.equal(preserveSuffix.status, "imported");
   assert.equal(preserveSuffix.id, "theme-id");
-  assert.deepEqual(await savedThemeNames(), ["theme-id", "theme-id-2", "theme-id-3", "third-id"]);
+  assert.deepEqual(await savedThemeNames(), [
+    "legacy-reimport",
+    "theme-id",
+    "theme-id-2",
+    "theme-id-3",
+    "third-id",
+  ]);
   assert.equal(
     JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id-2", "theme.json"), "utf8")).id,
     "unrelated-theme",
