@@ -771,8 +771,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return
       }
       let renamed = value["renamed"] as? Bool ?? false
+      let replaced = value["replaced"] as? Bool ?? false
       let nameCollision = value["nameCollision"] as? Bool ?? false
-      var details = "已把“\(name)”加入“已保存的主题”，当前正在使用的主题没有改变。"
+      var details = replaced
+        ? "已更新“\(name)”的已保存版本，当前正在使用的主题没有改变。"
+        : "已把“\(name)”加入“已保存的主题”，当前正在使用的主题没有改变。"
       if renamed {
         details += "\n为避免覆盖同 ID 主题，已使用新标识：\(id)。"
       }

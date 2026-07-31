@@ -80,6 +80,9 @@ const generic = createFixture();
 vm.runInNewContext(earlyPayloadFor('window.installs.push("generic")', "generic"), generic.context);
 generic.markers.main = true;
 generic.markers.genericInput = true;
+generic.tick();
+assert.deepEqual(generic.context.window.installs, [],
+  "An unbranded app:// page with generic main/input anchors must remain untouched.");
 generic.brandAsCodex();
 generic.tick();
 assert.deepEqual(generic.context.window.installs, ["generic"],
@@ -107,6 +110,12 @@ assert.doesNotMatch(earlySource, /MutationObserver|childList|subtree/,
   "Early bootstrap must not observe the entire renderer DOM.");
 assert.match(earlySource, /DOMContentLoaded/);
 assert.match(earlySource, /setInterval\(install, 250\)/);
+const identityProbeStart = source.indexOf("async function probeSession");
+const identityProbeSource = source.slice(identityProbeStart, identityProbeStart + 1800);
+assert.ok(identityProbeStart >= 0, "The live target probe must remain covered by the identity test.");
+assert.match(identityProbeSource, /return Boolean\(main && input && branded\)/,
+  "The live target probe must require branding together with both generic anchors.");
+assert.doesNotMatch(identityProbeSource, /\(main && input\) \|\||\(main && branded\) \|\||\(input && branded\)/);
 const registrationStart = source.indexOf("earlyScriptId = await registerEarlyPayload");
 const evaluateStart = source.indexOf("await session.evaluate(earlyPayloadFor", registrationStart);
 const probeStart = source.indexOf("const probe = await waitForCodexProbe", registrationStart);

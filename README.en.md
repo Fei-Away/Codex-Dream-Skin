@@ -219,8 +219,11 @@ The local simplified ZIP must contain exactly non-empty `theme.json`, non-empty
 manifest integrity or compatibility declaration and should come from a trusted
 source. Limits are 32 MiB per archive, 32 entries, and 64 MiB expanded. Import
 adds the pack to **Saved Themes** without changing the active theme. Identical
-content is not duplicated, and a distinct pack with an existing ID is
-preserved under a new safe ID.
+content is not duplicated. A newer pack with the same ID updates the saved theme
+in place after the old directory identity is confirmed, and only legacy `-2`/`-3`
+directories with an identical semantic fingerprint are cleaned up. If the
+existing directory identity cannot be confirmed, import fails closed instead of
+overwriting it; names alone are never used to delete another theme.
 
 For a manual fallback, extract the archive and move the complete directory
 containing `theme.json`, `theme.css`, and its image into the saved-theme folder:

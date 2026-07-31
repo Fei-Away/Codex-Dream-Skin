@@ -238,6 +238,42 @@ function Ensure-DreamSkinManagedDirectory {
   }
 }
 
+function Remove-DreamSkinManagedDirectoryVerified {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root
+  )
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\')
+  if (-not ($fullPath.StartsWith($fullRoot + '\', [System.StringComparison]::OrdinalIgnoreCase))) {
+    throw "Managed Dream Skin cleanup escaped its state root: $fullPath"
+  }
+  if (-not (Test-Path -LiteralPath $fullPath -ErrorAction Stop)) { return }
+  Assert-DreamSkinNoReparseComponents -Path $fullPath
+  if (-not (Test-Path -LiteralPath $fullPath -PathType Container -ErrorAction Stop)) {
+    throw "Managed Dream Skin cleanup target is not a directory: $fullPath"
+  }
+  Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
+  if (Test-Path -LiteralPath $fullPath -ErrorAction Stop) {
+    throw "Managed Dream Skin cleanup was not verified: $fullPath"
+  }
+}
+
+function Assert-DreamSkinRestoredThemeFingerprint {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$ExpectedFingerprint,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  if (-not (Test-Path -LiteralPath $Path -PathType Container -ErrorAction Stop)) {
+    throw "$Label was not restored as a directory."
+  }
+  $actualFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $Path
+  if ($actualFingerprint -cne $ExpectedFingerprint) {
+    throw "$Label fingerprint does not match the pre-import record."
+  }
+}
+
 function Get-DreamSkinValidatedImageMetadata {
   param([Parameter(Mandatory = $true)][string]$Path)
   if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue)) {
@@ -1004,6 +1040,42 @@ function Expand-DreamSkinThemeZipSecurely {
   return $sourceRoot
 }
 
+function Get-DreamSkinLegacySuffixNumber {
+  param(
+    [Parameter(Mandatory = $true)][string]$Value,
+    [Parameter(Mandatory = $true)][string]$BaseId
+  )
+  if (-not $BaseId -or $Value -ceq $BaseId) {
+    return $null
+  }
+  $match = [System.Text.RegularExpressions.Regex]::Match($Value, '-([2-9][0-9]*)$')
+  if (-not $match.Success) { return $null }
+  $suffix = $match.Groups[1].Value
+  $marker = "-$suffix"
+  $prefixLength = [Math]::Max(0, 80 - $marker.Length)
+  $expectedPrefix = $BaseId.Substring(0, [Math]::Min($BaseId.Length, $prefixLength))
+  if ($Value.Substring(0, $Value.Length - $marker.Length) -cne $expectedPrefix) { return $null }
+  if ($suffix -cnotmatch '^[2-9][0-9]*$') { return $null }
+  $number = 0L
+  $parsed = [int64]::TryParse(
+    $suffix,
+    [System.Globalization.NumberStyles]::None,
+    [System.Globalization.CultureInfo]::InvariantCulture,
+    [ref]$number
+  )
+  if (-not $parsed) { return $null }
+  return $number
+}
+
+function Test-DreamSkinLegacySuffixRecord {
+  param(
+    [Parameter(Mandatory = $true)]$Record,
+    [Parameter(Mandatory = $true)][string]$BaseId
+  )
+  $suffix = Get-DreamSkinLegacySuffixNumber -Value $Record.EntryName -BaseId $BaseId
+  return $null -ne $suffix -and $Record.ThemeId -ceq $Record.EntryName
+}
+
 function Import-DreamSkinThemeZip {
   param(
     [Parameter(Mandatory = $true)][string]$ArchivePath,
@@ -1082,32 +1154,6 @@ function Import-DreamSkinThemeZip {
     }
 
     $fingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $sourceRoot
-    $existingNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($savedDirectory in Get-ChildItem -LiteralPath $paths.Saved -Directory -Force -ErrorAction SilentlyContinue) {
-      if ($savedDirectory.Name.StartsWith('.')) { continue }
-      try {
-        $saved = Read-DreamSkinTheme -ThemeDirectory $savedDirectory.FullName -SkipImageMetadata
-        $savedName = if ($saved.Theme.name) { "$($saved.Theme.name)" } else { $savedDirectory.Name }
-        $null = $existingNames.Add($savedName)
-        if ((Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $savedDirectory.FullName) -ceq $fingerprint) {
-          $contentFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
-            -ThemeDirectory $savedDirectory.FullName
-          return [pscustomobject]@{
-            Status = 'Duplicate'
-            Id = $savedDirectory.Name
-            Name = $savedName
-            Renamed = $false
-            NameCollision = $false
-            PackageFormat = $packageFormat
-            SafeCssStatus = $safeCssStatus
-            SignatureIgnored = $signatureIgnored
-            ContentFingerprint = $contentFingerprint
-            Path = $savedDirectory.FullName
-          }
-        }
-      } catch {}
-    }
-
     $requestedId = "$($source.Theme.id)".Trim()
     $baseId = if ($requestedId -cmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' -and
       -not $requestedId.EndsWith('.') -and
@@ -1116,11 +1162,91 @@ function Import-DreamSkinThemeZip {
     } else {
       'import-' + $fingerprint.Substring(0, 12)
     }
+    $records = [System.Collections.Generic.List[object]]::new()
+    foreach ($savedDirectory in Get-ChildItem -LiteralPath $paths.Saved -Directory -Force -ErrorAction SilentlyContinue) {
+      if ($savedDirectory.Name.StartsWith('.')) { continue }
+      try {
+        $saved = Read-DreamSkinTheme -ThemeDirectory $savedDirectory.FullName -SkipImageMetadata
+        $savedName = if ($saved.Theme.name) { "$($saved.Theme.name)" } else { $savedDirectory.Name }
+        $savedFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $savedDirectory.FullName
+        $savedThemeId = if ($saved.Theme.id) { "$($saved.Theme.id)".Trim() } else { '' }
+        $contentFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
+          -ThemeDirectory $savedDirectory.FullName
+        $records.Add([pscustomobject]@{
+          EntryName = $savedDirectory.Name
+          Directory = $savedDirectory.FullName
+          Theme = $saved.Theme
+          ThemeId = $savedThemeId
+          Name = $savedName
+          Fingerprint = $savedFingerprint
+          ContentFingerprint = $contentFingerprint
+        })
+      } catch {}
+    }
+
     $id = $baseId
+    $existingForId = @($records | Where-Object { $_.EntryName -ceq $baseId } | Select-Object -First 1)
+    $canonicalFingerprint = if ($existingForId.Count -gt 0) {
+      "$($existingForId[0].Fingerprint)"
+    } else {
+      $null
+    }
+    $legacySuffixRecords = @($records | Where-Object {
+      Test-DreamSkinLegacySuffixRecord -Record $_ -BaseId $baseId
+    } | Sort-Object { Get-DreamSkinLegacySuffixNumber -Value $_.EntryName -BaseId $baseId })
+    $exactRecords = @($records | Where-Object { $_.Fingerprint -ceq $fingerprint })
+    $exactCanonical = @($exactRecords | Where-Object { $_.EntryName -ceq $baseId } | Select-Object -First 1)
+    $exactLegacy = @($exactRecords | Where-Object {
+      Test-DreamSkinLegacySuffixRecord -Record $_ -BaseId $baseId
+    })
+    $exactUnrelated = @($exactRecords | Where-Object {
+      $_.EntryName -cne $baseId -and -not (Test-DreamSkinLegacySuffixRecord -Record $_ -BaseId $baseId)
+    } | Select-Object -First 1)
+    if (-not $existingForId -and $exactUnrelated -and $exactLegacy.Count -eq 0) {
+      return [pscustomobject]@{
+        Status = 'Duplicate'
+        Id = $exactUnrelated.EntryName
+        Name = $exactUnrelated.Name
+        Renamed = $false
+        NameCollision = $false
+        PackageFormat = $packageFormat
+        SafeCssStatus = $safeCssStatus
+        SignatureIgnored = $signatureIgnored
+        ContentFingerprint = $exactUnrelated.ContentFingerprint
+        Path = $exactUnrelated.Directory
+      }
+    }
+    # A suffix and a display name are not proof of lineage: a legitimate
+    # theme may intentionally use an ID such as <base>-2. Only an identical
+    # semantic fingerprint makes cleanup safe and reversible.
+    $legacyCleanupRecords = @($legacySuffixRecords | Where-Object {
+      $_.EntryName -cne $baseId -and $_.Fingerprint -ceq $fingerprint
+    })
+    if ($exactCanonical -and $legacyCleanupRecords.Count -eq 0) {
+      return [pscustomobject]@{
+        Status = 'Duplicate'
+        Id = $exactCanonical.EntryName
+        Name = $exactCanonical.Name
+        Renamed = $false
+        NameCollision = $false
+        PackageFormat = $packageFormat
+        SafeCssStatus = $safeCssStatus
+        SignatureIgnored = $signatureIgnored
+        ContentFingerprint = $exactCanonical.ContentFingerprint
+        Path = $exactCanonical.Directory
+      }
+    }
     $replaceExisting = $false
     $baseDestination = Join-Path $paths.Saved $id
-    if (Test-Path -LiteralPath $baseDestination -PathType Container) {
+    $basePathExists = Test-Path -LiteralPath $baseDestination -ErrorAction Stop
+    if ($basePathExists) {
+      if (-not (Test-Path -LiteralPath $baseDestination -PathType Container)) {
+        throw 'Existing saved theme path is not a directory; refusing replacement.'
+      }
       Assert-DreamSkinNoReparseComponents -Path $baseDestination
+      if (-not $existingForId -or "$($existingForId.ThemeId)" -cne $baseId) {
+        throw 'Existing saved theme identity could not be confirmed for replacement.'
+      }
       $replaceExisting = $true
     } else {
       $suffix = 2
@@ -1156,39 +1282,139 @@ function Import-DreamSkinThemeZip {
     if ($LASTEXITCODE -ne 0) { throw 'Imported theme failed final payload validation.' }
 
     $destination = Join-Path $paths.Saved $id
-    if ($replaceExisting) {
-      $backup = Join-Path $paths.Saved ('.theme-replace-' + $id + '-' + [guid]::NewGuid().ToString('N'))
-      Assert-DreamSkinNoReparseComponents -Path $destination
-      [System.IO.Directory]::Move($destination, $backup)
-      try {
-        [System.IO.Directory]::Move($publishStage, $destination)
-      } catch {
-        if ((Test-Path -LiteralPath $backup -PathType Container) -and
-          -not (Test-Path -LiteralPath $destination)) {
-          [System.IO.Directory]::Move($backup, $destination)
-        }
-        throw
+    $backup = $null
+    $publishedDestination = $false
+    $legacyCleanupBackups = [System.Collections.Generic.List[object]]::new()
+    try {
+      if ($replaceExisting) {
+        $backup = Join-Path $paths.Saved ('.theme-replace-' + $id + '-' + [guid]::NewGuid().ToString('N'))
+        Assert-DreamSkinNoReparseComponents -Path $destination
+        [System.IO.Directory]::Move($destination, $backup)
       }
-      Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction SilentlyContinue
-    } else {
       [System.IO.Directory]::Move($publishStage, $destination)
+      $publishedDestination = $true
+      $publishStage = $null
+      $publishedFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $destination
+      if ($publishedFingerprint -cne $fingerprint) {
+        throw 'Published theme content does not match the validated import payload.'
+      }
+      $contentFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $destination
+      foreach ($legacy in $legacyCleanupRecords) {
+        if ($legacy.EntryName -ceq $id) { continue }
+        Assert-DreamSkinNoReparseComponents -Path $legacy.Directory
+        if (Test-Path -LiteralPath $legacy.Directory -PathType Container) {
+          $cleanupBackup = Join-Path $paths.Saved (
+            '.theme-legacy-cleanup-' + $legacy.EntryName + '-' + [guid]::NewGuid().ToString('N')
+          )
+          $legacyCleanupBackups.Add([pscustomobject]@{
+            Original = $legacy.Directory
+            Backup = $cleanupBackup
+            Fingerprint = $legacy.Fingerprint
+          })
+          [System.IO.Directory]::Move($legacy.Directory, $cleanupBackup)
+        }
+      }
+    } catch {
+      $publishError = $_.Exception
+      $rollbackErrors = [System.Collections.Generic.List[string]]::new()
+      for ($cleanupIndex = $legacyCleanupBackups.Count - 1; $cleanupIndex -ge 0; $cleanupIndex--) {
+        $cleanup = $legacyCleanupBackups[$cleanupIndex]
+        try {
+          $backupExists = Test-Path -LiteralPath $cleanup.Backup -PathType Container -ErrorAction Stop
+          $originalExists = Test-Path -LiteralPath $cleanup.Original -ErrorAction Stop
+          if ($backupExists) {
+            if ($originalExists) { throw 'original cleanup path already exists' }
+            [System.IO.Directory]::Move($cleanup.Backup, $cleanup.Original)
+          }
+          if (Test-Path -LiteralPath $cleanup.Backup -ErrorAction Stop) {
+            throw 'cleanup backup remains after restore'
+          }
+          if (-not (Test-Path -LiteralPath $cleanup.Original -PathType Container -ErrorAction Stop)) {
+            throw 'original cleanup directory was not restored'
+          }
+          Assert-DreamSkinRestoredThemeFingerprint -Path $cleanup.Original `
+            -ExpectedFingerprint $cleanup.Fingerprint -Label "Legacy saved theme $($cleanup.Original)"
+        } catch {
+          $rollbackErrors.Add(('{0}: {1}' -f $cleanup.Original, $_.Exception.Message))
+        }
+      }
+      if ($publishedDestination) {
+        try {
+          if (Test-Path -LiteralPath $destination -ErrorAction Stop) {
+            Assert-DreamSkinNoReparseComponents -Path $destination
+            $quarantine = Join-Path $paths.Saved ('.theme-failed-' + $id + '-' + [guid]::NewGuid().ToString('N'))
+            [System.IO.Directory]::Move($destination, $quarantine)
+            Remove-DreamSkinManagedDirectoryVerified -Path $quarantine -Root $paths.Root
+          }
+          if (Test-Path -LiteralPath $destination -ErrorAction Stop) {
+            throw 'published destination remains'
+          }
+        } catch {
+          $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
+        }
+      }
+      if ($backup) {
+        try {
+          $backupExists = Test-Path -LiteralPath $backup -PathType Container -ErrorAction Stop
+          $destinationExists = Test-Path -LiteralPath $destination -ErrorAction Stop
+          if ($backupExists) {
+            if ($destinationExists) { throw 'new destination remains' }
+            [System.IO.Directory]::Move($backup, $destination)
+          }
+          if (Test-Path -LiteralPath $backup -ErrorAction Stop) {
+            throw 'replacement backup remains after restore'
+          }
+          if (-not (Test-Path -LiteralPath $destination -PathType Container -ErrorAction Stop)) {
+            throw 'original directory was not restored'
+          }
+          Assert-DreamSkinRestoredThemeFingerprint -Path $destination `
+            -ExpectedFingerprint $canonicalFingerprint -Label 'Canonical saved theme'
+        } catch {
+          $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
+        }
+      } else {
+        try {
+          if (Test-Path -LiteralPath $destination -ErrorAction Stop) {
+            throw 'unexpected destination remains after rollback'
+          }
+        } catch {
+          $rollbackErrors.Add(('{0}: {1}' -f $destination, $_.Exception.Message))
+        }
+      }
+      if ($rollbackErrors.Count -gt 0) {
+        throw "$($publishError.Message); import rollback was not verified: $($rollbackErrors -join '; ')"
+      }
+      throw $publishError
     }
-    $publishStage = $null
-    $publishedFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $destination
-    if ($publishedFingerprint -cne $fingerprint) {
-      Assert-DreamSkinNoReparseComponents -Path $destination
-      Remove-Item -LiteralPath $destination -Recurse -Force -ErrorAction SilentlyContinue
-      throw 'Published theme content does not match the validated import payload.'
+    try {
+      foreach ($cleanup in $legacyCleanupBackups) {
+        Remove-DreamSkinManagedDirectoryVerified -Path $cleanup.Backup -Root $paths.Root
+      }
+      # Keep the canonical backup until every legacy cleanup has succeeded. It
+      # is the last recovery copy to be discarded on a successful import.
+      if ($backup) {
+        Remove-DreamSkinManagedDirectoryVerified -Path $backup -Root $paths.Root
+      }
+    } catch {
+      throw "Imported theme backup cleanup was not verified: $($_.Exception.Message)"
     }
-    $contentFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $destination
     $name = if ($theme.name) { "$($theme.name)" } else { $id }
+    $nameCollision = $false
+    foreach ($record in $records) {
+      if ($record.EntryName -ceq $id) { continue }
+      if (@($legacyCleanupRecords | Where-Object { $_.EntryName -ceq $record.EntryName }).Count -gt 0) { continue }
+      if ($record.Name -ceq $name) {
+        $nameCollision = $true
+        break
+      }
+    }
     return [pscustomobject]@{
       Status = 'Imported'
       Id = $id
       Name = $name
       Renamed = ($id -cne $requestedId)
       Replaced = $replaceExisting
-      NameCollision = (-not $replaceExisting -and $existingNames.Contains($name))
+      NameCollision = $nameCollision
       PackageFormat = $packageFormat
       SafeCssStatus = $safeCssStatus
       SignatureIgnored = $signatureIgnored

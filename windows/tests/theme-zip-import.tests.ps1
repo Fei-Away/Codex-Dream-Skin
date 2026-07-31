@@ -363,6 +363,19 @@ try {
     $first.SafeCssStatus -cne 'validated') {
     throw 'Valid root-level theme ZIP did not import with its requested id.'
   }
+  $firstFingerprint = Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $first.Path
+  Assert-DreamSkinRestoredThemeFingerprint -Path $first.Path `
+    -ExpectedFingerprint $firstFingerprint -Label 'Fingerprint fixture'
+  $fingerprintMismatchRejected = $false
+  try {
+    Assert-DreamSkinRestoredThemeFingerprint -Path $first.Path `
+      -ExpectedFingerprint ('0' * 64) -Label 'Fingerprint fixture'
+  } catch {
+    $fingerprintMismatchRejected = "$($_.Exception.Message)" -match 'pre-import record'
+  }
+  if (-not $fingerprintMismatchRejected) {
+    throw 'Restored-theme verification accepted content that did not match its pre-import fingerprint.'
+  }
   if ((Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $paths.Active) -cne $activeBefore) {
     throw 'Theme ZIP import changed the active / last-known-good theme.'
   }
@@ -392,6 +405,124 @@ try {
   New-TestZipFromDirectory -Source $sameNameSource -Archive $sameNameArchive
   $sameName = Import-DreamSkinThemeZip -ArchivePath $sameNameArchive -StateRoot $stateRoot
   if (-not $sameName.NameCollision) { throw 'Same-name theme import did not report the name collision.' }
+
+  $replacementNameCollisionSource = Join-Path $temporaryRoot 'replacement-name-collision-source'
+  $replacementNameCollisionArchive = Join-Path $temporaryRoot 'replacement-name-collision.zip'
+  Write-TestThemePack -Directory $replacementNameCollisionSource -Id 'import-test' `
+    -Name 'Second Theme' -Quote 'REPLACEMENT COLLIDES WITH THIRD'
+  New-TestZipFromDirectory -Source $replacementNameCollisionSource -Archive $replacementNameCollisionArchive
+  $replacementNameCollision = Import-DreamSkinThemeZip `
+    -ArchivePath $replacementNameCollisionArchive -StateRoot $stateRoot
+  if ($replacementNameCollision.Status -cne 'Imported' -or $replacementNameCollision.Id -cne 'import-test' -or
+    -not $replacementNameCollision.Replaced -or -not $replacementNameCollision.NameCollision) {
+    throw 'Same-id replacement did not preserve same-name collision reporting.'
+  }
+
+  $legacyExactDirectory = Join-Path $paths.Saved 'import-test-2'
+  Write-TestThemePack -Directory $legacyExactDirectory -Id 'import-test-2' `
+    -Name 'Legacy Exact' -Quote 'LEGACY EXACT CONTENT'
+  $legacyExactSource = Join-Path $temporaryRoot 'legacy-exact-source'
+  $legacyExactArchive = Join-Path $temporaryRoot 'legacy-exact.zip'
+  Write-TestThemePack -Directory $legacyExactSource -Id 'import-test' `
+    -Name 'Legacy Exact' -Quote 'LEGACY EXACT CONTENT'
+  New-TestZipFromDirectory -Source $legacyExactSource -Archive $legacyExactArchive
+  $legacyExact = Import-DreamSkinThemeZip -ArchivePath $legacyExactArchive -StateRoot $stateRoot
+  if ($legacyExact.Status -cne 'Imported' -or $legacyExact.Id -cne 'import-test' -or
+    -not $legacyExact.Replaced -or (Test-Path -LiteralPath $legacyExactDirectory)) {
+    throw 'Legacy same-base suffix duplicate was not consolidated into the canonical theme id.'
+  }
+  $canonicalLegacyTheme = Read-DreamSkinTheme -ThemeDirectory (Join-Path $paths.Saved 'import-test') -SkipImageMetadata
+  if ("$($canonicalLegacyTheme.Theme.name)" -cne 'Legacy Exact') {
+    throw 'Legacy exact suffix repair did not publish the canonical replacement content.'
+  }
+
+  $unrelatedSuffixDirectory = Join-Path $paths.Saved 'import-test-2'
+  Write-TestThemePack -Directory $unrelatedSuffixDirectory -Id 'unrelated-theme' `
+    -Name 'Unrelated Suffix' -Quote 'UNRELATED SUFFIX CONTENT'
+  $independentNumericIdDirectory = Join-Path $paths.Saved 'import-test-3'
+  Write-TestThemePack -Directory $independentNumericIdDirectory -Id 'import-test-3' `
+    -Name 'Preserve Canonical' -Quote 'INDEPENDENT NUMERIC ID CONTENT'
+  $preserveSuffixSource = Join-Path $temporaryRoot 'preserve-unrelated-suffix-source'
+  $preserveSuffixArchive = Join-Path $temporaryRoot 'preserve-unrelated-suffix.zip'
+  Write-TestThemePack -Directory $preserveSuffixSource -Id 'import-test' `
+    -Name 'Preserve Canonical' -Quote 'PRESERVE UNRELATED SUFFIX'
+  New-TestZipFromDirectory -Source $preserveSuffixSource -Archive $preserveSuffixArchive
+  $preserveSuffix = Import-DreamSkinThemeZip -ArchivePath $preserveSuffixArchive -StateRoot $stateRoot
+  if ($preserveSuffix.Status -cne 'Imported' -or $preserveSuffix.Id -cne 'import-test' -or
+    -not (Test-Path -LiteralPath $unrelatedSuffixDirectory)) {
+    throw 'Unrelated suffix-like saved theme was incorrectly removed.'
+  }
+  $unrelatedSuffix = Read-DreamSkinTheme -ThemeDirectory $unrelatedSuffixDirectory -SkipImageMetadata
+  if ("$($unrelatedSuffix.Theme.id)" -cne 'unrelated-theme') {
+    throw 'Unrelated suffix-like saved theme identity changed during canonical replacement.'
+  }
+  $independentNumericId = Read-DreamSkinTheme `
+    -ThemeDirectory $independentNumericIdDirectory -SkipImageMetadata
+  if ("$($independentNumericId.Theme.id)" -cne 'import-test-3') {
+    throw 'A legitimate numeric-suffix theme with unrelated content but the same name was removed or changed.'
+  }
+
+  $longBaseId = ('l' * 80)
+  $longLegacyId = $longBaseId.Substring(0, 78) + '-2'
+  $longLegacyDirectory = Join-Path $paths.Saved $longLegacyId
+  Write-TestThemePack -Directory $longLegacyDirectory -Id $longLegacyId `
+    -Name 'Long Legacy' -Quote 'LONG LEGACY CONTENT'
+  $longLegacySource = Join-Path $temporaryRoot 'long-legacy-source'
+  $longLegacyArchive = Join-Path $temporaryRoot 'long-legacy.zip'
+  Write-TestThemePack -Directory $longLegacySource -Id $longBaseId `
+    -Name 'Long Legacy' -Quote 'LONG LEGACY CONTENT'
+  New-TestZipFromDirectory -Source $longLegacySource -Archive $longLegacyArchive
+  $longLegacy = Import-DreamSkinThemeZip -ArchivePath $longLegacyArchive -StateRoot $stateRoot
+  if ($longLegacy.Status -cne 'Imported' -or $longLegacy.Id -cne $longBaseId -or
+    (Test-Path -LiteralPath $longLegacyDirectory)) {
+    throw 'An 80-character legacy suffix duplicate was not consolidated safely.'
+  }
+
+  $ambiguousDirectory = Join-Path $paths.Saved 'ambiguous-id'
+  Write-TestThemePack -Directory $ambiguousDirectory -Id 'different-internal-id' `
+    -Name 'Ambiguous Canonical' -Quote 'AMBIGUOUS CANONICAL'
+  $ambiguousSource = Join-Path $temporaryRoot 'ambiguous-replacement-source'
+  $ambiguousArchive = Join-Path $temporaryRoot 'ambiguous-replacement.zip'
+  Write-TestThemePack -Directory $ambiguousSource -Id 'ambiguous-id' `
+    -Name 'Should Not Replace' -Quote 'AMBIGUOUS REPLACEMENT'
+  New-TestZipFromDirectory -Source $ambiguousSource -Archive $ambiguousArchive
+  $ambiguousRejected = $false
+  try {
+    $null = Import-DreamSkinThemeZip -ArchivePath $ambiguousArchive -StateRoot $stateRoot
+  } catch {
+    $ambiguousRejected = "$($_.Exception.Message)" -match 'Existing saved theme identity could not be confirmed'
+  }
+  if (-not $ambiguousRejected) { throw 'Ambiguous canonical saved-theme identity was not rejected.' }
+  $ambiguousTheme = Read-DreamSkinTheme -ThemeDirectory $ambiguousDirectory -SkipImageMetadata
+  if ("$($ambiguousTheme.Theme.id)" -cne 'different-internal-id') {
+    throw 'Ambiguous canonical rejection did not preserve the old saved theme.'
+  }
+
+  $fileCollisionPath = Join-Path $paths.Saved 'file-collision'
+  [System.IO.File]::WriteAllText($fileCollisionPath, 'keep-file')
+  $fileCollisionSource = Join-Path $temporaryRoot 'file-collision-source'
+  $fileCollisionArchive = Join-Path $temporaryRoot 'file-collision.zip'
+  Write-TestThemePack -Directory $fileCollisionSource -Id 'file-collision' `
+    -Name 'File Collision' -Quote 'FILE COLLISION'
+  New-TestZipFromDirectory -Source $fileCollisionSource -Archive $fileCollisionArchive
+  $fileCollisionRejected = $false
+  try {
+    $null = Import-DreamSkinThemeZip -ArchivePath $fileCollisionArchive -StateRoot $stateRoot
+  } catch {
+    $fileCollisionRejected = "$($_.Exception.Message)" -match 'not a directory'
+  }
+  if (-not $fileCollisionRejected -or
+    [System.IO.File]::ReadAllText($fileCollisionPath) -cne 'keep-file') {
+    throw 'A file occupying the canonical theme path was not preserved and rejected.'
+  }
+  if (Test-Path -LiteralPath (Join-Path $paths.Saved 'file-collision-2')) {
+    throw 'A canonical file collision incorrectly allocated a suffixed saved-theme directory.'
+  }
+  $fileCollisionResidue = @(Get-ChildItem -LiteralPath $paths.Saved -Force -ErrorAction Stop |
+    Where-Object { $_.Name -like '.theme-*file-collision*' })
+  if ($fileCollisionResidue.Count -gt 0) {
+    throw 'A canonical file collision left hidden import or replacement state.'
+  }
 
   $wrappedRoot = Join-Path $temporaryRoot 'wrapped-source'
   $wrappedTheme = Join-Path $wrappedRoot 'theme-folder'
@@ -488,6 +619,11 @@ try {
 
   if ((Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $paths.Active) -cne $activeBefore) {
     throw 'Rejected or saved ZIP imports changed the active theme.'
+  }
+  $transactionResidue = @(Get-ChildItem -LiteralPath $paths.Saved -Force -ErrorAction Stop |
+    Where-Object { $_.Name -match '^\.theme-(?:failed|import-|legacy-cleanup-|replace-)' })
+  if ($transactionResidue.Count -gt 0) {
+    throw 'A successful or rolled-back import left hidden transaction directories.'
   }
   Write-Host 'PASS: Windows ZIP import is contained, bounded, atomic, deduplicated, and active-theme neutral.'
 } finally {

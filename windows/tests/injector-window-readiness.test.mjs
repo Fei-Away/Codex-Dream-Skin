@@ -115,8 +115,8 @@ function makeDomFixture({
       if (selector === selectors.homeIcon) return null;
       if (selector === selectors.home) return home;
       if (selector === selectors.gameSource || selector === selectors.suggestions) return homeSignal;
-      if (selector === 'main, [role="main"]') return genericMain ?? home;
-      if (selector.includes("textarea") || selector.includes("contenteditable") || selector.includes("textbox")) return genericInput;
+      if (selector === '[data-ds-part="main"], [data-ds-part="home"]') return genericMain ?? home;
+      if (selector === '[data-ds-part="composer"]') return genericInput;
       if (selector === selectors.settings || selector === selectors.themePreview) return settings;
       return null;
     },

@@ -27,6 +27,31 @@ function assertContained(rootPath, candidatePath, label) {
   throw new Error(`${label} must stay inside its managed directory`);
 }
 
+async function pathExists(filePath) {
+  try {
+    await fs.lstat(filePath);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function removeDirectoryVerified(directory, label) {
+  if (!(await pathExists(directory))) return;
+  await assertReplaceableDirectory(directory, label);
+  await fs.rm(directory, { recursive: true, force: true });
+  if (await pathExists(directory)) throw new Error(`${label} cleanup was not verified`);
+}
+
+async function assertStoredFingerprint(directory, expectedFingerprint, label) {
+  const stored = await readStoredTheme(directory);
+  if (!stored) throw new Error(`${label} could not be read after restore`);
+  if (stored.fingerprint !== expectedFingerprint) {
+    throw new Error(`${label} fingerprint does not match the pre-import record`);
+  }
+}
+
 function decodeTheme(bytes, label) {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   if (text.includes("\0")) throw new Error(`${label} contains NUL characters`);
@@ -132,16 +157,22 @@ async function assertReplaceableDirectory(directory, label) {
   }
 }
 
-async function replaceDirectoryAtomically(source, destination, backup) {
-  await assertReplaceableDirectory(destination, "Existing saved theme");
-  await fs.rename(destination, backup);
-  try {
-    await fs.rename(source, destination);
-  } catch (error) {
-    await fs.rename(backup, destination).catch(() => {});
-    throw error;
-  }
-  await fs.rm(backup, { recursive: true, force: true });
+function legacySuffixOf(value, baseId) {
+  if (!baseId || value === baseId) return null;
+  const match = value.match(/-([2-9][0-9]*)$/);
+  if (!match) return null;
+  const suffix = match[1];
+  const marker = `-${suffix}`;
+  const expectedPrefix = baseId.slice(0, Math.max(0, 80 - marker.length));
+  if (value.slice(0, -marker.length) !== expectedPrefix) return null;
+  if (!/^[2-9][0-9]*$/.test(suffix)) return null;
+  const number = Number(suffix);
+  return Number.isSafeInteger(number) ? number : null;
+}
+
+function isLegacySuffixRecord(record, baseId) {
+  return legacySuffixOf(record.entryName, baseId) !== null
+    && record.themeId === record.entryName;
 }
 
 async function acquireLock(root) {
@@ -204,38 +235,87 @@ async function main() {
   let temporary = "";
   try {
     const entries = await fs.readdir(themesRoot, { withFileTypes: true });
-    const existingNames = new Set();
+    const records = [];
     const storedById = new Map();
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const directory = path.join(themesRoot, entry.name);
       const stored = await readStoredTheme(directory);
       if (!stored) continue;
-      storedById.set(entry.name, stored);
-      existingNames.add(displayName(stored.theme));
-      if (stored.fingerprint === fingerprint) {
-        return {
-          status: "duplicate",
-          id: entry.name,
-          name: displayName(stored.theme),
-          renamed: false,
-          nameCollision: false,
-          packageFormat,
-          safeCssStatus,
-          signatureIgnored: Boolean(signatureBytes),
-          contentFingerprint: stored.contentFingerprint,
-        };
-      }
+      const record = {
+        entryName: entry.name,
+        directory,
+        stored,
+        theme: stored.theme,
+        themeId: typeof stored.theme.id === "string" ? stored.theme.id.trim() : "",
+        name: displayName(stored.theme),
+        fingerprint: stored.fingerprint,
+        contentFingerprint: stored.contentFingerprint,
+      };
+      records.push(record);
+      storedById.set(entry.name, record);
     }
 
     const baseId = safeBaseId(sourceTheme.id, fingerprint);
     let id = baseId;
     const existingForId = storedById.get(id) ?? null;
+    const canonicalFingerprint = existingForId?.entryName === baseId
+      ? existingForId.fingerprint
+      : null;
+    const legacySuffixRecords = records
+      .filter((record) => isLegacySuffixRecord(record, baseId))
+      .sort((a, b) => legacySuffixOf(a.entryName, baseId) - legacySuffixOf(b.entryName, baseId));
+    const exactRecords = records.filter((record) => record.fingerprint === fingerprint);
+    const exactCanonical = exactRecords.find((record) => record.entryName === baseId) ?? null;
+    const exactLegacy = exactRecords.filter((record) => isLegacySuffixRecord(record, baseId));
+    const exactUnrelated = exactRecords.find((record) =>
+      record.entryName !== baseId && !isLegacySuffixRecord(record, baseId));
+    if (!existingForId && exactUnrelated && exactLegacy.length === 0) {
+      return {
+        status: "duplicate",
+        id: exactUnrelated.entryName,
+        name: exactUnrelated.name,
+        renamed: false,
+        nameCollision: false,
+        packageFormat,
+        safeCssStatus,
+        signatureIgnored: Boolean(signatureBytes),
+        contentFingerprint: exactUnrelated.contentFingerprint,
+      };
+    }
+    // A suffix and a display name are not proof of lineage: a legitimate
+    // theme may intentionally use an ID such as `${baseId}-2`. Only an
+    // identical semantic fingerprint makes cleanup safe and reversible.
+    const legacyCleanupRecords = legacySuffixRecords.filter((record) =>
+      record.entryName !== baseId && record.fingerprint === fingerprint);
+    if (exactCanonical && legacyCleanupRecords.length === 0) {
+      return {
+        status: "duplicate",
+        id: exactCanonical.entryName,
+        name: exactCanonical.name,
+        renamed: false,
+        nameCollision: false,
+        packageFormat,
+        safeCssStatus,
+        signatureIgnored: Boolean(signatureBytes),
+        contentFingerprint: exactCanonical.contentFingerprint,
+      };
+    }
     const baseDestination = path.join(themesRoot, id);
-    const replaceExisting = await fs.access(baseDestination).then(() => true, () => false);
+    const basePathExists = await pathExists(baseDestination);
+    if (basePathExists) {
+      const baseStat = await fs.lstat(baseDestination);
+      if (!baseStat.isDirectory() || baseStat.isSymbolicLink()) {
+        throw new Error("Existing saved theme path is not a directory; refusing replacement");
+      }
+      if (!existingForId || existingForId.themeId !== baseId) {
+        throw new Error("Existing saved theme identity could not be confirmed for replacement");
+      }
+    }
+    const replaceExisting = basePathExists;
     if (!replaceExisting) {
       let suffix = 2;
-      while (await fs.access(path.join(themesRoot, id)).then(() => true, () => false)) {
+      while (await pathExists(path.join(themesRoot, id))) {
         const marker = `-${suffix}`;
         id = `${baseId.slice(0, 80 - marker.length)}${marker}`;
         suffix += 1;
@@ -257,23 +337,122 @@ async function main() {
     );
     if (cssBytes) await writeExclusive(path.join(temporary, "theme.css"), cssBytes);
     if (licenseBytes) await writeExclusive(path.join(temporary, "LICENSE.txt"), licenseBytes);
-    if (replaceExisting) {
-      const backup = path.join(themesRoot, `.theme-replace-${id}-${randomUUID()}`);
-      assertContained(themesRoot, backup, "Imported theme replacement backup");
-      await replaceDirectoryAtomically(temporary, destination, backup);
-    } else {
+    let replacementBackup = "";
+    let publishedDestination = false;
+    const legacyCleanupBackups = [];
+    try {
+      if (replaceExisting) {
+        replacementBackup = path.join(themesRoot, `.theme-replace-${id}-${randomUUID()}`);
+        assertContained(themesRoot, replacementBackup, "Imported theme replacement backup");
+        await fs.rename(destination, replacementBackup);
+      }
       await fs.rename(temporary, destination);
+      publishedDestination = true;
+      temporary = "";
+      const published = await readStoredTheme(destination);
+      if (!published || published.fingerprint !== fingerprint) {
+        throw new Error("Published theme content does not match the validated import payload");
+      }
+      for (const record of legacyCleanupRecords) {
+        if (record.entryName === id) continue;
+        await assertReplaceableDirectory(record.directory, "Legacy saved theme duplicate");
+        const cleanupBackup = path.join(
+          themesRoot,
+          `.theme-legacy-cleanup-${record.entryName}-${randomUUID()}`,
+        );
+        assertContained(themesRoot, cleanupBackup, "Legacy saved theme cleanup backup");
+        legacyCleanupBackups.push({
+          original: record.directory,
+          backup: cleanupBackup,
+          fingerprint: record.fingerprint,
+        });
+        await fs.rename(record.directory, cleanupBackup);
+      }
+    } catch (error) {
+      const rollbackErrors = [];
+      for (const record of [...legacyCleanupBackups].reverse()) {
+        try {
+          const backupExists = await pathExists(record.backup);
+          const originalExists = await pathExists(record.original);
+          if (backupExists) {
+            if (originalExists) throw new Error("original cleanup path already exists");
+            await fs.rename(record.backup, record.original);
+          }
+          if (await pathExists(record.backup)) throw new Error("cleanup backup remains after restore");
+          if (!(await pathExists(record.original))) throw new Error("original cleanup directory was not restored");
+          await assertStoredFingerprint(
+            record.original,
+            record.fingerprint,
+            `Legacy saved theme ${record.original}`,
+          );
+        } catch (rollbackError) {
+          rollbackErrors.push(`${record.original}: ${rollbackError.message}`);
+        }
+      }
+      if (publishedDestination) {
+        try {
+          if (await pathExists(destination)) {
+            await assertReplaceableDirectory(destination, "Published theme rollback target");
+            const quarantine = path.join(themesRoot, `.theme-failed-${id}-${randomUUID()}`);
+            assertContained(themesRoot, quarantine, "Failed theme quarantine");
+            await fs.rename(destination, quarantine);
+            await removeDirectoryVerified(quarantine, "Failed theme quarantine");
+          }
+          if (await pathExists(destination)) throw new Error("published destination remains");
+        } catch (rollbackError) {
+          rollbackErrors.push(`${destination}: ${rollbackError.message}`);
+        }
+      }
+      if (replacementBackup) {
+        try {
+          const backupExists = await pathExists(replacementBackup);
+          const destinationExists = await pathExists(destination);
+          if (backupExists) {
+            if (destinationExists) throw new Error("new destination remains");
+            await fs.rename(replacementBackup, destination);
+          }
+          if (await pathExists(replacementBackup)) throw new Error("replacement backup remains after restore");
+          if (!(await pathExists(destination))) throw new Error("original directory was not restored");
+          await assertStoredFingerprint(destination, canonicalFingerprint, "Canonical saved theme");
+        } catch (rollbackError) {
+          rollbackErrors.push(`${destination}: ${rollbackError.message}`);
+        }
+      } else {
+        try {
+          if (await pathExists(destination)) {
+            throw new Error("unexpected destination remains after rollback");
+          }
+        } catch (rollbackError) {
+          rollbackErrors.push(`${destination}: ${rollbackError.message}`);
+        }
+      }
+      if (rollbackErrors.length > 0) {
+        throw new Error(`${error.message}; import rollback was not verified: ${rollbackErrors.join("; ")}`);
+      }
+      throw error;
     }
-    temporary = "";
+    try {
+      for (const record of legacyCleanupBackups) {
+        await removeDirectoryVerified(record.backup, "Legacy duplicate cleanup backup");
+      }
+      // Keep the canonical backup until every legacy cleanup has succeeded. It
+      // is the last recovery copy to be discarded on a successful import.
+      if (replacementBackup) {
+        await removeDirectoryVerified(replacementBackup, "Theme replacement backup");
+      }
+    } catch (error) {
+      throw new Error(`Imported theme backup cleanup was not verified: ${error.message}`);
+    }
     return {
       status: "imported",
       id,
       name,
       renamed,
       replaced: replaceExisting,
-      nameCollision: existingNames.has(name) && (!replaceExisting || (
-        existingForId && displayName(existingForId.theme) !== name
-      )),
+      nameCollision: records.some((record) =>
+        record.name === name
+        && record.entryName !== id
+        && !legacyCleanupRecords.some((legacy) => legacy.entryName === record.entryName)),
       packageFormat,
       safeCssStatus,
       signatureIgnored: Boolean(signatureBytes),

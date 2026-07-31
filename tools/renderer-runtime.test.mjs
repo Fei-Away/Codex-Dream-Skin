@@ -27,7 +27,10 @@ function classList(initial) {
   };
 }
 
-function makeFixture({ nativeAppearance = "dark", settings = false, adopted = true } = {}) {
+function makeFixture({
+  nativeAppearance = "dark", settings = false, adopted = true,
+  generic = false, genericHome = false,
+} = {}) {
   const attrs = new Map();
   const rootStyle = styleDeclaration();
   const rootClasses = classList([nativeAppearance === "dark" ? "electron-dark" : "electron-light"]);
@@ -42,7 +45,8 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
   let nextId = 0;
   let nextBlob = 0;
   const attributesFor = (values) => [...values].map(([name, value]) => ({ name, value }));
-  const makeDomNode = (name, parentElement = null, values = new Map()) => {
+  const makeDomNode = (name, parentElement = null, values = new Map(), matchedSelectors = []) => {
+    const selectorMatches = new Set(matchedSelectors);
     const node = {
       name,
       parentElement,
@@ -51,6 +55,23 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
       setAttribute(attribute, value) { values.set(attribute, String(value)); },
       removeAttribute(attribute) { values.delete(attribute); },
       appendChild(child) { child.parentElement = node; return child; },
+      matches(selector) { return selectorMatches.has(selector); },
+      closest(selector) {
+        let current = node;
+        while (current) {
+          if (current.matches?.(selector)) return current;
+          current = current.parentElement;
+        }
+        return null;
+      },
+      contains(candidate) {
+        let current = candidate;
+        while (current) {
+          if (current === node) return true;
+          current = current.parentElement;
+        }
+        return false;
+      },
     };
     domNodes.add(node);
     return node;
@@ -75,7 +96,36 @@ function makeFixture({ nativeAppearance = "dark", settings = false, adopted = tr
     selectorNodes.set(selector, current);
   };
   const partFixtures = {};
-  if (!settings) {
+  if (!settings && generic) {
+    const mainSelector = 'main, [role="main"]';
+    const inputSelector = 'textarea, [contenteditable="true"], [role="textbox"]';
+    const sidebarSelector = 'aside, nav[aria-label]';
+    const composerSelector = 'form, [data-testid*="composer" i], [class*="composer" i], [class*="prompt" i]';
+    const overlaySelector = '[role="dialog"], [aria-modal="true"]';
+    partFixtures.shell = makeDomNode("generic-shell", body);
+    partFixtures.sidebar = makeDomNode("generic-sidebar", partFixtures.shell, new Map(), [sidebarSelector]);
+    partFixtures.main = makeDomNode("generic-main", partFixtures.shell, new Map(), [mainSelector]);
+    partFixtures.composer = makeDomNode("generic-composer", partFixtures.main, new Map(), [composerSelector]);
+    partFixtures.input = makeDomNode("generic-input", partFixtures.composer, new Map(), [inputSelector]);
+    partFixtures.unrelatedAside = makeDomNode(
+      "generic-content-aside", partFixtures.main, new Map(), [sidebarSelector],
+    );
+    partFixtures.dialog = makeDomNode("generic-dialog", partFixtures.main, new Map(), [overlaySelector]);
+    partFixtures.dialogInput = makeDomNode(
+      "generic-dialog-input", partFixtures.dialog, new Map(), [inputSelector],
+    );
+    register(mainSelector, partFixtures.main);
+    register(inputSelector, partFixtures.input);
+    register(inputSelector, partFixtures.dialogInput);
+    register(sidebarSelector, partFixtures.sidebar);
+    register(sidebarSelector, partFixtures.unrelatedAside);
+    if (genericHome) {
+      partFixtures.homeIcon = makeDomNode("generic-home-icon", partFixtures.main);
+      register('[data-testid="home-icon"]', partFixtures.homeIcon);
+      register('[role="main"]:has([data-testid="home-icon"])', partFixtures.main);
+      register('[role="main"]', partFixtures.main);
+    }
+  } else if (!settings) {
     partFixtures.sidebar = makeDomNode("sidebar", body);
     partFixtures.main = makeDomNode("main", body);
     partFixtures.header = makeDomNode("header", body);
@@ -264,6 +314,21 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /--ds-task-full-veil/);
   assert.match(css, /data-dream-task-mode="full"/);
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
+  assert.match(
+    css,
+    /:not\(:has\(main\.main-surface\)\)[\s\S]{0,120}\[data-ds-part="sidebar"\]/,
+    "Core CSS must style the validated generic sidebar when the exact shell selector is absent.",
+  );
+  assert.match(
+    css,
+    /:not\(:has\(main\.main-surface\)\)[\s\S]{0,180}\[data-ds-part="main"\]/,
+    "Core CSS must paint a validated generic main surface.",
+  );
+  assert.match(
+    css,
+    /:not\(:has\(main\.main-surface\)\)[\s\S]{0,120}\[data-ds-part="composer"\]/,
+    "Core CSS must style the validated generic composer.",
+  );
   // Every home/project selector must stay behind the root skin gate.  A
   // marker-class-to-:has() conversion must never leave native layout rules
   // active after pause/restore.
@@ -330,6 +395,24 @@ export async function runRendererRuntimeTest(assetRoot) {
   partObserver.callback([{ type: "childList" }]);
   home.flushTimers(80);
   assert.equal(dynamicMessage.getAttribute("data-ds-part"), "message");
+
+  const generic = makeFixture({ nativeAppearance: "dark", generic: true });
+  vm.runInNewContext(generic.payloadFor(), generic.context);
+  assert.equal(generic.partFixtures.sidebar.getAttribute("data-ds-part"), "sidebar");
+  assert.equal(generic.partFixtures.main.getAttribute("data-ds-part"), "main");
+  assert.equal(generic.partFixtures.composer.getAttribute("data-ds-part"), "composer");
+  assert.equal(generic.partFixtures.input.getAttribute("data-ds-part"), null,
+    "The composer wrapper, not its input, should receive the public part when available.");
+  assert.equal(generic.partFixtures.unrelatedAside.getAttribute("data-ds-part"), null,
+    "An aside inside the main content must not be exposed as the app sidebar.");
+  assert.equal(generic.partFixtures.dialogInput.getAttribute("data-ds-part"), null,
+    "Dialog inputs must not be mistaken for the app composer.");
+
+  const genericHome = makeFixture({ nativeAppearance: "dark", generic: true, genericHome: true });
+  vm.runInNewContext(genericHome.payloadFor(), genericHome.context);
+  assert.equal(genericHome.partFixtures.main.getAttribute("data-ds-part"), "home",
+    "The specific home part must win when generic home and main are one node.");
+  assert.equal(genericHome.window.__CODEX_DREAM_SKIN_STATE__.scope.baseState, "home");
 
   const full = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);

@@ -576,13 +576,44 @@
   const selectorNodes = (key) => queryAll(selectorByKey.get(key)?.selector);
   const genericNodes = (selector) => queryAll(selector)
     .filter((node) => node && typeof node.setAttribute === "function");
+  const genericInputNodes = () => genericNodes(
+    'textarea, [contenteditable="true"], [role="textbox"]',
+  ).filter((node) => !node.closest?.('[role="dialog"], [aria-modal="true"]'));
+  const resolvedMainNode = () => {
+    const exact = selectorNodes("shell-main")[0];
+    if (exact) return exact;
+    for (const input of genericInputNodes()) {
+      const main = input.closest?.('main, [role="main"]');
+      if (main && typeof main.setAttribute === "function") return main;
+    }
+    return genericNodes('main, [role="main"]')
+      .find((node) => !node.closest?.('[role="dialog"], [aria-modal="true"]')) ?? null;
+  };
   const fallbackMainNodes = () => selectorNodes("shell-main").length
-    ? [] : genericNodes('main, [role="main"]');
-  const fallbackSidebarNodes = () => selectorNodes("left-panel").length
-    ? [] : genericNodes('aside, nav[aria-label]');
+    ? [] : [resolvedMainNode()].filter(Boolean);
+  const fallbackSidebarNodes = () => {
+    if (selectorNodes("left-panel").length) return [];
+    const main = resolvedMainNode();
+    const mainParent = main?.parentElement;
+    if (!main || !mainParent) return [];
+    const candidate = genericNodes('aside, nav[aria-label]')
+      .filter((node) => !main.contains?.(node))
+      .filter((node) => !node.closest?.('[role="dialog"], [aria-modal="true"]'))
+      .find((node) => node.parentElement === mainParent
+        || node.parentElement?.parentElement === mainParent
+        || node.parentElement === mainParent.parentElement);
+    return candidate ? [candidate] : [];
+  };
   const fallbackComposerNodes = () => selectorNodes("composer-chrome").length
-    ? [] : genericNodes('textarea, [contenteditable="true"], [role="textbox"]')
-      .map((node) => node.closest?.('form, [class*="composer"], [class*="prompt"], div') ?? node);
+    ? [] : (() => {
+      const main = resolvedMainNode();
+      const input = genericInputNodes().find((node) => !main || main.contains?.(node));
+      if (!input) return [];
+      const owner = input.closest?.(
+        'form, [data-testid*="composer" i], [class*="composer" i], [class*="prompt" i]',
+      );
+      return [owner && (!main || main.contains?.(owner)) ? owner : input];
+    })();
   const addPart = (desired, part, nodes) => {
     for (const node of nodes) {
       if (node && typeof node.setAttribute === "function" && !desired.has(node)) {
@@ -595,9 +626,11 @@
     const desired = new Map();
     addPart(desired, "root", [document.documentElement]);
     addPart(desired, "sidebar", [...selectorNodes("left-panel"), ...fallbackSidebarNodes()]);
-    addPart(desired, "main", [...selectorNodes("shell-main"), ...fallbackMainNodes()]);
     addPart(desired, "header", selectorNodes("header-tint"));
+    // Route-specific parts win when a generic shell collapses home and main
+    // onto the same element.
     addPart(desired, "home", selectorNodes("home-route"));
+    addPart(desired, "main", [...selectorNodes("shell-main"), ...fallbackMainNodes()]);
     addPart(desired, "project-list", selectorNodes("project-selector"));
     addPart(desired, "thread", selectorNodes("thread-surface"));
     addPart(desired, "message", selectorNodes("message"));

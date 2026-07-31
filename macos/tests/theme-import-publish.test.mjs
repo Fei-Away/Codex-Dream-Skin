@@ -29,6 +29,19 @@ function publish(stage, destinationRoot = themesRoot) {
   });
 }
 
+function runCommand(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(stderr || `${command} exited with ${code}`));
+    });
+  });
+}
+
 async function makeStage(name, id, extra = {}) {
   const stage = path.join(tempRoot, name);
   await fs.mkdir(stage);
@@ -52,6 +65,39 @@ async function makeStage(name, id, extra = {}) {
     );
   }
   return stage;
+}
+
+async function writeSavedTheme(directoryName, id, extra = {}) {
+  const directory = path.join(themesRoot, directoryName);
+  await fs.mkdir(directory);
+  await fs.copyFile(fixtureImage, path.join(directory, "background.png"));
+  await fs.writeFile(
+    path.join(directory, "theme.json"),
+    `${JSON.stringify({
+      schemaVersion: 1,
+      id,
+      name: extra.displayName ?? "Imported Theme",
+      image: "background.png",
+      appearance: "auto",
+      art: { safeArea: "auto", taskMode: "auto" },
+      ...extra.theme,
+    }, null, 2)}\n`,
+  );
+  await fs.writeFile(
+    path.join(directory, "theme.css"),
+    extra.safeCss ?? '[data-ds-part="root"] { color: var(--ds-theme-color-text); }\n',
+  );
+  return directory;
+}
+
+async function savedThemeNames() {
+  return (await fs.readdir(themesRoot)).filter((name) => !name.startsWith(".")).sort();
+}
+
+async function transactionResidue() {
+  return (await fs.readdir(themesRoot))
+    .filter((name) => /^\.theme-(?:failed|import-|legacy-cleanup-|replace-)/.test(name))
+    .sort();
 }
 
 try {
@@ -99,7 +145,7 @@ try {
     JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id", "theme.json"), "utf8")).name,
     "Second Theme",
   );
-  assert.equal((await fs.readdir(themesRoot)).filter((name) => !name.startsWith(".")).length, 1);
+  assert.deepEqual(await savedThemeNames(), ["theme-id"]);
 
   const nameCollisionStage = await makeStage("name-collision", "third-id", {
     displayName: "Second Theme",
@@ -108,6 +154,141 @@ try {
   const nameCollision = await publish(nameCollisionStage);
   assert.equal(nameCollision.status, "imported");
   assert.equal(nameCollision.nameCollision, true);
+
+  const replacementNameCollisionStage = await makeStage("replacement-name-collision", "theme-id", {
+    displayName: "Second Theme",
+    theme: { quote: "REPLACEMENT COLLIDES WITH THIRD" },
+  });
+  const replacementNameCollision = await publish(replacementNameCollisionStage);
+  assert.equal(replacementNameCollision.status, "imported");
+  assert.equal(replacementNameCollision.id, "theme-id");
+  assert.equal(replacementNameCollision.replaced, true);
+  assert.equal(replacementNameCollision.nameCollision, true);
+
+  await writeSavedTheme("theme-id-2", "theme-id-2", {
+    displayName: "Legacy Exact",
+    theme: { quote: "LEGACY EXACT CONTENT" },
+  });
+  const legacyExactStage = await makeStage("legacy-exact", "theme-id", {
+    displayName: "Legacy Exact",
+    theme: { quote: "LEGACY EXACT CONTENT" },
+  });
+  const legacyExact = await publish(legacyExactStage);
+  assert.equal(legacyExact.status, "imported");
+  assert.equal(legacyExact.id, "theme-id");
+  assert.equal(legacyExact.replaced, true);
+  assert.deepEqual(await savedThemeNames(), ["theme-id", "third-id"]);
+  assert.equal(
+    JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id", "theme.json"), "utf8")).name,
+    "Legacy Exact",
+  );
+
+  await writeSavedTheme("theme-id-2", "unrelated-theme", {
+    displayName: "Unrelated Suffix",
+    theme: { quote: "UNRELATED SUFFIX CONTENT" },
+  });
+  await writeSavedTheme("theme-id-3", "theme-id-3", {
+    displayName: "Preserve Canonical",
+    theme: { quote: "INDEPENDENT NUMERIC ID CONTENT" },
+  });
+  const preserveSuffixStage = await makeStage("preserve-unrelated-suffix", "theme-id", {
+    displayName: "Preserve Canonical",
+    theme: { quote: "PRESERVE UNRELATED SUFFIX" },
+  });
+  const preserveSuffix = await publish(preserveSuffixStage);
+  assert.equal(preserveSuffix.status, "imported");
+  assert.equal(preserveSuffix.id, "theme-id");
+  assert.deepEqual(await savedThemeNames(), ["theme-id", "theme-id-2", "theme-id-3", "third-id"]);
+  assert.equal(
+    JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id-2", "theme.json"), "utf8")).id,
+    "unrelated-theme",
+  );
+  assert.equal(
+    JSON.parse(await fs.readFile(path.join(themesRoot, "theme-id-3", "theme.json"), "utf8")).id,
+    "theme-id-3",
+    "A legitimate numeric-suffix theme with unrelated content but the same name must be preserved.",
+  );
+
+  const longBaseId = "l".repeat(80);
+  const longLegacyId = `${longBaseId.slice(0, 78)}-2`;
+  await writeSavedTheme(longLegacyId, longLegacyId, {
+    displayName: "Long Legacy",
+    theme: { quote: "LONG LEGACY CONTENT" },
+  });
+  const longLegacyStage = await makeStage("long-legacy", longBaseId, {
+    displayName: "Long Legacy",
+    theme: { quote: "LONG LEGACY CONTENT" },
+  });
+  const longLegacy = await publish(longLegacyStage);
+  assert.equal(longLegacy.status, "imported");
+  assert.equal(longLegacy.id, longBaseId);
+  assert.equal(longLegacy.replaced, false);
+  assert.equal(await fs.access(path.join(themesRoot, longLegacyId)).then(() => true, () => false), false);
+
+  await writeSavedTheme("ambiguous-id", "different-internal-id", {
+    displayName: "Ambiguous Canonical",
+    theme: { quote: "AMBIGUOUS CANONICAL" },
+  });
+  const ambiguousStage = await makeStage("ambiguous-replacement", "ambiguous-id", {
+    displayName: "Should Not Replace",
+    theme: { quote: "AMBIGUOUS REPLACEMENT" },
+  });
+  await assert.rejects(
+    publish(ambiguousStage),
+    /Existing saved theme identity could not be confirmed/,
+  );
+  assert.equal(
+    JSON.parse(await fs.readFile(path.join(themesRoot, "ambiguous-id", "theme.json"), "utf8")).id,
+    "different-internal-id",
+  );
+
+  const fileCollisionPath = path.join(themesRoot, "file-collision");
+  await fs.writeFile(fileCollisionPath, "keep-file\n");
+  const fileCollisionStage = await makeStage("file-collision", "file-collision", {
+    displayName: "File Collision",
+    theme: { quote: "FILE COLLISION" },
+  });
+  await assert.rejects(
+    publish(fileCollisionStage),
+    /Existing saved theme path is not a directory/,
+  );
+  assert.equal(await fs.readFile(fileCollisionPath, "utf8"), "keep-file\n");
+  assert.equal(await fs.access(path.join(themesRoot, "file-collision-2")).then(() => true, () => false), false);
+  assert.deepEqual(await transactionResidue(), []);
+
+  if (process.platform === "darwin") {
+    const rollbackCanonical = await writeSavedTheme("rollback-id", "rollback-id", {
+      displayName: "Rollback Original",
+      theme: { quote: "ROLLBACK ORIGINAL CONTENT" },
+    });
+    const rollbackLegacy = await writeSavedTheme("rollback-id-2", "rollback-id-2", {
+      displayName: "Rollback Incoming",
+      theme: { quote: "ROLLBACK INCOMING CONTENT" },
+    });
+    const rollbackStage = await makeStage("rollback-stage", "rollback-id", {
+      displayName: "Rollback Incoming",
+      theme: { quote: "ROLLBACK INCOMING CONTENT" },
+    });
+    await runCommand("/usr/bin/chflags", ["uchg", rollbackLegacy]);
+    try {
+      await assert.rejects(publish(rollbackStage), /operation not permitted|EPERM/i);
+    } finally {
+      const rollbackEntries = (await fs.readdir(themesRoot))
+        .filter((name) => name.includes("rollback-id"));
+      for (const entry of rollbackEntries) {
+        await runCommand("/usr/bin/chflags", ["-R", "nouchg", path.join(themesRoot, entry)]);
+      }
+    }
+    assert.equal(
+      JSON.parse(await fs.readFile(path.join(rollbackCanonical, "theme.json"), "utf8")).quote,
+      "ROLLBACK ORIGINAL CONTENT",
+    );
+    assert.equal(
+      JSON.parse(await fs.readFile(path.join(rollbackLegacy, "theme.json"), "utf8")).quote,
+      "ROLLBACK INCOMING CONTENT",
+    );
+    assert.deepEqual(await transactionResidue(), []);
+  }
 
   const unsafeIdStage = await makeStage("unsafe-id", "../../escape", {
     displayName: "Unsafe ID Theme",
@@ -147,6 +328,7 @@ try {
   await assert.rejects(publish(badSchema), /schemaVersion 1/);
 
   assert.equal(await fs.readFile(path.join(activeRoot, "last-known-good"), "utf8"), "unchanged\n");
+  assert.deepEqual(await transactionResidue(), []);
   console.log("PASS: imported themes publish atomically with duplicate and collision handling.");
 } finally {
   await fs.rm(tempRoot, { recursive: true, force: true });

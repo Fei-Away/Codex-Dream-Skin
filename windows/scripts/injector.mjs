@@ -694,9 +694,10 @@ async function probeSession(session) {
       if (location.protocol !== 'app:') return false;
       const main = document.querySelector('main, [role="main"]');
       const input = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
-      const text = String(document.body?.innerText || "").slice(0, 1200);
+      const text = [document.title, document.body?.innerText]
+        .map((value) => String(value || "")).join("\\n").slice(0, 1600);
       const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(text);
-      return Boolean((main && input) || (main && branded) || (input && branded));
+      return Boolean(main && input && branded);
     };
     const markers = {
       shell: Boolean(document.querySelector(${selectorLiteral("shell-main")})),
@@ -860,9 +861,11 @@ export function earlyPayloadFor(payload, revision) {
         document.querySelector(${stableTestidLiteral("theme-preview")});
       const genericMain = document.querySelector('main, [role="main"]');
       const genericInput = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');
-      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(String(document.body?.innerText || "").slice(0, 1200));
+      const identityText = [document.title, document.body?.innerText]
+        .map((value) => String(value || "")).join("\\n").slice(0, 1600);
+      const branded = /\\b(?:ChatGPT|Codex)\\b/i.test(identityText);
       return Boolean((shell && sidebar) || settings || main ||
-        (genericMain && genericInput) || (genericMain && branded) || (genericInput && branded));
+        (genericMain && genericInput && branded));
     };
     const install = () => {
       if (window[generationKey] !== generation) { stop(); return true; }
@@ -1223,8 +1226,8 @@ export async function verifySession(
       composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
       shell: box(document.querySelector(${selectorLiteral("shell-main")})),
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
-      genericMain: box(document.querySelector('main, [role="main"]')),
-      genericInput: box(document.querySelector('textarea, [contenteditable="true"], [role="textbox"]')),
+      genericMain: box(document.querySelector('[data-ds-part="main"], [data-ds-part="home"]')),
+      genericInput: box(document.querySelector('[data-ds-part="composer"]')),
       nativeWindow: ${JSON.stringify(nativeWindow)},
       documentVisibility: document.visibilityState ?? null,
       documentHidden: document.hidden === true,

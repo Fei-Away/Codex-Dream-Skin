@@ -209,6 +209,8 @@ try {
           $imported = Import-DreamSkinThemeZip -ArchivePath $dialog.FileName -StateRoot $StateRoot
           if ($imported.Status -ceq 'Duplicate') {
             $message = "主题已存在：$($imported.Name)。没有重复写入。"
+          } elseif ($imported.Replaced) {
+            $message = "已更新已保存主题：$($imported.Name)。当前主题没有改变。"
           } else {
             $message = "已导入：$($imported.Name)。当前主题没有改变。"
             if ($imported.Renamed) { $message += " 新标识：$($imported.Id)。" }

@@ -1,6 +1,107 @@
 # Task Progress
 
-Updated: 2026-07-25 08:31 HKT (Asia/Hong_Kong)
+Updated: 2026-07-31 14:29 HKT (Asia/Hong_Kong)
+
+## Pre-push verification — PR #324 (2026-07-31)
+
+- [fixed] Import replacement rollback is fail-closed on both platforms. A
+  post-publish failure first quarantines the new directory, restores legacy
+  cleanup backups and the original canonical directory, and verifies every
+  move. Backup and quarantine cleanup errors are surfaced instead of being
+  silently ignored; the old theme is never discarded before the replacement
+  fingerprint is verified.
+- [added] `docs/pr-324-windows-validation.md` is the Windows AI handoff. It
+  covers #318/#320/#322, all-theme (not only colors-only) renderer checks,
+  legacy suffix safety, rollback expectations, exact commands, and the
+  `RemoteSigned`/no-`ExecutionPolicy Bypass` requirement.
+- [verified] Portable client regressions: `node --test macos/tests/*.test.mjs
+  windows/tests/*.test.mjs` — 74 passed; `NODE=$(command -v node)
+  CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash macos/tests/run-tests.sh` passed with
+  only the documented full-Xcode/Doctor skips; runtime asset sync, Node syntax,
+  renderer runtime, and `git diff --check` also pass.
+- [verified] Focused import, package-validator, injector, readiness, and
+  generic-renderer fixture checks pass after the rollback hardening.
+- [blocked] This macOS host has no `powershell.exe` or `pwsh`; Windows
+  PowerShell 5.1/7, Setup.exe compilation, and a real Windows Codex renderer
+  still require the user's Windows host or PR CI.
+- [pending] Commit and push the final client branch, update draft PR #324, and
+  wait for fresh CI on the new head. Do not merge, publish a Release, close an
+  issue, or post a user-facing fix comment.
+
+## Final review correction — legacy import cleanup (2026-07-31)
+
+- [fixed] Both platform importers now consolidate a legacy suffix directory
+  only when its stored identity matches the suffix and its semantic fingerprint
+  exactly matches the incoming package. Display-name equality is no longer
+  treated as lineage evidence, so an independent `family-2` with the same name
+  is preserved and ambiguous replacement remains fail-closed.
+- [fixed] Legacy suffix detection mirrors the old 80-character ID truncation,
+  including max-length IDs, and rejects numeric overflow rather than throwing.
+- [fixed] macOS and Windows import notifications distinguish an in-place saved
+  theme update from a first import; platform README/docs now describe the same
+  behavior and the exact-fingerprint cleanup boundary.
+- [pending] Rerun all portable/macOS suites, inspect staged diffs, commit and
+  push only after local checks pass. Windows PowerShell 5.1 remains a required
+  user/CI validation because this host has no PowerShell runtime.
+
+## Read-only deep review checkpoint — PR #324 / site PR #13 (2026-07-31)
+
+- [reviewed] Client draft PR #324 remains at `ee3b64f`; its four GitHub CI jobs
+  pass. Root reran shared-asset sync, the focused macOS/Windows import,
+  bootstrap and readiness tests, plus `git diff --check`; all passed.
+- [blocked] The generic `app://` gate is broader than the PR description:
+  `(main && input)` passes with no Codex/ChatGPT identity marker. A minimal
+  negative fixture independently executed the early payload on both platforms.
+- [blocked] Generic renderer parts do not complete #320/#322: canonical
+  `dream-skin.css` still has no `[data-ds-part]` fallback for the core
+  main/sidebar/composer rules, generic part selection is over-broad, and a
+  home `[role=main]` can keep the earlier `main` part instead of `home`.
+- [blocked] The #318 import change repairs only a clean future library. An
+  already-created `theme-id-2` exact duplicate returns early as `duplicate`,
+  leaving both old directories. Replacement is also selected by destination
+  directory existence rather than confirmed stored identity, and the Windows
+  post-publish mismatch path deletes the old backup before final verification.
+- [blocked] Site PR #13 has a validated-package CAS regression and no backfill
+  for the already-reset live count; see the site repository progress file.
+- [fact] No PR code, commit, push, merge, Release, issue comment, or issue
+  closure was performed during this review.
+
+## In Progress — Issues #318/#320/#322 community client/site fixes (2026-07-31)
+
+- [complete] Work is isolated in clean temporary worktrees:
+  client branch `codex/fix-318-320-322` at `/tmp/dreamskin-client-fix.O9D3Vw`
+  and site branch `codex/fix-318-download-inheritance` at
+  `/tmp/dreamskin-site-fix.pHtykF`. Main worktrees were left untouched.
+- [complete] Client implements same-id theme ZIP imports as in-place version
+  replacement on both macOS and Windows instead of suffixing `-2`, while exact
+  duplicate content remains `duplicate` and different-id same-name imports still
+  report `nameCollision`.
+- [complete] Client keeps dual-platform renderer behavior aligned: generic
+  `main`/sidebar/composer part fallbacks are generated from shared runtime
+  source and synced byte-for-byte into macOS and Windows assets.
+- [complete] Client injector verification now accepts newer `app://` Codex
+  renderer shells with generic visible main/input structure and Codex/ChatGPT
+  branding, while preserving exact payload/theme/revision checks and loopback
+  CDP target rejection.
+- [complete] Site moderation service now inherits the maximum prior same-theme
+  approved/downloaded version counter into a pending version before approval,
+  so newly approved community versions do not reset visible downloads to zero.
+- [verified] Site backend checks in `/tmp/dreamskin-site-fix.pHtykF/server`:
+  `go test ./internal/moderation ./internal/upload ./internal/httpapi`,
+  `go vet ./...`, `go build ./...`, and repo `git diff --check` all pass.
+- [verified] Client checks in `/tmp/dreamskin-client-fix.O9D3Vw`:
+  `node tools/sync-runtime-assets.mjs --check`,
+  `node macos/tests/theme-import-publish.test.mjs`,
+  `node macos/tests/theme-package-validator.test.mjs`,
+  `node macos/tests/injector-bootstrap.test.mjs`,
+  `node windows/tests/injector-bootstrap.test.mjs`,
+  `node macos/tests/window-readiness.test.mjs`,
+  `node windows/tests/injector-window-readiness.test.mjs`,
+  `NODE=$(command -v node) bash macos/tests/run-tests.sh`, and
+  `git diff --check` all pass. Native SwiftPM/XCTest was the existing local
+  environment skip; no local `pwsh` is installed for Windows PowerShell tests.
+- [pending] Commit, push, and open draft PRs. No merge, Release publication,
+  issue closure, or user-facing "fixed/retry" comment has been made.
 
 ## v1.5.1 Version Release (2026-07-25 08:28 HKT)
 
