@@ -1,22 +1,110 @@
 # Task Progress
 
-## PR #324 final L0 readiness correction — in progress (2026-07-31)
+## PR #324 hard-interruption import recovery — in progress (2026-07-31)
+
+- [reproduced by review] Both platform importers move the existing canonical
+  theme to a hidden replacement backup before publishing the new directory.
+  An uncatchable process termination or system restart between those two atomic
+  moves leaves the canonical saved theme missing; neither platform currently
+  recovers the hidden backup on the next import/startup.
+- [scope] Add a persisted, contained replacement journal before the first move.
+  Under the existing import lock, recovery must restore the verified old
+  fingerprint when the canonical destination is absent, keep a verified new
+  destination when publication committed, and fail closed without deleting
+  evidence on identity/path/fingerprint ambiguity.
+- [ownership] Root owns only macOS publisher/test changes; the Windows agent
+  owns only `windows/scripts/theme-windows.ps1` and
+  `windows/tests/theme-zip-import.tests.ps1`; the protocol-review agent is
+  read-only. Root will run the combined gates before any push.
+- [fixed locally/macOS] Replacement candidates and journals are durably synced
+  before the first canonical move. Prepared recovery now restores the verified
+  old canonical theme before inspecting a suspect candidate, retains malformed
+  evidence, rejects conflicting `committed` plus `commit.tmp` markers, and
+  preflights duplicate destination journals before any recovery mutation.
+- [verified locally/macOS] `node --test
+  macos/tests/theme-import-publish.test.mjs` passes (1/1, 12.8 s), including
+  real child-process `SIGKILL` after backup rename, candidate publication and
+  commit-marker rename, plus corrupt-candidate, conflicting-marker and
+  duplicate-transaction recovery cases. `node --check` and
+  `git diff --check` also pass at this checkpoint.
+- [verified locally/macOS app] An x86_64 menu-bar app build and strict deep
+  code-signature verification passed before the final wrapper correction.
+  Packaging included the new executable wrapper and publisher, but that build
+  is now superseded and must be repeated before push.
+- [fixed locally/macOS wrapper] Packaging review caught the wrapper calling the
+  nonexistent `discover_codex_bundle`; it now uses the established
+  `ensure_node_runtime` path. A source regression guards that call, and the
+  focused publish suite, wrapper Bash syntax, and `git diff --check` pass after
+  the correction. Startup recovery failure cancels any pending one-click apply
+  and reports a bounded repair instruction instead of silently continuing.
+- [verified locally/macOS final app] The corrected source builds as
+  `/tmp/CodexDreamSkin-pr324-recovery-final.app` (x86_64 Mach-O). Strict deep
+  code-signature verification passes; the packaged recovery wrapper is
+  executable, and its bytes plus the publisher bytes match the current
+  worktree exactly.
+- [verified locally/macOS full gate] `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash
+  macos/tests/run-tests.sh` passes on the integrated macOS files, including the
+  publish hard-kill regression, ZIP/archive bounds, community apply rollback,
+  installer rollback, signed-runtime switch, and runtime-state integration.
+  Only the documented full-Xcode native XCTest and installed signed-Codex
+  Doctor branches skipped on this host.
+- [fixed locally/Windows] Only a durable `committed` journal plus marker retains
+  the new theme. Earlier phases restore the verified old fingerprint first;
+  corrupt or missing candidate evidence is retained with the journal and fails
+  closed. Duplicate destinations and unsafe/unknown journal fields are rejected
+  before mutation, cleanup order is crash-safe, and legacy cleanup is outside
+  rollback. A corrupt published candidate is moved back to its contained stage
+  before the exact old canonical theme is restored.
+- [covered/Windows] The focused suite now includes a real child `FailFast` after
+  the first rename plus deterministic restart states for published and committed
+  phases, corrupt/missing candidates, duplicate targets, unsafe journals, and
+  committed-marker conflicts. Native PowerShell execution is unavailable on
+  this Mac and remains a fresh PR CI gate.
+- [verified locally/final] Portable macOS/Windows Node regressions pass 81/81.
+  The complete applicable macOS suite passes with only its documented full-
+  Xcode native XCTest and installed signed-Codex Doctor branches skipped.
+  Runtime asset sync, all Node and changed Bash syntax, Windows PowerShell BOM,
+  execution-policy safety, and `git diff --check` gates pass.
+- [committed locally] Recovery implementation and Windows validation document
+  are commit `dd19005e8a37ad7a80f1b957cf9759743b50d7e7` on branch
+  `codex/pr324-final-review-fixes`, intended for remote PR head branch
+  `origin/codex/fix-318-320-322` (Draft PR #324).
+- [pending] Commit this durable progress record, push both commits to the Draft
+  PR branch, and require fresh PowerShell 5.1/7 CI. Do not merge, release,
+  comment on issues, or close issues.
+
+## PR #324 final L0 readiness correction — pushed and CI-verified (2026-07-31)
 
 - [reviewed] Remote Draft PR head `8b39dcdaff5985f3a2247c13176cd4329a5186eb`
   correctly rejects an ordinary `thread/L0` renderer, but still accepts
   `home/L0` when required L1 shell anchors are missing. That permits an
   unrecognized sidebar/main/header to be reported as a successful apply or
   rollback on both platforms.
-- [fixed locally] macOS and Windows now reserve L0 visible verification only
+- [fixed] macOS and Windows now reserve L0 visible verification only
   for the real cross-platform Settings exception. Home and ordinary task views
   require `scope=L1` with an empty `missingL1`; focused dual-platform readiness
   tests and Node syntax checks pass.
 - [verified locally] Shared runtime sync passes, portable Node regressions pass
   80/80, and the complete macOS repository suite passes with only the documented
   full-Xcode and installed signed-app Doctor skips. `git diff --check` passes.
-- [pending] Commit and push this correction to Draft PR #324. Fresh Windows
-  PowerShell 5.1/7 CI and real-Windows validation from the new exact head remain
-  required. Do not merge, release, comment on issues, or close issues.
+- [committed/pushed] Code fix `0884be7c34cbbd62974d1ce8669a139ffbe81be2`
+  and progress commit `1a693364db0086afed30fa9a4e5991d1c61f9237`
+  are on remote Draft PR #324. The PR remains open, Draft, and unmerged.
+- [verified] GitHub Actions run `30632592756` passed all four jobs at exact head
+  `1a693364`: Static checks, macOS repository regressions with Universal DMG,
+  Windows PowerShell 7, and Windows PowerShell 5.1 with Setup.exe compilation.
+- [verified locally] Root repeated the portable Node suite (80/80), complete
+  applicable macOS suite, runtime asset sync, and `git diff --check` at the
+  exact remote head; all passed. Only documented full-Xcode and installed-app
+  Doctor branches were skipped.
+- [correlated] New issue #330 reports the same Codex `26.727.40816` app-shell
+  selector migration already reproduced for #322/#326 and covered by this PR's
+  shared macOS/Windows selector contract. It is not evidence of a separate
+  unresolved root cause.
+- [pending] Real Windows Codex validation must be repeated from exact head
+  `1a693364` using `docs/pr-324-windows-validation.md`. Do not merge, release,
+  tell issue users to retry a public version, or close issues before that result
+  is reviewed.
 
 ## PR #324 final review blockers — pushed and CI-verified (2026-07-31)
 
