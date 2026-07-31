@@ -4,12 +4,14 @@
 
 ### 修复
 
+- 适配 Codex Desktop 26.727.40816：外壳结构改用 `data-app-shell-*` 属性后，`main.main-surface`、`header.app-header-tint`、`home-icon` testid 与 `data-message-author-role` 均不再存在，导致注入器把新版主界面误判为“非 ChatGPT 页面”并验证失败。选择器契约已按 26.727 实测快照更新：主表面用 `main[data-app-shell-main-surface]`，顶栏用 `header[data-app-shell-application-menu-bar]`，首页用 `[role="main"]`（问候标题 `h1.heading-xl` 作为 home 信号），消息回合用 `[data-turn-key]`；首页不再渲染的旧建议卡/项目选择器锚点保留为 L2 静默降级。
 - 修复 Codex Desktop 26.721.x 首页在 `home-icon` 延迟渲染时被误判为注入校验失败的问题（#306）。校验现在复用已由首页内容信号解析出的 `[role="main"]` 容器；严格的 `home-icon` 路径仍优先，旧版行为不变。
 - 修复显式浅色、宽幅 artwork 的 `taskMode: "full"` 任务页 Markdown 继承原生深色壳白色前景的问题（#309）。完整模式现与 ambient/banner 一样强制使用主题文本色，并保留浅色壳对比阴影。
 - 修复社区主题 ZIP 导入拒绝 `backdrop-filter: blur(var(--ds-theme-surface-blur))` 的问题（#312）。Safe CSS 仍只允许 `none`、0-20px blur 或注册的主题 blur 变量，不放宽到任意 filter 函数。
 
 ### 内部
 
+- 同步 v1.6.0 版本号以发布 macOS 选择器契约适配（Codex 26.727）。
 - 同步 v1.5.9 版本号以发布 Windows 一键换肤补丁；macOS 运行时代码相对 v1.5.8 无行为变化。
 - 同步 v1.5.8 版本号以发布 Windows 安装器补丁；macOS 运行时代码相对 v1.5.7 无行为变化。
 

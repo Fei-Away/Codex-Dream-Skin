@@ -765,8 +765,6 @@ html[data-dream-skin="active"]:is([data-dream-art-safe="center"], [data-dream-ar
   text-align: center !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_ICON__ { display: none !important; }
-
 html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_GAME_SOURCE__ {
   display: block !important;
   max-width: 100% !important;
@@ -1174,7 +1172,7 @@ html[data-dream-skin="active"] button[class~="bg-token-foreground"] {
 }
 
 html[data-dream-skin="active"] article,
-html[data-dream-skin="active"] [data-message-author-role] { border-radius: 16px; }
+html[data-dream-skin="active"] [data-turn-key] { border-radius: 16px; }
 
 @media (max-width: 1120px) {
   html[data-dream-skin="active"]
