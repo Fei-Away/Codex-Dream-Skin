@@ -81,7 +81,7 @@ function makeHome(options = {}) {
 }
 
 function makeDomFixture({
-  scope = { level: "L1", baseState: "thread" },
+  scope = { level: "L1", baseState: "thread", missingL1: [] },
   shell = makeElement(),
   sidebar = makeElement(),
   composer = makeElement(),
@@ -258,9 +258,27 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
   assert.equal(generic.result.pass, true);
   assert.equal(generic.result.readiness.structurePass, true);
 
+  const genericL0 = await verify({
+    dom: makeDomFixture({
+      scope: {
+        level: "L0",
+        baseState: "thread",
+        missingL1: ["shell-main", "left-panel", "header-tint"],
+      },
+      shell: null,
+      sidebar: null,
+      home: null,
+      genericMain: makeElement({ rect: makeRect(900, 650, 20, 20) }),
+      genericInput: makeElement({ rect: makeRect(620, 80, 180, 620) }),
+    }),
+  });
+  assert.equal(genericL0.result.pass, false,
+    "Generic app parts must not turn an L0 thread with missing shell/header anchors into visible success.");
+  assert.equal(genericL0.result.readiness.structurePass, false);
+
   const falseHome = await verify({
     dom: makeDomFixture({
-      scope: { level: "L1", baseState: "home" },
+      scope: { level: "L1", baseState: "home", missingL1: [] },
       home: null,
       homeSignal: null,
       genericMain: makeElement({ rect: makeRect(900, 650, 20, 20) }),

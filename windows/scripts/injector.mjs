@@ -1239,14 +1239,17 @@ export async function verifySession(
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    const l0AnchorPass = Boolean(result.settingsAnchor?.visible || result.homeSurface?.visible);
     const homeScope = result.scope?.baseState === 'home' || result.homePresent;
-    const genericStructurePass = Boolean(result.genericMain?.visible) &&
+    const l1ScopePass = result.scope?.level === 'L1' &&
+      Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 0;
+    const genericStructurePass = l1ScopePass && Boolean(result.genericMain?.visible) &&
       Boolean(result.genericInput?.visible || (homeScope && result.homeSurface?.visible));
-    const structurePass = result.scope?.level === 'L0'
-      ? (l0AnchorPass || genericStructurePass)
-      : result.scope?.level === 'L1' &&
-        (Boolean(result.shell?.visible && result.sidebar?.visible) || genericStructurePass);
+    const l0StructurePass = result.scope?.level === 'L0' && (
+      (result.scope?.baseState === 'settings' && Boolean(result.settingsAnchor?.visible)) ||
+      (homeScope && Boolean(result.homeSurface?.visible))
+    );
+    const structurePass = l0StructurePass || (l1ScopePass &&
+      (Boolean(result.shell?.visible && result.sidebar?.visible) || genericStructurePass));
     const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;
     const viewportPass = result.viewport.width >= ${MIN_RENDERER_VIEWPORT_WIDTH} &&
       result.viewport.height >= ${MIN_RENDERER_VIEWPORT_HEIGHT};

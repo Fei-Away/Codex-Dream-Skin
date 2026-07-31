@@ -607,13 +607,15 @@
   const fallbackComposerNodes = () => selectorNodes("composer-chrome").length
     ? [] : (() => {
       const main = resolvedMainNode();
-      const input = genericInputNodes().find((node) => !main || main.contains?.(node));
-      if (!input) return [];
-      const owner = input.closest?.(
-        '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
-        '[class*="composer" i], [class*="prompt" i]',
-      );
-      return owner && (!main || main.contains?.(owner)) ? [owner] : [];
+      for (const input of genericInputNodes()) {
+        if (main && !main.contains?.(input)) continue;
+        const owner = input.closest?.(
+          '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
+          '[class*="composer" i], [class*="prompt" i]',
+        );
+        if (owner && (!main || main.contains?.(owner))) return [owner];
+      }
+      return [];
     })();
   const addPart = (desired, part, nodes) => {
     for (const node of nodes) {

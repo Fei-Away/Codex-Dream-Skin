@@ -40,7 +40,7 @@ const baseRenderer = {
   documentVisibility: "visible",
   viewport: { width: 1180, height: 740 },
   documentOverflow: { x: false, y: false },
-  scope: { level: "L1", baseState: "thread" },
+  scope: { level: "L1", baseState: "thread", missingL1: [] },
   shell: { visible: true, width: 900, height: 740 },
   sidebar: { visible: true, width: 280, height: 740 },
   settings: null,
@@ -68,7 +68,7 @@ assert.match(
 assert.equal(
   assessRendererVerification({
     ...baseRenderer,
-    scope: { level: "L1", baseState: "home" },
+    scope: { level: "L1", baseState: "home", missingL1: [] },
     homeRoute: true,
     homePresent: true,
     hero: { visible: true, width: 800, height: 520 },
@@ -79,7 +79,7 @@ assert.equal(
 assert.equal(
   assessRendererVerification({
     ...baseRenderer,
-    scope: { level: "L1", baseState: "home" },
+    scope: { level: "L1", baseState: "home", missingL1: [] },
     homeRoute: false,
     homePresent: false,
     genericMain: { visible: true, width: 900, height: 640 },
@@ -178,13 +178,29 @@ assert.equal(
 assert.equal(
   assessRendererVerification({
     ...baseRenderer,
+    scope: {
+      level: "L0",
+      baseState: "thread",
+      missingL1: ["shell-main", "left-panel", "header-tint"],
+    },
+    shell: null,
+    sidebar: null,
+    genericMain: { visible: true, width: 900, height: 640 },
+    genericInput: { visible: true, width: 620, height: 80 },
+  }, unsupported, exactPayload).pass,
+  false,
+  "Generic app parts must not turn an L0 thread with missing shell/header anchors into visible success.",
+);
+assert.equal(
+  assessRendererVerification({
+    ...baseRenderer,
     shell: null,
     sidebar: null,
     genericMain: { visible: true, width: 900, height: 640 },
     genericInput: { visible: true, width: 620, height: 80 },
   }, unsupported, exactPayload).pass,
   true,
-  "Newer Codex shells may verify through generic app main/input anchors when exact payload evidence is present.",
+  "A complete L1 scope may verify through registered generic app parts.",
 );
 assert.equal(
   assessRendererVerification(

@@ -231,11 +231,17 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   const documentVisible = result.documentVisibility === "visible";
   const settingsRoute = result.scope?.baseState === "settings";
   const homeRoute = result.scope?.baseState === "home" || result.homeRoute || result.homePresent;
-  const genericStructurePass = Boolean(result.genericMain?.visible) &&
+  const l1ScopePass = result.scope?.level === "L1" &&
+    Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 0;
+  const genericStructurePass = l1ScopePass && Boolean(result.genericMain?.visible) &&
     (Boolean(result.genericInput?.visible) || Boolean(homeRoute && result.homePresent));
-  const structurePass = settingsRoute
-    ? Boolean(result.settings?.visible)
-    : (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible)) || genericStructurePass;
+  const l0StructurePass = result.scope?.level === "L0" && (
+    (settingsRoute && Boolean(result.settings?.visible)) ||
+    (homeRoute && Boolean(result.homePresent))
+  );
+  const structurePass = l0StructurePass || (l1ScopePass && (
+    (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible)) || genericStructurePass
+  ));
   const nativeWindowPass = nativeWindow?.status === "ready";
   const fallbackWindowPass = nativeWindow?.status === "unsupported";
   const windowPass = documentVisible && viewportPass

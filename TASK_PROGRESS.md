@@ -1,5 +1,39 @@
 # Task Progress
 
+## PR #324 final review blockers — in progress (2026-07-31)
+
+- [reviewed] Draft PR #324 head `598dd07f6831faa238230752531bc75064baa581`
+  passed all four CI jobs and has real Windows Codex 26.727 renderer/import
+  evidence, but that evidence exposed follow-up behavior and does not waive
+  review of the resulting shared-runtime/import changes.
+- [reproduced] The head can clear the registered wallpaper whenever validated
+  Safe CSS sets `background-color`; its client Safe CSS parser also diverges
+  from the website/server glass-filter contract. A preceding search textbox can
+  prevent the real prompt composer from receiving its public part marker.
+- [reproduced] macOS validates the extracted payload before a missing or
+  non-string source ID is normalized, while Windows normalizes first. Windows
+  saved-theme enumeration also permits dotted recovery directories to leak into
+  the tray menu.
+- [fixed] Root/background colors preserve the registered body wallpaper;
+  surface image clearing is limited to registered core surfaces. The client
+  accepts the same bounded composite glass filters as Studio/server, and a
+  preceding search input no longer hides the real semantic composer.
+- [fixed] Missing/non-string IDs pass a private pre-publish payload check only
+  after temporary normalization, then receive the stable cross-platform ID and
+  pass the mandatory final check before any old theme moves. Windows saved-theme
+  enumeration filters every dotted transaction/recovery directory.
+- [fixed] Generic parts can verify an ordinary route only with `scope=L1` and
+  an empty `missingL1`; an L0 thread missing shell/sidebar/header can no longer
+  make apply or rollback report false visible success. Explicit settings/home
+  L0 anchors remain supported on both platforms.
+- [verified locally] Portable Node regressions pass 80/80; focused Safe CSS,
+  renderer, fallback-ID ZIP import, runtime sync, Node/shell syntax, and
+  `git diff --check` pass. The complete macOS repository suite passes with only
+  its documented full-Xcode and installed-app Doctor skips.
+- [pending] Commit and push this exact state to Draft PR #324, then require new
+  Windows PowerShell 5.1/7 CI plus the updated real-Windows checklist from the
+  new head. Do not merge, release, comment on issues, or close issues.
+
 ## Windows Codex 26.727.4816 final worktree acceptance (2026-07-31)
 
 - [verified] The official Store package is `OpenAI.Codex_26.727.4816.0`; the

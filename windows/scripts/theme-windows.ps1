@@ -1643,6 +1643,7 @@ function Get-DreamSkinSavedThemes {
   if (-not (Test-Path -LiteralPath $paths.Saved -PathType Container)) { return @() }
   $themes = @()
   foreach ($directory in Get-ChildItem -LiteralPath $paths.Saved -Directory -ErrorAction SilentlyContinue) {
+    if ($directory.Name.StartsWith('.')) { continue }
     try {
       $loaded = Read-DreamSkinTheme -ThemeDirectory $directory.FullName -SkipImageMetadata:$SkipImageMetadata
       $themes += [pscustomobject]@{

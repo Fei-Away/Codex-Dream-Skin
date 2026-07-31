@@ -127,9 +127,9 @@ function makeFixture({
       );
     }
     register(mainSelector, partFixtures.main);
+    if (genericSearch) register(inputSelector, partFixtures.searchInput);
     if (genericComposer) register(inputSelector, partFixtures.input);
     register(inputSelector, partFixtures.dialogInput);
-    if (genericSearch) register(inputSelector, partFixtures.searchInput);
     register(sidebarSelector, partFixtures.sidebar);
     register(sidebarSelector, partFixtures.unrelatedAside);
     if (genericHome) {
@@ -454,6 +454,21 @@ export async function runRendererRuntimeTest(assetRoot) {
     "A generic search form must not be exposed as the app composer.");
   assert.equal(genericSearch.partFixtures.searchInput.getAttribute("data-ds-part"), null,
     "A generic search textbox must not be exposed as the app composer.");
+
+  const genericSearchBeforeComposer = makeFixture({
+    nativeAppearance: "dark", generic: true, genericComposer: true, genericSearch: true,
+  });
+  vm.runInNewContext(
+    genericSearchBeforeComposer.payloadFor(), genericSearchBeforeComposer.context,
+  );
+  assert.equal(
+    genericSearchBeforeComposer.partFixtures.searchInput.getAttribute("data-ds-part"), null,
+    "A preceding search textbox must remain unmarked.",
+  );
+  assert.equal(
+    genericSearchBeforeComposer.partFixtures.composer.getAttribute("data-ds-part"), "composer",
+    "A preceding search textbox must not hide the real semantic composer.",
+  );
 
   const genericHome = makeFixture({ nativeAppearance: "dark", generic: true, genericHome: true });
   vm.runInNewContext(genericHome.payloadFor(), genericHome.context);

@@ -49,8 +49,9 @@ WORK_ROOT="$(/usr/bin/mktemp -d "$STATE_ROOT/.theme-import-work.XXXXXX")"
 ARCHIVE_SNAPSHOT="$WORK_ROOT/archive.zip"
 EXTRACT_STAGE="$WORK_ROOT/extracted"
 VALIDATED_STAGE="$WORK_ROOT/validated"
-/bin/mkdir "$EXTRACT_STAGE" "$VALIDATED_STAGE"
-/bin/chmod 700 "$EXTRACT_STAGE" "$VALIDATED_STAGE"
+PAYLOAD_VALIDATION_STAGE="$WORK_ROOT/payload-validation"
+/bin/mkdir "$EXTRACT_STAGE" "$VALIDATED_STAGE" "$PAYLOAD_VALIDATION_STAGE"
+/bin/chmod 700 "$EXTRACT_STAGE" "$VALIDATED_STAGE" "$PAYLOAD_VALIDATION_STAGE"
 
 ensure_node_runtime
 SNAPSHOTTER="$SCRIPT_DIR/snapshot-theme-zip.mjs"
@@ -80,7 +81,24 @@ PACKAGE_VALIDATOR="$PROJECT_ROOT/assets/theme-package-validator.mjs"
   --platform macos \
   --client-version "$SKIN_VERSION" >/dev/null \
   || fail "Theme ZIP failed official package or local simplified-format validation."
-"$NODE" "$INJECTOR" --check-payload --theme-dir "$VALIDATED_STAGE" >/dev/null \
+
+# The publisher assigns a stable private ID when a simplified package omits ID
+# or supplies a non-string value. Validate every other runtime field against a
+# private copy with a temporary valid ID, while preserving the original stage
+# for the publisher's cross-platform identity fingerprint.
+/bin/cp -R "$VALIDATED_STAGE/." "$PAYLOAD_VALIDATION_STAGE/"
+/bin/chmod -R u=rwX,go= "$PAYLOAD_VALIDATION_STAGE"
+"$NODE" -e '
+  const fs = require("node:fs");
+  const file = process.argv[1];
+  const theme = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (!Object.hasOwn(theme, "id") || typeof theme.id !== "string") {
+    theme.id = "import-payload-validation";
+    fs.writeFileSync(file, `${JSON.stringify(theme, null, 2)}\n`, "utf8");
+  }
+' "$PAYLOAD_VALIDATION_STAGE/theme.json" \
+  || fail "Theme ZIP failed theme.json validation."
+"$NODE" "$INJECTOR" --check-payload --theme-dir "$PAYLOAD_VALIDATION_STAGE" >/dev/null \
   || fail "Theme ZIP failed theme.json or image validation."
 
 # The publisher emits one JSON object consumed by the native menu app. It

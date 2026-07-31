@@ -748,6 +748,12 @@ try {
   }
   $cleanupWarningBackups = @(Get-ChildItem -LiteralPath $paths.Saved -Directory -Force |
     Where-Object { $_.Name -clike '.theme-replace-*' })
+  $cleanupWarningVisibleBackups = @(Get-DreamSkinSavedThemes `
+    -StateRoot $stateRoot -SkipImageMetadata | Where-Object {
+      [System.IO.Path]::GetFileName("$($_.Path)").StartsWith(
+        '.theme-replace-', [System.StringComparison]::Ordinal
+      )
+    })
   $cleanupWarningPublished = Read-DreamSkinTheme `
     -ThemeDirectory $cleanupWarningFirst.Path -SkipImageMetadata
   if (-not $script:CleanupWarningInjectionHit -or
@@ -755,6 +761,7 @@ try {
     "$($cleanupWarningPublished.Theme.quote)" -cne 'CLEANUP WARNING B' -or
     $cleanupWarningResult.CleanupWarning -cnotmatch 'committed-backup cleanup failure' -or
     $cleanupWarningBackups.Count -ne 1 -or
+    $cleanupWarningVisibleBackups.Count -ne 0 -or
     (Get-DreamSkinThemeSemanticFingerprint -ThemeDirectory $cleanupWarningBackups[0].FullName) -cne
       $cleanupWarningOldFingerprint) {
     throw 'A committed import was rolled back or reported failed when obsolete backup cleanup failed.'

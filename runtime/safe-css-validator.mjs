@@ -3,6 +3,7 @@ const MAX_RULES = 128;
 const MAX_DECLARATIONS = 512;
 const MAX_VALUE_CHARACTERS = 512;
 const RUNTIME_CASCADE_LAYER = "dreamskin-community";
+const CORE_BACKGROUND_IMAGE_PARTS = new Set(["sidebar", "main", "home"]);
 
 export const SAFE_CSS_PARTS = Object.freeze([
   "root",
@@ -109,6 +110,7 @@ const HEX_COLOR = /^#[0-9a-f]{3}(?:[0-9a-f]|[0-9a-f]{3}(?:[0-9a-f]{2})?)?$/i;
 const SIMPLE_SELECTOR = /^\[data-ds-part="([a-z]+(?:-[a-z]+)*)"\](?::([a-z-]+))?$/;
 const PROPERTY_NAME = /^[a-z][a-z-]*$/;
 const VAR_FUNCTION = /^var\(\s*(--[a-z0-9-]+)\s*\)$/;
+const FILTER_FUNCTION = /^(blur|saturate|brightness|contrast)\(\s*(.+?)\s*\)$/i;
 const SAFE_WHITESPACE = new Set(["\t", "\n", "\r", "\f", " "]);
 
 export class SafeCssValidationError extends Error {
@@ -262,6 +264,34 @@ function transitionPropertyValue(value) {
     && properties.every((property) => TRANSITION_TARGETS.has(property.toLowerCase())));
 }
 
+function backdropFilterValue(value) {
+  if (value.toLowerCase() === "none") return true;
+  const filters = splitWhitespace(value);
+  if (!filters || filters.length < 1 || filters.length > 4) return false;
+  const seen = new Set();
+  for (let index = 0; index < filters.length; index += 1) {
+    const match = filters[index].match(FILTER_FUNCTION);
+    if (!match) return false;
+    const name = match[1].toLowerCase();
+    const argument = match[2].trim();
+    if (seen.has(name)) return false;
+    seen.add(name);
+    if (name === "blur") {
+      if (index !== 0 || !(
+        registeredVar(argument, new Set(["--ds-theme-surface-blur"]))
+        || zeroOrPx(argument, 0, 30)
+      )) return false;
+    } else if (name === "saturate") {
+      if (!numeric(argument, 0.5, 2)) return false;
+    } else if (name === "brightness" || name === "contrast") {
+      if (!numeric(argument, 0.8, 1.5)) return false;
+    } else {
+      return false;
+    }
+  }
+  return seen.has("blur");
+}
+
 function validatePropertyValue(property, value) {
   if (COLOR_PROPERTIES.has(property)) return colorValue(value, property);
   if (WIDTH_PROPERTIES.has(property)) return repeatedValues(value, 1, 4, (item) => zeroOrPx(item, 0, 4));
@@ -277,14 +307,7 @@ function validatePropertyValue(property, value) {
   if (property === "opacity") {
     return registeredVar(value, new Set(["--ds-theme-surface-opacity"])) || numeric(value, 0.65, 1);
   }
-  if (property === "backdrop-filter") {
-    if (value.toLowerCase() === "none") return true;
-    const match = value.match(/^blur\(\s*(.+?)\s*\)$/i);
-    return Boolean(match && (
-      registeredVar(match[1], new Set(["--ds-theme-surface-blur"]))
-      || zeroOrPx(match[1], 0, 20)
-    ));
-  }
+  if (property === "backdrop-filter") return backdropFilterValue(value);
   if (property === "font-family") return fontFamilyValue(value);
   if (property === "font-size") return numeric(value, 12, 20, "px");
   if (property === "font-weight") return /^(?:400|500|600|700|normal|bold)$/i.test(value);
@@ -503,7 +526,10 @@ function compileRuntimeCss(parsed) {
     const runtimeDeclarations = [];
     for (const declaration of declarations) {
       runtimeDeclarations.push(declaration);
-      if (declaration.property === "background-color") {
+      if (
+        declaration.property === "background-color"
+        && CORE_BACKGROUND_IMAGE_PARTS.has(part)
+      ) {
         runtimeDeclarations.push({ property: "background-image", value: "none" });
       }
     }
@@ -520,9 +546,6 @@ function compileRuntimeCss(parsed) {
           "letter-spacing", "line-height",
         ].includes(declaration.property)) continue;
         bodyDeclarations.push(declaration);
-        if (declaration.property === "background-color") {
-          bodyDeclarations.push({ property: "background-image", value: "none" });
-        }
       }
       if (bodyDeclarations.length > 0) {
         const bodyBridge = bodyDeclarations

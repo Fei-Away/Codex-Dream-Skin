@@ -21,6 +21,18 @@ Windows behavior aligned:
   pass target verification when it has both Codex/ChatGPT identity evidence and
   the required structure; unrelated targets still fail closed.
 
+The final review also covers regressions found after the first Windows pass:
+
+- Missing, non-string, or Windows-reserved source IDs are normalized to the
+  same stable cross-platform ID before the mandatory final payload check. That
+  check must finish before an existing saved theme is moved or replaced.
+- Hidden transaction/recovery directories are never listed as saved themes,
+  even if an obsolete backup cannot be deleted immediately.
+- Validated Safe CSS keeps the website/server glass-filter contract (blur up
+  to 30 px plus bounded saturate/brightness/contrast), does not erase the
+  registered wallpaper merely because a root or surface sets a background
+  color, and still reaches the real composer when a search input appears first.
+
 The import repair is deliberately conservative. A legacy `id-2`/`id-3`
 directory is removed only when its stored suffix identity and semantic
 fingerprint both prove that it is the same package. A matching display name is
@@ -69,6 +81,34 @@ pwsh.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
 
 All commands must exit `0`. Keep the complete failure output if one does not.
 
+Before manual renderer testing, close Codex and exit the Dream Skin tray, then
+install the runtime from this checkout. Do not reuse the engine left by an
+older PR head or Release:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+  -File .\windows\scripts\install-dream-skin.ps1
+
+$engine = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin\engine'
+foreach ($relative in @(
+  'assets\dream-skin.css',
+  'assets\renderer-inject.js',
+  'assets\safe-css-validator.mjs',
+  'scripts\injector.mjs',
+  'scripts\theme-windows.ps1'
+)) {
+  $source = Join-Path (Resolve-Path .\windows) $relative
+  $installed = Join-Path $engine $relative
+  if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -cne
+      (Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash) {
+    throw "Installed engine does not match PR source: $relative"
+  }
+}
+```
+
+Record `git rev-parse HEAD` after installation. If any hash differs, stop; the
+manual result belongs to another build and is not evidence for this PR head.
+
 The automated generic renderer fixture is deliberately minimal: it contains
 only structural anchors such as main, sidebar, composer, and the registered
 Codex identity marker. Its typography, native form controls, placeholder copy,
@@ -93,6 +133,13 @@ background image. Importing a ZIP must not change the currently active theme.
    same display name. Importing `id` must preserve the independent `id-2`.
 7. Put a normal file at a candidate canonical theme path. Import must fail and
    leave that file byte-for-byte unchanged.
+8. Import packages whose source ID is missing, non-string, or Windows-reserved.
+   Each must receive the documented stable fallback ID and a later equivalent
+   package must update that same directory. Invalid payloads must fail before
+   the existing canonical directory is moved.
+9. Simulate or retain an obsolete hidden `.theme-replace-*` recovery copy.
+   The committed new theme may report a cleanup warning, but no dotted
+   transaction directory may appear in the tray's saved-theme menu.
 
 After each case, confirm there are no hidden `.theme-import-*`,
 `.theme-replace-*`, `.theme-legacy-cleanup-*`, or `.theme-failed-*` residues.
@@ -102,7 +149,7 @@ be reported explicitly; it must not be silently swallowed.
 
 ## Renderer and target checks (#320/#322)
 
-Build or install from this exact PR commit, then launch the current official
+Use the source-installed engine verified above, then launch the current official
 Microsoft Store Codex through DreamSkin. Do not test an older Setup.exe.
 
 1. Apply at least three complete community themes with different Safe CSS,
@@ -110,6 +157,8 @@ Microsoft Store Codex through DreamSkin. Do not test an older Setup.exe.
 2. Check Home and a normal task view. Main content, sidebar, home surface, and
    composer must receive the intended shared styling without styling search,
    settings, modal, or unrelated textbox containers as the composer.
+   Include a view where a search textbox occurs in DOM order before the prompt
+   composer; the prompt composer must still receive `data-ds-part="composer"`.
 3. On Codex `26.727.40816` or newer, confirm the real outer main surface has the
    theme background from the very top of the window. There must be no native
    white strip or white top-fade left behind. The header controls must remain
@@ -119,7 +168,12 @@ Microsoft Store Codex through DreamSkin. Do not test an older Setup.exe.
    is insufficient if `shell-main` or `header-tint` is still missing.
 5. Confirm sidebar navigation, project selection, task content, composer input,
    and send controls remain interactive and readable.
-6. Run the installed verification script and save its screenshot:
+6. Include at least one full-wallpaper theme whose Safe CSS sets a root or main
+   `background-color`. Its registered wallpaper must remain visible. Also test
+   a theme using `blur(21px..30px)` with bounded `saturate`, `brightness`, or
+   `contrast`; it must import and render instead of being rejected by the
+   client validator.
+7. Run the installed verification script and save its screenshot:
 
    ```powershell
    powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
@@ -127,9 +181,9 @@ Microsoft Store Codex through DreamSkin. Do not test an older Setup.exe.
      -ScreenshotPath "$env:TEMP\dreamskin-pr324.png"
    ```
 
-7. Restart Codex, reapply a theme, and verify again. A visible real Codex
+8. Restart Codex, reapply a theme, and verify again. A visible real Codex
    `app://` renderer must pass exact payload, theme ID, and revision checks.
-8. The automated bootstrap negative fixture must still reject an unbranded
+9. The automated bootstrap negative fixture must still reject an unbranded
    `app://` page with only generic main/input structure. Loopback endpoints not
    owned by the verified Codex package must also remain rejected.
 
@@ -145,8 +199,10 @@ Report all of the following:
 - Windows edition/build, Codex version, and Node version;
 - Windows PowerShell 5.1 result and optional PowerShell 7 result;
 - first import, same-ID update, exact duplicate, legacy cleanup, independent
-  suffix preservation, file-collision, and rollback results;
+  suffix preservation, file-collision, fallback-ID, rollback, cleanup-warning,
+  and hidden-directory menu-filter results;
 - the names of the three non-colors-only themes used for renderer testing;
+- wallpaper-preservation, composite-filter, and search-before-composer results;
 - verification output, screenshot path, and whether restart/reapply passed;
 - confirmation that the screenshot came from the real Codex app, not the
   generic renderer fixture;
