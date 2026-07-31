@@ -125,9 +125,7 @@ assert.deepEqual(
 );
 assert.equal(generations.context.window.__CODEX_DREAM_SKIN_EARLY_APPLIED__, "new");
 
-const earlyStart = source.indexOf("export function earlyPayloadFor");
-const earlySource = source.slice(earlyStart, earlyStart + 2200);
-assert.ok(earlyStart >= 0, "Early payload helper must remain exported for bootstrap tests.");
+const earlySource = earlyPayloadFor("", "source-contract");
 assert.doesNotMatch(earlySource, /MutationObserver|childList|subtree/,
   "Early bootstrap must not observe the entire renderer DOM.");
 assert.doesNotMatch(earlySource, /document\.title|document\.body\?\.innerText|location\.href/,

@@ -1,5 +1,28 @@
 # Task Progress
 
+## PR #334 Windows CRLF CI follow-up — locally verified (2026-08-01)
+
+- [scope] Client worktree `/private/tmp/dreamskin-settings-fix.4tH4ld` is on
+  `codex/fix-26-727-settings-renderer`; PR #334 targets `main`. The pre-fix PR
+  head is `159c650c3b43877df4413a7b0a20562fe556a018`.
+- [reproduced from CI] Run `30646840223` passed Static checks and macOS
+  repository regressions, but both Windows PowerShell 5.1 and PowerShell 7 jobs
+  failed in their regression suite. On the Windows CRLF checkout, the bootstrap
+  source-contract test's fixed 2,200-character slice ended at
+  `setInterval(in`, before the asserted `setInterval(install, 250)` text.
+- [fixed locally/tests only] Both platform bootstrap tests now inspect the
+  complete string returned by the already imported
+  `earlyPayloadFor("", "source-contract")`. This removes line-ending-dependent
+  truncation without changing or weakening the early-injection assertions and
+  without changing runtime implementation.
+- [verified locally] `node macos/tests/injector-bootstrap.test.mjs`,
+  `node windows/tests/injector-bootstrap.test.mjs`, both platform
+  `renderer-inject.test.mjs` tests, `node tools/doctor-selectors.test.mjs`, and
+  `git diff --check` all pass.
+- [pending] Commit and push this test-only follow-up to PR #334, then require a
+  fresh exact-head CI pass for all four jobs before merge. No merge, release,
+  deployment, Issue reply, or Issue closure has occurred in this follow-up.
+
 ## Client release v1.5.10 — in progress (2026-07-31)
 
 - [base] Feature PR #324 was squash-merged to `main` at
