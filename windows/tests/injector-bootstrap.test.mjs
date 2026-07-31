@@ -20,6 +20,7 @@ function createFixture() {
     shell: false,
     sidebar: false,
     main: false,
+    settingsPanel: false,
     settings: false,
     genericInput: false,
     branding: false,
@@ -36,6 +37,9 @@ function createFixture() {
         if (selector === "aside.app-shell-left-panel") return markers.sidebar ? {} : null;
         if (selector === "[role=\"main\"]") return markers.main ? {} : null;
         if (selector === "main, [role=\"main\"]") return markers.main ? {} : null;
+        if (selector === '[data-settings-panel-slug="general-settings"]') {
+          return markers.settingsPanel ? {} : null;
+        }
         if (selector.includes("textarea") || selector.includes("contenteditable") || selector.includes("textbox")) {
           return markers.genericInput ? {} : null;
         }
@@ -96,6 +100,16 @@ generic.tick();
 assert.deepEqual(generic.context.window.installs, ["generic"],
   "A verified app:// Codex surface with generic main/input anchors must accept newer renderer shells.");
 
+const settingsPanel = createFixture();
+vm.runInNewContext(
+  earlyPayloadFor('window.installs.push("settings-panel")', "settings-panel"),
+  settingsPanel.context,
+);
+settingsPanel.markers.settingsPanel = true;
+settingsPanel.tick();
+assert.deepEqual(settingsPanel.context.window.installs, ["settings-panel"],
+  "Codex 26.727 Settings must accept its stable general-settings panel without legacy appearance controls.");
+
 const generations = createFixture();
 generations.makeNotReady();
 generations.markers.shell = true;
@@ -111,9 +125,7 @@ assert.deepEqual(
 );
 assert.equal(generations.context.window.__CODEX_DREAM_SKIN_EARLY_APPLIED__, "new");
 
-const earlyStart = source.indexOf("export function earlyPayloadFor");
-const earlySource = source.slice(earlyStart, earlyStart + 2200);
-assert.ok(earlyStart >= 0, "Early payload helper must remain exported for bootstrap tests.");
+const earlySource = earlyPayloadFor("", "source-contract");
 assert.doesNotMatch(earlySource, /MutationObserver|childList|subtree/,
   "Early bootstrap must not observe the entire renderer DOM.");
 assert.doesNotMatch(earlySource, /document\.title|document\.body\?\.innerText|location\.href/,
@@ -123,6 +135,46 @@ assert.match(earlySource, /setInterval\(install, 250\)/);
 const identityProbeStart = source.indexOf("async function probeSession");
 const identityProbeSource = source.slice(identityProbeStart, identityProbeStart + 1800);
 assert.ok(identityProbeStart >= 0, "The live target probe must remain covered by the identity test.");
+const probePrefix = "return session.evaluate(`";
+const probePayloadStart = source.indexOf(probePrefix, identityProbeStart) + probePrefix.length;
+const probePayloadEnd = source.indexOf("`);", probePayloadStart);
+assert.ok(probePayloadStart >= probePrefix.length && probePayloadEnd > probePayloadStart,
+  "The live identity expression must remain extractable for behavioral testing.");
+const probeTemplate = source.slice(probePayloadStart, probePayloadEnd);
+assert.doesNotMatch(probeTemplate, /`/, "The live identity expression must not contain nested template literals.");
+const liveProbePayload = vm.runInNewContext(`\`${probeTemplate}\``, {
+  selectorLiteral: (key) => JSON.stringify(`[selector-${key}]`),
+  stableTestidLiteral: (key) => JSON.stringify(`[data-testid="${key}"]`),
+});
+const runLiveProbe = ({
+  protocol = "app:", settingsPanel: hasSettingsPanel = false,
+  genericMain = false, genericInput = false, branding = false,
+} = {}) => vm.runInNewContext(liveProbePayload, {
+  location: { protocol },
+  document: {
+    querySelector(selector) {
+      if (selector === "[selector-settings-panel]") return hasSettingsPanel ? {} : null;
+      if (selector === 'main, [role="main"]') return genericMain ? {} : null;
+      if (selector === 'textarea, [contenteditable="true"], [role="textbox"]') {
+        return genericInput ? {} : null;
+      }
+      if (selector === '[data-testid="app-shell-header-context-menu-surface"]') {
+        return branding ? {} : null;
+      }
+      return null;
+    },
+  },
+});
+assert.equal(runLiveProbe({ settingsPanel: true }).codex, true,
+  "The live probe must accept the Codex 26.727 general Settings panel on app://.");
+assert.equal(runLiveProbe({ protocol: "https:", settingsPanel: true }).codex, false,
+  "The Settings marker must never identify a non-app target.");
+assert.equal(runLiveProbe({ genericMain: true, genericInput: true }).codex, false,
+  "The live probe must reject an unbranded generic app target.");
+assert.equal(runLiveProbe({ genericMain: true, genericInput: true, branding: true }).codex, true,
+  "The live probe may accept generic anchors only with the stable Codex branding marker.");
+assert.match(identityProbeSource, /selectorLiteral\("settings-panel"\)/,
+  "The live probe must retain the current Settings structural marker.");
 assert.match(identityProbeSource, /return Boolean\(main && input && branded\)/,
   "The live target probe must require branding together with both generic anchors.");
 assert.match(identityProbeSource, /app-shell-header-context-menu-surface/,

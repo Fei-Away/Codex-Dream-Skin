@@ -28,7 +28,7 @@ function classList(initial) {
 }
 
 function makeFixture({
-  nativeAppearance = "dark", settings = false, adopted = true,
+  nativeAppearance = "dark", settings = false, settingsPanel = false, adopted = true,
   generic = false, genericComposer = true, genericHome = false, genericSearch = false,
   modernMessages = false,
 } = {}) {
@@ -97,7 +97,7 @@ function makeFixture({
     selectorNodes.set(selector, current);
   };
   const partFixtures = {};
-  if (!settings && generic) {
+  if (!settings && !settingsPanel && generic) {
     const mainSelector = 'main, [role="main"]';
     const inputSelector = 'textarea, [contenteditable="true"], [role="textbox"]';
     const sidebarSelector = 'aside, nav[aria-label]';
@@ -138,7 +138,7 @@ function makeFixture({
       register('[role="main"]:has([data-testid="home-icon"])', partFixtures.main);
       register('[role="main"]', partFixtures.main);
     }
-  } else if (!settings) {
+  } else if (!settings && !settingsPanel) {
     partFixtures.sidebar = makeDomNode("sidebar", body);
     partFixtures.main = makeDomNode("main", body);
     partFixtures.header = makeDomNode("header", body);
@@ -189,6 +189,9 @@ function makeFixture({
     createElement(tag) { return tag === "style" ? makeStyleNode() : { tagName: tag }; },
     getElementById(id) { return nodes.get(id) || null; },
     querySelector(selector) {
+      if (settingsPanel && selector === '[data-settings-panel-slug="general-settings"]') {
+        return makeDomNode("settings:general-settings", body);
+      }
       if (settings && (selector.includes("appearance-theme") || selector.includes("theme-preview"))) {
         return makeDomNode(`settings:${selector}`, body);
       }
@@ -565,6 +568,16 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(settings.window.__CODEX_DREAM_SKIN_STATE__.scope.level, "L0");
   assert.equal(settings.attrs.get("data-dream-skin"), "active");
   assert.equal(settings.document.adoptedStyleSheets.length, 1);
+
+  const currentSettings = makeFixture({ nativeAppearance: "light", settingsPanel: true });
+  vm.runInNewContext(currentSettings.payloadFor(), currentSettings.context);
+  const currentSettingsScope = currentSettings.window.__CODEX_DREAM_SKIN_STATE__.scope;
+  assert.equal(currentSettingsScope.baseState, "settings",
+    "Codex 26.727 general-settings must classify as Settings without legacy appearance controls.");
+  assert.equal(currentSettingsScope.level, "L0");
+  assert.equal(currentSettingsScope.missingL1.length, 0);
+  assert.equal(currentSettings.attrs.get("data-dream-skin"), "active");
+  assert.equal(currentSettings.document.adoptedStyleSheets.length, 1);
 
   const explicit = makeFixture({ nativeAppearance: "light" });
   const result = vm.runInNewContext(explicit.payloadFor({ appearance: "dark", quote: "TEST QUOTE" }), explicit.context);

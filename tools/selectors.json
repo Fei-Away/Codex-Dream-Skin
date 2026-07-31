@@ -44,7 +44,8 @@
     { "key": "markdown", "selector": "[class*=\"_markdown\"]", "tier": "L2", "scope": "thread", "required": false, "notes": "会话内容块，单页可达 100+ 个，样式规则注意性能" },
     { "key": "thread-surface", "selector": ".thread-scroll-container", "tier": "L2", "scope": "thread", "required": false, "notes": "会话滚动表面；双端活动会话快照均存在" },
     { "key": "message", "selector": ":is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])", "tier": "L2", "scope": "thread", "required": false, "notes": "用户与助手消息的稳定语义边界；兼容旧版 role 属性和 Codex 26.727.4816 的用户/助手语义属性，运行时对子节点变更做合并刷新" },
-    { "key": "appearance-radio", "selector": "input[name=\"appearance-theme\"]", "tier": "L2", "scope": "settings", "required": false, "notes": "外观三选一；theme-preview testid 同屏出现" },
+    { "key": "settings-panel", "selector": "[data-settings-panel-slug=\"general-settings\"]", "tier": "L2", "scope": "settings", "required": false, "notes": "Codex 26.727 设置页稳定导航锚点；设置页可先落在 General，不再保证 appearance-theme 或 theme-preview 存在" },
+    { "key": "appearance-radio", "selector": "input[name=\"appearance-theme\"]", "tier": "L2", "scope": "settings", "required": false, "notes": "旧版外观三选一；新设置页可能仅有 settings-panel" },
     { "key": "overlay-menu", "selector": "[role=\"menu\"]", "tier": "L2", "scope": "overlay", "required": false },
     { "key": "overlay-dialog", "selector": "[role=\"dialog\"]", "tier": "L2", "scope": "overlay", "required": false },
     { "key": "overlay-popper", "selector": "[data-radix-popper-content-wrapper]", "tier": "L2", "scope": "overlay", "required": false }

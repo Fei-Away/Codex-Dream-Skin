@@ -95,7 +95,8 @@ function pageDoctor(selectors, stableTestids = []) {
   const overlay = count("overlay-menu") > 0 || count("overlay-dialog") > 0 ||
     count("overlay-popper") > 0;
   let baseState = "thread";
-  if (count("appearance-radio") > 0 || stableTestidCount("theme-preview") > 0) baseState = "settings";
+  if (count("settings-panel") > 0 || count("appearance-radio") > 0 ||
+    stableTestidCount("theme-preview") > 0) baseState = "settings";
   else if (count("home-icon") > 0 || count("home-route") > 0) baseState = "home";
   else if (count("shell-main") === 0) baseState = "settings";
 

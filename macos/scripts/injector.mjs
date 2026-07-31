@@ -522,7 +522,8 @@ async function probeSession(session) {
       main: Boolean(document.querySelector(${selectorLiteral("home-route")})),
       generic: genericCodexSurface(),
     };
-    const settings = Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
+    const settings = Boolean(document.querySelector(${selectorLiteral("settings-panel")})) ||
+      Boolean(document.querySelector(${selectorLiteral("appearance-radio")})) ||
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       markers,
@@ -1154,6 +1155,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     const genericMain = box(document.querySelector('[data-ds-part="main"], [data-ds-part="home"]'));
     const genericInput = box(document.querySelector('[data-ds-part="composer"]'));
     const settingsBoxes = [
+      box(document.querySelector(${selectorLiteral("settings-panel")})),
       box(document.querySelector(${selectorLiteral("appearance-radio")})),
       box(document.querySelector(${stableTestidLiteral("theme-preview")})),
     ];
@@ -1406,7 +1408,8 @@ export function earlyPayloadFor(payload, revision) {
       const shell = document.querySelector(${selectorLiteral("shell-main")});
       const sidebar = document.querySelector(${selectorLiteral("left-panel")});
       const main = document.querySelector(${selectorLiteral("home-route")});
-      const settings = document.querySelector(${selectorLiteral("appearance-radio")}) ||
+      const settings = document.querySelector(${selectorLiteral("settings-panel")}) ||
+        document.querySelector(${selectorLiteral("appearance-radio")}) ||
         document.querySelector(${stableTestidLiteral("theme-preview")});
       const genericMain = document.querySelector('main, [role="main"]');
       const genericInput = document.querySelector('textarea, [contenteditable="true"], [role="textbox"]');

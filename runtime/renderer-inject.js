@@ -678,7 +678,8 @@
     const overlay = selectorHit("overlay-menu") || selectorHit("overlay-dialog") ||
       selectorHit("overlay-popper");
     let baseState = "thread";
-    if (selectorHit("appearance-radio") || stableTestidHit("theme-preview")) baseState = "settings";
+    if (selectorHit("settings-panel") || selectorHit("appearance-radio") ||
+      stableTestidHit("theme-preview")) baseState = "settings";
     else if (selectorHit("home-icon") || selectorHit("home-route")) baseState = "home";
     else if (!selectorHit("shell-main") && !document.querySelector('main, [role="main"]')) baseState = "settings";
     const missingL1 = SELECTOR_CONTRACT.selectors
