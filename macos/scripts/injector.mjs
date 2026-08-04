@@ -56,6 +56,16 @@ const PET_ACTIVITY_STYLE_ID = "codex-dream-skin-pet-compat-style";
 const PET_ACTIVITY_SURFACE_PATTERN = /^activity-slot-[0-3]$/;
 const PET_COMPOSITION_TITLE = "Codex Pet Composition Surface";
 const PET_COMPOSITION_PATH = "/avatar-overlay-composition-surface.html";
+const PET_AUXILIARY_SURFACES = new Set([
+  "activity-slot-0",
+  "activity-slot-1",
+  "activity-slot-2",
+  "activity-slot-3",
+  "mascot-badge",
+  "voice-output",
+  "voice-controls",
+  "voice-microphone",
+]);
 const PET_ACTIVITY_COMPATIBILITY_CSS = `
   [class*="_activityPillMaterial_"] {
     background-color: var(--color-token-main-surface-primary, Canvas) !important;
@@ -393,18 +403,28 @@ export function isCodexRendererCandidateTarget(target) {
 }
 
 export function classifyPetActivityTarget(target) {
-  if (target?.type !== "page" || target.title !== PET_COMPOSITION_TITLE) return null;
+  const surfaceId = classifyPetAuxiliaryTarget(target);
+  return PET_ACTIVITY_SURFACE_PATTERN.test(surfaceId ?? "") ? surfaceId : null;
+}
+
+export function classifyPetAuxiliaryTarget(target) {
+  if (target?.type !== "page") return null;
   let url;
   try {
     url = new URL(target.url);
   } catch {
     return null;
   }
-  if (url.protocol !== "app:" || url.host !== "-" || url.pathname !== PET_COMPOSITION_PATH
-    || url.username || url.password || url.hash) return null;
+  if (url.protocol !== "app:" || url.host !== "-" || url.username || url.password || url.hash) {
+    return null;
+  }
   const entries = [...url.searchParams.entries()];
-  if (entries.length !== 1 || entries[0][0] !== "surfaceId"
-    || !PET_ACTIVITY_SURFACE_PATTERN.test(entries[0][1])) return null;
+  if (target.title === "Codex" && url.pathname === "/index.html"
+    && entries.length === 1 && entries[0][0] === "initialRoute"
+    && entries[0][1] === "/avatar-overlay") return "avatar-overlay";
+  if (target.title !== PET_COMPOSITION_TITLE || url.pathname !== PET_COMPOSITION_PATH
+    || entries.length !== 1 || entries[0][0] !== "surfaceId"
+    || !PET_AUXILIARY_SURFACES.has(entries[0][1])) return null;
   return entries[0][1];
 }
 
@@ -934,12 +954,16 @@ async function setPetActivityCompatibility(session, enabled) {
   return result;
 }
 
-async function livePetActivityTarget(session) {
-  const target = await session.evaluate(`({
+async function livePageTarget(session) {
+  return session.evaluate(`({
     type: "page",
     title: document.title,
     url: location.href,
   })`);
+}
+
+async function livePetActivityTarget(session) {
+  const target = await livePageTarget(session);
   return { target, surfaceId: classifyPetActivityTarget(target) };
 }
 
@@ -1637,6 +1661,7 @@ async function runWatch(options) {
   let current = await loadPayload(options.themeDir);
   const sessions = new Map();
   const petSessions = new Map();
+  const cleanedPetAuxiliaryTargets = new Set();
   const rejected = new Set();
   let stopping = false;
   let reloadTimer = null;
@@ -2018,12 +2043,16 @@ async function runWatch(options) {
           petSessions.delete(id);
         }
       }
+      for (const id of cleanedPetAuxiliaryTargets) {
+        if (!activeIds.has(id)) cleanedPetAuxiliaryTargets.delete(id);
+      }
 
       const cycleRecovery = activeOperation ? null : pauseRecovery;
       let recoveredPauseThisCycle = false;
       let recoveryFailedThisCycle = false;
       for (const target of targets) {
         if (sessions.has(target.id) || petSessions.has(target.id)) continue;
+        const petAuxiliarySurfaceId = classifyPetAuxiliaryTarget(target);
         const petSurfaceId = classifyPetActivityTarget(target);
         if (petSurfaceId) {
           let petSession;
@@ -2039,6 +2068,7 @@ async function runWatch(options) {
             if (controlOnly || mutationEpoch !== petConnectionEpoch) {
               throw new Error("Pet activity target became inactive during setup");
             }
+            await updateOperationUi(petSession, "clear", "", "loading", "");
             await setPetActivityCompatibility(petSession, true);
             if (controlOnly || mutationEpoch !== petConnectionEpoch) {
               await setPetActivityCompatibility(petSession, false);
@@ -2073,6 +2103,31 @@ async function runWatch(options) {
               rejected.add(target.id);
             }
           } finally {
+            finishTargetSetup();
+          }
+          continue;
+        }
+        if (petAuxiliarySurfaceId) {
+          if (cleanedPetAuxiliaryTargets.has(target.id)) continue;
+          let auxiliarySession;
+          beginTargetSetup();
+          try {
+            auxiliarySession = await connectTarget(target, options.port);
+            const liveTarget = await livePageTarget(auxiliarySession);
+            if (classifyPetAuxiliaryTarget(liveTarget) !== petAuxiliarySurfaceId
+              || liveTarget.url !== target.url) {
+              throw new Error("Pet auxiliary target identity changed after connection");
+            }
+            await updateOperationUi(auxiliarySession, "clear", "", "loading", "");
+            cleanedPetAuxiliaryTargets.add(target.id);
+            rejected.delete(target.id);
+          } catch (error) {
+            if (!rejected.has(target.id)) {
+              console.error(`[dream-skin] pet auxiliary cleanup failed for ${target.id}: ${error.message}`);
+              rejected.add(target.id);
+            }
+          } finally {
+            auxiliarySession?.close();
             finishTargetSetup();
           }
           continue;
