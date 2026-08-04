@@ -1,5 +1,17 @@
 # Task Progress
 
+## Pet overlay + Dream Skin compatibility — locally fixed (2026-08-04)
+
+- [goal] Preserve the native Codex Pet/avatar overlay while a Dream Skin theme is active; auxiliary pet windows remain transparent while activity pills do not repeat the skin wallpaper.
+- [scope] Branch `codex/fix-pet-overlay-compat` from clean `main` at `1c7a859`. The fix is macOS-only because the reproduced failure is native transparent-window composition on macOS. Repository changes are limited to `macos/scripts/injector.mjs`, its focused bootstrap regression, and this progress record.
+- [root cause] The native Pet activity pill intentionally uses a transparent material. With Dream Skin painting a high-contrast wallpaper behind the separate Pet composition windows, each `activity-slot-0` through `activity-slot-3` surface samples the wallpaper into a rounded rectangle. The Pet renderer was not receiving Dream Skin CSS; the missing behavior was a bounded Dream Skin compatibility treatment.
+- [implemented] The watcher recognizes only the exact `app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-[0-3]` pages with the exact native title, re-verifies live identity, and applies an opaque native-token background only to `[class*="_activityPillMaterial_"]`. Main Codex, avatar root, mascot, voice output, voice controls, and microphone surfaces remain untouched. Pause/shutdown removal is verified before acknowledgement; target replacement and same-target reload are reprotected.
+- [tested] The focused regression first failed on the missing exported contract and now passes. The final complete `bash macos/tests/run-tests.sh` passes after the reload lifecycle change, including Swift build/XCTest, shared runtime checks, Safe CSS, import/rollback, signed-runtime integration, runtime-state integration, and Doctor. `node --check` and `git diff --check` pass.
+- [deployed locally] The installed v1.5.11 injector source was updated only after its pre-change SHA-256 matched repository `HEAD`, then the recorded injector was identity-checked and hot-restarted. Codex PID stayed `50570`; only the injector changed to PID `75775`. All four activity slots now contain the bounded style and compute to opaque `rgb(24, 24, 24)` while their HTML/body remain transparent. Main/avatar/mascot/voice surfaces contain no compatibility style. Reloading activity slot 0 produced a replacement target that the watcher automatically protected again.
+- [runtime status] The local theme operation record is `success` with message `皮肤已应用`, and a live scan of every CDP page found no Dream Skin operation host or operation registry. Pet activity slot 0 instead reports this still-running task as `Thinking`; the user's remaining spinner is therefore the Pet task-state indicator, not a stuck theme application. Codex was not restarted or switched.
+- [accepted locally] The user confirmed the native composite returned to normal after the task-state spinner ended.
+- [pending] Commit, push, open the requested draft PR, and synchronize the exact reviewed commit to Metis. No merge, version bump, or Release has occurred.
+
 ## Client release v1.5.11 — preparing (2026-08-01)
 
 - [base/merged] Settings renderer PR #334 passed exact-head CI run
