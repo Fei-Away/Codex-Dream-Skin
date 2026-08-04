@@ -5,6 +5,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import {
   classifyPetActivityTarget,
+  classifyPetAuxiliaryTarget,
   earlyPayloadFor,
   isCodexRendererCandidateTarget,
   petActivityCompatibilityPayloadFor,
@@ -234,6 +235,26 @@ assert.equal(classifyPetActivityTarget(petTarget(
   "app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-0",
   "Unexpected Surface",
 )), null, "The exact native pet title is part of the auxiliary-target identity boundary.");
+assert.equal(classifyPetAuxiliaryTarget(petTarget(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=voice-output",
+)), "voice-output");
+assert.equal(classifyPetAuxiliaryTarget(petTarget(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=mascot-badge",
+)), "mascot-badge");
+assert.equal(classifyPetAuxiliaryTarget({
+  type: "page",
+  title: "Codex",
+  url: "app://-/index.html?initialRoute=%2Favatar-overlay",
+}), "avatar-overlay");
+for (const target of [
+  petTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=unknown"),
+  petTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=voice-output&extra=1"),
+  petTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=voice-output", "Codex"),
+  { type: "page", title: "Codex", url: "app://-/index.html?initialRoute=%2Favatar-overlay&extra=1" },
+]) {
+  assert.equal(classifyPetAuxiliaryTarget(target), null,
+    `Unknown or ambiguous Pet targets must not be mutated: ${target.url}`);
+}
 
 const codexTarget = (url, title = "Codex") => ({ type: "page", title, url });
 assert.equal(isCodexRendererCandidateTarget(codexTarget("app://-/index.html")), true);
@@ -310,6 +331,8 @@ assert.match(source.slice(connectCodexTargetsStart, operationUiStart), /isCodexR
   "Operation UI discovery must reject the avatar-overlay root before probing or connecting it.");
 assert.match(source, /await setPetActivityCompatibility\(petSession, true\)/,
   "The watcher must install the bounded pet style only after live target identity verification.");
+assert.match(source, /classifyPetAuxiliaryTarget\(target\)[\s\S]*updateOperationUi\([\s\S]*"clear"/,
+  "The watcher must clear only Dream Skin's own stale operation host from exact Pet auxiliary targets.");
 assert.match(source, /petSession\.on\("Page\.loadEventFired"[\s\S]*livePetActivityTarget\(petSession\)[\s\S]*setPetActivityCompatibility\(petSession, true\)/,
   "A same-target pet renderer reload must reverify its identity and restore the bounded style.");
 assert.match(source, /operation\.status === "pausing"[\s\S]*await releasePetSessions\(\{ strict: true \}\)/,
