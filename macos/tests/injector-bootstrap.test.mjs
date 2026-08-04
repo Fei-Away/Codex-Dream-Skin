@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   classifyPetActivityTarget,
   earlyPayloadFor,
+  isCodexRendererCandidateTarget,
   petActivityCompatibilityPayloadFor,
 } from "../scripts/injector.mjs";
 
@@ -234,6 +235,21 @@ assert.equal(classifyPetActivityTarget(petTarget(
   "Unexpected Surface",
 )), null, "The exact native pet title is part of the auxiliary-target identity boundary.");
 
+const codexTarget = (url, title = "Codex") => ({ type: "page", title, url });
+assert.equal(isCodexRendererCandidateTarget(codexTarget("app://-/index.html")), true);
+assert.equal(isCodexRendererCandidateTarget(codexTarget(
+  "app://-/index.html?initialRoute=%2Fsettings",
+)), true, "Normal Codex initial routes must remain eligible for renderer probing.");
+for (const target of [
+  codexTarget("app://-/index.html?initialRoute=%2Favatar-overlay"),
+  codexTarget("app://-/index.html?initialRoute=%2Fsettings&initialRoute=%2Favatar-overlay"),
+  codexTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=mascot-badge"),
+  codexTarget("https://example.com/index.html"),
+]) {
+  assert.equal(isCodexRendererCandidateTarget(target), false,
+    `Auxiliary or non-Codex targets must not receive operation UI or full Dream Skin: ${target.url}`);
+}
+
 function createPetCompatibilityFixture(href) {
   const nodes = new Map();
   const head = {
@@ -282,10 +298,16 @@ assert.equal(petCompatWrongSurface.style, null,
   "Voice, mascot, and other auxiliary surfaces must remain completely untouched.");
 const targetLoopStart = source.indexOf("for (const target of targets)", source.indexOf("async function runWatch"));
 const petClassificationStart = source.indexOf("classifyPetActivityTarget(target)", targetLoopStart);
+const codexClassificationStart = source.indexOf("isCodexRendererCandidateTarget(target)", petClassificationStart);
 const mainEarlyRegistrationStart = source.indexOf("registerEarlyForRecord(", petClassificationStart);
 assert.ok(targetLoopStart >= 0 && petClassificationStart > targetLoopStart
-  && mainEarlyRegistrationStart > petClassificationStart,
-"Pet activity surfaces must be classified before the full Dream Skin early payload is registered.");
+  && codexClassificationStart > petClassificationStart
+  && mainEarlyRegistrationStart > codexClassificationStart,
+"Pet activity surfaces must be classified first, and only a true Codex renderer may receive the full payload.");
+const connectCodexTargetsStart = source.indexOf("async function connectCodexTargets");
+const operationUiStart = source.indexOf("function operationUiExpression", connectCodexTargetsStart);
+assert.match(source.slice(connectCodexTargetsStart, operationUiStart), /isCodexRendererCandidateTarget\(target\)/,
+  "Operation UI discovery must reject the avatar-overlay root before probing or connecting it.");
 assert.match(source, /await setPetActivityCompatibility\(petSession, true\)/,
   "The watcher must install the bounded pet style only after live target identity verification.");
 assert.match(source, /petSession\.on\("Page\.loadEventFired"[\s\S]*livePetActivityTarget\(petSession\)[\s\S]*setPetActivityCompatibility\(petSession, true\)/,
