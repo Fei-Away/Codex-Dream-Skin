@@ -379,6 +379,19 @@ function isValidCdpPageTarget(item, port) {
   }
 }
 
+export function isCodexRendererCandidateTarget(target) {
+  if (target?.type !== "page") return false;
+  let url;
+  try {
+    url = new URL(target.url);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "app:" || url.host !== "-" || url.pathname !== "/index.html"
+    || url.username || url.password || url.hash) return false;
+  return !url.searchParams.getAll("initialRoute").includes("/avatar-overlay");
+}
+
 export function classifyPetActivityTarget(target) {
   if (target?.type !== "page" || target.title !== PET_COMPOSITION_TITLE) return null;
   let url;
@@ -601,6 +614,7 @@ async function connectCodexTargets(port, timeoutMs) {
       const targets = await listAppTargets(port);
       const connected = [];
       for (const target of targets) {
+        if (!isCodexRendererCandidateTarget(target)) continue;
         let session;
         try {
           session = await connectTarget(target, port);
@@ -2063,6 +2077,7 @@ async function runWatch(options) {
           }
           continue;
         }
+        if (!isCodexRendererCandidateTarget(target)) continue;
         let session;
         let record;
         let connectionEpoch;
