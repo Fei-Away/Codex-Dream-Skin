@@ -52,6 +52,15 @@ const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
 const OPERATION_UI_STATES = new Set(["success", "error", "cancelled"]);
+const PET_ACTIVITY_STYLE_ID = "codex-dream-skin-pet-compat-style";
+const PET_ACTIVITY_SURFACE_PATTERN = /^activity-slot-[0-3]$/;
+const PET_COMPOSITION_TITLE = "Codex Pet Composition Surface";
+const PET_COMPOSITION_PATH = "/avatar-overlay-composition-surface.html";
+const PET_ACTIVITY_COMPATIBILITY_CSS = `
+  [class*="_activityPillMaterial_"] {
+    background-color: var(--color-token-main-surface-primary, Canvas) !important;
+  }
+`;
 const MIN_RENDERER_WIDTH = 320;
 const MIN_RENDERER_HEIGHT = 240;
 const MAX_RENDERER_DIMENSION = 65536;
@@ -368,6 +377,42 @@ function isValidCdpPageTarget(item, port) {
   } catch {
     return false;
   }
+}
+
+export function classifyPetActivityTarget(target) {
+  if (target?.type !== "page" || target.title !== PET_COMPOSITION_TITLE) return null;
+  let url;
+  try {
+    url = new URL(target.url);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "app:" || url.host !== "-" || url.pathname !== PET_COMPOSITION_PATH
+    || url.username || url.password || url.hash) return null;
+  const entries = [...url.searchParams.entries()];
+  if (entries.length !== 1 || entries[0][0] !== "surfaceId"
+    || !PET_ACTIVITY_SURFACE_PATTERN.test(entries[0][1])) return null;
+  return entries[0][1];
+}
+
+export function petActivityCompatibilityPayloadFor(enabled) {
+  return `(() => {
+    const styleId = ${JSON.stringify(PET_ACTIVITY_STYLE_ID)};
+    const applicable = location.protocol === "app:" && location.host === "-" &&
+      location.pathname === ${JSON.stringify(PET_COMPOSITION_PATH)} &&
+      /^\\?surfaceId=activity-slot-[0-3]$/.test(location.search);
+    const existing = document.getElementById(styleId);
+    if (!applicable || !${JSON.stringify(Boolean(enabled))}) {
+      existing?.remove();
+      return { applicable, installed: false };
+    }
+    if (!document.head) return { applicable: true, installed: false };
+    const style = existing || document.createElement("style");
+    style.id = styleId;
+    style.textContent = ${JSON.stringify(PET_ACTIVITY_COMPATIBILITY_CSS)};
+    if (!existing) document.head.append(style);
+    return { applicable: true, installed: true };
+  })()`;
 }
 
 class CdpSession {
@@ -865,6 +910,23 @@ export function assertPayloadIntegrity(payload) {
 
 async function applyToSession(session, payload) {
   return session.evaluate(payload);
+}
+
+async function setPetActivityCompatibility(session, enabled) {
+  const result = await session.evaluate(petActivityCompatibilityPayloadFor(enabled));
+  if (!result?.applicable || result.installed !== Boolean(enabled)) {
+    throw new Error(`Pet activity compatibility ${enabled ? "install" : "removal"} did not verify`);
+  }
+  return result;
+}
+
+async function livePetActivityTarget(session) {
+  const target = await session.evaluate(`({
+    type: "page",
+    title: document.title,
+    url: location.href,
+  })`);
+  return { target, surfaceId: classifyPetActivityTarget(target) };
 }
 
 function nextOperationToken() {
@@ -1560,6 +1622,7 @@ async function watchOperationState(statePath, onState) {
 async function runWatch(options) {
   let current = await loadPayload(options.themeDir);
   const sessions = new Map();
+  const petSessions = new Map();
   const rejected = new Set();
   let stopping = false;
   let reloadTimer = null;
@@ -1687,6 +1750,28 @@ async function runWatch(options) {
   const releaseControlSessions = () => {
     for (const record of sessions.values()) record.session.close();
     sessions.clear();
+  };
+
+  const releasePetSessions = async ({ strict = false } = {}) => {
+    const failures = [];
+    await Promise.all([...petSessions.entries()].map(async ([id, { session }]) => {
+      if (!session.closed) {
+        try {
+          await setPetActivityCompatibility(session, false);
+        } catch (error) {
+          if (strict) {
+            failures.push(error);
+            return;
+          }
+          console.error(`[dream-skin] pet compatibility removal failed: ${error.message}`);
+        }
+      }
+      session.close();
+      petSessions.delete(id);
+    }));
+    if (failures.length) {
+      throw new Error(`Pet compatibility removal did not verify: ${failures[0].message}`);
+    }
   };
 
   const restoreAfterAbortedPause = async (operation) => {
@@ -1833,6 +1918,7 @@ async function runWatch(options) {
       if (busy && operation.status === "pausing") {
         await reloadChain.catch(() => {});
         await waitForTargetSetups();
+        await releasePetSessions({ strict: true });
         await Promise.all([...sessions.values()].map(async (record) => {
           await invalidateEarly(record, { strict: true });
         }));
@@ -1841,6 +1927,7 @@ async function runWatch(options) {
       else if (operation.status === "paused") {
         await reloadChain.catch(() => {});
         await waitForTargetSetups().catch(() => {});
+        await releasePetSessions({ strict: true });
         await Promise.all([...sessions.values()].map((record) =>
           invalidateEarly(record, { strict: true }))).catch((error) => {
           console.error(`[dream-skin] final pause invalidation failed: ${error.message}`);
@@ -1874,6 +1961,7 @@ async function runWatch(options) {
         }
       }
       if (controlOnly && !activeOperation) {
+        await releasePetSessions();
         releaseControlSessions();
         await waitForControlOperation();
         continue;
@@ -1893,6 +1981,7 @@ async function runWatch(options) {
       }
 
       if (controlOnly && !activeOperation) {
+        await releasePetSessions();
         releaseControlSessions();
         continue;
       }
@@ -1909,12 +1998,71 @@ async function runWatch(options) {
           sessions.delete(id);
         }
       }
+      for (const [id, record] of petSessions) {
+        if (!activeIds.has(id) || record.session.closed) {
+          record.session.close();
+          petSessions.delete(id);
+        }
+      }
 
       const cycleRecovery = activeOperation ? null : pauseRecovery;
       let recoveredPauseThisCycle = false;
       let recoveryFailedThisCycle = false;
       for (const target of targets) {
-        if (sessions.has(target.id)) continue;
+        if (sessions.has(target.id) || petSessions.has(target.id)) continue;
+        const petSurfaceId = classifyPetActivityTarget(target);
+        if (petSurfaceId) {
+          let petSession;
+          let petRecord;
+          const petConnectionEpoch = mutationEpoch;
+          beginTargetSetup();
+          try {
+            petSession = await connectTarget(target, options.port);
+            const liveTarget = await livePetActivityTarget(petSession);
+            if (liveTarget.surfaceId !== petSurfaceId || liveTarget.target.url !== target.url) {
+              throw new Error("Pet activity target identity changed after connection");
+            }
+            if (controlOnly || mutationEpoch !== petConnectionEpoch) {
+              throw new Error("Pet activity target became inactive during setup");
+            }
+            await setPetActivityCompatibility(petSession, true);
+            if (controlOnly || mutationEpoch !== petConnectionEpoch) {
+              await setPetActivityCompatibility(petSession, false);
+              throw new Error("Pet activity target became inactive during setup");
+            }
+            petRecord = { session: petSession, surfaceId: petSurfaceId };
+            petSessions.set(target.id, petRecord);
+            petSession.on("Page.loadEventFired", () => {
+              const reloadEpoch = mutationEpoch;
+              setTimeout(async () => {
+                if (petSession.closed || controlOnly || mutationEpoch !== reloadEpoch
+                  || petSessions.get(target.id) !== petRecord) return;
+                try {
+                  const reloaded = await livePetActivityTarget(petSession);
+                  if (reloaded.surfaceId !== petSurfaceId) {
+                    petSession.close();
+                    petSessions.delete(target.id);
+                    return;
+                  }
+                  await setPetActivityCompatibility(petSession, true);
+                } catch (error) {
+                  console.error(`[dream-skin] pet compatibility reload failed for ${target.id}: ${error.message}`);
+                }
+              }, 0);
+            });
+            rejected.delete(target.id);
+            console.log(`[dream-skin] protected pet activity surface ${petSurfaceId}`);
+          } catch (error) {
+            petSession?.close();
+            if (!rejected.has(target.id)) {
+              console.error(`[dream-skin] pet compatibility failed for ${target.id}: ${error.message}`);
+              rejected.add(target.id);
+            }
+          } finally {
+            finishTargetSetup();
+          }
+          continue;
+        }
         let session;
         let record;
         let connectionEpoch;
@@ -2080,6 +2228,7 @@ async function runWatch(options) {
         ? bestEffortOperationUi(record.session, "hide", record.operationToken, "loading", "")
         : Promise.resolve(false)));
     await Promise.all([...sessions.values()].map((record) => removeEarly(record)));
+    await releasePetSessions();
     for (const record of sessions.values()) record.session.close();
   }
 }
