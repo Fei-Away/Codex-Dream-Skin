@@ -91,6 +91,7 @@ UPDATE_JSON="$({
   if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
 ' "$UPDATE_JSON"
 if /usr/bin/grep -R -n -E --exclude-dir='.build' \
+  --exclude-dir='.build-*' \
   'xattr|spctl[[:space:]]+--master-disable' \
   "$ROOT/menubar-app" "$ROOT/scripts/build-menubar-app.sh" "$ROOT/scripts/build-dmg.sh" >/dev/null; then
   printf 'Native distribution must not bypass Gatekeeper or remove quarantine attributes.\n' >&2
@@ -722,6 +723,34 @@ if /usr/bin/grep -F -q 'index($0, "--port " port)' "$ROOT/scripts/common-macos.s
   printf 'injector discovery still accepts a near-prefix port.\n' >&2
   exit 1
 fi
+APPLY_SCRIPT="$ROOT/scripts/apply-from-menubar-macos.sh"
+/usr/bin/grep -F -q 'if hot_reapply_theme "$PORT" 8000; then' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'RESTART_AUTHORIZED="true"' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'OPEN_PROMPT="ChatGPT 当前未打开，无法热重载。' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'if ! confirm "$OPEN_PROMPT" "打开并应用"; then' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'if ! confirm "$RESTART_PROMPT" "重启并应用"; then' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'START_ARGS=(--port "$PORT")' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'START_ARGS+=(--restart-existing)' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" "${START_ARGS[@]}"' "$APPLY_SCRIPT"
+if /usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT"; then
+  printf 'menu apply still authorizes a cold restart before the explicit restart prompt.\n' >&2
+  exit 1
+fi
+HOT_LINE="$(/usr/bin/grep -n 'hot_reapply_theme "$PORT" 8000' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+FIRST_CONFIRM_LINE="$(/usr/bin/grep -n 'if ! confirm ' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+AUTH_LINE="$(/usr/bin/grep -n 'RESTART_AUTHORIZED="true"' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+START_LINE="$(/usr/bin/grep -n 'start-dream-skin-macos.sh" "${START_ARGS\[@\]}"' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+if [ -z "$HOT_LINE" ] || [ -z "$FIRST_CONFIRM_LINE" ] || [ -z "$AUTH_LINE" ] || [ -z "$START_LINE" ] ||
+   [ "$HOT_LINE" -ge "$FIRST_CONFIRM_LINE" ] ||
+   [ "$FIRST_CONFIRM_LINE" -ge "$START_LINE" ] ||
+   [ "$AUTH_LINE" -ge "$START_LINE" ]; then
+  printf 'menu apply must hot-reapply before requesting and consuming restart consent.\n' >&2
+  exit 1
+fi
+MENU_SOURCE="$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
+/usr/bin/grep -F -q 'if !snapshot.codexRunning {' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'if snapshot.codexRunning {' "$MENU_SOURCE"
 
 # Corrupt or structurally incomplete state must be preserved and fail closed;
 # otherwise pause/restore could overwrite evidence while a watcher survives.

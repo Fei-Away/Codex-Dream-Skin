@@ -1,5 +1,40 @@
 # Task Progress
 
+## macOS menu reapply/open ChatGPT restart fix (2026-08-05)
+
+- [scope] Branch `codex/fix-macos-reapply-open-chatgpt` was created from latest
+  `upstream/main` (`0a727a5`). Fix the macOS menu behavior where the first
+  "重新应用皮肤" click can restart ChatGPT even though the prompt says no restart,
+  and review its interaction with the separate "打开 ChatGPT" action.
+- [diagnosed] The menu title is derived from lightweight `session=active`
+  status, while `apply-from-menubar-macos.sh` always calls
+  `start-dream-skin-macos.sh --restart-existing`. If ChatGPT is running without
+  a verified CDP endpoint, `start-dream-skin-macos.sh` stops and relaunches it.
+- [implemented] `apply-from-menubar-macos.sh` now attempts
+  `hot_reapply_theme` before cold start. If ChatGPT is running without a
+  verified CDP endpoint, it asks for explicit "重启并应用" consent before passing
+  `--restart-existing`; without that consent it records cancellation and exits.
+- [adjusted] Per follow-up interaction requirement, successful hot reapply no
+  longer shows a confirmation dialog. The apply wrapper only prompts after hot
+  reload is unavailable: "打开并应用" when ChatGPT is closed, or "重启并应用" when
+  ChatGPT is already running without a verified Dream Skin CDP connection.
+- [implemented] The native menu no longer shows "重新应用皮肤" when ChatGPT is not
+  running even if stale state says `active`; it shows "打开并应用皮肤" and hides the
+  separate normal "打开 ChatGPT" action until ChatGPT is already running.
+- [covered] Added static regressions to lock menu apply hot-reload ordering,
+  post-hot-reload confirmation placement, restart-consent gating, and the
+  not-running menu title. The macOS test
+  Gatekeeper scan now ignores the same `.build-*` SwiftPM artifacts already
+  listed in `macos/menubar-app/.gitignore`.
+- [verified] `bash -n` for changed shell scripts and `git diff --check` pass.
+  `swift build --package-path macos/menubar-app --product
+  CodexDreamSkinMenuBar` passes. `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash
+  macos/tests/run-tests.sh` passes with the documented Doctor skip.
+- [gap] Direct `swift test --package-path macos/menubar-app` fails on this host
+  because the installed Swift toolchain cannot import `XCTest`; the repository
+  macOS test wrapper detects the missing full matching Xcode platform and skips
+  native XCTest accordingly.
+
 ## Client release v1.5.11 — preparing (2026-08-01)
 
 - [base/merged] Settings renderer PR #334 passed exact-head CI run

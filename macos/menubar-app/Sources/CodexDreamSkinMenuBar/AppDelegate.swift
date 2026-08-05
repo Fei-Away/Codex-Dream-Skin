@@ -275,16 +275,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     let applyTitle: String
-    switch snapshot.session {
-    case "active": applyTitle = "重新应用皮肤"
-    case "stale", "unknown": applyTitle = "修复并应用"
-    default: applyTitle = "应用皮肤"
+    if !snapshot.codexRunning {
+      applyTitle = "打开并应用皮肤"
+    } else {
+      switch snapshot.session {
+      case "active": applyTitle = "重新应用皮肤"
+      case "stale", "unknown": applyTitle = "修复并应用"
+      default: applyTitle = "应用皮肤"
+      }
     }
     addActionItem(applyTitle, action: #selector(applySkin), enabled: !busy)
     if snapshot.session == "active" || snapshot.session == "applying" {
       addActionItem("暂停皮肤", action: #selector(pauseSkin), enabled: !busy)
     }
-    addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
+    if snapshot.codexRunning {
+      addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
+    }
     addActionItem("换一张背景图…", action: #selector(chooseBackgroundImage), enabled: !busy)
     addActionItem("导入主题 ZIP…", action: #selector(chooseThemeArchive), enabled: !busy)
     addSavedThemesMenu(enabled: !busy)
