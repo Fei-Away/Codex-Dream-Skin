@@ -31,6 +31,20 @@
   `swift build --package-path macos/menubar-app --product
   CodexDreamSkinMenuBar` passes. `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash
   macos/tests/run-tests.sh` passes with the documented Doctor skip.
+- [verified] `bash macos/scripts/doctor-macos.sh` passes on this host:
+  official `/Applications/ChatGPT.app` `26.730.61639` build `6234`, Team ID
+  `2DC432GLL2`, bundled Node `v24.14.0`, payload valid, `live=false`.
+- [verified] After explicit user authorization, `bash
+  macos/scripts/apply-from-menubar-macos.sh` opened/reconnected ChatGPT through
+  the Dream Skin path. `bash macos/scripts/status-dream-skin-macos.sh --deep
+  --json` then reported `codexRunning=true`, `cdpOk=true`, `operation=success`,
+  and theme `noir-mono` on port `9341`.
+- [verified] `bash macos/scripts/verify-dream-skin-macos.sh` passes against the
+  live ChatGPT session: theme `noir-mono`, version `1.5.11`, visible home L1
+  structure, sidebar/main visible, no document overflow, `pass=true`.
+- [verified] `bash macos/scripts/doctor-macos.sh --require-live` passes with
+  `live=true` on port `9341`.
+- [gap] Restore / re-apply smoke has not been run.
 - [gap] Direct `swift test --package-path macos/menubar-app` fails on this host
   because the installed Swift toolchain cannot import `XCTest`; the repository
   macOS test wrapper detects the missing full matching Xcode platform and skips
