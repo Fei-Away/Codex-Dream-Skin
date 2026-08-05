@@ -3,7 +3,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { earlyPayloadFor } from "../scripts/injector.mjs";
+import {
+  classifyPetActivityTarget,
+  classifyPetAuxiliaryTarget,
+  earlyPayloadFor,
+  isCodexRendererCandidateTarget,
+  petActivityCompatibilityPayloadFor,
+} from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
@@ -203,4 +209,135 @@ assert.match(
 assert.match(source, /visibleSuggestionLabels\.length >= result\.visibleCardCount/);
 assert.match(source, /result\.suggestionLabelColorsMatch/);
 
-console.log("PASS: early injection is L0-ready, generation-safe, and removed on shutdown.");
+const petTarget = (url, title = "Codex Pet Composition Surface") => ({
+  type: "page",
+  title,
+  url,
+});
+assert.equal(classifyPetActivityTarget(petTarget(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-0",
+)), "activity-slot-0");
+assert.equal(classifyPetActivityTarget(petTarget(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-3",
+)), "activity-slot-3");
+for (const url of [
+  "app://-/index.html?initialRoute=%2Favatar-overlay",
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=mascot-badge",
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=voice-controls",
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-4",
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-0&extra=1",
+  "https://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-0",
+]) {
+  assert.equal(classifyPetActivityTarget(petTarget(url)), null,
+    `Non-activity or non-app target must not receive pet compatibility CSS: ${url}`);
+}
+assert.equal(classifyPetActivityTarget(petTarget(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-0",
+  "Unexpected Surface",
+)), null, "The exact native pet title is part of the auxiliary-target identity boundary.");
+assert.equal(classifyPetAuxiliaryTarget(petTarget(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=voice-output",
+)), "voice-output");
+assert.equal(classifyPetAuxiliaryTarget(petTarget(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=mascot-badge",
+)), "mascot-badge");
+assert.equal(classifyPetAuxiliaryTarget({
+  type: "page",
+  title: "Codex",
+  url: "app://-/index.html?initialRoute=%2Favatar-overlay",
+}), "avatar-overlay");
+for (const target of [
+  petTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=unknown"),
+  petTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=voice-output&extra=1"),
+  petTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=voice-output", "Codex"),
+  { type: "page", title: "Codex", url: "app://-/index.html?initialRoute=%2Favatar-overlay&extra=1" },
+]) {
+  assert.equal(classifyPetAuxiliaryTarget(target), null,
+    `Unknown or ambiguous Pet targets must not be mutated: ${target.url}`);
+}
+
+const codexTarget = (url, title = "Codex") => ({ type: "page", title, url });
+assert.equal(isCodexRendererCandidateTarget(codexTarget("app://-/index.html")), true);
+assert.equal(isCodexRendererCandidateTarget(codexTarget(
+  "app://-/index.html?initialRoute=%2Fsettings",
+)), true, "Normal Codex initial routes must remain eligible for renderer probing.");
+for (const target of [
+  codexTarget("app://-/index.html?initialRoute=%2Favatar-overlay"),
+  codexTarget("app://-/index.html?initialRoute=%2Fsettings&initialRoute=%2Favatar-overlay"),
+  codexTarget("app://-/avatar-overlay-composition-surface.html?surfaceId=mascot-badge"),
+  codexTarget("https://example.com/index.html"),
+]) {
+  assert.equal(isCodexRendererCandidateTarget(target), false,
+    `Auxiliary or non-Codex targets must not receive operation UI or full Dream Skin: ${target.url}`);
+}
+
+function createPetCompatibilityFixture(href) {
+  const nodes = new Map();
+  const head = {
+    append(node) {
+      node.parentNode = head;
+      nodes.set(node.id, node);
+    },
+  };
+  const document = {
+    head,
+    createElement(tagName) {
+      return { tagName: tagName.toUpperCase(), id: "", textContent: "", parentNode: null };
+    },
+    getElementById(id) { return nodes.get(id) ?? null; },
+  };
+  return {
+    context: {
+      location: new URL(href),
+      document,
+    },
+    get style() { return nodes.get("codex-dream-skin-pet-compat-style") ?? null; },
+    remove(id) { nodes.delete(id); },
+  };
+}
+
+const petCompat = createPetCompatibilityFixture(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=activity-slot-1",
+);
+vm.runInNewContext(petActivityCompatibilityPayloadFor(true), petCompat.context);
+assert.ok(petCompat.style, "An exact activity slot must receive the bounded compatibility style.");
+assert.match(petCompat.style.textContent, /\[class\*="_activityPillMaterial_"\]/);
+assert.match(petCompat.style.textContent, /var\(--color-token-main-surface-primary, Canvas\)/);
+assert.doesNotMatch(petCompat.style.textContent, /(?:html|body|main|form)\s*\{/,
+  "Pet compatibility CSS must not paint the auxiliary window or native input surface.");
+assert.doesNotMatch(petCompat.style.textContent, /background-image|url\(/,
+  "Pet compatibility CSS must never copy the Dream Skin wallpaper into pet surfaces.");
+petCompat.style.remove = () => petCompat.remove(petCompat.style.id);
+vm.runInNewContext(petActivityCompatibilityPayloadFor(false), petCompat.context);
+assert.equal(petCompat.style, null, "Pausing or stopping Dream Skin must remove the pet workaround.");
+
+const petCompatWrongSurface = createPetCompatibilityFixture(
+  "app://-/avatar-overlay-composition-surface.html?surfaceId=voice-controls",
+);
+vm.runInNewContext(petActivityCompatibilityPayloadFor(true), petCompatWrongSurface.context);
+assert.equal(petCompatWrongSurface.style, null,
+  "Voice, mascot, and other auxiliary surfaces must remain completely untouched.");
+const targetLoopStart = source.indexOf("for (const target of targets)", source.indexOf("async function runWatch"));
+const petClassificationStart = source.indexOf("classifyPetActivityTarget(target)", targetLoopStart);
+const codexClassificationStart = source.indexOf("isCodexRendererCandidateTarget(target)", petClassificationStart);
+const mainEarlyRegistrationStart = source.indexOf("registerEarlyForRecord(", petClassificationStart);
+assert.ok(targetLoopStart >= 0 && petClassificationStart > targetLoopStart
+  && codexClassificationStart > petClassificationStart
+  && mainEarlyRegistrationStart > codexClassificationStart,
+"Pet activity surfaces must be classified first, and only a true Codex renderer may receive the full payload.");
+const connectCodexTargetsStart = source.indexOf("async function connectCodexTargets");
+const operationUiStart = source.indexOf("function operationUiExpression", connectCodexTargetsStart);
+assert.match(source.slice(connectCodexTargetsStart, operationUiStart), /isCodexRendererCandidateTarget\(target\)/,
+  "Operation UI discovery must reject the avatar-overlay root before probing or connecting it.");
+assert.match(source, /await setPetActivityCompatibility\(petSession, true\)/,
+  "The watcher must install the bounded pet style only after live target identity verification.");
+assert.match(source, /classifyPetAuxiliaryTarget\(target\)[\s\S]*updateOperationUi\([\s\S]*"clear"/,
+  "The watcher must clear only Dream Skin's own stale operation host from exact Pet auxiliary targets.");
+assert.match(source, /petSession\.on\("Page\.loadEventFired"[\s\S]*livePetActivityTarget\(petSession\)[\s\S]*setPetActivityCompatibility\(petSession, true\)/,
+  "A same-target pet renderer reload must reverify its identity and restore the bounded style.");
+assert.match(source, /operation\.status === "pausing"[\s\S]*await releasePetSessions\(\{ strict: true \}\)/,
+  "Pausing Dream Skin must remove pet compatibility before acknowledging control-only mode.");
+assert.match(source, /finally\s*\{[\s\S]*await releasePetSessions\(\)[\s\S]*record\.session\.close/,
+  "Watcher shutdown must remove the pet style before closing auxiliary CDP sessions.");
+
+console.log("PASS: early injection is L0-ready, generation-safe, removed on shutdown, and pet-safe.");
