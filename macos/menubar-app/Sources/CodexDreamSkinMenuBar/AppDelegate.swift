@@ -275,22 +275,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     let applyTitle: String
-    if !snapshot.codexRunning {
-      applyTitle = "打开并应用皮肤"
-    } else {
-      switch snapshot.session {
-      case "active": applyTitle = "重新应用皮肤"
-      case "stale", "unknown": applyTitle = "修复并应用"
-      default: applyTitle = "应用皮肤"
-      }
+    switch snapshot.session {
+    case "active": applyTitle = "重新应用皮肤"
+    case "stale", "unknown": applyTitle = "修复并应用"
+    default: applyTitle = "应用皮肤"
     }
     addActionItem(applyTitle, action: #selector(applySkin), enabled: !busy)
     if snapshot.session == "active" || snapshot.session == "applying" {
       addActionItem("暂停皮肤", action: #selector(pauseSkin), enabled: !busy)
     }
-    if snapshot.codexRunning {
-      addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
-    }
+    addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
     addActionItem("换一张背景图…", action: #selector(chooseBackgroundImage), enabled: !busy)
     addActionItem("导入主题 ZIP…", action: #selector(chooseThemeArchive), enabled: !busy)
     addSavedThemesMenu(enabled: !busy)
@@ -948,18 +942,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   @objc private func openCodex() {
-    guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
-      showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")
-      return
-    }
-    let configuration = NSWorkspace.OpenConfiguration()
-    NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
-      if let error {
-        DispatchQueue.main.async {
-          self.showError(title: "无法打开 ChatGPT", message: error.localizedDescription)
-        }
-      }
-    }
+    runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")
   }
 
   @objc private func openDreamSkinWebsite() {

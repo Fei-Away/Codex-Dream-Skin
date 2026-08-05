@@ -18,12 +18,13 @@
   longer shows a confirmation dialog. The apply wrapper only prompts after hot
   reload is unavailable: "打开并应用" when ChatGPT is closed, or "重启并应用" when
   ChatGPT is already running without a verified Dream Skin CDP connection.
-- [implemented] The native menu no longer shows "重新应用皮肤" when ChatGPT is not
-  running even if stale state says `active`; it shows "打开并应用皮肤" and hides the
-  separate normal "打开 ChatGPT" action until ChatGPT is already running.
+- [corrected] The native menu keeps the original "打开 ChatGPT" operation title
+  and always shows that action. Its implementation now calls the Dream Skin
+  apply/start path instead of `NSWorkspace.openApplication`, so opening ChatGPT
+  also starts the skinned CDP session and applies the current theme.
 - [covered] Added static regressions to lock menu apply hot-reload ordering,
-  post-hot-reload confirmation placement, restart-consent gating, and the
-  not-running menu title. The macOS test
+  post-hot-reload confirmation placement, restart-consent gating, the unchanged
+  "打开 ChatGPT" title, and the Dream Skin-backed open action. The macOS test
   Gatekeeper scan now ignores the same `.build-*` SwiftPM artifacts already
   listed in `macos/menubar-app/.gitignore`.
 - [verified] `bash -n` for changed shell scripts and `git diff --check` pass.

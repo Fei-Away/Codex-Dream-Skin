@@ -748,9 +748,13 @@ if [ -z "$HOT_LINE" ] || [ -z "$FIRST_CONFIRM_LINE" ] || [ -z "$AUTH_LINE" ] || 
   exit 1
 fi
 MENU_SOURCE="$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
-/usr/bin/grep -F -q 'if !snapshot.codexRunning {' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'if snapshot.codexRunning {' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")' "$MENU_SOURCE"
+if /usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE" ||
+   /usr/bin/grep -F -q 'NSWorkspace.shared.openApplication(at: appURL' "$MENU_SOURCE"; then
+  printf 'Open ChatGPT must keep its menu title and use the Dream Skin apply path, not native app opening.\n' >&2
+  exit 1
+fi
 
 # Corrupt or structurally incomplete state must be preserved and fail closed;
 # otherwise pause/restore could overwrite evidence while a watcher survives.
