@@ -942,7 +942,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   @objc private func openCodex() {
-    runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")
+    guard NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") != nil else {
+      showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")
+      return
+    }
+    guard !operationInFlight else { return }
+    guard let script = installedScript(named: "apply-from-menubar-macos.sh") else {
+      showError(title: "无法打开 ChatGPT", message: "请先选择“安装 / 升级引擎”，再重试。")
+      return
+    }
+    operationInFlight = true
+    rebuildMenu()
+    ScriptRunner.run(script: script) { [weak self] result in
+      guard let self else { return }
+      self.operationInFlight = false
+      self.refreshStatus()
+      self.rebuildMenu()
+      if !result.succeeded {
+        self.showError(
+          title: "无法打开 ChatGPT",
+          message: self.conciseOutput(result.output, fallback: "请检查 ChatGPT 是否已安装，并重试。")
+        )
+      }
+    }
   }
 
   @objc private func openDreamSkinWebsite() {

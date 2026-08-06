@@ -99,16 +99,7 @@ if [ "$CODEX_RUNNING" = "true" ]; then
   fi
   RESTART_AUTHORIZED="true"
 else
-  progress "热重载不可用，等待打开授权…"
-  OPEN_PROMPT="ChatGPT 当前未打开，无法热重载。
-打开 ChatGPT 并应用「${THEME_NAME}」？首次启动通常需要 10–30 秒。"
-  if ! confirm "$OPEN_PROMPT" "打开并应用"; then
-    OPERATION_TOKEN="$(new_operation_token)"
-    write_operation_state cancelled "操作已取消，原皮肤保持不变" \
-      "$OPERATION_TOKEN" idle >/dev/null 2>&1 || true
-    progress "已取消，原皮肤保持不变"
-    exit 0
-  fi
+  progress "热重载不可用，ChatGPT 未运行，准备打开…"
   notify_progress "正在打开 ChatGPT 并应用皮肤…"
 fi
 

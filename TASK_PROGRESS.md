@@ -15,13 +15,16 @@
   verified CDP endpoint, it asks for explicit "重启并应用" consent before passing
   `--restart-existing`; without that consent it records cancellation and exits.
 - [adjusted] Per follow-up interaction requirement, successful hot reapply no
-  longer shows a confirmation dialog. The apply wrapper only prompts after hot
-  reload is unavailable: "打开并应用" when ChatGPT is closed, or "重启并应用" when
-  ChatGPT is already running without a verified Dream Skin CDP connection.
+  longer shows a confirmation dialog. The apply wrapper only prompts when
+  ChatGPT is already running without a verified Dream Skin CDP connection and a
+  restart is required. If ChatGPT is closed, it opens and applies without an
+  extra confirmation.
 - [corrected] The native menu keeps the original "打开 ChatGPT" operation title
-  and always shows that action. Its implementation now calls the Dream Skin
-  apply/start path instead of `NSWorkspace.openApplication`, so opening ChatGPT
-  also starts the skinned CDP session and applies the current theme.
+  and always shows that action. Its implementation preserves the original
+  "未找到 ChatGPT" and "无法打开 ChatGPT" error surfaces, but replaces the
+  successful native `NSWorkspace.openApplication` launch with the Dream Skin
+  apply/start path, so opening ChatGPT also starts the skinned CDP session and
+  applies the current theme.
 - [covered] Added static regressions to lock menu apply hot-reload ordering,
   post-hot-reload confirmation placement, restart-consent gating, the unchanged
   "打开 ChatGPT" title, and the Dream Skin-backed open action. The macOS test

@@ -726,8 +726,15 @@ fi
 APPLY_SCRIPT="$ROOT/scripts/apply-from-menubar-macos.sh"
 /usr/bin/grep -F -q 'if hot_reapply_theme "$PORT" 8000; then' "$APPLY_SCRIPT"
 /usr/bin/grep -F -q 'RESTART_AUTHORIZED="true"' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q 'OPEN_PROMPT="ChatGPT 当前未打开，无法热重载。' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q 'if ! confirm "$OPEN_PROMPT" "打开并应用"; then' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'progress "热重载不可用，ChatGPT 未运行，准备打开…"' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'notify_progress "正在打开 ChatGPT 并应用皮肤…"' "$APPLY_SCRIPT"
+if /usr/bin/grep -F -q 'OPEN_PROMPT=' "$APPLY_SCRIPT" ||
+   /usr/bin/grep -F -q 'confirm "$OPEN_PROMPT"' "$APPLY_SCRIPT" ||
+   /usr/bin/grep -F -q '"打开并应用"' "$APPLY_SCRIPT" ||
+   /usr/bin/grep -F -q 'MENU_ACTION=' "$APPLY_SCRIPT"; then
+  printf 'menu apply should open a closed ChatGPT without an extra confirmation or source flag.\n' >&2
+  exit 1
+fi
 /usr/bin/grep -F -q 'if ! confirm "$RESTART_PROMPT" "重启并应用"; then' "$APPLY_SCRIPT"
 /usr/bin/grep -F -q 'START_ARGS=(--port "$PORT")' "$APPLY_SCRIPT"
 /usr/bin/grep -F -q 'START_ARGS+=(--restart-existing)' "$APPLY_SCRIPT"
@@ -749,7 +756,11 @@ if [ -z "$HOT_LINE" ] || [ -z "$FIRST_CONFIRM_LINE" ] || [ -z "$AUTH_LINE" ] || 
 fi
 MENU_SOURCE="$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
 /usr/bin/grep -F -q 'addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'guard let script = installedScript(named: "apply-from-menubar-macos.sh") else {' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'showError(title: "无法打开 ChatGPT", message: "请先选择“安装 / 升级引擎”，再重试。")' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'ScriptRunner.run(script: script)' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'title: "无法打开 ChatGPT",' "$MENU_SOURCE"
 if /usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE" ||
    /usr/bin/grep -F -q 'NSWorkspace.shared.openApplication(at: appURL' "$MENU_SOURCE"; then
   printf 'Open ChatGPT must keep its menu title and use the Dream Skin apply path, not native app opening.\n' >&2
