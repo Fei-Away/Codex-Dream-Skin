@@ -725,45 +725,37 @@ if /usr/bin/grep -F -q 'index($0, "--port " port)' "$ROOT/scripts/common-macos.s
 fi
 APPLY_SCRIPT="$ROOT/scripts/apply-from-menubar-macos.sh"
 /usr/bin/grep -F -q 'if hot_reapply_theme "$PORT" 8000; then' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q 'RESTART_AUTHORIZED="true"' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q 'progress "热重载不可用，ChatGPT 未运行，准备打开…"' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q 'notify_progress "正在打开 ChatGPT 并应用皮肤…"' "$APPLY_SCRIPT"
-if /usr/bin/grep -F -q 'OPEN_PROMPT=' "$APPLY_SCRIPT" ||
-   /usr/bin/grep -F -q 'confirm "$OPEN_PROMPT"' "$APPLY_SCRIPT" ||
-   /usr/bin/grep -F -q '"打开并应用"' "$APPLY_SCRIPT" ||
-   /usr/bin/grep -F -q 'MENU_ACTION=' "$APPLY_SCRIPT"; then
-  printf 'menu apply should open a closed ChatGPT without an extra confirmation or source flag.\n' >&2
-  exit 1
-fi
-/usr/bin/grep -F -q 'if ! confirm "$RESTART_PROMPT" "重启并应用"; then' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q 'START_ARGS=(--port "$PORT")' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q 'START_ARGS+=(--restart-existing)' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" "${START_ARGS[@]}"' "$APPLY_SCRIPT"
-if /usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT"; then
-  printf 'menu apply still authorizes a cold restart before the explicit restart prompt.\n' >&2
+/usr/bin/grep -F -q 'SESSION="off"' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'if ! confirm "$PROMPT" "$OK_LABEL"; then' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT"
+if /usr/bin/grep -F -q 'CODEX_RUNNING=' "$APPLY_SCRIPT" ||
+   /usr/bin/grep -F -q 'MENU_ACTION=' "$APPLY_SCRIPT" ||
+   /usr/bin/grep -F -q 'OPEN_PROMPT=' "$APPLY_SCRIPT"; then
+  printf 'menu apply must preserve the original session-driven prompt model.\n' >&2
   exit 1
 fi
 HOT_LINE="$(/usr/bin/grep -n 'hot_reapply_theme "$PORT" 8000' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
-FIRST_CONFIRM_LINE="$(/usr/bin/grep -n 'if ! confirm ' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
-AUTH_LINE="$(/usr/bin/grep -n 'RESTART_AUTHORIZED="true"' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
-START_LINE="$(/usr/bin/grep -n 'start-dream-skin-macos.sh" "${START_ARGS\[@\]}"' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
-if [ -z "$HOT_LINE" ] || [ -z "$FIRST_CONFIRM_LINE" ] || [ -z "$AUTH_LINE" ] || [ -z "$START_LINE" ] ||
-   [ "$HOT_LINE" -ge "$FIRST_CONFIRM_LINE" ] ||
-   [ "$FIRST_CONFIRM_LINE" -ge "$START_LINE" ] ||
-   [ "$AUTH_LINE" -ge "$START_LINE" ]; then
-  printf 'menu apply must hot-reapply before requesting and consuming restart consent.\n' >&2
+CONFIRM_LINE="$(/usr/bin/grep -n 'if ! confirm "$PROMPT" "$OK_LABEL"; then' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+START_LINE="$(/usr/bin/grep -n 'start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+if [ -z "$HOT_LINE" ] || [ -z "$CONFIRM_LINE" ] || [ -z "$START_LINE" ] ||
+   [ "$CONFIRM_LINE" -ge "$HOT_LINE" ] ||
+   [ "$HOT_LINE" -ge "$START_LINE" ]; then
+  printf 'menu apply must keep its confirmation and hot-reapply before falling back to start.\n' >&2
   exit 1
 fi
 MENU_SOURCE="$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
+OPEN_CODEX_BODY="$(/usr/bin/sed -n '/@objc private func openCodex()/,/@objc private func openDreamSkinWebsite()/p' "$MENU_SOURCE")"
 /usr/bin/grep -F -q 'addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'guard let script = installedScript(named: "apply-from-menubar-macos.sh") else {' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'showError(title: "无法打开 ChatGPT", message: "请先选择“安装 / 升级引擎”，再重试。")' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'guard !engineNeedsInstall(),' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'let script = installedScript(named: "start-dream-skin-macos.sh") else {' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'ScriptRunner.run(script: script)' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'title: "无法打开 ChatGPT",' "$MENU_SOURCE"
 if /usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE" ||
-   /usr/bin/grep -F -q 'NSWorkspace.shared.openApplication(at: appURL' "$MENU_SOURCE"; then
-  printf 'Open ChatGPT must keep its menu title and use the Dream Skin apply path, not native app opening.\n' >&2
+   /usr/bin/grep -F -q 'runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")' "$MENU_SOURCE" ||
+   /usr/bin/printf '%s\n' "$OPEN_CODEX_BODY" | /usr/bin/grep -F -q 'installBundledEngineIfNeeded(force:'; then
+  printf 'Open ChatGPT must keep its menu title and must not use menu apply or install the engine implicitly.\n' >&2
   exit 1
 fi
 

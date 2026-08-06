@@ -10,44 +10,32 @@
   status, while `apply-from-menubar-macos.sh` always calls
   `start-dream-skin-macos.sh --restart-existing`. If ChatGPT is running without
   a verified CDP endpoint, `start-dream-skin-macos.sh` stops and relaunches it.
-- [implemented] `apply-from-menubar-macos.sh` now attempts
-  `hot_reapply_theme` before cold start. If ChatGPT is running without a
-  verified CDP endpoint, it asks for explicit "重启并应用" consent before passing
-  `--restart-existing`; without that consent it records cancellation and exits.
-- [adjusted] Per follow-up interaction requirement, successful hot reapply no
-  longer shows a confirmation dialog. The apply wrapper only prompts when
-  ChatGPT is already running without a verified Dream Skin CDP connection and a
-  restart is required. If ChatGPT is closed, it opens and applies without an
-  extra confirmation.
+- [implemented] `apply-from-menubar-macos.sh` keeps the original
+  `CHEAP_RUNNING` / `SESSION` prompt flow and now attempts `hot_reapply_theme`
+  after the existing confirmation but before falling back to
+  `start-dream-skin-macos.sh --restart-existing`. A successful hot reapply
+  exits without restarting ChatGPT.
 - [corrected] The native menu keeps the original "打开 ChatGPT" operation title
   and always shows that action. Its implementation preserves the original
   "未找到 ChatGPT" and "无法打开 ChatGPT" error surfaces, but replaces the
   successful native `NSWorkspace.openApplication` launch with the Dream Skin
-  apply/start path, so opening ChatGPT also starts the skinned CDP session and
-  applies the current theme.
+  start path only when the installed engine is complete. If the engine is
+  missing or incomplete, the action falls back to native `NSWorkspace` opening
+  and does not install the engine implicitly.
 - [covered] Added static regressions to lock menu apply hot-reload ordering,
-  post-hot-reload confirmation placement, restart-consent gating, the unchanged
-  "打开 ChatGPT" title, and the Dream Skin-backed open action. The macOS test
-  Gatekeeper scan now ignores the same `.build-*` SwiftPM artifacts already
-  listed in `macos/menubar-app/.gitignore`.
-- [verified] `bash -n` for changed shell scripts and `git diff --check` pass.
-  `swift build --package-path macos/menubar-app --product
-  CodexDreamSkinMenuBar` passes. `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash
-  macos/tests/run-tests.sh` passes with the documented Doctor skip.
-- [verified] `bash macos/scripts/doctor-macos.sh` passes on this host:
-  official `/Applications/ChatGPT.app` `26.730.61639` build `6234`, Team ID
-  `2DC432GLL2`, bundled Node `v24.14.0`, payload valid, `live=false`.
-- [verified] After explicit user authorization, `bash
-  macos/scripts/apply-from-menubar-macos.sh` opened/reconnected ChatGPT through
-  the Dream Skin path. `bash macos/scripts/status-dream-skin-macos.sh --deep
-  --json` then reported `codexRunning=true`, `cdpOk=true`, `operation=success`,
-  and theme `noir-mono` on port `9341`.
-- [verified] `bash macos/scripts/verify-dream-skin-macos.sh` passes against the
-  live ChatGPT session: theme `noir-mono`, version `1.5.11`, visible home L1
-  structure, sidebar/main visible, no document overflow, `pass=true`.
-- [verified] `bash macos/scripts/doctor-macos.sh --require-live` passes with
-  `live=true` on port `9341`.
-- [gap] Restore / re-apply smoke has not been run.
+  the preserved session-driven prompt model, the unchanged "打开 ChatGPT" title,
+  the Dream Skin-backed open action, and the native fallback when the engine is
+  not installed. The macOS test Gatekeeper scan now ignores the same
+  `.build-*` SwiftPM artifacts already listed in `macos/menubar-app/.gitignore`.
+- [verified 2026-08-06] `bash -n
+  macos/scripts/apply-from-menubar-macos.sh macos/tests/run-tests.sh`,
+  `git diff --check`, `swift build --package-path macos/menubar-app --product
+  CodexDreamSkinMenuBar`, and `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash
+  macos/tests/run-tests.sh` all pass. The wrapper skipped Doctor as requested
+  by the environment flag.
+- [gap] Live restore / re-apply / open ChatGPT smoke has not been rerun after
+  narrowing the implementation back to the minimal AppDelegate + hot-reapply
+  path.
 - [gap] Direct `swift test --package-path macos/menubar-app` fails on this host
   because the installed Swift toolchain cannot import `XCTest`; the repository
   macOS test wrapper detects the missing full matching Xcode platform and skips

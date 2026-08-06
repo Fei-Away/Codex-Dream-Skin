@@ -942,13 +942,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   @objc private func openCodex() {
-    guard NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") != nil else {
+    guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
       showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")
       return
     }
     guard !operationInFlight else { return }
-    guard let script = installedScript(named: "apply-from-menubar-macos.sh") else {
-      showError(title: "无法打开 ChatGPT", message: "请先选择“安装 / 升级引擎”，再重试。")
+    guard !engineNeedsInstall(),
+          let script = installedScript(named: "start-dream-skin-macos.sh") else {
+      let configuration = NSWorkspace.OpenConfiguration()
+      NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
+        if let error {
+          DispatchQueue.main.async {
+            self.showError(title: "无法打开 ChatGPT", message: error.localizedDescription)
+          }
+        }
+      }
       return
     }
     operationInFlight = true
