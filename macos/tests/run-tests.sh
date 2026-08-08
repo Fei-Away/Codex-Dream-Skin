@@ -699,6 +699,30 @@ STATUS_JSON="$(/usr/bin/env HOME="$STATUS_HOME" "$ROOT/scripts/status-dream-skin
 wait "$STATUS_PID" 2>/dev/null || true
 STATUS_PID=""
 
+# The main executable can have a truncated process name on macOS even though
+# its command starts with the complete path saved by the launcher.
+STATUS_CODEX_EXE="$TMP/Fake ChatGPT"
+/bin/bash -c 'exec -a "$1" /bin/sleep 600' _ "$STATUS_CODEX_EXE" &
+STATUS_PID="$!"
+/bin/sleep 0.08
+"$NODE" -e '
+  const fs = require("node:fs");
+  const [file, codexExe] = process.argv.slice(1);
+  fs.writeFileSync(file, `${JSON.stringify({
+    schemaVersion: 4,
+    session: "off",
+    codexExe,
+  })}\n`);
+' "$STATUS_STATE_ROOT/state.json" "$STATUS_CODEX_EXE"
+STATUS_JSON="$(/usr/bin/env HOME="$STATUS_HOME" "$ROOT/scripts/status-dream-skin-macos.sh" --json)"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (value.codexRunning !== true) process.exit(1);
+' "$STATUS_JSON"
+/bin/kill -TERM "$STATUS_PID" 2>/dev/null || true
+wait "$STATUS_PID" 2>/dev/null || true
+STATUS_PID=""
+
 # The common stop path must reject a real watcher running on 19341 when the
 # saved state claims 1934, even though nodePath/injectorPath/start-time all
 # match. This exercises the signal gate directly (status has its own matcher).
