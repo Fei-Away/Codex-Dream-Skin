@@ -119,13 +119,21 @@ export function classifyImageDimensions({ width, height }) {
   };
 }
 
-export function readImageMetadata(value, extension = "") {
+// Raw pixel dimensions straight from the container header — no decode, and no
+// safety-cap classification, so callers can reject oversized images *before*
+// anything rasterizes them. Returns null for formats this header parser does
+// not recognize (e.g. HEIC/TIFF).
+export function readRawDimensions(value, extension = "") {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
   const normalized = extension.toLowerCase();
-  let dimensions = null;
-  if (normalized === ".png" || bytes[0] === 0x89) dimensions = pngDimensions(bytes);
-  else if (normalized === ".jpg" || normalized === ".jpeg" ||
-    (bytes[0] === 0xff && bytes[1] === 0xd8)) dimensions = jpegDimensions(bytes);
-  else if (normalized === ".webp" || ascii(bytes, 8, 4) === "WEBP") dimensions = webpDimensions(bytes);
+  if (normalized === ".png" || bytes[0] === 0x89) return pngDimensions(bytes);
+  if (normalized === ".jpg" || normalized === ".jpeg" ||
+    (bytes[0] === 0xff && bytes[1] === 0xd8)) return jpegDimensions(bytes);
+  if (normalized === ".webp" || ascii(bytes, 8, 4) === "WEBP") return webpDimensions(bytes);
+  return null;
+}
+
+export function readImageMetadata(value, extension = "") {
+  const dimensions = readRawDimensions(value, extension);
   return dimensions ? classifyImageDimensions(dimensions) : null;
 }
