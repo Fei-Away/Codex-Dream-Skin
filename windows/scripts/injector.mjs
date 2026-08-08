@@ -39,7 +39,11 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.11";
+const SKIN_VERSION = "1.5.12";
+// .github/workflows/ci.yml's version-consistency check greps this file for a
+// literal `const SKIN_VERSION = "...";` line, so the export stays a separate
+// statement rather than an inline `export const`.
+export { SKIN_VERSION };
 const MAX_ART_BYTES = 10 * 1024 * 1024;
 const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;

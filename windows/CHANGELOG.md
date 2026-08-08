@@ -4,6 +4,17 @@
 
 ### 修复
 
+- Windows 路径穿越校验此前会把合法的、以 `.` 开头的主题文件名也当作可疑路径拒绝；现在能正确区分它们与真正的 `..` 路径穿越（#296）。
+- Windows 运行时加载主题前强制校验 `schemaVersion` 必须是数字 `1`，拒绝缺失或未来版本的 schema（#299）。
+- 主题包 manifest 时间戳校验拒绝不合法的 RFC 3339 值（#297），双平台共享。
+
+### 内部
+
+- 同步 v1.5.12 版本号，发布上述修复。
+- README / SECURITY.md 补充说明换肤期间本机回环 CDP 调试口未做身份验证这一既有安全边界（#18）。
+- CI 新增对 shared runtime 与 tools 目录的测试覆盖（#300）。
+- 修复共享的 `image-metadata.mjs` 生成源与 macOS 产物不同步的问题：Windows 一侧此前完全没有拿到 `readRawDimensions` 拆分后的能力，现已随双端产物重新生成补上。
+
 - 修复 Codex Desktop 26.727 设置页改用新版导航标记后，被注入器误判为非 ChatGPT 页面并报 `No page matched the expected ChatGPT shell markers` 的问题。双端共享契约现识别 `data-settings-panel-slug="general-settings"`，同时保留旧版外观设置锚点和严格的 `app:` 来源校验；首页与任务页的 L1 校验边界不变。
 - 修复 Codex Desktop 26.727 更新后主区域、顶栏和顶部渐隐仍保持原生白底，或注入被错误报告为成功的问题（#320、#322、#326、#330）。共享选择器现同时识别旧结构与新版 app-shell 标记，首页和普通任务页必须达到完整 L1 可见性后才会提交成功。
 - 同 ID 社区主题再次导入时原地升级，不再生成重复的 `id-2` / `id-3` 目录；仅在身份与完整语义指纹都匹配时清理旧后缀副本，缺失或非法 ID 使用双端一致的稳定映射（#318）。

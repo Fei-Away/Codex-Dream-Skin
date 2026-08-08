@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { verifySession } from "../scripts/injector.mjs";
+import { SKIN_VERSION, verifySession } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const startPath = path.resolve(here, "../scripts/start-dream-skin.ps1");
@@ -125,7 +125,7 @@ function makeDomFixture({
   };
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
-      version: "1.5.11",
+      version: SKIN_VERSION,
       themeId: "fixture-theme",
       revision: "fixture-revision",
       styleMode: "style",

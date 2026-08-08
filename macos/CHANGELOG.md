@@ -2,7 +2,27 @@
 
 ## Unreleased
 
+### 新增
+
+- 菜单栏更新检查改为后台自动进行：启动后约 15 秒与此后每 24 小时静默访问一次 GitHub Releases，发现新版本时推送系统通知，并在菜单顶部显示可点击的「🆕 发现新版本」条目；同一版本只通知一次。原「检查更新」菜单项保留为「维护」子菜单里的「立即检查更新」，用于手动触发。
+- 菜单栏状态栏菜单由 16 个平铺项收纳进「主题」「链接」「维护」三个子菜单，只保留重新应用皮肤、打开 ChatGPT 与退出在最外层，降低误触和视觉噪音。
+
 ### 修复
+
+- 修复菜单栏「重新应用皮肤」与「打开 ChatGPT」入口语义不一致的问题（#341）：重新应用现在会先尝试热重载，失败才回退到完整重启；打开 ChatGPT 复用已安装的 Dream Skin 启动脚本而不是直接原生拉起。
+- 渲染器可见性校验加固（#294）：从仅检查宽高与 `display` 改为同时校验 `checkVisibility()`、`opacity`、`content-visibility` 与视口相交，减少"校验通过但皮肤实际不可见"的假阳性。已核实社区主题的 Safe CSS 沙盒不允许 `opacity` 低于 0.65、且不开放 `display`/`visibility`/`position`，不会被这次加固误伤。
+- macOS 自定义主题写入器输出对齐当前运行时 schema（#295）。
+- 导入主题背景图前先用轻量方式读取尺寸再决定是否用 `sips` 全量解码（#66），避免超大图片在校验尺寸上限前就把整张图解码进内存造成的内存膨胀风险。
+- 主题包 manifest 时间戳校验拒绝不合法的 RFC 3339 值（#297），双平台共享。
+
+### 内部
+
+- 同步 v1.5.12 版本号，发布菜单栏重组、更新通知与上述修复。
+- 仓库根目录补充 `LICENSE` 入口（此前只在 `macos/LICENSE`）（#57）。
+- README / SECURITY.md 补充说明换肤期间本机回环 CDP 调试口未做身份验证这一既有安全边界（#18）。
+- CI 新增对 shared runtime 与 tools 目录的测试覆盖（#300）。
+- 修复 `macos/scripts/image-metadata.mjs` 与其生成源 `runtime/image-metadata.mjs` 不同步的问题——后者补上 `readRawDimensions` 拆分后未重新生成，Windows 对应文件因此完全没有这个能力；现已重新生成双端产物并导出 `SKIN_VERSION` 供测试引用，避免下次发版再次手工漂移。
+- 修复 `renderer-verification.test.mjs` 的 mock fixture 与运行时契约脱节导致的 CI 常年报红（并非本次改动引入，是历史遗留）：选择器字符串、`scope.missingL1` 字段与版本号三处过时。
 
 - 修复 Codex Desktop 26.727 设置页改用新版导航标记后，被注入器误判为非 ChatGPT 页面并报 `No page matched the expected ChatGPT shell markers` 的问题。双端共享契约现识别 `data-settings-panel-slug="general-settings"`，同时保留旧版外观设置锚点和严格的 `app:` 来源校验；首页与任务页的 L1 校验边界不变。
 - 修复 Codex Desktop 26.727 更新后主区域、顶栏和顶部渐隐仍保持原生白底，或注入被错误报告为成功的问题（#320、#322、#326、#330）。共享选择器现同时识别旧结构与新版 app-shell 标记，首页和普通任务页必须达到完整 L1 可见性后才会提交成功。

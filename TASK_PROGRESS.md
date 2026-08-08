@@ -1,5 +1,76 @@
 # Task Progress
 
+## Client release v1.5.12 (2026-08-08)
+
+- [scope] Reviewed and merged 10 pending community/self PRs that had accumulated
+  unmerged on `main` since late July (#68, #212, #283, #284, #285, #286, #288,
+  #289, #106, #342) — each individually verified against current `main` before
+  merge: git-mergeable both alone and stacked together, no version-fragile
+  selector/DOM assumptions, and (for #283 specifically) the Safe CSS sandbox
+  in `runtime/safe-css-policy.json` was cross-checked to confirm no community
+  theme can trip the stricter visibility check (opacity floored at 0.65,
+  display/visibility/position not themable at all).
+- [diagnosed] Merging #68 exposed that `macos/scripts/image-metadata.mjs` is
+  generated from `runtime/image-metadata.mjs` via `tools/sync-runtime-assets.mjs`;
+  #68 edited the generated output directly instead of the source, so
+  `--check` failed on `main` and `windows/scripts/image-metadata.mjs` never
+  picked up the new `readRawDimensions` export at all. Fixed at the source
+  and regenerated both platform outputs (#347).
+- [diagnosed] `Static checks` CI was independently red on `main` — 3 tests in
+  `macos/tests/renderer-verification.test.mjs` failed against `main` HEAD
+  directly, unrelated to any merge here. Root cause: the test's hand-rolled
+  DOM mock had drifted from the real runtime contract in three ways (stale
+  `shell-main` selector literal predating the 26.727 `:is(...)` update,
+  missing `scope.missingL1` that `assessRendererVerification` requires,
+  hardcoded `version: "1.5.6"` against the real `SKIN_VERSION` of `"1.5.11"`).
+  Fixed the fixtures and exported `SKIN_VERSION` so the test imports the real
+  constant instead of re-hardcoding a value that drifts on every release (#349).
+- [implemented] Regrouped the menu bar's ~16 flat top-level items into
+  `主题`/`链接`/`维护` submenus, and replaced the always-present manual
+  "检查更新…" item with a background check (24h timer + one-shot ~15s after
+  launch) that posts a system notification the first time a new version is
+  seen and shows a conditional "🆕 发现新版本" item only while one is
+  available; manual check moved into 维护 as "立即检查更新" (#348). Could not
+  run `swift build`/`swift test` locally — this sandbox's Command Line Tools
+  (Swift 5.10) don't match the macOS 15.2 SDK (needs 6.0.3) — so an
+  independent review agent read the full diff for compile-breaking issues
+  before push, and the PR was only merged after real CI's `macos-latest` job
+  (`swift test --package-path macos/menubar-app` + DMG build) came back
+  green. The review agent's two substantive findings (install doc no longer
+  matched the new background-polling behavior; a manual check during an
+  in-flight background check could double-spawn `check-update-macos.sh`)
+  were fixed before merge with a dedicated `updateCheckInFlight` guard
+  separate from the broader `operationInFlight` busy state, so the 24h timer
+  no longer disables the primary apply/open actions while it runs.
+- [verified] Before cutting the version: `node --test macos/tests/*.test.mjs
+  windows/tests/*.test.mjs tools/*.test.mjs` (93/93 pass), full
+  `macos/tests/run-tests.sh` including signed-runtime and Doctor checks, and
+  both `injector.mjs --check-payload` invocations all pass on `main` post-merge.
+- [implemented] Version bump touches all six release version sources
+  (`macos/VERSION`, `windows/VERSION`, `macos/package.json`,
+  `macos/scripts/common-macos.sh`, both platforms' `injector.mjs`
+  `SKIN_VERSION`) plus the two hardcoded `1.5.11` assertions in
+  `macos/tests/run-tests.sh` (the update-check JSON fixture and the
+  `common-macos.sh`-sourced `$SKIN_VERSION` check). A grep-only pass across
+  the repo for the literal `1.5.11` first missed a third real dependency:
+  `windows/tests/injector-window-readiness.test.mjs` imports `verifySession`
+  (not `assessRendererVerification` directly), so its mock
+  `__CODEX_DREAM_SKIN_STATE__.version` is transitively checked against the
+  real `SKIN_VERSION` even though the test file never names that identifier.
+  The full portable test run after the version bump caught this immediately
+  (4 failures) before it reached CI; fixed the same way as the macOS
+  `renderer-verification.test.mjs` case — export `SKIN_VERSION` from
+  `windows/scripts/injector.mjs` (as a separate `export { }` statement, same
+  reason as macOS) and import it into the test instead of re-hardcoding.
+  `windows/tests/start-verified-skin-preserved.tests.ps1`'s literal
+  `"version":"1.5.11"` is a fully mocked PowerShell fixture with no path to
+  `SKIN_VERSION` at all (grepped every `.ps1` script; it's JS-only), so that
+  one is genuinely safe to leave unchanged.
+- [gap] Live click-through of the reorganized macOS menu bar and a real
+  "update available" notification have not been manually exercised on a
+  physical Mac — verification here is CI (`swift test`) plus static review,
+  not an interactive smoke test.
+
 ## macOS menu reapply/open ChatGPT restart fix (2026-08-05)
 
 - [scope] Branch `codex/fix-macos-reapply-open-chatgpt` was created from latest
