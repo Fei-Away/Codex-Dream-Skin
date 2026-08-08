@@ -3,8 +3,9 @@ import CryptoKit
 import DreamSkinCore
 import ServiceManagement
 import UniformTypeIdentifiers
+import UserNotifications
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
   private enum CommunityRollbackRetention {
     case preserved(URL)
     case retainedInOperationRoot(URL)
@@ -28,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var communityBaselineThemeID = ""
   private var communityStageMessage = ""
   private var refreshTimer: Timer?
+  private var updateCheckTimer: Timer?
+  private var availableUpdate: (version: String, releaseURL: String)?
   private lazy var communityHTTP = BoundedCommunityHTTPClient(
     userAgent: "CodexDreamSkin/\(appVersion)"
   )
@@ -119,10 +122,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       userInfo: nil,
       repeats: true
     )
+    UNUserNotificationCenter.current().delegate = self
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+      // Silent either way: an update banner is a courtesy, not something worth
+      // nagging a user who declined notifications to re-enable.
+    }
+    updateCheckTimer = Timer.scheduledTimer(
+      withTimeInterval: 24 * 60 * 60,
+      repeats: true
+    ) { [weak self] _ in
+      self?.performBackgroundUpdateCheck()
+    }
+    // Fire once shortly after launch instead of waiting a full day for the
+    // first check.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+      self?.performBackgroundUpdateCheck()
+    }
   }
 
   func applicationWillTerminate(_ notification: Notification) {
     refreshTimer?.invalidate()
+    updateCheckTimer?.invalidate()
     communityHTTP.invalidate()
   }
 
@@ -262,17 +282,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     addDisabledItem("版本：v\(appVersion)")
 
     menu.addItem(.separator())
+    if let availableUpdate {
+      addActionItem(
+        "🆕 发现新版本 \(availableUpdate.version)",
+        action: #selector(openAvailableUpdate)
+      )
+      menu.addItem(.separator())
+    }
     let busy = operationInFlight || engineInstallInFlight || themeRecoveryInFlight || snapshot.busy
     let needsEngineInstall = engineNeedsInstall()
-    if engineInstallInFlight {
-      addDisabledItem("正在安装引擎…")
-    } else {
-      addActionItem(
-        needsEngineInstall ? "安装 / 升级引擎…" : "修复 / 重新安装引擎…",
-        action: #selector(reinstallEngine),
-        enabled: !busy
-      )
-    }
 
     let applyTitle: String
     switch snapshot.session {
@@ -285,30 +303,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       addActionItem("暂停皮肤", action: #selector(pauseSkin), enabled: !busy)
     }
     addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
-    addActionItem("换一张背景图…", action: #selector(chooseBackgroundImage), enabled: !busy)
-    addActionItem("导入主题 ZIP…", action: #selector(chooseThemeArchive), enabled: !busy)
-    addSavedThemesMenu(enabled: !busy)
-    addActionItem("打开主题文件夹", action: #selector(openThemesFolder))
-    addActionItem("打开图片文件夹", action: #selector(openImagesFolder))
 
     menu.addItem(.separator())
-    addActionItem("检查更新…", action: #selector(checkForUpdates), enabled: !operationInFlight)
-    addActionItem("主题库 Gallery", action: #selector(openThemeGallery))
-    addActionItem("在线 Studio", action: #selector(openOnlineStudio))
-    addActionItem("打开 DreamSkin.cc", action: #selector(openDreamSkinWebsite))
+    addThemeMenu(enabled: !busy)
+    addLinksMenu()
+
+    menu.addItem(.separator())
     let loginItem = addActionItem("登录时启动", action: #selector(toggleLoginItem))
     loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
-    if !legacyPluginURLs().isEmpty {
-      addActionItem("停用旧 SwiftBar 菜单…", action: #selector(disableLegacySwiftBarFromMenu))
-    }
+    addMaintenanceMenu(enabled: !busy, needsEngineInstall: needsEngineInstall)
 
     menu.addItem(.separator())
+    addActionItem("退出", action: #selector(quit), enabled: !busy)
+  }
+
+  private func addThemeMenu(enabled: Bool) {
+    let root = NSMenuItem(title: "主题", action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: "主题")
+    submenu.autoenablesItems = false
+    addActionItem("换一张背景图…", action: #selector(chooseBackgroundImage), enabled: enabled, to: submenu)
+    addActionItem("导入主题 ZIP…", action: #selector(chooseThemeArchive), enabled: enabled, to: submenu)
+    addSavedThemesMenu(enabled: enabled, to: submenu)
+    submenu.addItem(.separator())
+    addActionItem("打开主题文件夹", action: #selector(openThemesFolder), to: submenu)
+    addActionItem("打开图片文件夹", action: #selector(openImagesFolder), to: submenu)
+    root.submenu = submenu
+    menu.addItem(root)
+  }
+
+  private func addLinksMenu() {
+    let root = NSMenuItem(title: "链接", action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: "链接")
+    submenu.autoenablesItems = false
+    addActionItem("主题库 Gallery", action: #selector(openThemeGallery), to: submenu)
+    addActionItem("在线 Studio", action: #selector(openOnlineStudio), to: submenu)
+    addActionItem("打开 DreamSkin.cc", action: #selector(openDreamSkinWebsite), to: submenu)
+    root.submenu = submenu
+    menu.addItem(root)
+  }
+
+  private func addMaintenanceMenu(enabled: Bool, needsEngineInstall: Bool) {
+    let root = NSMenuItem(title: "维护", action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: "维护")
+    submenu.autoenablesItems = false
+    if engineInstallInFlight {
+      addDisabledItem("正在安装引擎…", to: submenu)
+    } else {
+      addActionItem(
+        needsEngineInstall ? "安装 / 升级引擎…" : "修复 / 重新安装引擎…",
+        action: #selector(reinstallEngine),
+        enabled: enabled,
+        to: submenu
+      )
+    }
+    addActionItem(
+      "立即检查更新",
+      action: #selector(checkForUpdates),
+      enabled: !operationInFlight,
+      to: submenu
+    )
+    if !legacyPluginURLs().isEmpty {
+      addActionItem("停用旧 SwiftBar 菜单…", action: #selector(disableLegacySwiftBarFromMenu), to: submenu)
+    }
+    submenu.addItem(.separator())
     addActionItem(
       "恢复原状并卸载…",
       action: #selector(restoreAndUninstall),
-      enabled: !busy
+      enabled: enabled,
+      to: submenu
     )
-    addActionItem("退出", action: #selector(quit), enabled: !busy)
+    root.submenu = submenu
+    menu.addItem(root)
   }
 
   @discardableResult
@@ -331,7 +396,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     (destination ?? menu).addItem(item)
   }
 
-  private func addSavedThemesMenu(enabled: Bool) {
+  private func addSavedThemesMenu(enabled: Bool, to destination: NSMenu? = nil) {
     let root = NSMenuItem(title: "已保存的主题", action: nil, keyEquivalent: "")
     let submenu = NSMenu(title: "已保存的主题")
     submenu.autoenablesItems = false
@@ -353,7 +418,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       }
     }
     root.submenu = submenu
-    menu.addItem(root)
+    (destination ?? menu).addItem(root)
   }
 
   private func savedThemes() -> [SavedThemeOption] {
@@ -1031,6 +1096,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.showInfo(title: "已是最新版本", message: "当前安装的是 \(current)。")
       }
     }
+  }
+
+  /// Silent counterpart to `checkForUpdates()`: runs on a timer, never shows a
+  /// modal, and only surfaces a system notification the first time a given
+  /// version is seen so a user who dismisses it isn't renotified every day.
+  private func performBackgroundUpdateCheck() {
+    guard !operationInFlight,
+          let script = installedScript(named: "check-update-macos.sh")
+            ?? bundledScript(named: "check-update-macos.sh") else { return }
+    ScriptRunner.run(script: script, arguments: ["--json"]) { [weak self] result in
+      guard let self else { return }
+      guard result.succeeded,
+            let data = result.output.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let value = object as? [String: Any],
+            let latest = value["latestVersion"] as? String,
+            let available = value["updateAvailable"] as? Bool else {
+        // A transient network/API failure here just means we try again on the
+        // next timer tick; unlike the manual check, there's no button press
+        // waiting on an answer, so staying quiet is correct.
+        return
+      }
+      guard available else {
+        self.availableUpdate = nil
+        self.rebuildMenu()
+        return
+      }
+      let releaseURL = (value["releaseUrl"] as? String)
+        ?? "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest"
+      self.availableUpdate = (version: latest, releaseURL: releaseURL)
+      self.rebuildMenu()
+      let lastNotifiedKey = "lastNotifiedUpdateVersion"
+      guard UserDefaults.standard.string(forKey: lastNotifiedKey) != latest else { return }
+      UserDefaults.standard.set(latest, forKey: lastNotifiedKey)
+      self.postUpdateAvailableNotification(version: latest, releaseURL: releaseURL)
+    }
+  }
+
+  private func postUpdateAvailableNotification(version: String, releaseURL: String) {
+    let content = UNMutableNotificationContent()
+    content.title = "Codex Dream Skin 有新版本"
+    content.body = "\(version) 已发布，点按前往下载页面。"
+    content.sound = .default
+    content.userInfo = ["releaseURL": releaseURL]
+    let request = UNNotificationRequest(
+      identifier: "dreamskin-update-\(version)",
+      content: content,
+      trigger: nil
+    )
+    UNUserNotificationCenter.current().add(request)
+  }
+
+  @objc private func openAvailableUpdate() {
+    guard let url = URL(string: availableUpdate?.releaseURL
+      ?? "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") else { return }
+    NSWorkspace.shared.open(url)
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .sound])
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    if let urlString = response.notification.request.content.userInfo["releaseURL"] as? String,
+       let url = URL(string: urlString) {
+      NSWorkspace.shared.open(url)
+    }
+    completionHandler()
   }
 
   @objc private func toggleLoginItem() {
