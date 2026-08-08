@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   private var refreshTimer: Timer?
   private var updateCheckTimer: Timer?
   private var availableUpdate: (version: String, releaseURL: String)?
+  private var updateCheckInFlight = false
   private lazy var communityHTTP = BoundedCommunityHTTPClient(
     userAgent: "CodexDreamSkin/\(appVersion)"
   )
@@ -359,7 +360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     addActionItem(
       "立即检查更新",
       action: #selector(checkForUpdates),
-      enabled: !operationInFlight,
+      enabled: !operationInFlight && !updateCheckInFlight,
       to: submenu
     )
     if !legacyPluginURLs().isEmpty {
@@ -1056,17 +1057,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   @objc private func checkForUpdates() {
-    guard !operationInFlight,
-          let script = installedScript(named: "check-update-macos.sh")
-            ?? bundledScript(named: "check-update-macos.sh") else {
+    guard !operationInFlight, !updateCheckInFlight else { return }
+    guard let script = installedScript(named: "check-update-macos.sh")
+      ?? bundledScript(named: "check-update-macos.sh") else {
       showError(title: "无法检查更新", message: "更新检查脚本缺失，请重新安装应用。")
       return
     }
     operationInFlight = true
+    updateCheckInFlight = true
     rebuildMenu()
     ScriptRunner.run(script: script, arguments: ["--json"]) { [weak self] result in
       guard let self else { return }
       self.operationInFlight = false
+      self.updateCheckInFlight = false
       self.rebuildMenu()
       guard result.succeeded,
             let data = result.output.data(using: .utf8),
@@ -1102,11 +1105,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   /// modal, and only surfaces a system notification the first time a given
   /// version is seen so a user who dismisses it isn't renotified every day.
   private func performBackgroundUpdateCheck() {
-    guard !operationInFlight,
+    guard !operationInFlight, !updateCheckInFlight,
           let script = installedScript(named: "check-update-macos.sh")
             ?? bundledScript(named: "check-update-macos.sh") else { return }
+    updateCheckInFlight = true
     ScriptRunner.run(script: script, arguments: ["--json"]) { [weak self] result in
       guard let self else { return }
+      defer { self.updateCheckInFlight = false }
       guard result.succeeded,
             let data = result.output.data(using: .utf8),
             let object = try? JSONSerialization.jsonObject(with: data),
