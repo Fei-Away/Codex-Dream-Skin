@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import vm from "node:vm";
-import { verifySession, waitForVerifiedSession } from "../scripts/injector.mjs";
+import { SKIN_VERSION, verifySession, waitForVerifiedSession } from "../scripts/injector.mjs";
 
+// Mirrors macos/assets/selectors.json — keep these in sync when that file's
+// selector strings change, since this mock's querySelector matches by exact
+// string equality and silently returns null on drift.
 const selectors = {
-  shell: "main.main-surface",
+  shell: 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])',
   sidebar: "aside.app-shell-left-panel",
   composer: ".composer-surface-chrome",
   home: '[role="main"]:has([data-testid="home-icon"])',
@@ -47,7 +50,7 @@ function makeElement({
 }
 
 function makeDomFixture({
-  scope = { level: "L1", baseState: "thread" },
+  scope = { level: "L1", baseState: "thread", missingL1: [] },
   shell = makeElement(),
   sidebar = makeElement(),
   composer = makeElement(),
@@ -82,7 +85,7 @@ function makeDomFixture({
   };
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
-      version: "1.5.6",
+      version: SKIN_VERSION,
       themeId: "fixture-theme",
       revision: "fixture-revision",
       styleMode: "style",
