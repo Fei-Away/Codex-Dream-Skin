@@ -419,6 +419,18 @@ function Invoke-DreamSkinNative {
   }
 }
 
+function ConvertFrom-DreamSkinUtf8Base64 {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value
+  )
+  try {
+    $bytes = [Convert]::FromBase64String($Value.Trim())
+    return ([System.Text.UTF8Encoding]::new($false, $true)).GetString($bytes)
+  } catch {
+    throw 'The native UTF-8 probe returned invalid data.'
+  }
+}
+
 function Import-DreamSkinPowerShellSecurityModule {
   $command = Get-Command Get-AuthenticodeSignature -CommandType Cmdlet -ErrorAction SilentlyContinue
   if ($command) { return }
@@ -470,10 +482,33 @@ function Get-DreamSkinValidatedNodeRuntime {
   $versionProbe = Invoke-DreamSkinNative -FilePath $candidate -ArgumentList @('-p', 'process.versions.node') -DiscardStderr
   $version = ($versionProbe.Output -join '').Trim()
   if ($versionProbe.ExitCode -ne 0 -or -not $version) { throw 'The Node.js runtime could not be validated.' }
-  $pathProbe = Invoke-DreamSkinNative -FilePath $candidate -ArgumentList @('-p', 'process.execPath') -DiscardStderr
-  $runtimePath = ($pathProbe.Output -join '').Trim()
-  if ($pathProbe.ExitCode -ne 0 -or -not $runtimePath -or -not (Test-Path -LiteralPath $runtimePath)) {
-    throw 'The Node.js executable path could not be validated.'
+  # Windows PowerShell 5.1 decodes redirected native stdout through the active
+  # console code page. Node writes UTF-8, so a non-ASCII temporary path can be
+  # corrupted before Test-Path sees it. Keep the transport ASCII-only and
+  # decode the original UTF-8 bytes explicitly; never fall back to the
+  # candidate when the identity probe is invalid.
+  $pathProbe = Invoke-DreamSkinNative -FilePath $candidate -ArgumentList @(
+    '-e', "process.stdout.write(Buffer.from(process.execPath, 'utf8').toString('base64'))"
+  ) -DiscardStderr
+  $encodedRuntimePath = ($pathProbe.Output -join '').Trim()
+  $runtimePath = ''
+  if ($pathProbe.ExitCode -eq 0 -and $encodedRuntimePath) {
+    try {
+      $runtimePath = ConvertFrom-DreamSkinUtf8Base64 -Value $encodedRuntimePath
+    } catch {
+      $runtimePath = ''
+    }
+  }
+  $runtimePathExists = $false
+  if ($runtimePath) {
+    try { $runtimePathExists = Test-Path -LiteralPath $runtimePath -PathType Leaf } catch {}
+  }
+  if ($pathProbe.ExitCode -ne 0 -or -not $runtimePath -or -not $runtimePathExists) {
+    $reason = 'path-not-found'
+    if ($pathProbe.ExitCode -ne 0) { $reason = 'probe-exit' }
+    elseif (-not $encodedRuntimePath) { $reason = 'empty-output' }
+    elseif (-not $runtimePath) { $reason = 'invalid-output' }
+    throw "The Node.js executable path could not be validated ($reason)."
   }
   $major = 0
   if (-not [int]::TryParse(($version -split '\.')[0], [ref]$major) -or $major -lt $MinimumMajor) {

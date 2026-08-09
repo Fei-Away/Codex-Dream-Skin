@@ -23,7 +23,44 @@ try {
   New-Item -ItemType Directory -Path $runtimeNodeDirectory -Force | Out-Null
   $pathNode = Get-Command node.exe -ErrorAction SilentlyContinue
   if (-not $pathNode) { $pathNode = Get-Command node -ErrorAction Stop }
-  Copy-Item -LiteralPath $pathNode.Source -Destination (Join-Path $runtimeNodeDirectory 'node.exe') -Force
+  $unicodeNodePath = Join-Path $runtimeNodeDirectory 'node.exe'
+  Copy-Item -LiteralPath $pathNode.Source -Destination $unicodeNodePath -Force
+  $unicodeNode = Get-DreamSkinValidatedNodeRuntime -Path $unicodeNodePath
+  if (-not (Test-DreamSkinPathEqual -Left $unicodeNode.Path -Right $unicodeNodePath)) {
+    throw "Node executable path did not survive a Unicode PowerShell round-trip: $($unicodeNode.Path)"
+  }
+  try {
+    $null = ConvertFrom-DreamSkinUtf8Base64 -Value '////'
+    throw 'Invalid UTF-8 from the Node path probe was accepted.'
+  } catch {
+    if ($_.Exception.Message -notmatch 'invalid data') { throw }
+  }
+  $realNativeInvoker = (Get-Command Invoke-DreamSkinNative -CommandType Function).ScriptBlock
+  try {
+    function Invoke-DreamSkinNative {
+      param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [switch]$DiscardStderr
+      )
+      if ($ArgumentList -contains 'process.versions.node') {
+        return [pscustomobject]@{ Output = @('22.23.1'); ExitCode = 0 }
+      }
+      return [pscustomobject]@{ Output = @('////'); ExitCode = 0 }
+    }
+    $invalidPathProbeRejected = $false
+    try {
+      $null = Get-DreamSkinValidatedNodeRuntime -Path $unicodeNodePath
+    } catch {
+      if ($_.Exception.Message -notmatch '\(invalid-output\)') { throw }
+      $invalidPathProbeRejected = $true
+    }
+    if (-not $invalidPathProbeRejected) {
+      throw 'Invalid Node path probe output fell back to the candidate executable.'
+    }
+  } finally {
+    Set-Item -Path Function:\Invoke-DreamSkinNative -Value $realNativeInvoker
+  }
   [System.IO.File]::WriteAllText(
     (Join-Path $runtimeNodeDirectory 'LICENSE'),
     'Node.js runtime license fixture',
@@ -212,6 +249,15 @@ try {
   )
   if ($trustIndex -lt 0 -or $probeIndex -le $trustIndex) {
     throw 'The Node.js runtime is executed before its signature is verified.'
+  }
+  foreach ($requiredUnicodeProbeContract in @(
+    'ConvertFrom-DreamSkinUtf8Base64',
+    'Buffer.from(process.execPath, ''utf8'').toString(''base64'')',
+    'invalid-output', 'path-not-found', 'empty-output', 'probe-exit'
+  )) {
+    if (-not $commonSource.Contains($requiredUnicodeProbeContract)) {
+      throw "Unicode-safe Node path probe is missing: $requiredUnicodeProbeContract"
+    }
   }
   $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
   $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
