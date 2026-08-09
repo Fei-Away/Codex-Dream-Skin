@@ -203,6 +203,11 @@ variable for the menu selection.
 5. Confirm cancellation is never reported as success and a failure does not
    leave a false active state. Machine-readable status/state JSON must remain
    unchanged; only human-facing copy is localized.
+6. Apply one test theme with an explicit white accent and one with an explicit
+   black accent. On both light and dark Codex appearances, accent-filled
+   controls must remain readable: black text on white and white text on black.
+   Reapply an adaptive/default accent afterward and confirm no stale explicit
+   foreground remains.
 
 Also test one normal apply and one restore against the real Store Codex app.
 Run the installed verifier on Home and one normal task route:
