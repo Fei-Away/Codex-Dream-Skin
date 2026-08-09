@@ -2,6 +2,45 @@ import XCTest
 @testable import DreamSkinCore
 
 final class CoreTests: XCTestCase {
+  func testLanguageSelectionResolvesSystemAndPersistsOverrides() throws {
+    XCTAssertEqual(
+      DreamSkinLanguage.system.resolved(preferredLanguages: ["zh-Hans-CN"]),
+      .chinese
+    )
+    XCTAssertEqual(
+      DreamSkinLanguage.system.resolved(preferredLanguages: ["en-HK", "zh-Hans"]),
+      .english
+    )
+    XCTAssertEqual(
+      DreamSkinLanguage.system.resolved(preferredLanguages: ["fr-FR"]),
+      .english
+    )
+
+    let suiteName = "DreamSkinCoreTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    XCTAssertEqual(DreamSkinLanguage.stored(defaults: defaults), .system)
+    defaults.set(DreamSkinLanguage.chinese.rawValue, forKey: DreamSkinLanguage.defaultsKey)
+    XCTAssertEqual(DreamSkinLanguage.stored(defaults: defaults), .chinese)
+    defaults.set("unsupported", forKey: DreamSkinLanguage.defaultsKey)
+    XCTAssertEqual(DreamSkinLanguage.stored(defaults: defaults), .system)
+  }
+
+  func testLocalizedCopyKeepsStateSemanticsStable() {
+    let english = DreamSkinCopy(language: .english)
+    let chinese = DreamSkinCopy(language: .chinese)
+
+    XCTAssertEqual(english.text(.apply), "Apply skin")
+    XCTAssertEqual(chinese.text(.apply), "应用皮肤")
+    XCTAssertEqual(english.statusTitle(session: "active", operation: ""), "Skin ON")
+    XCTAssertEqual(chinese.statusTitle(session: "active", operation: "failed"), "Skin ON · 操作失败")
+    XCTAssertEqual(english.statusTitle(session: "paused", operation: "pausing"), "Skin pausing")
+    XCTAssertEqual(english.format(.selectedThemePending, "Paper"), "Selected: Paper (pending apply)")
+    XCTAssertEqual(chinese.format(.selectedThemePending, "纸面"), "已选主题：纸面（待应用）")
+    XCTAssertEqual(english.operationFailed("Apply skin"), "Apply skin failed")
+    XCTAssertEqual(chinese.operationFailed("应用皮肤"), "应用皮肤失败")
+  }
+
   func testSemanticVersionParsingAndComparison() throws {
     XCTAssertEqual(SemanticVersion("v1.3")?.description, "1.3.0")
     XCTAssertEqual(SemanticVersion(" 2.0.1\n")?.description, "2.0.1")

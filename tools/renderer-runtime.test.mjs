@@ -552,6 +552,39 @@ export async function runRendererRuntimeTest(assetRoot) {
       `${variable} must support official hex forms and clamp RGB channels`);
   }
 
+  const contrastCases = [
+    { accent: "#ffffff", expectedInk: "rgb(0 0 0)" },
+    { accent: "#000000", expectedInk: "rgb(255 255 255)" },
+  ];
+  for (const nativeAppearance of ["light", "dark"]) {
+    for (const { accent, expectedInk } of contrastCases) {
+      const contrast = makeFixture({ nativeAppearance });
+      vm.runInNewContext(contrast.payloadFor({
+        appearance: "auto",
+        colorMode: "explicit",
+        explicitColorKeys: ["accent"],
+        colors: { accent },
+      }), contrast.context);
+      assert.equal(contrast.rootStyle.values.get("--ds-green"), accent);
+      assert.equal(
+        contrast.rootStyle.values.get("--ds-on-accent"),
+        expectedInk,
+        `Explicit ${accent} must keep readable button text in the ${nativeAppearance} shell`,
+      );
+    }
+  }
+
+  const adaptiveAccent = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(adaptiveAccent.payloadFor({
+    colorMode: "explicit",
+    explicitColorKeys: ["accent"],
+    colors: { accent: "#ffffff" },
+  }), adaptiveAccent.context);
+  assert.equal(adaptiveAccent.rootStyle.values.get("--ds-on-accent"), "rgb(0 0 0)");
+  vm.runInNewContext(adaptiveAccent.payloadFor(), adaptiveAccent.context);
+  assert.equal(adaptiveAccent.rootStyle.values.has("--ds-on-accent"), false,
+    "Reapplying an adaptive accent must restore the shell-specific CSS foreground default");
+
   rootObserver.callback([]);
   home.flushTimers(64);
   assert.equal(state.metrics.routePasses, 2, "Attribute safety pass must not be a route pass");

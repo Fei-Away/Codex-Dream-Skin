@@ -2271,17 +2271,25 @@ function Show-DreamSkinOperationUi {
 function Invoke-DreamSkinLiveRemove {
   param(
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'),
-    [int]$TimeoutMs = 8000
+    [int]$TimeoutMs = 8000,
+    [string]$PauseNoSessionMessage = '没有可连接的活动会话；已记录暂停，当前窗口可能仍显示皮肤。',
+    [string]$PauseSucceededMessage = '皮肤已暂停',
+    [string]$PauseFailedMessage = '已记录暂停，但卸下当前皮肤失败；可重试暂停或完全恢复。'
   )
   if ($TimeoutMs -lt 250 -or $TimeoutMs -gt 120000) {
     throw "Invalid live-remove timeout: $TimeoutMs"
+  }
+  foreach ($message in @($PauseNoSessionMessage, $PauseSucceededMessage, $PauseFailedMessage)) {
+    if ([string]::IsNullOrWhiteSpace($message) -or $message.Length -gt 240 -or $message -match "[\r\n]") {
+      throw 'Invalid live-remove message.'
+    }
   }
   $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
   if ($null -eq $session) {
     return [pscustomobject]@{
       Attempted = $false
       Removed = $false
-      Message = '没有可连接的活动会话；已记录暂停，当前窗口可能仍显示皮肤。'
+      Message = $PauseNoSessionMessage
     }
   }
 
@@ -2305,21 +2313,21 @@ function Invoke-DreamSkinLiveRemove {
   if ($removal.ExitCode -eq 0) {
     if ($token) {
       $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $token `
-        -UiState success -Message '皮肤已暂停' -TimeoutMs 1500
+        -UiState success -Message $PauseSucceededMessage -TimeoutMs 1500
     }
     return [pscustomobject]@{
       Attempted = $true
       Removed = $true
-      Message = '皮肤已暂停'
+      Message = $PauseSucceededMessage
     }
   }
   if ($token) {
     $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $token `
-      -UiState error -Message '暂停失败，请重试' -TimeoutMs 1500
+      -UiState error -Message $PauseFailedMessage -TimeoutMs 1500
   }
   return [pscustomobject]@{
     Attempted = $true
     Removed = $false
-    Message = '已记录暂停，但卸下当前皮肤失败；可重试暂停或完全恢复。'
+    Message = $PauseFailedMessage
   }
 }

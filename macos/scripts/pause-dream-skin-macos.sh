@@ -37,8 +37,8 @@ record_pause_error() {
       mark_state_stale 2>/dev/null || true
     fi
   fi
-  write_operation_state failed "暂停失败，原状态可能未改变" "${OPERATION_TOKEN:-}" 2>/dev/null || true
-  finish_client_operation "${PORT:-9341}" error "暂停失败，原状态可能未改变" \
+  write_operation_state failed "$(dreamskin_text pause_failed)" "${OPERATION_TOKEN:-}" 2>/dev/null || true
+  finish_client_operation "${PORT:-9341}" error "$(dreamskin_text pause_failed)" \
     "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
   if [ "$expect_recovery" = "true" ] \
     && wait_for_operation_ack "$OPERATION_TOKEN" "$recovery_pid" full 240 \
@@ -46,7 +46,7 @@ record_pause_error() {
       "$recovery_pid" "$recovery_start" "$recovery_node" "$recovery_path" "$recovery_port"; then
     mark_state_active 2>/dev/null || true
   fi
-  alert_user "暂停失败，请重新打开菜单查看状态。"
+  alert_user "$(dreamskin_text pause_failed_alert)"
 }
 trap 'record_pause_error "$?"' EXIT
 
@@ -92,7 +92,7 @@ done
 OPERATION_TOKEN="$(new_operation_token)"
 ensure_state_root
 /bin/rm -f "$OPERATION_ACK_PATH"
-write_operation_state pausing "正在暂停皮肤" "$OPERATION_TOKEN" \
+write_operation_state pausing "$(dreamskin_text pausing_skin)" "$OPERATION_TOKEN" \
   || fail "Could not publish the pause operation state."
 discover_codex_app
 require_signed_node_runtime
@@ -188,7 +188,7 @@ fi
   fs.writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
   fs.renameSync(temporary, file);
   ' "$STATE_PATH" "$PORT" "$THEME_DIR" "$PROJECT_ROOT" "$KEEP_CONTROL_WATCHER"
-write_operation_state paused "皮肤已暂停" "$OPERATION_TOKEN" \
+write_operation_state paused "$(dreamskin_text skin_paused)" "$OPERATION_TOKEN" \
   || fail "Could not publish the completed pause state."
 trap - EXIT
 

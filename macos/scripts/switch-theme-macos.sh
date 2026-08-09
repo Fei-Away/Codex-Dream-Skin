@@ -19,8 +19,8 @@ finish_switch() {
   [ -z "${stage:-}" ] || /bin/rm -rf "$stage"
   release_theme_switch_lock
   if [ "$code" -ne 0 ] && [ -n "${OPERATION_TOKEN:-}" ]; then
-    write_operation_state failed "主题切换未完成，应用结果未确认" "$OPERATION_TOKEN" 2>/dev/null || true
-    finish_client_operation "${PORT:-9341}" error "主题切换未完成，应用结果未确认" \
+    write_operation_state failed "$(dreamskin_text theme_switch_unconfirmed)" "$OPERATION_TOKEN" 2>/dev/null || true
+    finish_client_operation "${PORT:-9341}" error "$(dreamskin_text theme_switch_unconfirmed)" \
       "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
   fi
 }
@@ -75,7 +75,7 @@ else
 fi
 if [ "$APPLY_NOW" = "true" ]; then
   OPERATION_TOKEN="$(new_operation_token)"
-  write_operation_state applying "正在切换主题" "$OPERATION_TOKEN" \
+  write_operation_state applying "$(dreamskin_text switching_theme)" "$OPERATION_TOKEN" \
     || fail "Could not publish the theme switch operation state."
 fi
 ensure_node_runtime
@@ -105,7 +105,7 @@ progress() {
   notify_user "$*"
 }
 
-progress "Validating theme content..."
+progress "$(dreamskin_text validating_theme_content)"
 
 stage="$(/usr/bin/mktemp -d "$STATE_ROOT/.theme-switch.XXXXXX")"
 /bin/mkdir -p "$THEME_DIR"
@@ -139,7 +139,7 @@ THEME_BYTES="$(/usr/bin/stat -f '%z' "$stage/$THEME_IMAGE")"
 SAFE_CSS_NAME=""
 [ ! -f "$stage/theme.css" ] || SAFE_CSS_NAME="theme.css"
 /bin/chmod 600 "$stage/"*
-progress "Publishing validated theme..."
+progress "$(dreamskin_text publishing_validated_theme)"
 for entry in "$stage/"*; do
   [ -f "$entry" ] || continue
   [ "$(/usr/bin/basename "$entry")" = "theme.json" ] && continue
@@ -165,26 +165,26 @@ THEME_NAME="$("$NODE" -e 'try{const t=JSON.parse(require("fs").readFileSync(proc
 [ -n "$THEME_NAME" ] || THEME_NAME="$THEME_ID"
 
 if [ "$APPLY_NOW" != "true" ]; then
-  progress "Ready: ${THEME_NAME} (not applied)"
+  progress "$(dreamskin_text theme_ready_not_applied): ${THEME_NAME}"
   exit 0
 fi
 
 # Hot path: CDP already open → seconds, not tens of seconds
-progress "Applying theme to ChatGPT..."
+progress "$(dreamskin_text applying_theme_to_chatgpt)"
 if hot_reapply_theme "$PORT" 8000 "$OPERATION_TOKEN"; then
-  progress "Verifying rendered theme..."
+  progress "$(dreamskin_text verifying_rendered_theme)"
   "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 10000 >/dev/null \
     || fail "Theme injection completed but the visible renderer did not verify the exact active theme."
-  progress "Done: ${THEME_NAME}"
+  progress "$(dreamskin_text skin_applied): ${THEME_NAME}"
   exit 0
 fi
 
 # Cold path only when debug port is missing
-progress "Restarting ChatGPT for verified apply..."
+progress "$(dreamskin_text restarting_chatgpt_for_apply)"
 if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing; then
-  progress "Done: ${THEME_NAME}"
+  progress "$(dreamskin_text skin_applied): ${THEME_NAME}"
   exit 0
 fi
 
-alert_user "Theme switched but inject failed. Click Apply Skin."
+alert_user "$(dreamskin_text theme_switch_apply_failed)"
 exit 1

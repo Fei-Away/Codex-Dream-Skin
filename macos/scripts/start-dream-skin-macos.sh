@@ -25,8 +25,8 @@ record_start_exit() {
   fi
   printf '%s exit=%s line=%s\n' "$(/bin/date -u '+%Y-%m-%dT%H:%M:%SZ')" "$code" "$line" \
     >> "$START_ERROR_LOG" 2>/dev/null || true
-  write_operation_state failed "应用失败，应用结果未确认" "${OPERATION_TOKEN:-}" 2>/dev/null || true
-  finish_client_operation "${PORT:-9341}" error "应用失败，应用结果未确认" \
+  write_operation_state failed "$(dreamskin_text apply_unconfirmed)" "${OPERATION_TOKEN:-}" 2>/dev/null || true
+  finish_client_operation "${PORT:-9341}" error "$(dreamskin_text apply_unconfirmed)" \
     "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
   printf 'ChatGPT Dream Skin: start failed at line %s (exit %s). See %s\n' "$line" "$code" "$START_ERROR_LOG" >&2
 }
@@ -52,7 +52,7 @@ case "$PORT" in ''|*[!0-9]*) fail "Invalid port: $PORT" ;; esac
 ensure_state_root
 if [ "$FOREGROUND_INJECTOR" != "true" ]; then
   OPERATION_TOKEN="$(new_operation_token)"
-  write_operation_state applying "正在应用皮肤" "$OPERATION_TOKEN" \
+  write_operation_state applying "$(dreamskin_text applying_skin)" "$OPERATION_TOKEN" \
     || fail "Could not publish the apply operation state."
 fi
 discover_codex_app
@@ -80,10 +80,19 @@ fi
 
 if codex_is_running && [ "$DEBUG_READY" = "false" ]; then
   if [ "$PROMPT_RESTART" = "true" ] && [ "$RESTART_EXISTING" = "false" ]; then
-    if ! /usr/bin/osascript -e 'display dialog "ChatGPT 需要重启一次才能启用皮肤。通常会在 10–30 秒内完成。" buttons {"取消", "重启并应用"} default button "重启并应用" with title "ChatGPT Dream Skin"' >/dev/null; then
-      write_operation_state cancelled "操作已取消，原皮肤保持不变" "$OPERATION_TOKEN" \
+    if ! /usr/bin/osascript - "$(dreamskin_text restart_prompt)" \
+      "$(dreamskin_text restart_and_apply)" "$(dreamskin_text cancel)" <<'APPLESCRIPT' >/dev/null
+on run argv
+  set promptText to item 1 of argv
+  set okLabel to item 2 of argv
+  set cancelLabel to item 3 of argv
+  display dialog promptText buttons {cancelLabel, okLabel} default button okLabel cancel button cancelLabel with title "ChatGPT Dream Skin"
+end run
+APPLESCRIPT
+    then
+      write_operation_state cancelled "$(dreamskin_text cancelled_unchanged)" "$OPERATION_TOKEN" \
         || fail "Could not publish the cancelled apply state."
-      finish_client_operation "$PORT" cancelled "操作已取消，原皮肤保持不变" \
+      finish_client_operation "$PORT" cancelled "$(dreamskin_text cancelled_unchanged)" \
         "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
       OPERATION_FINISHED="true"
       exit 0
@@ -180,7 +189,7 @@ fi
 cleanup_verify_output
 
 mark_state_active || fail "Could not commit the verified active skin state."
-write_operation_state success "皮肤已应用" "$OPERATION_TOKEN" \
+write_operation_state success "$(dreamskin_text skin_applied)" "$OPERATION_TOKEN" \
   || fail "Could not publish the completed apply state."
 OPERATION_FINISHED="true"
 printf 'ChatGPT Dream Skin %s is active on loopback port %s.\n' "$SKIN_VERSION" "$PORT"

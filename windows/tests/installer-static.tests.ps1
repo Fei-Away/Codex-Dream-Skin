@@ -189,6 +189,7 @@ foreach ($requiredRepairContract in @(
   'assets\safe-css-validator.mjs',
   'scripts\validate-safe-css-file.mjs',
   'scripts\apply-community-theme.ps1',
+  'scripts\localization-windows.ps1',
   'presets\preset-gothic-void-crusade\theme.json',
   'scripts\start-dream-skin.ps1',
   'scripts\check-update.ps1',

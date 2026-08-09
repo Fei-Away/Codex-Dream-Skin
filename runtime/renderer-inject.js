@@ -22,7 +22,7 @@
     ? THEME.artMetadata : null;
   const ANALYSIS_CACHE_KEY = "__CODEX_DREAM_SKIN_ANALYSIS_CACHE__";
   const THEME_VARIABLES = [
-    "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime",
+    "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime", "--ds-on-accent",
     "--ds-cyan", "--ds-purple", "--ds-text", "--ds-muted", "--ds-line",
     "--ds-bg-rgb", "--ds-panel-rgb", "--ds-panel-2-rgb", "--ds-accent-rgb",
     "--ds-accent-alt-rgb", "--ds-secondary-rgb", "--ds-highlight-rgb",
@@ -141,6 +141,25 @@
   const rgbToHex = ({ r, g, b }) => `#${[r, g, b]
     .map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0"))
     .join("")}`;
+
+  const relativeLuminance = ({ r, g, b }) => {
+    const channels = [r, g, b].map((value) => {
+      const normalized = clamp(value, 0, 255) / 255;
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+
+  const readableAccentInk = (accent) => {
+    const rgb = parseRgb(accent);
+    if (!rgb) return null;
+    const luminance = relativeLuminance(rgb);
+    const whiteContrast = 1.05 / (luminance + 0.05);
+    const blackContrast = (luminance + 0.05) / 0.05;
+    return whiteContrast >= blackContrast ? "rgb(255 255 255)" : "rgb(0 0 0)";
+  };
 
   const rgbToHsl = ({ r, g, b }) => {
     const values = [r, g, b].map((value) => value / 255);
@@ -265,6 +284,10 @@
 
     for (const [name, value] of Object.entries(variables)) {
       if (typeof value === "string" && value) setStyleProperty(root, name, value);
+    }
+    if (explicit.has("accent")) {
+      const accentInk = readableAccentInk(accent);
+      if (accentInk) setStyleProperty(root, "--ds-on-accent", accentInk);
     }
     const publicColors = {
       "--ds-theme-color-background": variables["--ds-bg"],
