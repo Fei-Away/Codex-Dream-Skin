@@ -1,5 +1,66 @@
 # Task Progress
 
+## Issue #354 Windows failed-start appearance recovery (2026-08-12)
+
+- [current local implementation] All prior independent-audit findings are
+  addressed. Startup appearance uses a strict, 64 KiB durable
+  `preparing -> committed` journal before marker/config writes. Recovery is
+  three-way per managed key and marker, preserves a newer post-crash user
+  `system -> light` edit, rejects a journal whose declared changes do not match
+  its snapshots without mutating config/marker/evidence, and normalizes CRLF
+  snapshot line endings before serialization. One-click child completion gets
+  lock timeout plus 300000 ms independent grace, never force-kills a live child,
+  and keeps candidate files coherent for timeout/invalid/blocked/
+  `preserved-rendered` states. A rendered-but-unverified result-token child
+  closes its exact new CDP session and restores appearance before returning
+  `restored`.
+- [focused verification 2026-08-12] Seven PowerShell 7.6.4 suites pass together:
+  `config-startup-rollback`, `start-result-contract`, CDP-failure recovery,
+  post-launch recovery, renderer readiness, verified-skin preservation, and
+  `community-theme-link`. Executable coverage includes marker/config hard-stop
+  windows, tampered journals, CRLF quoted keys and dollar-bearing values,
+  post-crash user edits, 480000 ms parent wait, no force-kill/result cleanup
+  while the child remains live, preserved-rendered file coherence, and the full
+  outer child catch/writer/reader category path.
+- [complete local gate 2026-08-12] Portable Node passes 103/103 (macOS 74,
+  Windows 27, tools 2). All 23 PowerShell files parse and satisfy the PS5.1
+  non-ASCII UTF-8 BOM policy; all Node and Bash syntax checks, both platform
+  payload checks, runtime asset sync, and `git diff --check` pass. The full
+  `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash macos/tests/run-tests.sh` wrapper exits
+  0, including signed-runtime switch and runtime-state integration. Native
+  SwiftPM/XCTest is skipped because this host lacks a matching full Xcode
+  platform, and Doctor is explicitly skipped because no installed signed Codex
+  app is available. Native Windows PowerShell 5.1/7 and Setup remain CI gates.
+- [independent final audit] Read-only review of the complete local diff found no
+  remaining P0/P1. The prior parent hard-kill and `preserved-rendered` mixed-state
+  blockers are closed by executable production-helper/result-path coverage.
+  Non-blocking P2 residuals are documented: same-user coherent rewriting of the
+  entire local journal is outside corruption detection; the explicitly invoked
+  test/debug-only `-ForegroundInjector` mode has a narrow pre-injector committed
+  window and no production caller; and a concurrent manual action choosing
+  byte-identical theme content is indistinguishable from no superseding change.
+- [remote state] PR #351 is squash-merged as
+  `main@9e6798700c0e35be0713135ebd9b3a6f01583499`; exact-head run
+  `31522162828` and post-merge run `31523222468` passed all four client CI
+  jobs. Draft PR #357 targets that `main` from
+  `codex/fix-354-appearance-rollback@fa3e53822a4158d56dc1ae10efa8f288b2d73a88`.
+  Exact-head run `31531028135` passed Static, macOS/DMG, Windows PowerShell 7,
+  and Windows PowerShell 5.1/Setup.
+- [local commit] The 15 implementation, test, and Windows documentation files
+  are committed as `54933c3678034333a4e00c0a93c9d4da5d2ded6d` on
+  `codex/fix-354-appearance-rollback`. This commit has not been pushed yet; PR
+  #357 and run `31531028135` still refer to the older remote head `fa3e538`.
+- [scope] The PR fixes only caught Windows failed-start partial appearance,
+  rollback ownership/concurrency, and bounded one-click diagnostics. It does
+  not claim that official Store Codex `26.803.5235.0` restored a supported CDP
+  endpoint. User authorization covers scoped commit, push, PR merge, and issue
+  handling, but not a version, tag, Release, deployment, or external config.
+- [remaining] Commit this progress checkpoint, then push the two scoped commits.
+  Require all four CI jobs green on that exact head before marking #357 Ready
+  and squash-merging with head protection. Verify post-merge `main` CI, then
+  update only #235, #352, and #354. Native Windows 5.1/7 and Setup are CI-only
+  evidence on this macOS host.
+
 ## Client release v1.5.12 (2026-08-08)
 
 - [scope] Reviewed and merged 10 pending community/self PRs that had accumulated
