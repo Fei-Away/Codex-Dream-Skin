@@ -5,6 +5,34 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $Root 'scripts\common-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
+. (Join-Path $Root 'scripts\localization-windows.ps1')
+
+if ((Resolve-DreamSkinLanguage -Language 'zh-CN') -cne 'zh-CN' -or
+  (Resolve-DreamSkinLanguage -Language 'en-US') -cne 'en-US') {
+  throw 'Explicit Windows language overrides did not resolve deterministically.'
+}
+if ((Get-DreamSkinText -Key 'Apply' -Language 'zh-CN') -cne '应用或重新应用' -or
+  (Get-DreamSkinText -Key 'Apply' -Language 'en-US') -cne 'Apply or reapply' -or
+  (Get-DreamSkinText -Key 'Applied' -Language 'en-US' -FormatArguments @('Paper')) -cne 'Applied: Paper') {
+  throw 'Windows tray localization returned incorrect copy.'
+}
+$languageState = Join-Path ([System.IO.Path]::GetTempPath()) ('dreamskin-language-' + [Guid]::NewGuid().ToString('N'))
+$originalLanguageOverride = $env:DREAMSKIN_LANG
+try {
+  $env:DREAMSKIN_LANG = $null
+  Set-DreamSkinLanguage -Language 'zh-CN' -StateRoot $languageState
+  if ((Resolve-DreamSkinLanguage -Language '' -StateRoot $languageState) -cne 'zh-CN' -or
+    (Get-DreamSkinLanguagePreference -StateRoot $languageState) -cne 'zh-CN') {
+    throw 'Windows language preference did not persist.'
+  }
+  Set-DreamSkinLanguage -Language 'system' -StateRoot $languageState
+  if ((Get-DreamSkinLanguagePreference -StateRoot $languageState) -cne 'system') {
+    throw 'Windows system-language preference did not clear the override.'
+  }
+} finally {
+  $env:DREAMSKIN_LANG = $originalLanguageOverride
+  Remove-Item -LiteralPath $languageState -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-tests-$PID-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
@@ -23,7 +51,44 @@ try {
   New-Item -ItemType Directory -Path $runtimeNodeDirectory -Force | Out-Null
   $pathNode = Get-Command node.exe -ErrorAction SilentlyContinue
   if (-not $pathNode) { $pathNode = Get-Command node -ErrorAction Stop }
-  Copy-Item -LiteralPath $pathNode.Source -Destination (Join-Path $runtimeNodeDirectory 'node.exe') -Force
+  $unicodeNodePath = Join-Path $runtimeNodeDirectory 'node.exe'
+  Copy-Item -LiteralPath $pathNode.Source -Destination $unicodeNodePath -Force
+  $unicodeNode = Get-DreamSkinValidatedNodeRuntime -Path $unicodeNodePath
+  if (-not (Test-DreamSkinPathEqual -Left $unicodeNode.Path -Right $unicodeNodePath)) {
+    throw "Node executable path did not survive a Unicode PowerShell round-trip: $($unicodeNode.Path)"
+  }
+  try {
+    $null = ConvertFrom-DreamSkinUtf8Base64 -Value '////'
+    throw 'Invalid UTF-8 from the Node path probe was accepted.'
+  } catch {
+    if ($_.Exception.Message -notmatch 'invalid data') { throw }
+  }
+  $realNativeInvoker = (Get-Command Invoke-DreamSkinNative -CommandType Function).ScriptBlock
+  try {
+    function Invoke-DreamSkinNative {
+      param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [switch]$DiscardStderr
+      )
+      if ($ArgumentList -contains 'process.versions.node') {
+        return [pscustomobject]@{ Output = @('22.23.1'); ExitCode = 0 }
+      }
+      return [pscustomobject]@{ Output = @('////'); ExitCode = 0 }
+    }
+    $invalidPathProbeRejected = $false
+    try {
+      $null = Get-DreamSkinValidatedNodeRuntime -Path $unicodeNodePath
+    } catch {
+      if ($_.Exception.Message -notmatch '\(invalid-output\)') { throw }
+      $invalidPathProbeRejected = $true
+    }
+    if (-not $invalidPathProbeRejected) {
+      throw 'Invalid Node path probe output fell back to the candidate executable.'
+    }
+  } finally {
+    Set-Item -Path Function:\Invoke-DreamSkinNative -Value $realNativeInvoker
+  }
   [System.IO.File]::WriteAllText(
     (Join-Path $runtimeNodeDirectory 'LICENSE'),
     'Node.js runtime license fixture',
@@ -212,6 +277,15 @@ try {
   )
   if ($trustIndex -lt 0 -or $probeIndex -le $trustIndex) {
     throw 'The Node.js runtime is executed before its signature is verified.'
+  }
+  foreach ($requiredUnicodeProbeContract in @(
+    'ConvertFrom-DreamSkinUtf8Base64',
+    'Buffer.from(process.execPath, ''utf8'').toString(''base64'')',
+    'invalid-output', 'path-not-found', 'empty-output', 'probe-exit'
+  )) {
+    if (-not $commonSource.Contains($requiredUnicodeProbeContract)) {
+      throw "Unicode-safe Node path probe is missing: $requiredUnicodeProbeContract"
+    }
   }
   $trayGuardIndex = $installSource.IndexOf('if (Test-DreamSkinTrayActive)', [System.StringComparison]::Ordinal)
   $engineInstallIndex = $installSource.IndexOf('$engine = Install-DreamSkinRuntimeEngine', [System.StringComparison]::Ordinal)
@@ -1053,6 +1127,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\image-metadata.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\injector.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\install-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\localization-windows.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\restore-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\start-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-windows.ps1') -Destination $releaseFixtureScripts -Force
@@ -1186,7 +1261,15 @@ try {
     throw 'macOS and Windows selector contract assets are not byte-identical.'
   }
   $traySource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\tray-dream-skin.ps1')
-  foreach ($requiredTrayAction in @('System.Windows.Forms.NotifyIcon', '暂停皮肤', '继续显示皮肤', '更换背景图', '已保存主题', '完全恢复 Codex')) {
+  foreach ($requiredTrayAction in @(
+    'System.Windows.Forms.NotifyIcon',
+    "Get-DreamSkinTrayText -Key 'Pause'",
+    "Get-DreamSkinTrayText -Key 'Resume'",
+    "Get-DreamSkinTrayText -Key 'ChangeBackground'",
+    "Get-DreamSkinTrayText -Key 'SavedThemes'",
+    "Get-DreamSkinTrayText -Key 'Restore'",
+    'Add-DreamSkinTrayLanguageMenu'
+  )) {
     if (-not $traySource.Contains($requiredTrayAction)) { throw "Tray action is missing: $requiredTrayAction" }
   }
   if (-not $traySource.Contains('Invoke-DreamSkinLiveRemove') -or
@@ -1198,6 +1281,9 @@ try {
   $themeWindowsSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\theme-windows.ps1')
   foreach ($requiredLiveRemoveToken in @(
     'function Invoke-DreamSkinLiveRemove',
+    '[string]$PauseNoSessionMessage',
+    '[string]$PauseSucceededMessage',
+    '[string]$PauseFailedMessage',
     'function Show-DreamSkinOperationUi',
     "'--remove'",
     "'--browser-id'",
@@ -1206,6 +1292,19 @@ try {
   )) {
     if (-not $themeWindowsSource.Contains($requiredLiveRemoveToken)) {
       throw "Live remove helper is missing required token: $requiredLiveRemoveToken"
+    }
+  }
+  if ([regex]::IsMatch($themeWindowsSource, "-Message\s+'(?:皮肤已暂停|暂停失败，请重试)'")) {
+    throw 'Live remove renderer result still embeds a Chinese-only hard-coded message.'
+  }
+  foreach ($requiredPauseMessageToken in @(
+    "Get-DreamSkinTrayText -Key 'PauseNoSession'",
+    "Get-DreamSkinTrayText -Key 'PauseSucceeded'",
+    "Get-DreamSkinTrayText -Key 'PauseFailed'",
+    '$removalMessage = $removal.Message'
+  )) {
+    if (-not $traySource.Contains($requiredPauseMessageToken)) {
+      throw "Tray pause localization is missing: $requiredPauseMessageToken"
     }
   }
   $injectorSource = Read-DreamSkinUtf8File -Path (Join-Path $Root 'scripts\injector.mjs')
@@ -1233,7 +1332,12 @@ try {
     -not $traySource.Contains('Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata')) {
     throw 'Tray menu metadata enumeration still performs full image parsing on every open.'
   }
-  foreach ($requiredReleaseAction in @('check-update.ps1', '检查更新', '打开 DreamSkin.cc', '登录时启动')) {
+  foreach ($requiredReleaseAction in @(
+    'check-update.ps1',
+    "Get-DreamSkinTrayText -Key 'CheckUpdate'",
+    "Get-DreamSkinTrayText -Key 'OpenSite'",
+    "Get-DreamSkinTrayText -Key 'LaunchAtLogin'"
+  )) {
     if (-not $traySource.Contains($requiredReleaseAction)) {
       throw "Tray release action is missing: $requiredReleaseAction"
     }
@@ -1279,7 +1383,7 @@ try {
   $stateReadIndex = $startSource.IndexOf('$previousState = Read-DreamSkinState', [System.StringComparison]::Ordinal)
   $restartPromptIndex = $startSource.IndexOf('$restartAuthorized = Confirm-DreamSkinRestart', [System.StringComparison]::Ordinal)
   $recordedStopIndex = $startSource.IndexOf('$recordedInjectorStopped = Stop-DreamSkinRecordedInjector', [System.StringComparison]::Ordinal)
-  $cancelIndex = $startSource.IndexOf("Write-Host 'Dream Skin launch was cancelled", [System.StringComparison]::Ordinal)
+  $cancelIndex = $startSource.IndexOf("Get-DreamSkinText -Key 'LaunchCancelled'", [System.StringComparison]::Ordinal)
   $pauseClearIndex = $startSource.IndexOf('Set-DreamSkinPaused -Paused $false', [System.StringComparison]::Ordinal)
   if ($stateReadIndex -lt 0 -or $pauseClearIndex -le $stateReadIndex -or
     ($restartPromptIndex -ge 0 -and $pauseClearIndex -le $restartPromptIndex) -or

@@ -4,6 +4,7 @@ param([Parameter(Mandatory = $true)][string]$Root)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $Root 'scripts\common-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
+. (Join-Path $Root 'scripts\localization-windows.ps1')
 
 function Assert-CommunityValueRejected {
   param(
@@ -209,11 +210,19 @@ $successMessageHelperAst = $applyAst.Find({
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Format-DreamSkinCommunitySuccessMessage'
 }, $true)
-if ($null -eq $requestHelperAst -or $null -eq $successMessageHelperAst) {
-  throw 'The fixed-origin request or success-message helper is missing.'
+$communityTextHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Get-DreamSkinCommunityText'
+}, $true)
+if ($null -eq $requestHelperAst -or $null -eq $successMessageHelperAst -or
+  $null -eq $communityTextHelperAst) {
+  throw 'The fixed-origin request or localized success-message helper is missing.'
 }
 Invoke-Expression $requestHelperAst.Extent.Text
+Invoke-Expression $communityTextHelperAst.Extent.Text
 Invoke-Expression $successMessageHelperAst.Extent.Text
+$dreamSkinLanguage = 'en-US'
 $successMessage = Format-DreamSkinCommunitySuccessMessage -Name 'Paper'
 if (-not $successMessage -or $successMessage -notmatch 'Paper' -or
   $successMessage -notmatch 'SHA-256' -or $successMessage -notmatch 'Safe CSS' -or
@@ -225,6 +234,13 @@ $cleanupWarningMessage = Format-DreamSkinCommunitySuccessMessage -Name 'Paper' `
 if ($cleanupWarningMessage.Length -le $successMessage.Length -or
   $cleanupWarningMessage -match 'simulated private path') {
   throw 'The community success warning is missing or leaks the raw cleanup failure.'
+}
+$dreamSkinLanguage = 'zh-CN'
+$chineseSuccessMessage = Format-DreamSkinCommunitySuccessMessage -Name 'Paper'
+if (-not $chineseSuccessMessage -or $chineseSuccessMessage -notmatch 'Paper' -or
+  $chineseSuccessMessage -notmatch 'SHA-256' -or $chineseSuccessMessage -notmatch 'Safe CSS' -or
+  $chineseSuccessMessage -notmatch 'Codex' -or $chineseSuccessMessage -ceq $successMessage) {
+  throw 'The localized community success message is empty, malformed, or not language-specific.'
 }
 $request = New-DreamSkinCommunityHttpRequest `
   -RequestUri 'https://api.dreamskin.cc/v1/themes/ver_1234abcd' -Accept 'application/json'

@@ -22,7 +22,7 @@
     ? THEME.artMetadata : null;
   const ANALYSIS_CACHE_KEY = "__CODEX_DREAM_SKIN_ANALYSIS_CACHE__";
   const THEME_VARIABLES = [
-    "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime",
+    "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime", "--ds-on-accent",
     "--ds-cyan", "--ds-purple", "--ds-text", "--ds-muted", "--ds-line",
     "--ds-bg-rgb", "--ds-panel-rgb", "--ds-panel-2-rgb", "--ds-accent-rgb",
     "--ds-accent-alt-rgb", "--ds-secondary-rgb", "--ds-highlight-rgb",
@@ -118,15 +118,31 @@
     if (!value || value === "transparent") return null;
     const hex = String(value).trim().match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
     if (hex) {
-      const rgbHex = hex[1].length <= 4
-        ? hex[1].slice(0, 3).split("").map((digit) => `${digit}${digit}`).join("")
-        : hex[1].slice(0, 6);
+      const digits = hex[1];
+      const rgbHex = digits.length <= 4
+        ? digits.slice(0, 3).split("").map((digit) => `${digit}${digit}`).join("")
+        : digits.slice(0, 6);
+      const alphaHex = digits.length === 4
+        ? `${digits[3]}${digits[3]}`
+        : digits.length === 8 ? digits.slice(6, 8) : "ff";
       const number = Number.parseInt(rgbHex, 16);
-      return { r: number >> 16, g: (number >> 8) & 255, b: number & 255 };
+      return {
+        r: number >> 16,
+        g: (number >> 8) & 255,
+        b: number & 255,
+        alpha: Number.parseInt(alphaHex, 16) / 255,
+      };
     }
-    const m = String(value).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+    const m = String(value).trim().match(
+      /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i,
+    );
     if (!m) return null;
-    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) };
+    return {
+      r: Number(m[1]),
+      g: Number(m[2]),
+      b: Number(m[3]),
+      alpha: m[4] === undefined ? 1 : Math.min(1, Math.max(0, Number(m[4]))),
+    };
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -141,6 +157,44 @@
   const rgbToHex = ({ r, g, b }) => `#${[r, g, b]
     .map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0"))
     .join("")}`;
+
+  const relativeLuminance = ({ r, g, b }) => {
+    const channels = [r, g, b].map((value) => {
+      const normalized = clamp(value, 0, 255) / 255;
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+
+  const compositeColor = (value, background, alphaOverride = null) => {
+    const foreground = parseRgb(value);
+    if (!foreground) return background;
+    const alpha = clamp(alphaOverride ?? foreground.alpha ?? 1, 0, 1);
+    return {
+      r: clamp(foreground.r, 0, 255) * alpha + background.r * (1 - alpha),
+      g: clamp(foreground.g, 0, 255) * alpha + background.g * (1 - alpha),
+      b: clamp(foreground.b, 0, 255) * alpha + background.b * (1 - alpha),
+    };
+  };
+
+  const readableAccentInk = (accent, panel) => {
+    // The send button sits on the composer surface, which renders panel RGB
+    // at 94% regardless of the panel color's declared alpha. Compare against
+    // both possible backdrop extremes so artwork cannot flip the decision.
+    const luminances = [0, 255].map((backdrop) => {
+      const surface = compositeColor(
+        panel,
+        { r: backdrop, g: backdrop, b: backdrop },
+        0.94,
+      );
+      return relativeLuminance(compositeColor(accent, surface));
+    });
+    const whiteContrast = Math.min(...luminances.map((value) => 1.05 / (value + 0.05)));
+    const blackContrast = Math.min(...luminances.map((value) => (value + 0.05) / 0.05));
+    return whiteContrast >= blackContrast ? "rgb(255 255 255)" : "rgb(0 0 0)";
+  };
 
   const rgbToHsl = ({ r, g, b }) => {
     const values = [r, g, b].map((value) => value / 255);
@@ -265,6 +319,13 @@
 
     for (const [name, value] of Object.entries(variables)) {
       if (typeof value === "string" && value) setStyleProperty(root, name, value);
+    }
+    if (explicit.has("accent")) {
+      const accentInk = readableAccentInk(
+        accent,
+        variables["--ds-panel"],
+      );
+      if (accentInk) setStyleProperty(root, "--ds-on-accent", accentInk);
     }
     const publicColors = {
       "--ds-theme-color-background": variables["--ds-bg"],

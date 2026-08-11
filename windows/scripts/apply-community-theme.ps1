@@ -9,6 +9,14 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
+. (Join-Path $PSScriptRoot 'localization-windows.ps1')
+$dreamSkinLanguage = Resolve-DreamSkinLanguage `
+  -StateRoot (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+
+function Get-DreamSkinCommunityText {
+  param([Parameter(Mandatory = $true)][string]$Key, [object[]]$FormatArguments = @())
+  Get-DreamSkinText -Key $Key -Language $dreamSkinLanguage -FormatArguments $FormatArguments
+}
 
 function Show-DreamSkinCommunityMessage {
   param(
@@ -36,9 +44,10 @@ function Format-DreamSkinCommunitySuccessMessage {
     [string]$Name,
     [string]$CleanupWarning = ''
   )
-  $message = "主题「$Name」已通过下载、SHA-256、主题包与 Safe CSS 校验，并已应用到 Codex。"
+  $message = Get-DreamSkinCommunityText -Key 'CommunitySuccess' -FormatArguments @($Name)
   if (-not [string]::IsNullOrWhiteSpace($CleanupWarning)) {
-    $message += "`r`n`r`n主题已成功应用，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。"
+    $message += [Environment]::NewLine + [Environment]::NewLine +
+      (Get-DreamSkinCommunityText -Key 'CommunityCleanup')
   }
   return $message
 }
@@ -47,18 +56,18 @@ function Confirm-DreamSkinCommunityApply {
   param([Parameter(Mandatory = $true)][object]$Metadata)
   Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
   $sizeMiB = [Math]::Round($Metadata.PackageBytes / 1MB, 2)
-  $message = @"
-从 DreamSkin.cc 下载并应用“$($Metadata.Name)”？
-
-作者：$($Metadata.AuthorDisplayName)
-版本：$($Metadata.Version) · $sizeMiB MiB
-SHA-256：$($Metadata.PackageSha256)
-
-客户端只会连接固定官方 API，并重新校验下载大小、SHA-256、ZIP、清单和 Safe CSS。应用时 Codex 可能重启，未保存的输入可能丢失。主题内容不会作为命令执行。
-"@
+  $message = @(
+    (Get-DreamSkinCommunityText -Key 'CommunityConfirm' -FormatArguments @($Metadata.Name)),
+    '',
+    (Get-DreamSkinCommunityText -Key 'CommunityAuthor' -FormatArguments @($Metadata.AuthorDisplayName)),
+    (Get-DreamSkinCommunityText -Key 'CommunityVersion' -FormatArguments @($Metadata.Version, $sizeMiB)),
+    (Get-DreamSkinCommunityText -Key 'CommunityHash' -FormatArguments @($Metadata.PackageSha256)),
+    '',
+    (Get-DreamSkinCommunityText -Key 'CommunitySafety')
+  ) -join [Environment]::NewLine
   $choice = [System.Windows.Forms.MessageBox]::Show(
     $message.Trim(),
-    '确认一键换肤',
+    (Get-DreamSkinCommunityText -Key 'CommunityConfirmTitle'),
     [System.Windows.Forms.MessageBoxButtons]::YesNo,
     [System.Windows.Forms.MessageBoxIcon]::Question,
     [System.Windows.Forms.MessageBoxDefaultButton]::Button2
@@ -797,24 +806,30 @@ try {
   $rollbackPath = "$($_.Exception.Data['DreamSkinRollbackPath'])"
   $workRootRetained = [bool]$_.Exception.Data['DreamSkinWorkRootRetained']
   $recoveryMessage = switch ($recovery) {
-    'Verified' { '新主题未能生效；此前主题已重新应用并完成可见渲染验证。' }
-    'Failed' { '新主题未能生效；此前主题的自动恢复或渲染验证未完成。请重新打开客户端检查。' }
-    'Superseded' { '检测到另一个换肤操作，客户端保留了较新的选择，没有覆盖它。' }
-    default { '新主题未写入已验证的活动状态。' }
+    'Verified' { Get-DreamSkinCommunityText -Key 'RecoveryVerified' }
+    'Failed' { Get-DreamSkinCommunityText -Key 'RecoveryFailed' }
+    'Superseded' { Get-DreamSkinCommunityText -Key 'RecoverySuperseded' }
+    default { Get-DreamSkinCommunityText -Key 'RecoveryUnconfirmed' }
   }
   $cleanupMessage = if ($workRootRetained) {
-    '恢复工作目录已保留，未自动删除。'
+    Get-DreamSkinCommunityText -Key 'RecoveryWorkRetained'
   } else {
-    '下载临时文件已清理。'
+    Get-DreamSkinCommunityText -Key 'DownloadCleaned'
   }
   $rollbackMessage = if ($rollbackPath) {
-    "`r`n回滚快照：$rollbackPath"
+    Get-DreamSkinCommunityText -Key 'RollbackSnapshot' -FormatArguments @($rollbackPath)
   } else {
     ''
   }
+  $summary = @(
+    (Get-DreamSkinCommunityText -Key 'CommunityApplyFailed'),
+    $cleanupMessage,
+    $recoveryMessage
+  )
+  if ($rollbackMessage) { $summary += $rollbackMessage }
   Show-DreamSkinCommunityMessage -Kind Error -Message (
-    "一键换肤失败。$cleanupMessage$recoveryMessage`r`n`r`n" +
-      $_.Exception.Message + $rollbackMessage
+    (($summary -join [Environment]::NewLine) + [Environment]::NewLine +
+      [Environment]::NewLine + $_.Exception.Message)
   )
   [Console]::Error.WriteLine($_.Exception.Message)
   if ($recovery -ceq 'Verified') { exit 20 }

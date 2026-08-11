@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     "scripts/injector.mjs",
     "scripts/install-dream-skin-macos.sh",
     "scripts/load-image-theme-macos.sh",
+    "scripts/localization-macos.sh",
     "scripts/pause-dream-skin-macos.sh",
     "scripts/publish-theme-import.mjs",
     "scripts/recover-theme-imports-macos.sh",
@@ -108,6 +109,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
   }
 
+  private var selectedLanguage: DreamSkinLanguage {
+    get { DreamSkinLanguage.stored() }
+    set { UserDefaults.standard.set(newValue.rawValue, forKey: DreamSkinLanguage.defaultsKey) }
+  }
+
+  private var copy: DreamSkinCopy {
+    DreamSkinCopy(language: selectedLanguage)
+  }
+
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
     configureStatusItem()
@@ -150,8 +160,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     guard !operationInFlight, !engineInstallInFlight, !themeRecoveryInFlight, !snapshot.busy else {
       showError(
-        title: "操作仍在进行",
-        message: "请等待当前下载、导入、应用或恢复完成后再退出，以免留下未完成的主题状态。"
+        title: copy.text(.busyTitle),
+        message: copy.text(.busyMessage)
       )
       return .terminateCancel
     }
@@ -162,8 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     guard urls.count == 1,
           let versionID = CommunityThemeContract.versionID(from: urls[0]) else {
       showError(
-        title: "一键换肤链接无效",
-        message: "只接受 DreamSkin.cc 生成的主题版本链接；不会打开链接中的任意网址或文件。"
+        title: copy.text(.invalidLinkTitle),
+        message: copy.text(.invalidLinkMessage)
       )
       return
     }
@@ -218,7 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         )
         try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
       } catch {
-        showError(title: "无法准备用户目录", message: error.localizedDescription)
+        showError(title: copy.text(.prepareDirectoryTitle), message: error.localizedDescription)
         break
       }
     }
@@ -264,28 +274,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   private func rebuildMenu() {
     menu.removeAllItems()
-    addDisabledItem(snapshot.title)
+    addDisabledItem(copy.statusTitle(session: snapshot.session, operation: snapshot.operation))
     if !snapshot.appliedThemeName.isEmpty && snapshot.session == "active" {
-      addDisabledItem("已应用：\(cleanMenuText(snapshot.appliedThemeName))")
+      addDisabledItem(copy.format(.appliedTheme, cleanMenuText(snapshot.appliedThemeName)))
     }
     if !snapshot.themeName.isEmpty && snapshot.themeName != snapshot.appliedThemeName {
-      addDisabledItem("已选主题：\(cleanMenuText(snapshot.themeName))（待应用）")
+      addDisabledItem(copy.format(.selectedThemePending, cleanMenuText(snapshot.themeName)))
     } else if snapshot.appliedThemeName.isEmpty && !snapshot.themeName.isEmpty {
-      addDisabledItem("已选主题：\(cleanMenuText(snapshot.themeName))")
+      addDisabledItem(copy.format(.selectedTheme, cleanMenuText(snapshot.themeName)))
     }
-    addDisabledItem(snapshot.codexRunning ? "ChatGPT：已打开" : "ChatGPT：未打开")
+    addDisabledItem(copy.text(snapshot.codexRunning ? .codexOpen : .codexClosed))
     if !snapshot.operationMessage.isEmpty {
       addDisabledItem(cleanMenuText(snapshot.operationMessage))
     }
     if !communityStageMessage.isEmpty {
       addDisabledItem(cleanMenuText(communityStageMessage))
     }
-    addDisabledItem("版本：v\(appVersion)")
+    addDisabledItem(copy.format(.version, appVersion))
 
     menu.addItem(.separator())
     if let availableUpdate {
       addActionItem(
-        "🆕 发现新版本 \(availableUpdate.version)",
+        copy.format(.newVersion, availableUpdate.version),
         action: #selector(openAvailableUpdate)
       )
       menu.addItem(.separator())
@@ -295,86 +305,113 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     let applyTitle: String
     switch snapshot.session {
-    case "active": applyTitle = "重新应用皮肤"
-    case "stale", "unknown": applyTitle = "修复并应用"
-    default: applyTitle = "应用皮肤"
+    case "active": applyTitle = copy.text(.reapply)
+    case "stale", "unknown": applyTitle = copy.text(.repairApply)
+    default: applyTitle = copy.text(.apply)
     }
     addActionItem(applyTitle, action: #selector(applySkin), enabled: !busy)
     if snapshot.session == "active" || snapshot.session == "applying" {
-      addActionItem("暂停皮肤", action: #selector(pauseSkin), enabled: !busy)
+      addActionItem(copy.text(.pause), action: #selector(pauseSkin), enabled: !busy)
     }
-    addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)
+    addActionItem(copy.text(.openChatGPT), action: #selector(openCodex), enabled: !busy)
 
     menu.addItem(.separator())
     addThemeMenu(enabled: !busy)
     addLinksMenu()
 
     menu.addItem(.separator())
-    let loginItem = addActionItem("登录时启动", action: #selector(toggleLoginItem))
+    addLanguageMenu()
+    let loginItem = addActionItem(copy.text(.loginAtStartup), action: #selector(toggleLoginItem))
     loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
     addMaintenanceMenu(enabled: !busy, needsEngineInstall: needsEngineInstall)
 
     menu.addItem(.separator())
-    addActionItem("退出", action: #selector(quit), enabled: !busy)
+    addActionItem(copy.text(.quit), action: #selector(quit), enabled: !busy)
   }
 
   private func addThemeMenu(enabled: Bool) {
-    let root = NSMenuItem(title: "主题", action: nil, keyEquivalent: "")
-    let submenu = NSMenu(title: "主题")
+    let root = NSMenuItem(title: copy.text(.themeMenu), action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: copy.text(.themeMenu))
     submenu.autoenablesItems = false
-    addActionItem("换一张背景图…", action: #selector(chooseBackgroundImage), enabled: enabled, to: submenu)
-    addActionItem("导入主题 ZIP…", action: #selector(chooseThemeArchive), enabled: enabled, to: submenu)
+    addActionItem(copy.text(.changeBackground), action: #selector(chooseBackgroundImage), enabled: enabled, to: submenu)
+    addActionItem(copy.text(.importZip), action: #selector(chooseThemeArchive), enabled: enabled, to: submenu)
     addSavedThemesMenu(enabled: enabled, to: submenu)
     submenu.addItem(.separator())
-    addActionItem("打开主题文件夹", action: #selector(openThemesFolder), to: submenu)
-    addActionItem("打开图片文件夹", action: #selector(openImagesFolder), to: submenu)
+    addActionItem(copy.text(.openThemes), action: #selector(openThemesFolder), to: submenu)
+    addActionItem(copy.text(.openImages), action: #selector(openImagesFolder), to: submenu)
     root.submenu = submenu
     menu.addItem(root)
   }
 
   private func addLinksMenu() {
-    let root = NSMenuItem(title: "链接", action: nil, keyEquivalent: "")
-    let submenu = NSMenu(title: "链接")
+    let root = NSMenuItem(title: copy.text(.linksMenu), action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: copy.text(.linksMenu))
     submenu.autoenablesItems = false
-    addActionItem("主题库 Gallery", action: #selector(openThemeGallery), to: submenu)
-    addActionItem("在线 Studio", action: #selector(openOnlineStudio), to: submenu)
-    addActionItem("打开 DreamSkin.cc", action: #selector(openDreamSkinWebsite), to: submenu)
+    addActionItem(copy.text(.gallery), action: #selector(openThemeGallery), to: submenu)
+    addActionItem(copy.text(.studio), action: #selector(openOnlineStudio), to: submenu)
+    addActionItem(copy.text(.openSite), action: #selector(openDreamSkinWebsite), to: submenu)
     root.submenu = submenu
     menu.addItem(root)
   }
 
   private func addMaintenanceMenu(enabled: Bool, needsEngineInstall: Bool) {
-    let root = NSMenuItem(title: "维护", action: nil, keyEquivalent: "")
-    let submenu = NSMenu(title: "维护")
+    let root = NSMenuItem(title: copy.text(.maintenanceMenu), action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: copy.text(.maintenanceMenu))
     submenu.autoenablesItems = false
     if engineInstallInFlight {
-      addDisabledItem("正在安装引擎…", to: submenu)
+      addDisabledItem(copy.text(.installingEngine), to: submenu)
     } else {
       addActionItem(
-        needsEngineInstall ? "安装 / 升级引擎…" : "修复 / 重新安装引擎…",
+        copy.text(needsEngineInstall ? .installEngine : .repairEngine),
         action: #selector(reinstallEngine),
         enabled: enabled,
         to: submenu
       )
     }
     addActionItem(
-      "立即检查更新",
+      copy.text(.checkUpdate),
       action: #selector(checkForUpdates),
       enabled: !operationInFlight && !updateCheckInFlight,
       to: submenu
     )
     if !legacyPluginURLs().isEmpty {
-      addActionItem("停用旧 SwiftBar 菜单…", action: #selector(disableLegacySwiftBarFromMenu), to: submenu)
+      addActionItem(copy.text(.disableSwiftBar), action: #selector(disableLegacySwiftBarFromMenu), to: submenu)
     }
     submenu.addItem(.separator())
     addActionItem(
-      "恢复原状并卸载…",
+      copy.text(.restoreUninstall),
       action: #selector(restoreAndUninstall),
       enabled: enabled,
       to: submenu
     )
     root.submenu = submenu
     menu.addItem(root)
+  }
+
+  private func addLanguageMenu() {
+    let root = NSMenuItem(title: copy.text(.languageMenu), action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: copy.text(.languageMenu))
+    submenu.autoenablesItems = false
+    for language in DreamSkinLanguage.allCases {
+      let item = addActionItem(
+        language.displayName,
+        action: #selector(selectLanguage(_:)),
+        to: submenu
+      )
+      item.representedObject = language.rawValue
+      item.state = language == selectedLanguage ? .on : .off
+    }
+    root.submenu = submenu
+    menu.addItem(root)
+  }
+
+  @objc private func selectLanguage(_ sender: NSMenuItem) {
+    guard let raw = sender.representedObject as? String,
+          let language = DreamSkinLanguage(rawValue: raw) else { return }
+    selectedLanguage = language
+    communityStageMessage = ""
+    refreshStatus()
+    rebuildMenu()
   }
 
   @discardableResult
@@ -398,12 +435,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   private func addSavedThemesMenu(enabled: Bool, to destination: NSMenu? = nil) {
-    let root = NSMenuItem(title: "已保存的主题", action: nil, keyEquivalent: "")
-    let submenu = NSMenu(title: "已保存的主题")
+    let root = NSMenuItem(title: copy.text(.savedThemes), action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: copy.text(.savedThemes))
     submenu.autoenablesItems = false
     let themes = savedThemes()
     if themes.isEmpty {
-      addDisabledItem("还没有保存的主题", to: submenu)
+      addDisabledItem(copy.text(.noSavedThemes), to: submenu)
     } else {
       for theme in themes {
         let item = addActionItem(
@@ -515,7 +552,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       if result.succeeded,
          let parsed = StatusSnapshot(jsonData: Data(result.output.utf8)) {
         self.snapshot = parsed
-        self.statusItem.button?.toolTip = "Codex Dream Skin · \(parsed.title)"
+        self.statusItem.button?.toolTip = "Codex Dream Skin · \(self.copy.statusTitle(session: parsed.session, operation: parsed.operation))"
         self.statusItem.button?.appearsDisabled = parsed.session == "unknown" || parsed.session == "stale"
         self.rebuildMenu()
       }
@@ -523,11 +560,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   @objc private func applySkin() {
-    runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "应用皮肤")
+    runInstalledScript(named: "apply-from-menubar-macos.sh", operation: copy.text(.apply))
   }
 
   @objc private func pauseSkin() {
-    runInstalledScript(named: "pause-dream-skin-macos.sh", operation: "暂停皮肤")
+    runInstalledScript(named: "pause-dream-skin-macos.sh", operation: copy.text(.pause))
   }
 
   @objc private func reinstallEngine() {
@@ -537,8 +574,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   @objc private func chooseBackgroundImage() {
     let panel = NSOpenPanel()
-    panel.title = "选择 Dream Skin 背景图"
-    panel.prompt = "选择"
+    panel.title = copy.text(.changeBackground)
+    panel.prompt = copy.resolvedLanguage == .chinese ? "选择" : "Choose"
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
     panel.allowsMultipleSelection = false
@@ -548,14 +585,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     runInstalledScript(
       named: "load-image-theme-macos.sh",
       arguments: ["--file", imageURL.path],
-      operation: "更换背景图"
+      operation: copy.text(.changeBackground).replacingOccurrences(of: "…", with: "")
     )
   }
 
   @objc private func chooseThemeArchive() {
     let panel = NSOpenPanel()
-    panel.title = "选择 Dream Skin 主题 ZIP"
-    panel.prompt = "导入"
+    panel.title = copy.text(.importZip)
+    panel.prompt = copy.resolvedLanguage == .chinese ? "导入" : "Import"
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
     panel.allowsMultipleSelection = false
@@ -567,7 +604,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   private func beginCommunityThemeApply(versionID: String) {
     guard !operationInFlight, !snapshot.busy else {
-      showError(title: "暂时无法换肤", message: "Dream Skin 正在执行其他操作，请稍后再点一次。")
+      showError(title: copy.text(.cannotApplyTitle), message: copy.text(.cannotApplyMessage))
       return
     }
     if engineInstallInFlight {
@@ -580,16 +617,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       return
     }
     guard let metadataURL = CommunityThemeContract.metadataURL(for: versionID) else {
-      showError(title: "一键换肤链接无效", message: "主题版本标识不符合安全规则。")
+      showError(title: copy.text(.invalidLinkTitle), message: copy.text(.invalidThemeMessage))
       return
     }
     guard let statusScript = installedScript(named: "status-dream-skin-macos.sh") else {
-      showError(title: "引擎尚未安装", message: "请先选择“安装 / 升级引擎”，再使用一键换肤。")
+      showError(title: copy.text(.missingEngineTitle), message: copy.text(.missingEngineCommunityMessage))
       return
     }
 
     operationInFlight = true
-    updateCommunityStage("正在确认当前皮肤可安全回滚…")
+    updateCommunityStage(copy.resolvedLanguage == .chinese
+      ? "正在确认当前皮肤可安全回滚…"
+      : "Checking that the current skin can be safely restored…")
     ScriptRunner.run(script: statusScript, arguments: ["--json", "--deep"]) { [weak self] result in
       guard let self else { return }
       guard result.succeeded,
@@ -597,8 +636,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             current.isReadyForCommunityApply else {
         self.finishThemeOperation()
         self.showError(
-          title: "当前皮肤还不能安全换肤",
-          message: "请先从菜单栏应用当前皮肤，确认状态为 Skin ON 且没有“待应用”主题，再回到网页重试。这样失败时才能恢复并验证点击前真正显示的主题。"
+          title: self.copy.text(.baselineTitle),
+          message: self.copy.text(.baselineMessage)
         )
         return
       }
@@ -608,7 +647,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   private func fetchCommunityThemeMetadata(versionID: String, metadataURL: URL) {
-    updateCommunityStage("正在读取已审核主题信息…")
+    updateCommunityStage(copy.resolvedLanguage == .chinese
+      ? "正在读取已审核主题信息…"
+      : "Loading approved theme metadata…")
     communityHTTP.get(
       metadataURL,
       accept: "application/json",
@@ -621,8 +662,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
               !payload.body.isEmpty else {
           self.finishThemeOperation()
           self.showError(
-            title: "无法读取主题信息",
-            message: "DreamSkin.cc 没有返回可验证的已审核主题，请稍后重试。"
+            title: self.copy.text(.readThemeTitle),
+            message: self.copy.text(.readThemeMessage)
           )
           return
         }
@@ -633,7 +674,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         } catch {
           self.finishThemeOperation()
           self.showError(
-            title: "主题信息未通过校验",
+            title: self.copy.text(.validationTitle),
             message: error.localizedDescription
           )
         }
@@ -642,21 +683,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   private func confirmCommunityThemeApply(_ metadata: CommunityThemeMetadata) {
-    updateCommunityStage("等待确认：\(cleanMenuText(metadata.name))")
+    updateCommunityStage(copy.resolvedLanguage == .chinese
+      ? "等待确认：\(cleanMenuText(metadata.name))"
+      : "Waiting for confirmation: \(cleanMenuText(metadata.name))")
     let size = ByteCountFormatter.string(fromByteCount: metadata.packageBytes, countStyle: .file)
     let alert = NSAlert()
-    alert.messageText = "从 DreamSkin.cc 应用“\(cleanMenuText(metadata.name))”？"
-    alert.informativeText = """
-    作者：\(cleanMenuText(metadata.authorDisplayName))
-    版本：\(metadata.version) · \(size)
-    SHA-256：\(metadata.packageSha256)
+    let name = cleanMenuText(metadata.name)
+    let author = cleanMenuText(metadata.authorDisplayName)
+    if copy.resolvedLanguage == .chinese {
+      alert.messageText = "从 DreamSkin.cc 应用“\(name)”？"
+      alert.informativeText = """
+      作者：\(author)
+      版本：\(metadata.version) · \(size)
+      SHA-256：\(metadata.packageSha256)
 
-    客户端会从固定官方 API 下载，核对完整哈希，并重新执行 ZIP、清单与 Safe CSS 校验。导入和应用前不会运行主题中的任意命令。
+      客户端会从固定官方 API 下载，核对完整哈希，并重新执行 ZIP、清单与 Safe CSS 校验。导入和应用前不会运行主题中的任意命令。
 
-    如果 ChatGPT 当前没有安全调试连接，应用时会重启 ChatGPT；请先保存未发送的输入。
-    """
-    alert.addButton(withTitle: "下载并应用")
-    alert.addButton(withTitle: "取消")
+      如果 ChatGPT 当前没有安全调试连接，应用时会重启 ChatGPT；请先保存未发送的输入。
+      """
+    } else {
+      alert.messageText = "Apply “\(name)” from DreamSkin.cc?"
+      alert.informativeText = """
+      Author: \(author)
+      Version: \(metadata.version) · \(size)
+      SHA-256: \(metadata.packageSha256)
+
+      The client downloads from the fixed official API, verifies the full hash, and reruns the ZIP, manifest, and Safe CSS checks. It does not execute commands from the theme before importing or applying it.
+
+      ChatGPT may restart if no safe debug connection is active. Save any unsent input first.
+      """
+    }
+    alert.addButton(withTitle: copy.resolvedLanguage == .chinese ? "下载并应用" : "Download and apply")
+    alert.addButton(withTitle: copy.resolvedLanguage == .chinese ? "取消" : "Cancel")
     activateForUserInteraction()
     guard alert.runModal() == .alertFirstButtonReturn else {
       finishThemeOperation()
@@ -668,10 +726,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   private func downloadCommunityTheme(_ metadata: CommunityThemeMetadata) {
     guard let downloadURL = CommunityThemeContract.downloadURL(for: metadata.id) else {
       finishThemeOperation()
-      showError(title: "无法下载主题", message: "主题下载地址无法由版本标识安全构造。")
+      showError(title: copy.text(.downloadThemeTitle), message: copy.text(.downloadThemeMessage))
       return
     }
-    updateCommunityStage("正在下载主题包…")
+    updateCommunityStage(copy.resolvedLanguage == .chinese ? "正在下载主题包…" : "Downloading theme package…")
     communityHTTP.get(
       downloadURL,
       accept: "application/zip",
@@ -712,7 +770,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
           throw CommunityThemeContractError.invalidPackageIdentity
         }
         DispatchQueue.main.async {
-          self.updateCommunityStage("下载完成，正在执行严格导入校验…")
+          self.updateCommunityStage(self.copy.resolvedLanguage == .chinese
+            ? "下载完成，正在执行严格导入校验…"
+            : "Download complete; running strict import validation…")
           self.performThemeImport(
             archiveURL,
             cleanupRoot: root,
@@ -727,8 +787,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         DispatchQueue.main.async {
           self.finishThemeOperation()
           self.showError(
-            title: "主题包未通过下载校验",
-            message: "下载已丢弃，没有导入或应用任何内容。\n\n\(error.localizedDescription)"
+            title: self.copy.text(.downloadValidationTitle),
+            message: self.copy.format(.downloadValidationMessage, error.localizedDescription)
           )
         }
       }
@@ -769,7 +829,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   ) {
     guard let script = installedScript(named: "import-theme-zip-macos.sh") else {
       finishThemeOperation(cleanupRoot: cleanupRoot)
-      showError(title: "引擎尚未安装", message: "请先选择“安装 / 升级引擎”，再导入主题。")
+      showError(title: copy.text(.missingEngineTitle), message: copy.text(.missingEngineImportMessage))
       return
     }
     var importArguments = ["--file", archiveURL.path]
@@ -790,8 +850,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             let rawID = value["id"] as? String else {
         self.finishThemeOperation(cleanupRoot: cleanupRoot)
         self.showError(
-          title: "导入主题失败",
-          message: self.conciseOutput(result.output, fallback: "主题 ZIP 未通过安全或内容校验。")
+          title: self.copy.text(.importFailedTitle),
+          message: self.conciseOutput(result.output, fallback: self.copy.text(.invalidZipMessage))
         )
         return
       }
@@ -811,8 +871,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
               ) != nil else {
           self.finishThemeOperation(cleanupRoot: cleanupRoot)
           self.showError(
-            title: "主题已下载，但没有应用",
-            message: "主题包没有完成严格 ZIP 与 Safe CSS 导入校验。"
+            title: self.copy.text(.downloadedNotAppliedTitle),
+            message: self.copy.text(.downloadedNotAppliedMessage)
           )
           return
         }
@@ -827,16 +887,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         return
       }
       if status == "duplicate" {
-        var details = "“\(name)”与已保存主题完全相同，没有重复写入。"
+        var details = self.copy.format(.duplicateBase, name)
         if safeCssStatus == "validated" {
-          details += "\n包内 theme.css 已通过本机 Safe CSS 校验，切换到该主题时会一并生效。"
+          details += self.copy.text(.duplicateCSS)
         }
         if signatureIgnored {
-          details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
+          details += self.copy.text(.signatureIgnored)
         }
         self.finishThemeOperation(cleanupRoot: cleanupRoot)
         self.showInfo(
-          title: "主题已经存在",
+          title: self.copy.text(.duplicateTitle),
           message: details
         )
         return
@@ -845,25 +905,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       let replaced = value["replaced"] as? Bool ?? false
       let nameCollision = value["nameCollision"] as? Bool ?? false
       var details = replaced
-        ? "已更新“\(name)”的已保存版本，当前正在使用的主题没有改变。"
-        : "已把“\(name)”加入“已保存的主题”，当前正在使用的主题没有改变。"
+        ? self.copy.format(.importedUpdated, name)
+        : self.copy.format(.importedAdded, name)
       if renamed {
-        details += "\n为避免覆盖同 ID 主题，已使用新标识：\(id)。"
+        details += self.copy.format(.renamed, id)
       }
       if nameCollision {
-        details += "\n主题库中已有同名主题，可在菜单中按需要选择。"
+        details += self.copy.text(.nameCollision)
       }
       if safeCssStatus == "validated" {
-        details += "\ntheme.css 已通过本机 Safe CSS 校验，切换到该主题时会一并生效。"
+        details += self.copy.text(.cssValidated)
       }
       if signatureIgnored {
-        details += "\n包内 manifest.sig 是预留文件，当前版本已忽略。"
+        details += self.copy.text(.signatureIgnored)
       }
       if cleanupWarning {
-        details += "\n主题已成功保存，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。"
+        details += self.copy.text(.cleanupWarning)
       }
       self.finishThemeOperation(cleanupRoot: cleanupRoot)
-      self.showInfo(title: "主题导入完成", message: details)
+      self.showInfo(title: self.copy.text(.importCompleteTitle), message: details)
     }
   }
 
@@ -886,13 +946,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
           let transactionScript = installedScript(named: "apply-community-theme-macos.sh") else {
       finishThemeOperation(cleanupRoot: cleanupRoot)
       showError(
-        title: "主题已导入，但没有应用",
-        message: "客户端无法启动带回滚保护的一键换肤事务。当前主题没有改变。"
+        title: copy.text(.importedApplyTitle),
+        message: copy.text(.importedApplyMessage)
       )
       return
     }
     reactivateCodexBeforeTransaction()
-    updateCommunityStage("正在保存当前主题、应用新主题并验证渲染…")
+    updateCommunityStage(copy.resolvedLanguage == .chinese
+      ? "正在保存当前主题、应用新主题并验证渲染…"
+      : "Saving the current theme, applying the new theme, and verifying rendering…")
     ScriptRunner.run(
       script: transactionScript,
       arguments: [
@@ -910,39 +972,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         cleanupRoot: rollbackRetention.requiresOperationRoot ? nil : cleanupRoot
       )
       if result.succeeded {
-        var details = "“\(name)”已通过下载、SHA-256、主题包、Safe CSS 和可见渲染校验，并已切换到客户端。"
+        var details = self.copy.format(.appliedMessage, name)
         if cleanupWarning {
-          details += "\n\n主题已成功应用，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。"
+          details += "\n" + self.copy.text(.cleanupWarning)
         }
         self.showInfo(
-          title: "主题已应用",
+          title: self.copy.text(.appliedTitle),
           message: details
         )
       } else if result.exitCode == 20 {
         self.showError(
-          title: "新主题应用失败，原主题已恢复",
-          message: "换肤前的精确主题快照已重新应用，并通过可见渲染验证。\n\n\(self.conciseOutput(result.output, fallback: "新主题仍保存在主题库中。"))"
+          title: self.copy.text(.rollbackTitle),
+          message: self.copy.format(
+            .rollbackMessage,
+            self.conciseOutput(
+              result.output,
+              fallback: self.copy.resolvedLanguage == .chinese
+                ? "新主题仍保存在主题库中。"
+                : "The new theme remains in Saved themes."
+            )
+          )
         )
       } else {
         var details = self.conciseOutput(
           result.output,
-          fallback: "请从已保存主题中重新选择一个主题。"
+          fallback: self.copy.resolvedLanguage == .chinese
+            ? "请从已保存主题中重新选择一个主题。"
+            : "Choose a theme again from Saved themes."
         )
         let title: String
         switch rollbackRetention {
         case let .preserved(recoveryURL):
-          title = "自动恢复未完成，原主题快照已保留"
-          details += "\n\n换肤前的精确主题快照已移入私有恢复目录：\n\(recoveryURL.path)\n该快照尚未通过恢复验证，请不要把“已保留”理解为已经恢复。"
+          title = self.copy.resolvedLanguage == .chinese
+            ? "自动恢复未完成，原主题快照已保留"
+            : "Automatic recovery did not finish; original snapshot retained"
+          details += self.copy.resolvedLanguage == .chinese
+            ? "\n\n换肤前的精确主题快照已移入私有恢复目录：\n\(recoveryURL.path)\n该快照尚未通过恢复验证，请不要把“已保留”理解为已经恢复。"
+            : "\n\nThe exact pre-apply snapshot was moved to this private recovery folder:\n\(recoveryURL.path)\nThe snapshot has not passed restore verification; retained does not mean restored."
         case let .retainedInOperationRoot(snapshotURL):
-          title = "自动恢复未完成，快照仍在事务目录"
-          details += "\n\n客户端无法把快照提升到 recovery 目录，但已停止清理原事务目录，并检测到快照仍位于：\n\(snapshotURL.path)\n该快照尚未通过恢复验证，请不要继续切换主题。"
+          title = self.copy.resolvedLanguage == .chinese
+            ? "自动恢复未完成，快照仍在事务目录"
+            : "Automatic recovery did not finish; snapshot remains in transaction folder"
+          details += self.copy.resolvedLanguage == .chinese
+            ? "\n\n客户端无法把快照提升到 recovery 目录，但已停止清理原事务目录，并检测到快照仍位于：\n\(snapshotURL.path)\n该快照尚未通过恢复验证，请不要继续切换主题。"
+            : "\n\nThe client could not move the snapshot into the recovery folder, so it stopped cleaning the transaction folder. The snapshot remains at:\n\(snapshotURL.path)\nIt has not passed restore verification. Do not switch themes again yet."
         case .unavailable:
-          title = "主题已导入，但应用状态未确认"
-          details += "\n\n客户端没有确认到可保留的换肤前快照，不能承诺可自动恢复。请不要继续切换主题，并查看 Dream Skin 日志。"
+          title = self.copy.text(.unconfirmedTitle)
+          details += self.copy.resolvedLanguage == .chinese
+            ? "\n\n客户端没有确认到可保留的换肤前快照，不能承诺可自动恢复。请不要继续切换主题，并查看 Dream Skin 日志。"
+            : "\n\nThe client could not confirm a retainable pre-apply snapshot, so automatic recovery cannot be promised. Do not switch themes again; check the Dream Skin logs."
         }
         self.showError(
           title: title,
-          message: "当前可见主题状态未能确认。\n\n\(details)"
+          message: self.copy.format(.unconfirmedMessage, details)
         )
       }
     }
@@ -987,13 +1069,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   @objc private func switchSavedTheme(_ sender: NSMenuItem) {
     guard let id = sender.representedObject as? String,
           id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"#, options: .regularExpression) != nil else {
-      showError(title: "主题无效", message: "主题标识不符合安全规则。")
+      showError(title: copy.text(.invalidThemeTitle), message: copy.text(.invalidThemeMessage))
       return
     }
     runInstalledScript(
       named: "switch-theme-macos.sh",
       arguments: ["--id", id],
-      operation: "切换主题"
+      operation: copy.resolvedLanguage == .chinese ? "切换主题" : "Switch theme"
     )
   }
 
@@ -1009,7 +1091,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   @objc private func openCodex() {
     guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
-      showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")
+      showError(title: copy.text(.notFoundTitle), message: copy.text(.notFoundMessage))
       return
     }
     guard !operationInFlight else { return }
@@ -1019,7 +1101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
         if let error {
           DispatchQueue.main.async {
-            self.showError(title: "无法打开 ChatGPT", message: error.localizedDescription)
+            self.showError(title: self.copy.text(.openFailedTitle), message: error.localizedDescription)
           }
         }
       }
@@ -1034,8 +1116,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       self.rebuildMenu()
       if !result.succeeded {
         self.showError(
-          title: "无法打开 ChatGPT",
-          message: self.conciseOutput(result.output, fallback: "请检查 ChatGPT 是否已安装，并重试。")
+          title: self.copy.text(.openFailedTitle),
+          message: self.conciseOutput(result.output, fallback: self.copy.text(.openFailedMessage))
         )
       }
     }
@@ -1060,7 +1142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     guard !operationInFlight, !updateCheckInFlight else { return }
     guard let script = installedScript(named: "check-update-macos.sh")
       ?? bundledScript(named: "check-update-macos.sh") else {
-      showError(title: "无法检查更新", message: "更新检查脚本缺失，请重新安装应用。")
+      showError(title: copy.text(.updateMissingTitle), message: copy.text(.updateMissingMessage))
       return
     }
     operationInFlight = true
@@ -1079,24 +1161,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             let latest = value["latestVersion"] as? String,
             let available = value["updateAvailable"] as? Bool else {
         self.showError(
-          title: "检查更新失败",
-          message: self.conciseOutput(result.output, fallback: "无法连接 GitHub，请稍后重试。")
+          title: self.copy.text(.updateFailedTitle),
+          message: self.conciseOutput(result.output, fallback: self.copy.text(.updateFailedMessage))
         )
         return
       }
       if available {
         let alert = NSAlert()
-        alert.messageText = "发现新版本 \(latest)"
-        alert.informativeText = "当前版本为 \(current)。是否前往 GitHub Releases 下载？"
-        alert.addButton(withTitle: "前往下载")
-        alert.addButton(withTitle: "稍后")
+        alert.messageText = self.copy.format(.newVersionTitle, latest)
+        alert.informativeText = self.copy.format(.newVersionMessage, current)
+        alert.addButton(withTitle: self.copy.text(.downloadNow))
+        alert.addButton(withTitle: self.copy.text(.later))
         self.activateForUserInteraction()
         if alert.runModal() == .alertFirstButtonReturn,
            let url = URL(string: "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") {
           NSWorkspace.shared.open(url)
         }
       } else {
-        self.showInfo(title: "已是最新版本", message: "当前安装的是 \(current)。")
+        self.showInfo(
+          title: self.copy.text(.upToDateTitle),
+          message: self.copy.format(.upToDateMessage, current)
+        )
       }
     }
   }
@@ -1141,8 +1226,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   private func postUpdateAvailableNotification(version: String, releaseURL: String) {
     let content = UNMutableNotificationContent()
-    content.title = "Codex Dream Skin 有新版本"
-    content.body = "\(version) 已发布，点按前往下载页面。"
+    if copy.resolvedLanguage == .chinese {
+      content.title = "Codex Dream Skin 有新版本"
+      content.body = "\(version) 已发布，点按前往下载页面。"
+    } else {
+      content.title = "Codex Dream Skin update available"
+      content.body = "\(version) is available. Click to open the download page."
+    }
     content.sound = .default
     content.userInfo = ["releaseURL": releaseURL]
     let request = UNNotificationRequest(
@@ -1189,14 +1279,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       rebuildMenu()
       if SMAppService.mainApp.status == .requiresApproval {
         showInfo(
-          title: "需要系统确认",
-          message: "请在“系统设置 → 通用 → 登录项”中允许 Codex Dream Skin。"
+          title: copy.text(.loginApprovalTitle),
+          message: copy.text(.loginApprovalMessage)
         )
       }
     } catch {
       showError(
-        title: "无法修改登录启动",
-        message: "请先把 App 拖到“应用程序”文件夹，再重试。\n\n\(error.localizedDescription)"
+        title: copy.text(.loginStartFailedTitle),
+        message: copy.format(.loginStartFailedMessage, error.localizedDescription)
       )
     }
   }
@@ -1208,17 +1298,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   @objc private func restoreAndUninstall() {
     let alert = NSAlert()
     alert.alertStyle = .warning
-    alert.messageText = "恢复原状并卸载 Dream Skin？"
-    alert.informativeText = "将停止皮肤、恢复 ChatGPT 外观、删除本地引擎并关闭本应用。你的图片和已保存主题会保留。"
-    alert.addButton(withTitle: "恢复并卸载")
-    alert.addButton(withTitle: "取消")
+    alert.messageText = copy.text(.restoreConfirmTitle)
+    alert.informativeText = copy.text(.restoreConfirmMessage)
+    alert.addButton(withTitle: copy.text(.restoreAndUninstall))
+    alert.addButton(withTitle: copy.resolvedLanguage == .chinese ? "取消" : "Cancel")
     activateForUserInteraction()
     guard alert.runModal() == .alertFirstButtonReturn else { return }
 
     let script = installedScript(named: "restore-dream-skin-macos.sh")
       ?? bundledScript(named: "restore-dream-skin-macos.sh")
     guard let script else {
-      showError(title: "无法恢复", message: "恢复脚本缺失；没有删除任何文件。")
+      showError(
+        title: copy.resolvedLanguage == .chinese ? "无法恢复" : "Could not restore",
+        message: copy.resolvedLanguage == .chinese
+          ? "恢复脚本缺失；没有删除任何文件。"
+          : "The restore script is missing. No files were removed."
+      )
       return
     }
     operationInFlight = true
@@ -1232,8 +1327,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       guard result.succeeded else {
         self.rebuildMenu()
         self.showError(
-          title: "恢复未完成",
-          message: self.conciseOutput(result.output, fallback: "引擎和设置均已保留，请处理错误后重试。")
+          title: self.copy.text(.restoreFailedTitle),
+          message: self.conciseOutput(result.output, fallback: self.copy.text(.restoreFailedMessage))
         )
         return
       }
@@ -1247,14 +1342,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       } catch {
         self.rebuildMenu()
         self.showError(
-          title: "恢复完成，但清理失败",
-          message: "ChatGPT 已恢复，部分安装文件未能删除：\n\n\(error.localizedDescription)"
+          title: self.copy.text(.restoreCleanupFailedTitle),
+          message: self.copy.format(.restoreCleanupFailedMessage, error.localizedDescription)
         )
         return
       }
       self.showInfo(
-        title: "恢复完成",
-        message: "本地引擎和登录启动已移除。最后请把“Codex Dream Skin.app”移到废纸篓。"
+        title: self.copy.text(.restoreDoneTitle),
+        message: self.copy.text(.restoreDoneMessage)
       )
       NSApp.terminate(nil)
     }
@@ -1262,7 +1357,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   @objc private func quit() {
     guard !operationInFlight, !engineInstallInFlight, !snapshot.busy else {
-      showError(title: "操作仍在进行", message: "请等待当前操作完成后再退出。")
+      showError(
+        title: copy.text(.busyTitle),
+        message: copy.resolvedLanguage == .chinese
+          ? "请等待当前操作完成后再退出。"
+          : "Wait for the current operation to finish before quitting."
+      )
       return
     }
     NSApp.terminate(nil)
@@ -1275,7 +1375,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   ) {
     guard !operationInFlight else { return }
     guard let script = installedScript(named: name) else {
-      showError(title: "引擎尚未安装", message: "请先选择“安装 / 升级引擎”，再重试。")
+      showError(title: copy.text(.missingEngineTitle), message: copy.text(.missingEngineRetryMessage))
       return
     }
     operationInFlight = true
@@ -1287,8 +1387,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       self.rebuildMenu()
       if !result.succeeded {
         self.showError(
-          title: "\(operation)失败",
-          message: self.conciseOutput(result.output, fallback: "请检查 ChatGPT 是否已安装，并重试。")
+          title: self.copy.operationFailed(operation),
+          message: self.conciseOutput(result.output, fallback: self.copy.text(.openFailedMessage))
         )
       }
     }
@@ -1309,21 +1409,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
     guard let bundledVersion = version(at: bundledEngineURL?.appendingPathComponent("VERSION")) else {
       pendingCommunityVersionID = nil
-      showError(title: "安装资源损坏", message: "App 内的版本信息无效，请重新下载。")
+      showError(title: copy.text(.installCorruptTitle), message: copy.text(.installVersionInvalid))
       return
     }
     if let installedVersion = version(at: installedEngineURL.appendingPathComponent("VERSION")),
        installedVersion > bundledVersion {
       pendingCommunityVersionID = nil
       showError(
-        title: "已安装更新版本",
-        message: "本机引擎 v\(installedVersion) 比当前 App 的 v\(bundledVersion) 更新。请下载相同或更新版本的 DMG，不会执行降级。"
+        title: copy.text(.installedNewerTitle),
+        message: copy.format(.installedNewerMessage, installedVersion.description, bundledVersion.description)
       )
       return
     }
     guard let script = bundledScript(named: "install-dream-skin-macos.sh") else {
       pendingCommunityVersionID = nil
-      showError(title: "安装资源损坏", message: "App 内没有找到 Dream Skin 引擎。请重新下载。")
+      showError(title: copy.text(.installCorruptTitle), message: copy.text(.installMissingEngine))
       return
     }
     engineInstallInFlight = true
@@ -1348,10 +1448,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       } else {
         self.pendingCommunityVersionID = nil
         self.showError(
-          title: "引擎安装未完成",
+          title: self.copy.text(.installFailedTitle),
           message: self.conciseOutput(
             result.output,
-            fallback: "安装脚本返回了错误，请重试；如果问题持续，请查看 Dream Skin 日志。"
+            fallback: self.copy.text(.installFailedMessage)
           )
         )
       }
@@ -1365,8 +1465,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
     guard let script = installedScript(named: "recover-theme-imports-macos.sh") else {
       showError(
-        title: "主题恢复组件缺失",
-        message: "本地引擎不完整，未继续待执行的换肤操作。请先选择“修复 / 重新安装引擎…”。"
+        title: copy.text(.recoveryMissingTitle),
+        message: copy.text(.recoveryMissingMessage)
       )
       completion?(false)
       return
@@ -1382,8 +1482,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
           self.conciseOutput(result.output, fallback: "unknown recovery failure")
         )
         self.showError(
-          title: "主题恢复未完成",
-          message: "已保留恢复记录，未继续待执行的换肤操作。请先选择“修复 / 重新安装引擎…”；如果仍失败，请附上日志反馈。"
+          title: self.copy.text(.recoveryFailedTitle),
+          message: self.copy.text(.recoveryFailedMessage)
         )
       }
       self.rebuildMenu()
@@ -1472,10 +1572,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     guard !plugins.isEmpty else { return }
     if confirmFirst {
       let alert = NSAlert()
-      alert.messageText = "停用旧 SwiftBar 菜单？"
-      alert.informativeText = "已检测到旧版 Dream Skin SwiftBar 插件。停用后可避免菜单栏出现两个图标；插件会改名保留，不会直接删除。"
-      alert.addButton(withTitle: "停用旧插件")
-      alert.addButton(withTitle: "稍后")
+      alert.messageText = copy.text(.legacyConfirmTitle)
+      alert.informativeText = copy.text(.legacyConfirmMessage)
+      alert.addButton(withTitle: copy.text(.legacyDisable))
+      alert.addButton(withTitle: copy.text(.later))
       activateForUserInteraction()
       guard alert.runModal() == .alertFirstButtonReturn else { return }
     }
@@ -1495,9 +1595,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       NSWorkspace.shared.open(refreshURL)
     }
     if failures.isEmpty {
-      showInfo(title: "旧菜单已停用", message: "SwiftBar 插件已安全改名保留。")
+      showInfo(title: copy.text(.legacyDisabledTitle), message: copy.text(.legacyDisabledMessage))
     } else {
-      showError(title: "部分旧插件未能停用", message: failures.joined(separator: "\n"))
+      showError(title: copy.text(.legacyPartialTitle), message: failures.joined(separator: "\n"))
     }
   }
 
@@ -1528,7 +1628,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     let alert = NSAlert()
     alert.messageText = title
     alert.informativeText = message
-    alert.addButton(withTitle: "好")
+    alert.addButton(withTitle: copy.text(.ok))
     activateForUserInteraction()
     alert.runModal()
   }
@@ -1538,7 +1638,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     alert.alertStyle = .warning
     alert.messageText = title
     alert.informativeText = message
-    alert.addButton(withTitle: "好")
+    alert.addButton(withTitle: copy.text(.ok))
     activateForUserInteraction()
     alert.runModal()
   }

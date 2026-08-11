@@ -17,6 +17,19 @@ while IFS= read -r file; do "$NODE" --check "$file" >/dev/null; done < <(
 # the real failure behind a bogus "unbound variable" (#251).
 "$NODE" "$ROOT/tests/shell-braced-vars-before-cjk.test.mjs"
 
+ZH_COPY="$(DREAMSKIN_LANG=zh-CN /bin/bash -c '
+  . "$1/scripts/localization-macos.sh"
+  printf "%s|%s|%s" "$(dreamskin_language)" "$(dreamskin_text apply)" "$(dreamskin_text skin_applied)"
+' _ "$ROOT")"
+EN_COPY="$(DREAMSKIN_LANG=en-US /bin/bash -c '
+  . "$1/scripts/localization-macos.sh"
+  printf "%s|%s|%s" "$(dreamskin_language)" "$(dreamskin_text apply)" "$(dreamskin_text skin_applied)"
+' _ "$ROOT")"
+[ "$ZH_COPY" = 'zh|应用|皮肤已应用' ] \
+  || { printf 'Chinese runtime localization contract failed: %s\n' "$ZH_COPY" >&2; exit 1; }
+[ "$EN_COPY" = 'en|Apply|Skin applied' ] \
+  || { printf 'English runtime localization contract failed: %s\n' "$EN_COPY" >&2; exit 1; }
+
 if /usr/bin/grep -R -n -E 'dream-skin-skin|DREAM_SKIN_SKIN|1\.0\.0-rc2' \
   "$ROOT/scripts" "$ROOT/assets" >/dev/null; then
   printf 'Legacy release-candidate identifiers remain in runtime files.\n' >&2
@@ -77,7 +90,7 @@ fi
   "$ROOT/scripts/switch-theme-macos.sh"
 /usr/bin/grep -F -q 'CFBundleURLTypes.0.CFBundleURLSchemes.0' "$ROOT/scripts/build-dmg.sh"
 for required_runtime in apply-community-theme-macos.sh snapshot-active-theme-macos.sh \
-  theme-content-fingerprint.mjs theme-switch-lock-macos.sh; do
+  theme-content-fingerprint.mjs theme-switch-lock-macos.sh localization-macos.sh; do
   /usr/bin/grep -F -q "$required_runtime" "$ROOT/scripts/build-dmg.sh"
 done
 UPDATE_JSON="$({
@@ -776,13 +789,17 @@ if [ -z "$HOT_LINE" ] || [ -z "$CONFIRM_LINE" ] || [ -z "$START_LINE" ] ||
 fi
 MENU_SOURCE="$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
 OPEN_CODEX_BODY="$(/usr/bin/sed -n '/@objc private func openCodex()/,/@objc private func openDreamSkinWebsite()/p' "$MENU_SOURCE")"
-/usr/bin/grep -F -q 'addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'addActionItem(copy.text(.openChatGPT), action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'showError(title: copy.text(.notFoundTitle), message: copy.text(.notFoundMessage))' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'addLanguageMenu()' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'DreamSkinLanguage.defaultsKey' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'environment["DREAMSKIN_LANG"] = DreamSkinLanguage.stored().environmentValue' \
+  "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/ScriptRunner.swift"
 /usr/bin/grep -F -q 'guard !engineNeedsInstall(),' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'let script = installedScript(named: "start-dream-skin-macos.sh") else {' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'ScriptRunner.run(script: script)' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'title: "无法打开 ChatGPT",' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'title: self.copy.text(.openFailedTitle),' "$MENU_SOURCE"
 if /usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE" ||
    /usr/bin/grep -F -q 'runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")' "$MENU_SOURCE" ||
    /usr/bin/printf '%s\n' "$OPEN_CODEX_BODY" | /usr/bin/grep -F -q 'installBundledEngineIfNeeded(force:'; then

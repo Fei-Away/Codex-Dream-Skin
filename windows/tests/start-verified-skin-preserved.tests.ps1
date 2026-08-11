@@ -11,11 +11,12 @@ param([Parameter(Mandatory = $true)][string]$Root)
 # must still restart it when the renderer reports a genuinely broken session.
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $Root 'scripts\localization-windows.ps1')
 $startPath = Join-Path $Root 'scripts\start-dream-skin.ps1'
 $rawSource = [System.IO.File]::ReadAllText($startPath)
-$dotSourcePattern = '(?m)^\.\s+\(Join-Path \$PSScriptRoot ''(?:common-windows|theme-windows)\.ps1''\)\r?\n'
-if ([regex]::Matches($rawSource, $dotSourcePattern).Count -ne 2) {
-  throw 'Preserved-skin fixture could not isolate the two runtime imports.'
+$dotSourcePattern = '(?m)^\.\s+\(Join-Path \$PSScriptRoot ''(?:common-windows|theme-windows|localization-windows)\.ps1''\)\r?\n'
+if ([regex]::Matches($rawSource, $dotSourcePattern).Count -ne 3) {
+  throw 'Preserved-skin fixture could not isolate the three runtime imports.'
 }
 $rawSource = [regex]::Replace($rawSource, $dotSourcePattern, '')
 $rawSource = $rawSource.Replace(

@@ -14,6 +14,7 @@ $PortExplicit = $PSBoundParameters.ContainsKey('Port')
 $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
+. (Join-Path $PSScriptRoot 'localization-windows.ps1')
 
 $operationLock = Enter-DreamSkinOperationLock `
   -TimeoutMilliseconds $OperationLockTimeoutMilliseconds
@@ -24,6 +25,7 @@ try {
   $currentCodex = Get-DreamSkinCodexInstall
   $codex = $currentCodex
   $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+  $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
   $StatePath = Join-Path $StateRoot 'state.json'
@@ -103,9 +105,10 @@ try {
   if (-not $debugReady -and $codexProcesses.Count -gt 0) {
     $restartAuthorized = [bool]$RestartExisting
     if (-not $restartAuthorized -and $PromptRestart) {
-      $restartAuthorized = Confirm-DreamSkinRestart -Message 'Codex must restart once to enable Dream Skin. Unsaved input may be lost. Restart now?'
+      $restartAuthorized = Confirm-DreamSkinRestart -Message `
+        (Get-DreamSkinText -Key 'RestartPrompt' -Language $language)
       if (-not $restartAuthorized) {
-        Write-Host 'Dream Skin launch was cancelled; Codex was not changed.'
+        Write-Host (Get-DreamSkinText -Key 'LaunchCancelled' -Language $language)
         exit 0
       }
     }

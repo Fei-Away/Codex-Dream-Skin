@@ -4,6 +4,12 @@
 
 ### 修复
 
+- 修复 Windows PowerShell 5.1 在中文、日文等非 ASCII 临时目录下读取
+  bundled Node.js `process.execPath` 时受控制台代码页影响，导致安装器错误
+  报告「Node.js executable path could not be validated」的问题。路径探针现在
+  通过 ASCII Base64 传输原始 UTF-8 字节并严格解码，仍保留签名、版本和文件
+  存在性校验；无效探针不会回退到未经确认的候选路径（#337）。
+
 - Windows 路径穿越校验此前会把合法的、以 `.` 开头的主题文件名也当作可疑路径拒绝；现在能正确区分它们与真正的 `..` 路径穿越（#296）。
 - Windows 运行时加载主题前强制校验 `schemaVersion` 必须是数字 `1`，拒绝缺失或未来版本的 schema（#299）。
 - 主题包 manifest 时间戳校验拒绝不合法的 RFC 3339 值（#297），双平台共享。

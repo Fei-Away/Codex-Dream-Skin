@@ -346,6 +346,11 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
+    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
+    "Accent foreground contrast must model the composer panel's 94% RGB surface",
+  );
+  assert.match(
+    css,
     /:not\(:has\(main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\)\)\)[\s\S]{0,120}\[data-ds-part="sidebar"\]/,
     "Core CSS must style the validated generic sidebar when the exact shell selector is absent.",
   );
@@ -551,6 +556,64 @@ export async function runRendererRuntimeTest(assetRoot) {
     assert.equal(explicitLight.rootStyle.values.get(variable), expected,
       `${variable} must support official hex forms and clamp RGB channels`);
   }
+
+  const contrastCases = [
+    { accent: "#ffffff", lightInk: "rgb(0 0 0)", darkInk: "rgb(0 0 0)" },
+    { accent: "#000000", lightInk: "rgb(255 255 255)", darkInk: "rgb(255 255 255)" },
+    { accent: "#fff0", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
+    { accent: "#00000000", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
+    { accent: "rgba(255, 255, 255, 0.05)", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
+    { accent: "rgba(999, 999, 999, 0.1)", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
+  ];
+  for (const nativeAppearance of ["light", "dark"]) {
+    for (const { accent, lightInk, darkInk } of contrastCases) {
+      const contrast = makeFixture({ nativeAppearance });
+      vm.runInNewContext(contrast.payloadFor({
+        appearance: "auto",
+        colorMode: "explicit",
+        explicitColorKeys: ["accent"],
+        colors: { accent },
+      }), contrast.context);
+      assert.equal(contrast.rootStyle.values.get("--ds-green"), accent);
+      assert.equal(
+        contrast.rootStyle.values.get("--ds-on-accent"),
+        nativeAppearance === "light" ? lightInk : darkInk,
+        `Explicit ${accent} must keep readable button text in the ${nativeAppearance} shell`,
+      );
+    }
+  }
+
+  for (const { nativeAppearance, panel, expectedInk } of [
+    { nativeAppearance: "light", panel: "#0000", expectedInk: "rgb(255 255 255)" },
+    { nativeAppearance: "dark", panel: "#fff0", expectedInk: "rgb(0 0 0)" },
+  ]) {
+    const transparentSurfaces = makeFixture({ nativeAppearance });
+    vm.runInNewContext(transparentSurfaces.payloadFor({
+      appearance: "auto",
+      colorMode: "explicit",
+      explicitColorKeys: ["panel", "accent"],
+      colors: {
+        panel,
+        accent: "rgba(0, 0, 0, 0)",
+      },
+    }), transparentSurfaces.context);
+    assert.equal(
+      transparentSurfaces.rootStyle.values.get("--ds-on-accent"),
+      expectedInk,
+      `Transparent accent ink must model the ${panel} composer RGB surface`,
+    );
+  }
+
+  const adaptiveAccent = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(adaptiveAccent.payloadFor({
+    colorMode: "explicit",
+    explicitColorKeys: ["accent"],
+    colors: { accent: "#ffffff" },
+  }), adaptiveAccent.context);
+  assert.equal(adaptiveAccent.rootStyle.values.get("--ds-on-accent"), "rgb(0 0 0)");
+  vm.runInNewContext(adaptiveAccent.payloadFor(), adaptiveAccent.context);
+  assert.equal(adaptiveAccent.rootStyle.values.has("--ds-on-accent"), false,
+    "Reapplying an adaptive accent must restore the shell-specific CSS foreground default");
 
   rootObserver.callback([]);
   home.flushTimers(64);

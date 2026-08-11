@@ -2,11 +2,12 @@
 param([Parameter(Mandatory = $true)][string]$Root)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $Root 'scripts\localization-windows.ps1')
 $startPath = Join-Path $Root 'scripts\start-dream-skin.ps1'
 $source = [System.IO.File]::ReadAllText($startPath)
-$dotSourcePattern = '(?m)^\.\s+\(Join-Path \$PSScriptRoot ''(?:common-windows|theme-windows)\.ps1''\)\r?\n'
-if ([regex]::Matches($source, $dotSourcePattern).Count -ne 2) {
-  throw 'Start readiness fixture could not isolate the two runtime imports.'
+$dotSourcePattern = '(?m)^\.\s+\(Join-Path \$PSScriptRoot ''(?:common-windows|theme-windows|localization-windows)\.ps1''\)\r?\n'
+if ([regex]::Matches($source, $dotSourcePattern).Count -ne 3) {
+  throw 'Start readiness fixture could not isolate the three runtime imports.'
 }
 $source = [regex]::Replace($source, $dotSourcePattern, '')
 $source = $source.Replace(
