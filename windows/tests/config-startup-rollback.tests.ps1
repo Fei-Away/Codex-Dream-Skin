@@ -259,6 +259,125 @@ try {
     throw 'A rejected install config commit left incorrect appearance ownership metadata.'
   }
 
+  # A pass-through install remains durably preparing until startup visibly
+  # succeeds. Simulate a hard stop after both marker and config commits; the
+  # next locked operation must restore the exact prior values and commit the
+  # recovery record.
+  $crashConfig = Join-Path $temporaryRoot 'hard-stop-after-config.toml'
+  $crashBackup = Join-Path $temporaryRoot 'hard-stop-after-config.before.toml'
+  Write-FixtureConfig -Path $crashConfig -Content $conflictOriginal
+  $crashTransaction = Install-DreamSkinBaseTheme -ConfigPath $crashConfig `
+    -BackupPath $crashBackup -AppearanceTheme 'dark' -PassThruTransaction
+  $crashPreparing = Read-DreamSkinAppearanceTransactionState -BackupPath $crashBackup
+  $crashRecovery = Resolve-DreamSkinPendingAppearanceTransaction `
+    -ConfigPath $crashConfig -BackupPath $crashBackup
+  $crashCommitted = Read-DreamSkinAppearanceTransactionState -BackupPath $crashBackup
+  if ("$($crashPreparing.Stage)" -cne 'preparing' -or
+    "$($crashCommitted.Stage)" -cne 'committed' -or
+    $crashRecovery.ConflictedKeys.Count -ne 0 -or
+    (Read-DreamSkinUtf8File -Path $crashConfig) -cne $conflictOriginal) {
+    throw 'A hard stop after config commit did not durably restore the prior appearance.'
+  }
+
+  # Simulate the earlier marker/config boundary: the journal and applied marker
+  # exist, but config still has its exact before bytes.
+  $markerWindowConfig = Join-Path $temporaryRoot 'hard-stop-after-marker.toml'
+  $markerWindowBackup = Join-Path $temporaryRoot 'hard-stop-after-marker.before.toml'
+  Write-FixtureConfig -Path $markerWindowConfig -Content $conflictOriginal
+  $markerWindowTransaction = Install-DreamSkinBaseTheme -ConfigPath $markerWindowConfig `
+    -BackupPath $markerWindowBackup -AppearanceTheme 'dark' -PassThruTransaction
+  [System.IO.File]::WriteAllBytes(
+    $markerWindowConfig,
+    $utf8NoBom.GetBytes($conflictOriginal)
+  )
+  $markerWindowRecovery = Resolve-DreamSkinPendingAppearanceTransaction `
+    -ConfigPath $markerWindowConfig -BackupPath $markerWindowBackup
+  if ($markerWindowRecovery.ConflictedKeys.Count -ne 0 -or
+    (Read-DreamSkinUtf8File -Path $markerWindowConfig) -cne $conflictOriginal -or
+    (Read-DreamSkinAppearanceTransactionState -BackupPath $markerWindowBackup).Stage -cne
+      'committed') {
+    throw 'A hard stop between marker and config commits was not recovered idempotently.'
+  }
+
+  # Reproduce the audit case: after a crash the user changes system -> light.
+  # Recovery may restore the other still-owned keys but must never use the old
+  # backup to overwrite that newer appearance choice.
+  $crashEditConfig = Join-Path $temporaryRoot 'hard-stop-user-edit.toml'
+  $crashEditBackup = Join-Path $temporaryRoot 'hard-stop-user-edit.before.toml'
+  Write-FixtureConfig -Path $crashEditConfig -Content $conflictOriginal
+  $null = Install-DreamSkinBaseTheme -ConfigPath $crashEditConfig `
+    -BackupPath $crashEditBackup -AppearanceTheme 'dark' -PassThruTransaction
+  $crashEditApplied = Read-DreamSkinUtf8File -Path $crashEditConfig
+  Write-FixtureConfig -Path $crashEditConfig -Content (
+    $crashEditApplied.Replace('appearanceTheme = "dark"', 'appearanceTheme = "light"')
+  )
+  $crashEditRecovery = Resolve-DreamSkinPendingAppearanceTransaction `
+    -ConfigPath $crashEditConfig -BackupPath $crashEditBackup
+  $crashEditAfter = Read-DreamSkinUtf8File -Path $crashEditConfig
+  if (($crashEditRecovery.ConflictedKeys -join ',') -cne 'appearanceTheme' -or
+    -not $crashEditAfter.Contains('appearanceTheme = "light"') -or
+    -not $crashEditAfter.Contains('appearanceLightCodeThemeId = "before-code"') -or
+    -not $crashEditAfter.Contains('appearanceLightChromeTheme = { accent = "#abcdef" }') -or
+    (Read-DreamSkinAppearanceTransactionState -BackupPath $crashEditBackup).Stage -cne
+      'committed') {
+    throw 'Crash recovery overwrote a newer user appearance or failed to restore owned keys.'
+  }
+
+  # A journal whose declared touched keys do not match its own snapshots must
+  # fail closed before recovery mutates config, marker, or retained evidence.
+  $tamperedConfig = Join-Path $temporaryRoot 'tampered-journal.toml'
+  $tamperedBackup = Join-Path $temporaryRoot 'tampered-journal.before.toml'
+  Write-FixtureConfig -Path $tamperedConfig -Content $conflictOriginal
+  $null = Install-DreamSkinBaseTheme -ConfigPath $tamperedConfig `
+    -BackupPath $tamperedBackup -AppearanceTheme 'dark' -PassThruTransaction
+  $tamperedJournalPath = Get-DreamSkinAppearanceTransactionPath -BackupPath $tamperedBackup
+  $tamperedRecord = (Read-DreamSkinUtf8File -Path $tamperedJournalPath) |
+    ConvertFrom-Json -ErrorAction Stop
+  $tamperedRecord.touchedKeys = @('appearanceTheme')
+  [System.IO.File]::WriteAllText(
+    $tamperedJournalPath,
+    (($tamperedRecord | ConvertTo-Json -Depth 8 -Compress) + "`r`n"),
+    $utf8NoBom
+  )
+  $tamperedConfigBefore = [System.IO.File]::ReadAllBytes($tamperedConfig)
+  $tamperedMarkerPath = Get-DreamSkinAppearanceMarkerPath -BackupPath $tamperedBackup
+  $tamperedMarkerBefore = [System.IO.File]::ReadAllBytes($tamperedMarkerPath)
+  $tamperedJournalBefore = [System.IO.File]::ReadAllBytes($tamperedJournalPath)
+  $tamperedRejected = $false
+  try {
+    $null = Resolve-DreamSkinPendingAppearanceTransaction `
+      -ConfigPath $tamperedConfig -BackupPath $tamperedBackup
+  } catch {
+    $tamperedRejected = $true
+  }
+  if (-not $tamperedRejected -or
+    -not (Test-DreamSkinBytesEqual -Left $tamperedConfigBefore `
+      -Right ([System.IO.File]::ReadAllBytes($tamperedConfig))) -or
+    -not (Test-DreamSkinBytesEqual -Left $tamperedMarkerBefore `
+      -Right ([System.IO.File]::ReadAllBytes($tamperedMarkerPath))) -or
+    -not (Test-DreamSkinBytesEqual -Left $tamperedJournalBefore `
+      -Right ([System.IO.File]::ReadAllBytes($tamperedJournalPath)))) {
+    throw 'A tampered startup appearance journal was trusted or mutated recovery evidence.'
+  }
+
+  # A visibly successful startup promotes the same preparing record instead of
+  # rolling it back on the next install.
+  $commitConfig = Join-Path $temporaryRoot 'startup-committed.toml'
+  $commitBackup = Join-Path $temporaryRoot 'startup-committed.before.toml'
+  Write-FixtureConfig -Path $commitConfig -Content $conflictOriginal
+  $commitTransaction = Install-DreamSkinBaseTheme -ConfigPath $commitConfig `
+    -BackupPath $commitBackup -AppearanceTheme 'dark' -PassThruTransaction
+  Complete-DreamSkinAppearanceTransaction `
+    -BackupPath $commitBackup -Transaction $commitTransaction
+  $resolvedCommitted = Resolve-DreamSkinPendingAppearanceTransaction `
+    -ConfigPath $commitConfig -BackupPath $commitBackup
+  if ($null -ne $resolvedCommitted -or
+    -not (Read-DreamSkinUtf8File -Path $commitConfig).Contains('appearanceTheme = "dark"') -or
+    (Read-DreamSkinAppearanceTransactionState -BackupPath $commitBackup).Stage -cne
+      'committed') {
+    throw 'A completed startup appearance transaction was rolled back as pending.'
+  }
+
   # Close the final precondition-check/File.Replace window. File.Replace's
   # backup exposes the exact bytes that were replaced, so a late writer can be
   # restored even when it lands after the initial byte comparison.

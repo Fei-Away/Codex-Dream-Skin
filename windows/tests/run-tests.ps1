@@ -972,15 +972,19 @@ try {
       return 'not-forwarded'
     }
     $directArgumentFailureReported = $false
+    $directArgumentFailureCategory = $null
     try {
       $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
         -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
     } catch {
       $directArgumentFailureReported = $_.Exception.Message.Contains(
         'package activation or validated direct launch')
+      $directArgumentFailureCategory = Get-DreamSkinStartFailureCategory `
+        -Exception $_.Exception
     }
-    if (-not $directArgumentFailureReported) {
-      throw 'A direct fallback that also dropped the CDP argument did not fail closed.'
+    if (-not $directArgumentFailureReported -or
+      $directArgumentFailureCategory -cne 'cdp-endpoint-unavailable') {
+      throw 'A direct fallback that also dropped the CDP argument did not preserve its result category.'
     }
 
     Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'protocol-redirected' }
@@ -988,14 +992,18 @@ try {
       throw [System.UnauthorizedAccessException]::new('denied')
     }
     $accessDeniedReported = $false
+    $accessDeniedCategory = $null
     try {
       $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
         -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
     } catch {
       $accessDeniedReported = $_.Exception.Message.Contains('(access-denied)') -and
         $_.Exception.Message.Contains('protected app package')
+      $accessDeniedCategory = Get-DreamSkinStartFailureCategory -Exception $_.Exception
     }
-    if (-not $accessDeniedReported) { throw 'A blocked direct Store launch did not produce the compatibility error.' }
+    if (-not $accessDeniedReported -or $accessDeniedCategory -cne 'cdp-direct-access-denied') {
+      throw 'A blocked direct Store launch did not preserve its result category.'
+    }
   } finally {
     foreach ($functionName in $launcherFunctionNames) {
       Set-Item ("function:$functionName") -Value $originalLauncherFunctions[$functionName]

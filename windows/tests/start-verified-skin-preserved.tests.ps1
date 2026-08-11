@@ -35,7 +35,8 @@ function Invoke-DreamSkinStartupFixture {
   param(
     [Parameter(Mandatory = $true)][string[]]$VerifyPayloads,
     [Parameter(Mandatory = $true)][string]$OncePayload,
-    [switch]$ReuseExistingCdp
+    [switch]$ReuseExistingCdp,
+    [switch]$WithResultToken
   )
 
   $script:daemon = [pscustomobject]@{ Id = 4242; HasExited = $false }
@@ -47,6 +48,7 @@ function Invoke-DreamSkinStartupFixture {
   $script:codexStopped = $false
   $script:codexStarted = $false
   $script:cdpReady = [bool]$ReuseExistingCdp
+  $script:codexProcessRunning = [bool]$ReuseExistingCdp
   $script:appearanceInstallCalls = 0
   $script:appearanceRestoreCalls = 0
   $script:removeCalls = 0
@@ -54,6 +56,7 @@ function Invoke-DreamSkinStartupFixture {
   $script:verifyPayloadIndex = 0
   $script:oncePayload = $OncePayload
   $script:lastError = '(no error)'
+  $script:resultAppearanceRecovery = $null
 
   function Enter-DreamSkinOperationLock { param([int]$TimeoutMilliseconds); return 'mock-lock' }
   function Exit-DreamSkinOperationLock { param([object]$Mutex) }
@@ -84,6 +87,7 @@ function Invoke-DreamSkinStartupFixture {
     return Get-DreamSkinThemePaths -StateRoot $StateRoot
   }
   function Test-DreamSkinPaused { param([string]$StateRoot); return $false }
+  function Test-DreamSkinPendingAppearanceTransaction { param([string]$BackupPath); return $false }
   function Read-DreamSkinState { param([string]$Path); return $null }
   function Get-DreamSkinCodexStatePathCandidate { param([object]$State); return $null }
   function Get-DreamSkinCodexInstallFromState { param([object]$State); return $null }
@@ -98,7 +102,11 @@ function Invoke-DreamSkinStartupFixture {
 
   # No Codex is running yet, so startup launches it with the debug port itself.
   # That is the branch that used to force-restart on any verify failure.
-  function Get-DreamSkinCodexProcesses { param([object]$Codex); return @() }
+  function Get-DreamSkinCodexProcesses {
+    param([object]$Codex)
+    if ($script:codexProcessRunning) { return @([pscustomobject]@{ ProcessId = 909 }) }
+    return @()
+  }
   function Get-DreamSkinVerifiedCdpIdentity {
     param([int]$Port, [object]$Codex)
     if (-not $script:cdpReady) { return $null }
@@ -120,20 +128,35 @@ function Invoke-DreamSkinStartupFixture {
     $script:appearanceRestoreCalls += 1
     return [pscustomobject]@{ ConflictedKeys = @(); MarkerStatus = 'restored' }
   }
+  function Complete-DreamSkinAppearanceTransaction { param([string]$BackupPath, [object]$Transaction) }
   function Start-DreamSkinCodexForDebugging {
     param([object]$Codex, [string[]]$Arguments, [int]$Port, [int[]]$PreserveProcessIds)
     $script:cdpReady = $true
+    $script:codexProcessRunning = $true
     return [pscustomobject]@{ Strategy = 'package-activation' }
   }
   function Stop-DreamSkinCodex {
     param([object]$Codex, [int[]]$PreserveProcessIds, [switch]$AllowForce)
     $script:codexStopped = $true
     $script:cdpReady = $false
+    $script:codexProcessRunning = $false
   }
   function Start-DreamSkinCodex {
     param([object]$Codex)
     $script:codexStarted = $true
+    $script:codexProcessRunning = $true
     return [pscustomobject]@{ Id = 909 }
+  }
+  function Get-DreamSkinStartFailureCategory {
+    param([System.Exception]$Exception, [string]$FallbackCategory)
+    return $FallbackCategory
+  }
+  function Write-DreamSkinStartResult {
+    param(
+      [string]$StateRoot, [string]$Token, [string]$Outcome,
+      [string]$Category, [string]$AppearanceRecovery
+    )
+    $script:resultAppearanceRecovery = $AppearanceRecovery
   }
 
   function Invoke-DreamSkinNative {
@@ -192,7 +215,11 @@ function Invoke-DreamSkinStartupFixture {
   try {
     $startBlock = [scriptblock]::Create($rawSource)
     try {
-      & $startBlock -Port 9335
+      if ($WithResultToken) {
+        & $startBlock -Port 9335 -ResultToken '0123456789abcdef0123456789abcdef'
+      } else {
+        & $startBlock -Port 9335
+      }
     } catch {
       $script:lastError = $_.Exception.Message
       $failed = $_.Exception.Message -like 'Dream Skin verification failed.*'
@@ -208,6 +235,7 @@ function Invoke-DreamSkinStartupFixture {
     AppearanceInstallCalls = $script:appearanceInstallCalls
     AppearanceRestoreCalls = $script:appearanceRestoreCalls
     RemoveCalls = $script:removeCalls
+    ResultAppearanceRecovery = $script:resultAppearanceRecovery
     LastError = $script:lastError
   }
 }
@@ -247,6 +275,15 @@ $onceRendered = Invoke-DreamSkinStartupFixture `
 if (-not $onceRendered.Failed -or $onceRendered.CodexStopped -or
   $onceRendered.AppearanceRestoreCalls -ne 0) {
   throw 'Visible evidence returned by the one-shot injection was not latched.'
+}
+
+$communityRendered = Invoke-DreamSkinStartupFixture `
+  -VerifyPayloads @($renderedPayload, $malformedPayload) -OncePayload $malformedPayload `
+  -WithResultToken
+if (-not $communityRendered.Failed -or -not $communityRendered.CodexStopped -or
+  -not $communityRendered.CodexStarted -or $communityRendered.AppearanceRestoreCalls -ne 1 -or
+  "$($communityRendered.ResultAppearanceRecovery)" -cne 'restored') {
+  throw 'A one-click rendered-but-unverified session was not closed and appearance-restored before parent rollback.'
 }
 
 $broken = Invoke-DreamSkinStartupFixture `

@@ -345,6 +345,22 @@ function Get-DreamSkinCommunityStartFailureMessage {
   return $message
 }
 
+function New-DreamSkinCommunityStartStateException {
+  param(
+    [Parameter(Mandatory = $true)][string]$Message,
+    [switch]$StillRunning,
+    [AllowNull()][System.Exception]$InnerException
+  )
+  $exception = if ($null -ne $InnerException) {
+    [System.InvalidOperationException]::new($Message, $InnerException)
+  } else {
+    [System.InvalidOperationException]::new($Message)
+  }
+  $exception.Data['DreamSkinStartStateUnconfirmed'] = $true
+  if ($StillRunning) { $exception.Data['DreamSkinStartStillRunning'] = $true }
+  return $exception
+}
+
 function Invoke-DreamSkinCommunityStartAndVerify {
   param(
     [ValidateRange(1000, 300000)]
@@ -359,30 +375,46 @@ function Invoke-DreamSkinCommunityStartAndVerify {
   $resultToken = [guid]::NewGuid().ToString('N')
   $resultPath = Get-DreamSkinStartResultPath -StateRoot $stateRoot -Token $resultToken
   if (Test-Path -LiteralPath $resultPath) {
-    throw (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult')
+    throw (New-DreamSkinCommunityStartStateException `
+      -Message (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult') `
+      -InnerException $null)
   }
   $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
   $argumentLine = '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' +
     (ConvertTo-DreamSkinProcessArgument -Value $startScript) + ' -RestartExisting' +
     ' -RequireUnpaused -OperationLockTimeoutMilliseconds ' +
     "$OperationLockTimeoutMilliseconds" + ' -ResultToken ' + $resultToken
+  $startProcess = $null
+  $childExited = $false
   try {
     $startProcess = Start-Process -FilePath $powershell -ArgumentList $argumentLine `
       -WindowStyle Hidden -PassThru
-    if (-not $startProcess.WaitForExit($OperationLockTimeoutMilliseconds)) {
-      try { Stop-Process -InputObject $startProcess -Force -ErrorAction SilentlyContinue } catch {}
-      [void]$startProcess.WaitForExit(15000)
-      throw (Get-DreamSkinCommunityText -Key 'CommunityStartTimedOut')
+    $childCompletionGraceMilliseconds = 300000
+    $childCompletionTimeoutMilliseconds = [int](
+      $OperationLockTimeoutMilliseconds + $childCompletionGraceMilliseconds
+    )
+    if (-not $startProcess.WaitForExit($childCompletionTimeoutMilliseconds)) {
+      # The child may still own the operation mutex and be inside its bounded
+      # rollback. Killing it here would bypass every catch/finally block. Leave
+      # it running and preserve both theme states for a later verified action.
+      throw (New-DreamSkinCommunityStartStateException `
+        -Message (Get-DreamSkinCommunityText -Key 'CommunityStartTimedOut') `
+        -StillRunning -InnerException $null)
     }
+    $childExited = $true
     try {
       $result = Read-DreamSkinStartResult -StateRoot $stateRoot -Token $resultToken
     } catch {
-      throw (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult')
+      throw (New-DreamSkinCommunityStartStateException `
+        -Message (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult') `
+        -InnerException $_.Exception)
     }
     $coherentSuccess = $startProcess.ExitCode -eq 0 -and "$($result.outcome)" -ceq 'success'
     $coherentFailure = $startProcess.ExitCode -ne 0 -and "$($result.outcome)" -ceq 'failure'
     if (-not ($coherentSuccess -or $coherentFailure)) {
-      throw (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult')
+      throw (New-DreamSkinCommunityStartStateException `
+        -Message (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult') `
+        -InnerException $null)
     }
     if ($coherentFailure) {
       $message = Get-DreamSkinCommunityStartFailureMessage `
@@ -390,10 +422,13 @@ function Invoke-DreamSkinCommunityStartAndVerify {
       $exception = [System.InvalidOperationException]::new($message)
       $exception.Data['DreamSkinStartCategory'] = "$($result.category)"
       $exception.Data['DreamSkinAppearanceRecovery'] = "$($result.appearanceRecovery)"
+      if ("$($result.appearanceRecovery)" -in @('retained', 'blocked', 'preserved-rendered')) {
+        $exception.Data['DreamSkinStartStateUnconfirmed'] = $true
+      }
       throw $exception
     }
   } finally {
-    if (Test-Path -LiteralPath $resultPath) {
+    if ($childExited -and (Test-Path -LiteralPath $resultPath)) {
       Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
     }
   }
@@ -406,6 +441,10 @@ function Assert-DreamSkinCommunityActiveBaseline {
     [ValidateRange(1000, 120000)]
     [int]$RendererTimeoutMilliseconds = 30000
   )
+  $backupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
+  if (Test-DreamSkinPendingAppearanceTransaction -BackupPath $backupPath) {
+    throw 'One-click apply is blocked until the interrupted appearance transaction is recovered.'
+  }
   if (Test-DreamSkinPaused -StateRoot $StateRoot) {
     throw 'One-click apply requires an active, unpaused Dream Skin renderer.'
   }
@@ -632,6 +671,16 @@ function Invoke-DreamSkinCommunityThemeTransaction {
       -OperationLockTimeoutMilliseconds $OperationLockTimeoutMilliseconds
   } catch {
     $startFailure = $_
+    $appearanceRecovery = "$($startFailure.Exception.Data['DreamSkinAppearanceRecovery'])"
+    $startStateUnconfirmed = [bool]$startFailure.Exception.Data['DreamSkinStartStateUnconfirmed'] -or
+      $appearanceRecovery -in @('retained', 'blocked', 'preserved-rendered')
+    if ($startStateUnconfirmed) {
+      throw (New-DreamSkinCommunityApplyException `
+        -Message ("The imported theme start state is unconfirmed and was preserved without " +
+          "rewriting active-theme files: $($startFailure.Exception.Message)") `
+        -Recovery 'Failed' -InnerException $startFailure.Exception `
+        -RollbackSnapshot $snapshotRoot -RollbackFingerprint $rollbackFingerprint)
+    }
     $superseded = $false
     $rollbackFailure = $null
     $rollbackLock = $null

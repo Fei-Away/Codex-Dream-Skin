@@ -146,6 +146,15 @@ try {
       }
     }
   }
+  $pendingAppearanceTransaction = Test-DreamSkinPendingAppearanceTransaction `
+    -BackupPath $BackupPath
+  if ($pendingAppearanceTransaction) {
+    # A previous process ended before it could commit or recover appearance.
+    # Do not reuse its live session: the locked restart path closes Codex first,
+    # then Install-DreamSkinBaseTheme performs the durable three-way recovery.
+    $appearanceRecovery = 'blocked'
+    $cdpIdentity = $null
+  }
   $debugReady = $null -ne $cdpIdentity
   $codexProcesses = if (Test-DreamSkinPathEqual -Left $codexToStop.Executable -Right $currentCodex.Executable) {
     $currentProcesses
@@ -179,6 +188,22 @@ try {
   # complete skin even though verification did not pass overall.
   $skinLooksRendered = $false
   try {
+    if ($pendingAppearanceTransaction) {
+      $startFailureCategory = 'state-reconciliation-failed'
+      try {
+        $pendingRecovery = Resolve-DreamSkinPendingAppearanceTransaction `
+          -ConfigPath $ConfigPath -BackupPath $BackupPath
+        if ($null -ne $pendingRecovery -and
+          ($pendingRecovery.ConflictedKeys.Count -gt 0 -or
+            "$($pendingRecovery.MarkerStatus)" -ceq 'conflict-preserved')) {
+          Write-Warning 'Interrupted appearance recovery preserved newer user changes.'
+        }
+        $pendingAppearanceTransaction = $false
+      } catch {
+        $appearanceRecovery = 'blocked'
+        throw 'Interrupted startup appearance could not be recovered safely; config was preserved.'
+      }
+    }
     if ($null -eq (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex)) {
       # Codex is closed on this path; sync the appearanceTheme pin to the
       # active theme before launching (config writes race the app while it runs).
@@ -317,6 +342,10 @@ try {
       $foregroundBaselinePause = [bool](Test-DreamSkinPaused -StateRoot $StateRoot)
       $foregroundBaselineFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
         -ThemeDirectory $themePaths.Active
+      if ($null -ne $appearanceTransaction) {
+        Complete-DreamSkinAppearanceTransaction `
+          -BackupPath $BackupPath -Transaction $appearanceTransaction
+      }
       Exit-DreamSkinOperationLock -Mutex $operationLock
       $operationLock = $null
       $foregroundLockReleased = $true
@@ -489,6 +518,10 @@ try {
       if ((Get-Date) -ge $verifyDeadline) { throw "Dream Skin verification failed. See $VerifyPath" }
       Start-Sleep -Seconds 3
     }
+    if ($null -ne $appearanceTransaction) {
+      Complete-DreamSkinAppearanceTransaction `
+        -BackupPath $BackupPath -Transaction $appearanceTransaction
+    }
   } catch {
     $startupError = $_
     # We own the daemon Process object, so stop it directly: the object is
@@ -542,6 +575,38 @@ try {
         if ($null -ne $appearanceTransaction) { $appearanceRecovery = 'blocked' }
         Write-Warning 'Startup rollback could not fully close Codex; close Codex to ensure its CDP port is closed.'
       }
+    } elseif ($skinLooksRendered -and $ResultToken -and $launchedWithCdp -and
+      $null -ne $appearanceTransaction) {
+      # One-click apply has a parent theme-file transaction. Leaving the new
+      # appearance/session alive would make any parent file rollback produce a
+      # mixed theme. Close only the still-matching CDP session, recover this
+      # appearance transaction, and reopen ordinary Codex before reporting.
+      $renderedRollbackClosed = $false
+      try {
+        $renderedProcesses = @(Get-DreamSkinCodexProcesses -Codex $codex)
+        if ($renderedProcesses.Count -eq 0) {
+          $renderedRollbackClosed = $true
+        } else {
+          $renderedIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
+          if ($null -ne $renderedIdentity -and
+            "$($renderedIdentity.BrowserId)" -ceq "$($cdpIdentity.BrowserId)") {
+            Stop-DreamSkinCodex -Codex $codex -AllowForce
+            $renderedRollbackClosed = (Get-DreamSkinCodexProcesses -Codex $codex).Count -eq 0
+          }
+        }
+      } catch {
+        $renderedRollbackClosed = $false
+      }
+      if ($renderedRollbackClosed) {
+        $appearanceRecovery = Invoke-DreamSkinStartupAppearanceRecovery `
+          -Transaction $appearanceTransaction -ConfigPath $ConfigPath -BackupPath $BackupPath
+        try { $null = Start-DreamSkinCodex -Codex $codex } catch {
+          Write-Warning 'Rendered-session rollback could not reopen Codex automatically.'
+        }
+      } else {
+        $appearanceRecovery = 'blocked'
+        Write-Warning 'Rendered-session rollback could not confirm the exact Codex session was closed.'
+      }
     } elseif ($skinLooksRendered) {
       # The skin is on screen and only an inconclusive probe failed. Force-
       # restarting Codex here would take a working window away from the user
@@ -549,7 +614,16 @@ try {
       # unverified state we are in. The injector is already stopped and the
       # state file removed, so nothing claims this session is verified; Codex
       # keeps running with its debug port until the user closes it (#267).
-      if ($null -ne $appearanceTransaction) { $appearanceRecovery = 'preserved-rendered' }
+      if ($null -ne $appearanceTransaction) {
+        try {
+          Complete-DreamSkinAppearanceTransaction `
+            -BackupPath $BackupPath -Transaction $appearanceTransaction
+          $appearanceRecovery = 'preserved-rendered'
+        } catch {
+          $appearanceRecovery = 'blocked'
+          Write-Warning 'Rendered appearance ownership could not be committed; the pending recovery record was retained.'
+        }
+      }
       Write-Warning 'Dream Skin could not verify this session, but the theme is rendered. Codex was left running; close and reopen it to return to the stock appearance.'
     }
     if ($pauseWasSet -and $pauseCleared) {

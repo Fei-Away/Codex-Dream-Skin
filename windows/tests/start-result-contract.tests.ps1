@@ -93,6 +93,69 @@ try {
   }
   Remove-Item -LiteralPath $oversizedPath -Force
 
+  # Exercise the real launch helper and result-category resolver together. A
+  # package protocol redirect must not collapse either direct-fallback failure
+  # into the generic category used before the helper knew the precise cause.
+  $launcherFunctionNames = @(
+    'Start-DreamSkinCodex',
+    'Wait-DreamSkinCodexDebugArgumentStatus',
+    'Start-DreamSkinCodexDirect',
+    'Stop-DreamSkinCodex',
+    'Get-DreamSkinCodexProcesses'
+  )
+  $originalLauncherFunctions = @{}
+  foreach ($functionName in $launcherFunctionNames) {
+    $originalLauncherFunctions[$functionName] =
+      (Get-Command $functionName -CommandType Function).ScriptBlock
+  }
+  $fakeCodex = [pscustomobject]@{ Version = '26.803.5235.0' }
+  try {
+    Set-Item 'function:Start-DreamSkinCodex' -Value { return 101 }
+    Set-Item 'function:Stop-DreamSkinCodex' -Value {
+      param($Codex, [int[]]$PreserveProcessIds, [switch]$AllowForce)
+    }
+    Set-Item 'function:Get-DreamSkinCodexProcesses' -Value { return @() }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value { return 202 }
+    $script:startResultStatusCall = 0
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value {
+      $script:startResultStatusCall += 1
+      if ($script:startResultStatusCall -eq 1) { return 'protocol-redirected' }
+      return 'not-forwarded'
+    }
+    $notForwardedCategory = $null
+    try {
+      $null = Start-DreamSkinCodexForDebugging -Codex $fakeCodex `
+        -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    } catch {
+      $notForwardedCategory = Get-DreamSkinStartFailureCategory -Exception $_.Exception
+    }
+    if ($notForwardedCategory -cne 'cdp-endpoint-unavailable') {
+      throw 'A direct launch that dropped the CDP argument lost its bounded result category.'
+    }
+
+    Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value {
+      return 'protocol-redirected'
+    }
+    Set-Item 'function:Start-DreamSkinCodexDirect' -Value {
+      throw [System.UnauthorizedAccessException]::new('denied')
+    }
+    $accessDeniedCategory = $null
+    try {
+      $null = Start-DreamSkinCodexForDebugging -Codex $fakeCodex `
+        -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
+    } catch {
+      $accessDeniedCategory = Get-DreamSkinStartFailureCategory -Exception $_.Exception
+    }
+    if ($accessDeniedCategory -cne 'cdp-direct-access-denied') {
+      throw 'A blocked direct Store launch lost its bounded result category.'
+    }
+  } finally {
+    foreach ($functionName in $launcherFunctionNames) {
+      Set-Item ("function:$functionName") -Value $originalLauncherFunctions[$functionName]
+    }
+    Remove-Variable -Name startResultStatusCall -Scope Script -ErrorAction SilentlyContinue
+  }
+
   $startSource = [System.IO.File]::ReadAllText((Join-Path $Root 'scripts\start-dream-skin.ps1'))
   $communitySource = [System.IO.File]::ReadAllText((Join-Path $Root 'scripts\apply-community-theme.ps1'))
   $commonSource = [System.IO.File]::ReadAllText((Join-Path $Root 'scripts\common-windows.ps1'))
@@ -116,4 +179,4 @@ try {
   Remove-Item -LiteralPath $stateRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output 'PASS: bounded child-start results reject stale, oversized, and unrecognized data.'
+Write-Output 'PASS: bounded child-start results reject unsafe data and preserve direct-fallback categories.'

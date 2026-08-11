@@ -77,6 +77,7 @@ function Initialize-DreamSkinThemeStore {
   return Get-DreamSkinThemePaths -StateRoot $StateRoot
 }
 function Test-DreamSkinPaused { param([string]$StateRoot); return $false }
+function Test-DreamSkinPendingAppearanceTransaction { param([string]$BackupPath); return $false }
 function Read-DreamSkinState { param([string]$Path); return $null }
 function Get-DreamSkinCodexStatePathCandidate { param([object]$State); return $null }
 function Get-DreamSkinCodexInstallFromState { param([object]$State); return $null }
@@ -103,6 +104,7 @@ function Restore-DreamSkinManagedAppearanceSnapshot {
   $script:appearanceRestoreCalls += 1
   return [pscustomobject]@{ ConflictedKeys = @(); MarkerStatus = 'restored' }
 }
+function Complete-DreamSkinAppearanceTransaction { param([string]$BackupPath, [object]$Transaction) }
 function Start-DreamSkinCodexForDebugging {
   param([object]$Codex, [string[]]$Arguments, [int]$Port, [int[]]$PreserveProcessIds)
   $script:cdpReady = $true

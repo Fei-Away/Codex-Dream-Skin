@@ -154,34 +154,38 @@ exit `$exitCode
   }
 }
 
-$powerShellExecutable = if ($PSVersionTable.PSEdition -eq 'Core') {
-  Join-Path $PSHOME 'pwsh.exe'
-} else {
-  Join-Path $PSHOME 'powershell.exe'
-}
-if (-not (Test-Path -LiteralPath $powerShellExecutable -PathType Leaf)) {
-  $powerShellExecutable = (Get-Process -Id $PID -ErrorAction Stop).Path
-}
-$commonPath = Join-Path $Root 'scripts\common-windows.ps1'
-$heldOperationLock = Enter-DreamSkinOperationLock
-try {
-  $failFastProbe = Invoke-CommunityOperationLockProbe `
+$isWindowsHost = $PSVersionTable.PSEdition -eq 'Desktop' -or
+  [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+if ($isWindowsHost) {
+  $powerShellExecutable = if ($PSVersionTable.PSEdition -eq 'Core') {
+    Join-Path $PSHOME 'pwsh.exe'
+  } else {
+    Join-Path $PSHOME 'powershell.exe'
+  }
+  if (-not (Test-Path -LiteralPath $powerShellExecutable -PathType Leaf)) {
+    $powerShellExecutable = (Get-Process -Id $PID -ErrorAction Stop).Path
+  }
+  $commonPath = Join-Path $Root 'scripts\common-windows.ps1'
+  $heldOperationLock = Enter-DreamSkinOperationLock
+  try {
+    $failFastProbe = Invoke-CommunityOperationLockProbe `
+      -PowerShellPath $powerShellExecutable -CommonPath $commonPath `
+      -TimeoutMilliseconds -1 -ExpectSuccess $false
+    $boundedFailureProbe = Invoke-CommunityOperationLockProbe `
+      -PowerShellPath $powerShellExecutable -CommonPath $commonPath `
+      -TimeoutMilliseconds 600 -ExpectSuccess $false
+  } finally {
+    Exit-DreamSkinOperationLock -Mutex $heldOperationLock
+  }
+  $boundedSuccessProbe = Invoke-CommunityOperationLockProbe `
     -PowerShellPath $powerShellExecutable -CommonPath $commonPath `
-    -TimeoutMilliseconds -1 -ExpectSuccess $false
-  $boundedFailureProbe = Invoke-CommunityOperationLockProbe `
-    -PowerShellPath $powerShellExecutable -CommonPath $commonPath `
-    -TimeoutMilliseconds 600 -ExpectSuccess $false
-} finally {
-  Exit-DreamSkinOperationLock -Mutex $heldOperationLock
-}
-$boundedSuccessProbe = Invoke-CommunityOperationLockProbe `
-  -PowerShellPath $powerShellExecutable -CommonPath $commonPath `
-  -TimeoutMilliseconds 3000 -ExpectSuccess $true
-if ($failFastProbe.ExitCode -ne 0 -or $failFastProbe.ElapsedMilliseconds -gt 15000 -or
-  $boundedFailureProbe.ExitCode -ne 0 -or
-  $boundedFailureProbe.ElapsedMilliseconds -lt 500 -or
-  $boundedSuccessProbe.ExitCode -ne 0) {
-  throw 'The real Windows operation mutex did not preserve fail-fast and bounded-wait behavior.'
+    -TimeoutMilliseconds 3000 -ExpectSuccess $true
+  if ($failFastProbe.ExitCode -ne 0 -or $failFastProbe.ElapsedMilliseconds -gt 15000 -or
+    $boundedFailureProbe.ExitCode -ne 0 -or
+    $boundedFailureProbe.ElapsedMilliseconds -lt 500 -or
+    $boundedSuccessProbe.ExitCode -ne 0) {
+    throw 'The real Windows operation mutex did not preserve fail-fast and bounded-wait behavior.'
+  }
 }
 
 $applyPath = Join-Path $Root 'scripts\apply-community-theme.ps1'
@@ -278,9 +282,11 @@ foreach ($requiredSafety in @(
   'Set-DreamSkinActiveThemeFromSnapshot',
   'Get-DreamSkinThemeRuntimeContentFingerprint',
   'Invoke-DreamSkinCommunityStartAndVerify',
-  'WaitForExit($OperationLockTimeoutMilliseconds)',
+  '$childCompletionGraceMilliseconds = 300000',
+  'WaitForExit($childCompletionTimeoutMilliseconds)',
   "' -ResultToken ' + `$resultToken",
   'Read-DreamSkinStartResult',
+  "['DreamSkinStartStateUnconfirmed']",
   "Get-DreamSkinCommunityText -Key 'CommunityStartTimedOut'",
   'Remove-Item -LiteralPath $resultPath',
   'Move-DreamSkinCommunityRollbackSnapshot',
@@ -303,7 +309,8 @@ foreach ($forbiddenBehavior in @(
   '-ExecutionPolicy Bypass',
   '[switch]$Silent',
   'Start-Process -FilePath $Uri',
-  'Invoke-Item $Uri'
+  'Invoke-Item $Uri',
+  'Stop-Process -InputObject $startProcess -Force'
 )) {
   if ($applySource.Contains($forbiddenBehavior)) {
     throw "Community theme apply script contains forbidden behavior: $forbiddenBehavior"
@@ -335,9 +342,25 @@ $moveRollbackHelperAst = $applyAst.Find({
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Move-DreamSkinCommunityRollbackSnapshot'
 }, $true)
+$startFailureMessageHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Get-DreamSkinCommunityStartFailureMessage'
+}, $true)
+$startStateExceptionHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'New-DreamSkinCommunityStartStateException'
+}, $true)
+$startAndVerifyHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Invoke-DreamSkinCommunityStartAndVerify'
+}, $true)
 if ($null -eq $transactionAst -or $null -eq $exceptionHelperAst -or
   $null -eq $baselineHelperAst -or $null -eq $activeStateHelperAst -or
-  $null -eq $moveRollbackHelperAst) {
+  $null -eq $moveRollbackHelperAst -or $null -eq $startFailureMessageHelperAst -or
+  $null -eq $startStateExceptionHelperAst -or $null -eq $startAndVerifyHelperAst) {
   throw 'A testable community apply transaction, baseline, state, or recovery helper is missing.'
 }
 $transactionSource = $transactionAst.Extent.Text
@@ -369,6 +392,98 @@ if ($transactionLockIndex -lt 0 -or $transactionBaselineIndex -le $transactionLo
 if ($transactionSource.Contains('Set-DreamSkinPaused -Paused $false')) {
   throw 'One-click apply must not silently clear a click-time or newer pause choice.'
 }
+
+# Exercise the real parent wait/result helper with a delayed child contract. Its
+# completion budget is independent from lock acquisition, and a still-running
+# child must never be force-killed out of its recovery finally block.
+& {
+  param($FailureMessageSource, $StateExceptionSource, $StartSource)
+  Invoke-Expression $FailureMessageSource
+  Invoke-Expression $StateExceptionSource
+  Invoke-Expression $StartSource
+
+  $script:parentStartMode = 'complete'
+  $script:parentWaitTimeout = 0
+  $script:parentStopCalls = 0
+  $script:parentReadCalls = 0
+  $script:parentRemoveCalls = 0
+  $script:parentResultPathProbes = 0
+  $fakeProcess = [pscustomobject]@{ ExitCode = 1 }
+  $fakeProcess | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
+    param([int]$Milliseconds)
+    $script:parentWaitTimeout = $Milliseconds
+    return $script:parentStartMode -ceq 'complete'
+  }
+
+  function Get-DreamSkinCommunityText { param([string]$Key); return $Key }
+  function Assert-DreamSkinNoReparseComponents { param([string]$Path) }
+  function Join-Path {
+    param([AllowEmptyString()][string]$Path, [string]$ChildPath)
+    return 'fixture-' + $ChildPath
+  }
+  function Get-DreamSkinStartResultPath { param([string]$StateRoot, [string]$Token); return 'fixture-result' }
+  function ConvertTo-DreamSkinProcessArgument { param([string]$Value); return $Value }
+  function Get-Command { param([string]$Name, [object]$ErrorAction); return [pscustomobject]@{ Source = 'powershell.exe' } }
+  function Start-Process {
+    param([string]$FilePath, [object]$ArgumentList, [string]$WindowStyle, [switch]$PassThru)
+    return $fakeProcess
+  }
+  function Stop-Process {
+    param([object]$InputObject, [switch]$Force, [object]$ErrorAction)
+    $script:parentStopCalls += 1
+  }
+  function Read-DreamSkinStartResult {
+    param([string]$StateRoot, [string]$Token)
+    $script:parentReadCalls += 1
+    return [pscustomobject]@{
+      outcome = 'failure'
+      category = 'cdp-endpoint-unavailable'
+      appearanceRecovery = 'restored'
+    }
+  }
+  function Test-Path {
+    param([string]$LiteralPath, [object]$PathType)
+    if ($LiteralPath -ceq 'fixture-result') {
+      $script:parentResultPathProbes += 1
+      return $script:parentResultPathProbes -gt 1
+    }
+    return $true
+  }
+  function Remove-Item {
+    param([string]$LiteralPath, [switch]$Force, [object]$ErrorAction)
+    $script:parentRemoveCalls += 1
+  }
+
+  $completedFailure = $null
+  try { Invoke-DreamSkinCommunityStartAndVerify } catch { $completedFailure = $_ }
+  if ($null -eq $completedFailure -or
+    "$($completedFailure.Exception.Data['DreamSkinAppearanceRecovery'])" -cne 'restored' -or
+    $script:parentWaitTimeout -ne 480000 -or $script:parentStopCalls -ne 0 -or
+    $script:parentReadCalls -ne 1 -or $script:parentRemoveCalls -ne 1) {
+    throw ("The delayed child did not receive its independent completion grace and exact " +
+      "restored result (message=$($completedFailure.Exception.Message); recovery=" +
+      "$($completedFailure.Exception.Data['DreamSkinAppearanceRecovery']); wait=" +
+      "$script:parentWaitTimeout; stops=$script:parentStopCalls; reads=" +
+      "$script:parentReadCalls; removes=$script:parentRemoveCalls).")
+  }
+
+  $script:parentStartMode = 'timeout'
+  $script:parentWaitTimeout = 0
+  $script:parentReadCalls = 0
+  $script:parentRemoveCalls = 0
+  $script:parentResultPathProbes = 0
+  $timeoutFailure = $null
+  try { Invoke-DreamSkinCommunityStartAndVerify } catch { $timeoutFailure = $_ }
+  if ($null -eq $timeoutFailure -or
+    -not [bool]$timeoutFailure.Exception.Data['DreamSkinStartStateUnconfirmed'] -or
+    -not [bool]$timeoutFailure.Exception.Data['DreamSkinStartStillRunning'] -or
+    $script:parentWaitTimeout -ne 480000 -or $script:parentStopCalls -ne 0 -or
+    $script:parentReadCalls -ne 0 -or $script:parentRemoveCalls -ne 0) {
+    throw 'A still-running child was killed, consumed, or reported as safely rolled back.'
+  }
+} $startFailureMessageHelperAst.Extent.Text `
+  $startStateExceptionHelperAst.Extent.Text $startAndVerifyHelperAst.Extent.Text
+
 Invoke-Expression $exceptionHelperAst.Extent.Text
 Invoke-Expression $baselineHelperAst.Extent.Text
 Invoke-Expression $activeStateHelperAst.Extent.Text
@@ -461,6 +576,11 @@ function Test-DreamSkinPaused {
   return $script:communityPaused
 }
 
+function Test-DreamSkinPendingAppearanceTransaction {
+  param([string]$BackupPath)
+  return $script:communityMode -ceq 'baseline-pending-appearance'
+}
+
 function Set-DreamSkinPaused {
   param([bool]$Paused, [string]$StateRoot)
   $script:communityPauseWriteCalls += 1
@@ -541,6 +661,13 @@ function Invoke-DreamSkinCommunityStartAndVerify {
     }
     throw 'forced imported renderer failure'
   }
+  if ($script:communityMode -ceq 'preserved-rendered' -and
+    $script:communityStartCalls -eq 1) {
+    $exception = [System.InvalidOperationException]::new('forced preserved rendered result')
+    $exception.Data['DreamSkinAppearanceRecovery'] = 'preserved-rendered'
+    $exception.Data['DreamSkinStartStateUnconfirmed'] = $true
+    throw $exception
+  }
   if ($script:communityMode -ceq 'rollback-renderer-failure') {
     throw 'forced renderer failure'
   }
@@ -592,7 +719,8 @@ foreach ($baselineCase in @(
   @{ Mode = 'baseline-session-mismatch'; VerifyCalls = 0 },
   @{ Mode = 'baseline-renderer-mismatch'; VerifyCalls = 1 },
   @{ Mode = 'baseline-selection-changed'; VerifyCalls = 1 },
-  @{ Mode = 'baseline-pause-during-verify'; VerifyCalls = 1 }
+  @{ Mode = 'baseline-pause-during-verify'; VerifyCalls = 1 },
+  @{ Mode = 'baseline-pending-appearance'; VerifyCalls = 0 }
 )) {
   Reset-CommunityTransactionFixture -Mode $baselineCase.Mode
   Assert-CommunityValueRejected -Label $baselineCase.Mode -Action {
@@ -696,6 +824,21 @@ Assert-CommunityIntSequence -Actual $script:communityStartTimeouts `
 Assert-CommunityIntSequence -Actual $script:communityLockTimeouts `
   -Expected @(0, 180000, 180000) -Label 'Renderer rollback lock'
 
+Reset-CommunityTransactionFixture -Mode 'preserved-rendered'
+$preservedRenderedError = $null
+try {
+  $null = Invoke-DreamSkinCommunityThemeTransaction -Imported $mockImported `
+    -Paths $mockPaths -WorkRoot 'work' -StateRoot 'state'
+} catch {
+  $preservedRenderedError = $_
+}
+if ($null -eq $preservedRenderedError -or
+  "$($preservedRenderedError.Exception.Data['DreamSkinRecovery'])" -cne 'Failed' -or
+  $script:communityCurrentFingerprint -cne $script:communityExpectedFingerprint -or
+  $script:communityRestoreCalls -ne 0 -or $script:communityStartCalls -ne 1) {
+  throw 'A preserved rendered child result rewrote active-theme files into mixed state.'
+}
+
 Reset-CommunityTransactionFixture -Mode 'rollback-write-failure'
 $rollbackWriteError = $null
 try {
@@ -795,43 +938,45 @@ Assert-CommunityIntSequence -Actual $script:communityStartTimeouts -Expected @(1
 Assert-CommunityIntSequence -Actual $script:communityLockTimeouts -Expected @(0, 180000) `
   -Label 'Recovery lock-timeout lock'
 
-$retentionRoot = Join-Path ([System.IO.Path]::GetTempPath()) `
-  ('dreamskin-community-retention-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $retentionRoot -Force | Out-Null
-try {
-  $retentionPaths = [pscustomobject]@{ Root = $retentionRoot }
-  $retainedPaths = @()
-  foreach ($index in 1..2) {
-    Reset-CommunityTransactionFixture -Mode 'success'
-    $retentionWork = Join-Path $retentionRoot ('.community-apply-test-' + $index)
-    $retentionSnapshot = Join-Path $retentionWork 'active-before'
-    New-Item -ItemType Directory -Path $retentionSnapshot -Force | Out-Null
-    $retainedPaths += Move-DreamSkinCommunityRollbackSnapshot `
-      -WorkRoot $retentionWork -Paths $retentionPaths `
-      -ExpectedContentFingerprint $script:communityRollbackFingerprint
-  }
-  $missingRetained = @($retainedPaths | Where-Object {
-      -not (Test-Path -LiteralPath $_ -PathType Container)
-    })
-  if ($retainedPaths.Count -ne 2 -or $retainedPaths[0] -ceq $retainedPaths[1] -or
-    $missingRetained.Count -ne 0) {
-    throw 'Rollback snapshots were not atomically retained under unique managed paths.'
-  }
+if ($isWindowsHost) {
+  $retentionRoot = Join-Path ([System.IO.Path]::GetTempPath()) `
+    ('dreamskin-community-retention-' + [guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Path $retentionRoot -Force | Out-Null
+  try {
+    $retentionPaths = [pscustomobject]@{ Root = $retentionRoot }
+    $retainedPaths = @()
+    foreach ($index in 1..2) {
+      Reset-CommunityTransactionFixture -Mode 'success'
+      $retentionWork = Join-Path $retentionRoot ('.community-apply-test-' + $index)
+      $retentionSnapshot = Join-Path $retentionWork 'active-before'
+      New-Item -ItemType Directory -Path $retentionSnapshot -Force | Out-Null
+      $retainedPaths += Move-DreamSkinCommunityRollbackSnapshot `
+        -WorkRoot $retentionWork -Paths $retentionPaths `
+        -ExpectedContentFingerprint $script:communityRollbackFingerprint
+    }
+    $missingRetained = @($retainedPaths | Where-Object {
+        -not (Test-Path -LiteralPath $_ -PathType Container)
+      })
+    if ($retainedPaths.Count -ne 2 -or $retainedPaths[0] -ceq $retainedPaths[1] -or
+      $missingRetained.Count -ne 0) {
+      throw 'Rollback snapshots were not atomically retained under unique managed paths.'
+    }
 
-  Reset-CommunityTransactionFixture -Mode 'rollback-snapshot-mismatch'
-  $mismatchWork = Join-Path $retentionRoot '.community-apply-mismatch'
-  $mismatchSnapshot = Join-Path $mismatchWork 'active-before'
-  New-Item -ItemType Directory -Path $mismatchSnapshot -Force | Out-Null
-  Assert-CommunityValueRejected -Label 'a changed rollback snapshot' -Action {
-    Move-DreamSkinCommunityRollbackSnapshot -WorkRoot $mismatchWork `
-      -Paths $retentionPaths `
-      -ExpectedContentFingerprint $script:communityRollbackFingerprint
+    Reset-CommunityTransactionFixture -Mode 'rollback-snapshot-mismatch'
+    $mismatchWork = Join-Path $retentionRoot '.community-apply-mismatch'
+    $mismatchSnapshot = Join-Path $mismatchWork 'active-before'
+    New-Item -ItemType Directory -Path $mismatchSnapshot -Force | Out-Null
+    Assert-CommunityValueRejected -Label 'a changed rollback snapshot' -Action {
+      Move-DreamSkinCommunityRollbackSnapshot -WorkRoot $mismatchWork `
+        -Paths $retentionPaths `
+        -ExpectedContentFingerprint $script:communityRollbackFingerprint
+    }
+    if (-not (Test-Path -LiteralPath $mismatchSnapshot -PathType Container)) {
+      throw 'A changed rollback snapshot was removed instead of being preserved in place.'
+    }
+  } finally {
+    Remove-Item -LiteralPath $retentionRoot -Recurse -Force -ErrorAction SilentlyContinue
   }
-  if (-not (Test-Path -LiteralPath $mismatchSnapshot -PathType Container)) {
-    throw 'A changed rollback snapshot was removed instead of being preserved in place.'
-  }
-} finally {
-  Remove-Item -LiteralPath $retentionRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host 'PASS: Windows community links, metadata, identity, serialized apply, and verified rollback are fail-closed.'
