@@ -27,7 +27,7 @@ record_pause_error() {
     recovery_path="$(state_field injectorPath 2>/dev/null || true)"
     recovery_port="$(state_field port 2>/dev/null || true)"
     recovery_protocol="$(state_field injectorProtocol 2>/dev/null || true)"
-    if [ "$recovery_protocol" = "3" ] \
+    if [ "$recovery_protocol" = "4" ] \
       && recorded_injector_process_matches \
         "$recovery_pid" "$recovery_start" "$recovery_node" "$recovery_path" "$recovery_port" \
       && operation_ack_matches "$OPERATION_TOKEN" "$recovery_pid" control; then
@@ -127,7 +127,7 @@ if [ -f "$STATE_PATH" ]; then
   recorded_node="$(state_field nodePath 2>/dev/null || true)"
   recorded_path="$(state_field injectorPath 2>/dev/null || true)"
   recorded_port="$(state_field port 2>/dev/null || true)"
-  if [ "$injector_protocol" = "3" ]; then
+  if [ "$injector_protocol" = "4" ]; then
     case "$recorded_pid" in
       ''|*[!0-9]*) ;;
       *)

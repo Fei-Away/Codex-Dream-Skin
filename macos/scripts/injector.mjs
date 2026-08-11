@@ -56,6 +56,10 @@ const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
 const OPERATION_UI_STATES = new Set(["success", "error", "cancelled"]);
+const DISCOVERY_RETRY_INITIAL_MS = 250;
+const DISCOVERY_RETRY_MAX_MS = 30000;
+const DISCOVERY_ERROR_LOG_INTERVAL_MS = 30000;
+const HOST_FULL_IDENTITY_INTERVAL_MS = 5000;
 const MIN_RENDERER_WIDTH = 320;
 const MIN_RENDERER_HEIGHT = 240;
 const MAX_RENDERER_DIMENSION = 65536;
@@ -168,6 +172,138 @@ const OPERATION_UI_CSS = `
 `;
 let staticPayloadAssets = null;
 let operationSequence = 0;
+
+const normalizeProcessStart = (value) => String(value ?? "").trim().replace(/\s+/g, " ");
+
+export function processIsAlive(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 1 || pid > 2147483647) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
+export async function readProcessIdentity(pid, run = execFileAsync) {
+  if (!Number.isSafeInteger(pid) || pid <= 1 || pid > 2147483647) return null;
+  try {
+    const [{ stdout: startedAt }, { stdout: executableList }] = await Promise.all([
+      run("/bin/ps", ["-p", String(pid), "-o", "lstart="], { timeout: 2000 }),
+      run(
+        "/usr/sbin/lsof",
+        ["-a", "-p", String(pid), "-d", "txt", "-Fn"],
+        { timeout: 2000 },
+      ),
+    ]);
+    const executable = String(executableList).split("\n")
+      .find((line) => line.startsWith("n"))?.slice(1) ?? "";
+    const normalizedStart = normalizeProcessStart(startedAt);
+    if (!normalizedStart || !path.isAbsolute(executable)) return null;
+    return { pid, startedAt: normalizedStart, executable };
+  } catch {
+    return null;
+  }
+}
+
+export async function processIdentityMatches(expected, readIdentity = readProcessIdentity) {
+  const actual = await readIdentity(expected?.pid);
+  return Boolean(actual
+    && actual.pid === expected.pid
+    && normalizeProcessStart(actual.startedAt) === normalizeProcessStart(expected.startedAt)
+    && actual.executable === expected.executable);
+}
+
+export function nextDiscoveryDelay(currentDelayMs) {
+  return Math.min(
+    DISCOVERY_RETRY_MAX_MS,
+    Math.max(DISCOVERY_RETRY_INITIAL_MS, Math.round(currentDelayMs * 2)),
+  );
+}
+
+export function createLogThrottle(intervalMs, now = Date.now) {
+  let lastLogAt = null;
+  return () => {
+    const currentTime = now();
+    if (lastLogAt !== null && currentTime - lastLogAt < intervalMs) return false;
+    lastLogAt = currentTime;
+    return true;
+  };
+}
+
+function abortableSleep(delayMs, signal) {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve(false);
+      return;
+    }
+    let timer;
+    const finish = (completed) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      resolve(completed);
+    };
+    const onAbort = () => finish(false);
+    timer = setTimeout(() => finish(true), delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export async function waitForWatchRetry(delayMs, {
+  matchesHost,
+  signal = null,
+  pollIntervalMs = 1000,
+} = {}) {
+  const deadline = Date.now() + delayMs;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) return "stopped";
+    if (!await matchesHost()) return "host-exited";
+    const completed = await abortableSleep(
+      Math.min(deadline - Date.now(), Math.max(1, pollIntervalMs)),
+      signal,
+    );
+    if (!completed) return "stopped";
+  }
+  if (!await matchesHost()) return "host-exited";
+  return signal?.aborted ? "stopped" : "elapsed";
+}
+
+async function markWatcherStateStale(options) {
+  if (!options.watcherState) return;
+  let state;
+  try {
+    const details = await fs.lstat(options.watcherState);
+    if (!details.isFile() || details.isSymbolicLink()) return;
+    state = JSON.parse(await fs.readFile(options.watcherState, "utf8"));
+  } catch {
+    return;
+  }
+  if (Number(state.injectorPid) !== process.pid
+    || Number(state.codexPid) !== options.hostPid
+    || normalizeProcessStart(state.codexStartedAt) !== normalizeProcessStart(options.hostStartedAt)
+    || state.codexExe !== options.hostExecutable) return;
+  state.session = "stale";
+  state.injectorPid = 0;
+  state.injectorStartedAt = "";
+  state.injectorMode = "stopped";
+  state.staleReason = "codex-host-exited";
+  state.updatedAt = new Date().toISOString();
+  const temporary = `${options.watcherState}.${process.pid}.tmp`;
+  try {
+    await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+    const latest = JSON.parse(await fs.readFile(options.watcherState, "utf8"));
+    if (Number(latest.injectorPid) !== process.pid
+      || Number(latest.codexPid) !== options.hostPid
+      || normalizeProcessStart(latest.codexStartedAt) !== normalizeProcessStart(options.hostStartedAt)
+      || latest.codexExe !== options.hostExecutable) {
+      await fs.rm(temporary, { force: true });
+      return;
+    }
+    await fs.rename(temporary, options.watcherState);
+  } catch {
+    await fs.rm(temporary, { force: true }).catch(() => {});
+  }
+}
 
 function hasReasonableDimensions(width, height) {
   return Number.isFinite(width) && Number.isFinite(height)
@@ -286,7 +422,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
   return result;
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     port: 9341,
     mode: "watch",
@@ -300,6 +436,10 @@ function parseArgs(argv) {
     operationUiState: null,
     operationMessage: null,
     operationToken: null,
+    hostPid: null,
+    hostStartedAt: null,
+    hostExecutable: null,
+    watcherState: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -320,6 +460,10 @@ function parseArgs(argv) {
     else if (arg === "--operation-ui-state") options.operationUiState = argv[++i];
     else if (arg === "--operation-message") options.operationMessage = argv[++i];
     else if (arg === "--operation-token") options.operationToken = argv[++i];
+    else if (arg === "--host-pid") options.hostPid = Number(argv[++i]);
+    else if (arg === "--host-started-at") options.hostStartedAt = argv[++i];
+    else if (arg === "--host-executable") options.hostExecutable = path.resolve(argv[++i]);
+    else if (arg === "--watcher-state") options.watcherState = path.resolve(argv[++i]);
     else if (arg === "--reload") options.reload = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -328,6 +472,22 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 250 || options.timeoutMs > 120000) {
     throw new Error(`Invalid timeout: ${options.timeoutMs}`);
+  }
+  if (options.mode === "watch") {
+    if (!Number.isSafeInteger(options.hostPid) || options.hostPid <= 1
+      || options.hostPid > 2147483647) {
+      throw new Error(`Invalid or missing watcher host PID: ${options.hostPid}`);
+    }
+    if (typeof options.hostStartedAt !== "string" || !options.hostStartedAt.trim()
+      || options.hostStartedAt.length > 128 || /[\r\n]/.test(options.hostStartedAt)) {
+      throw new Error("Invalid or missing watcher host start time");
+    }
+    if (typeof options.hostExecutable !== "string" || !path.isAbsolute(options.hostExecutable)) {
+      throw new Error("Invalid or missing watcher host executable");
+    }
+    if (options.watcherState !== null && !path.isAbsolute(options.watcherState)) {
+      throw new Error("Invalid watcher state path");
+    }
   }
   if (options.operationToken !== null && !/^\d{1,12}:\d{13}:\d{1,8}$/.test(options.operationToken)) {
     throw new Error("Invalid operation token");
@@ -1594,14 +1754,43 @@ async function watchOperationState(statePath, onState) {
 }
 
 async function runWatch(options) {
+  const expectedHost = {
+    pid: options.hostPid,
+    startedAt: options.hostStartedAt,
+    executable: options.hostExecutable,
+  };
+  let lastHostCheckAt = 0;
+  let lastFullHostCheckAt = 0;
+  let lastHostMatched = false;
+  const matchesHost = async ({ force = false } = {}) => {
+    const currentTime = Date.now();
+    if (!force && currentTime - lastHostCheckAt < 1000) return lastHostMatched;
+    lastHostCheckAt = currentTime;
+    if (!processIsAlive(expectedHost.pid)) {
+      lastHostMatched = false;
+      return false;
+    }
+    if (force || currentTime - lastFullHostCheckAt >= HOST_FULL_IDENTITY_INTERVAL_MS) {
+      lastHostMatched = await processIdentityMatches(expectedHost);
+      lastFullHostCheckAt = currentTime;
+    }
+    return lastHostMatched;
+  };
+  if (!await matchesHost({ force: true })) {
+    console.log(`[dream-skin] Codex host identity ${options.hostPid} is gone; stopping watcher`);
+    await markWatcherStateStale(options);
+    return;
+  }
   let current = await loadPayload(options.themeDir);
   const sessions = new Map();
   const rejected = new Set();
   let stopping = false;
   let reloadTimer = null;
   let reloadChain = Promise.resolve();
-  let discoveryDelayMs = 100;
-  let lastListErrorAt = 0;
+  let discoveryDelayMs = DISCOVERY_RETRY_INITIAL_MS;
+  const shouldLogListError = createLogThrottle(DISCOVERY_ERROR_LOG_INTERVAL_MS);
+  const retryController = new AbortController();
+  let hostExited = false;
   let operationSignalChain = Promise.resolve();
   let activeOperation = null;
   let pauseRecovery = null;
@@ -1624,11 +1813,12 @@ async function runWatch(options) {
       if (wakeControlWait === finish) wakeControlWait = null;
       resolve();
     };
-    const timer = setTimeout(finish, 60000);
+    const timer = setTimeout(finish, 1000);
     wakeControlWait = finish;
   });
   const stop = () => {
     stopping = true;
+    retryController.abort();
     wakeControlLoop();
   };
   process.on("SIGINT", stop);
@@ -1891,6 +2081,11 @@ async function runWatch(options) {
 
   try {
     while (!stopping) {
+      if (!await matchesHost()) {
+        hostExited = true;
+        console.log(`[dream-skin] Codex host identity ${options.hostPid} exited; stopping watcher`);
+        break;
+      }
       if (activeOperation && !isFreshBusyOperation(activeOperation)) {
         const expiredOperation = activeOperation;
         activeOperation = null;
@@ -1917,14 +2112,22 @@ async function runWatch(options) {
       let targets = [];
       try {
         targets = await listAppTargets(options.port);
-        discoveryDelayMs = 100;
+        discoveryDelayMs = DISCOVERY_RETRY_INITIAL_MS;
       } catch (error) {
-        if (Date.now() - lastListErrorAt >= 2000) {
+        if (shouldLogListError()) {
           console.error(`[dream-skin] ${new Date().toISOString()} ${error.message}`);
-          lastListErrorAt = Date.now();
         }
-        await new Promise((resolve) => setTimeout(resolve, discoveryDelayMs));
-        discoveryDelayMs = Math.min(500, Math.round(discoveryDelayMs * 1.6));
+        const retryResult = await waitForWatchRetry(discoveryDelayMs, {
+          matchesHost,
+          signal: retryController.signal,
+        });
+        if (retryResult === "stopped") break;
+        if (retryResult === "host-exited") {
+          hostExited = true;
+          console.log(`[dream-skin] Codex host identity ${options.hostPid} exited; stopping watcher`);
+          break;
+        }
+        discoveryDelayMs = nextDiscoveryDelay(discoveryDelayMs);
         continue;
       }
 
@@ -2103,9 +2306,11 @@ async function runWatch(options) {
         pauseRecovery = null;
       }
       const pollDelay = sessions.size ? 800 : (targets.length ? 250 : 100);
-      await new Promise((resolve) => setTimeout(resolve, pollDelay));
+      await abortableSleep(pollDelay, retryController.signal);
     }
   } finally {
+    process.off("SIGINT", stop);
+    process.off("SIGTERM", stop);
     if (reloadTimer) clearTimeout(reloadTimer);
     closePayloadWatchers();
     closeOperationWatcher();
@@ -2117,6 +2322,7 @@ async function runWatch(options) {
         : Promise.resolve(false)));
     await Promise.all([...sessions.values()].map((record) => removeEarly(record)));
     for (const record of sessions.values()) record.session.close();
+    if (hostExited) await markWatcherStateStale(options);
   }
 }
 

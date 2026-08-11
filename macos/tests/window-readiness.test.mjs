@@ -327,7 +327,11 @@ launch_injector_daemon() {
 }
 wait_for_cdp() { return 0; }
 process_started_at() { /usr/bin/printf 'test-start-time\\n'; }
+process_executable_path() { /usr/bin/printf '/Applications/ChatGPT.app/Contents/MacOS/ChatGPT\\n'; }
+pid_is_codex_executable() { return 0; }
 codex_main_pids() { /usr/bin/printf '4242\\n'; }
+wait_for_codex_main_pid() { /usr/bin/printf '4242\\n'; }
+codex_host_pid_for_port() { /usr/bin/printf '4242\\n'; }
 write_state() { /usr/bin/printf '{}\\n' > "$STATE_PATH"; }
 mark_state_stale() { /usr/bin/printf 'stale\\n' > "$STALE_MARKER"; }
 mark_state_active() { /usr/bin/printf 'active\\n' > "$ACTIVE_MARKER"; }

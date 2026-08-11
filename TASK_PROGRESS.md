@@ -1,5 +1,44 @@
 # Task Progress
 
+## macOS stale watcher lifecycle fix (2026-08-11)
+
+- [scope] Replayed the still-relevant lifecycle portion of #264 on current
+  `main` (`6f789be`, v1.5.12), without its unrelated status-process discovery
+  change. The skin remained paused and Codex was not restarted during local
+  development and verification.
+- [implemented] Replaced `launchctl submit` with a one-shot LaunchAgent and
+  bound every watcher to the exact Codex host PID, process start time, and
+  executable path. Hot reapply only reuses a watcher whose saved host and
+  injector identities still match.
+- [implemented] CDP discovery now backs off from 250 ms to 30 seconds, throttles
+  errors to one per 30 seconds across changing error messages, and keeps both
+  retry waits and signal shutdown interruptible. A vanished or reused host PID
+  marks only its matching state record stale; the one-shot LaunchAgent does not
+  relaunch the exited watcher.
+- [covered] Added regressions for missing/mismatched host identity, PID reuse,
+  a short unavailable-CDP window, SIGTERM during retry, exact host exit, stale
+  state cleanup, one-shot LaunchAgent arguments, isolated repeated LaunchAgent
+  replacement/cleanup, and existing start/verify interaction behavior.
+- [verified] `CODEX_DREAM_SKIN_SKIP_DOCTOR=1
+  CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS=1 bash macos/tests/run-tests.sh`
+  passes, including the new lifecycle test. Full-Xcode, installed signed-runtime,
+  and Doctor branches were intentionally skipped so the paused skin and current
+  Codex session were not touched.
+- [measured] An isolated Apple Silicon run against a closed test port produced
+  one error line over 10 seconds; sampled watcher CPU fell to 0.0-0.2% for the
+  final four samples (with one 0.5% full-identity check), versus the old
+  sub-second retry loop. This used a temporary `/bin/sleep` host, not Codex.
+- [gap] A real themed Codex start/quit/reopen smoke was intentionally not run
+  on this machine because the user asked to keep the skin off. LaunchAgent
+  bootstrap/replacement was exercised only with an isolated test label and
+  closed test port. CI and maintainer review remain required before merge.
+- [pushed/PR open] Branch `Syfyivan:agent/fix-macos-stale-watcher` is pushed;
+  draft PR #353 targets current
+  upstream `main` and links #218 while crediting the original #264 work.
+- [pending] GitHub classified the fork workflow as `action_required` before
+  creating jobs, so a maintainer must approve the first-time fork workflow
+  before CI can execute. This is not a test failure.
+
 ## Client release v1.5.12 (2026-08-08)
 
 - [scope] Reviewed and merged 10 pending community/self PRs that had accumulated
