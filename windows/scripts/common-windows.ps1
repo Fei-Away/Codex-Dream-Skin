@@ -1,5 +1,180 @@
 . (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
+$script:DreamSkinStartResultCategories = @(
+  'none',
+  'cdp-launch-failed',
+  'cdp-direct-access-denied',
+  'cdp-endpoint-unavailable',
+  'port-unavailable',
+  'state-reconciliation-failed',
+  'injector-start-failed',
+  'renderer-verification-failed',
+  'superseded',
+  'internal-start-failure'
+)
+$script:DreamSkinStartAppearanceRecoveryStates = @(
+  'not-needed',
+  'retained',
+  'restored',
+  'conflict-preserved',
+  'blocked',
+  'preserved-rendered'
+)
+
+function New-DreamSkinStartException {
+  param(
+    [Parameter(Mandatory = $true)][string]$Category,
+    [Parameter(Mandatory = $true)][string]$Message,
+    [AllowNull()][System.Exception]$InnerException
+  )
+  if ($script:DreamSkinStartResultCategories -cnotcontains $Category -or $Category -ceq 'none') {
+    throw 'Invalid Dream Skin start failure category.'
+  }
+  $exception = if ($null -ne $InnerException) {
+    [System.InvalidOperationException]::new($Message, $InnerException)
+  } else {
+    [System.InvalidOperationException]::new($Message)
+  }
+  $exception.Data['DreamSkinStartCategory'] = $Category
+  return $exception
+}
+
+function Get-DreamSkinStartFailureCategory {
+  param(
+    [Parameter(Mandatory = $true)][System.Exception]$Exception,
+    [ValidateSet(
+      'cdp-launch-failed', 'cdp-direct-access-denied', 'cdp-endpoint-unavailable',
+      'port-unavailable', 'state-reconciliation-failed', 'injector-start-failed',
+      'renderer-verification-failed', 'superseded', 'internal-start-failure'
+    )]
+    [string]$FallbackCategory = 'internal-start-failure'
+  )
+  $current = $Exception
+  while ($null -ne $current) {
+    $category = "$($current.Data['DreamSkinStartCategory'])"
+    if ($script:DreamSkinStartResultCategories -ccontains $category -and $category -cne 'none') {
+      return $category
+    }
+    $current = $current.InnerException
+  }
+  return $FallbackCategory
+}
+
+function Get-DreamSkinStartResultPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$StateRoot,
+    [Parameter(Mandatory = $true)][string]$Token
+  )
+  if ($Token -cnotmatch '\A[a-f0-9]{32}\z') {
+    throw 'Dream Skin start result token is invalid.'
+  }
+  $root = [System.IO.Path]::GetFullPath($StateRoot)
+  return Join-Path $root ('.start-result-' + $Token + '.json')
+}
+
+function Write-DreamSkinStartResult {
+  param(
+    [Parameter(Mandatory = $true)][string]$StateRoot,
+    [Parameter(Mandatory = $true)][string]$Token,
+    [Parameter(Mandatory = $true)][ValidateSet('success', 'failure')][string]$Outcome,
+    [Parameter(Mandatory = $true)][string]$Category,
+    [Parameter(Mandatory = $true)][string]$AppearanceRecovery
+  )
+  if ($script:DreamSkinStartResultCategories -cnotcontains $Category -or
+    $script:DreamSkinStartAppearanceRecoveryStates -cnotcontains $AppearanceRecovery -or
+    ($Outcome -ceq 'success' -and $Category -cne 'none') -or
+    ($Outcome -ceq 'failure' -and $Category -ceq 'none')) {
+    throw 'Dream Skin start result fields are invalid.'
+  }
+  $path = Get-DreamSkinStartResultPath -StateRoot $StateRoot -Token $Token
+  [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetFullPath($StateRoot)) | Out-Null
+  if (Get-Command Assert-DreamSkinNoReparseComponents -ErrorAction SilentlyContinue) {
+    Assert-DreamSkinNoReparseComponents -Path $path
+  }
+  $result = [ordered]@{
+    schemaVersion = 1
+    token = $Token
+    outcome = $Outcome
+    category = $Category
+    appearanceRecovery = $AppearanceRecovery
+  }
+  $content = (($result | ConvertTo-Json -Compress) + "`r`n")
+  if ($script:DreamSkinUtf8NoBom.GetByteCount($content) -gt 4096) {
+    throw 'Dream Skin start result exceeded its fixed size limit.'
+  }
+  Write-DreamSkinUtf8FileAtomically -Path $path -Content $content -ExpectedBytes $null
+}
+
+function Read-DreamSkinStartResult {
+  param(
+    [Parameter(Mandatory = $true)][string]$StateRoot,
+    [Parameter(Mandatory = $true)][string]$Token
+  )
+  $path = Get-DreamSkinStartResultPath -StateRoot $StateRoot -Token $Token
+  if (Get-Command Assert-DreamSkinNoReparseComponents -ErrorAction SilentlyContinue) {
+    Assert-DreamSkinNoReparseComponents -Path $path
+  }
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw 'Dream Skin start did not return a structured result.'
+  }
+  $stream = $null
+  try {
+    # Hold one non-writable, non-deletable handle from the size check through
+    # the read. This prevents a path swap or growth between two file opens.
+    $stream = [System.IO.FileStream]::new(
+      $path,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,
+      [System.IO.FileShare]::Read
+    )
+    if ($stream.Length -le 0 -or $stream.Length -gt 4096) {
+      throw 'Dream Skin start returned an invalid structured result size.'
+    }
+    $bytes = [byte[]]::new([int]$stream.Length)
+    $offset = 0
+    while ($offset -lt $bytes.Length) {
+      $read = $stream.Read($bytes, $offset, $bytes.Length - $offset)
+      if ($read -le 0) {
+        throw 'Dream Skin start returned a truncated structured result.'
+      }
+      $offset += $read
+    }
+  } finally {
+    if ($null -ne $stream) { $stream.Dispose() }
+  }
+  $json = ConvertFrom-DreamSkinUtf8Bytes -Bytes $bytes -Path $path
+  try { $result = $json | ConvertFrom-Json -ErrorAction Stop } catch {
+    throw 'Dream Skin start returned invalid structured result JSON.'
+  }
+  if ($null -eq $result -or $result -is [string] -or $result -is [array]) {
+    throw 'Dream Skin start returned an invalid structured result object.'
+  }
+  $allowed = @('schemaVersion', 'token', 'outcome', 'category', 'appearanceRecovery')
+  $properties = @($result.PSObject.Properties)
+  if ($properties.Count -ne $allowed.Count) {
+    throw 'Dream Skin start returned an unexpected structured result shape.'
+  }
+  foreach ($property in $properties) {
+    if ($allowed -cnotcontains $property.Name) {
+      throw 'Dream Skin start returned an unexpected structured result field.'
+    }
+  }
+  if (($result.schemaVersion -isnot [int] -and $result.schemaVersion -isnot [long]) -or
+    [int64]$result.schemaVersion -ne 1 -or
+    $result.token -isnot [string] -or "$($result.token)" -cne $Token -or
+    $result.outcome -isnot [string] -or
+    @('success', 'failure') -cnotcontains "$($result.outcome)" -or
+    $result.category -isnot [string] -or
+    $script:DreamSkinStartResultCategories -cnotcontains "$($result.category)" -or
+    $result.appearanceRecovery -isnot [string] -or
+    $script:DreamSkinStartAppearanceRecoveryStates -cnotcontains "$($result.appearanceRecovery)" -or
+    ("$($result.outcome)" -ceq 'success' -and "$($result.category)" -cne 'none') -or
+    ("$($result.outcome)" -ceq 'failure' -and "$($result.category)" -ceq 'none')) {
+    throw 'Dream Skin start returned invalid structured result values.'
+  }
+  return $result
+}
+
 function Enter-DreamSkinOperationLock {
   param(
     [ValidateRange(0, 300000)]
@@ -765,16 +940,23 @@ function Start-DreamSkinCodexForDebugging {
   try {
     Stop-DreamSkinCodex -Codex $Codex -PreserveProcessIds $preservedProcessIds -AllowForce
   } catch {
-    throw "Codex package activation did not retain the CDP arguments, and its process could not be closed safely: $($_.Exception.Message)"
+    throw (New-DreamSkinStartException -Category 'cdp-launch-failed' `
+      -Message 'Codex package activation did not retain the CDP arguments, and its process could not be closed safely.' `
+      -InnerException $_.Exception)
   }
 
   try {
     $directProcessId = Start-DreamSkinCodexDirect -Codex $Codex -Arguments $Arguments
   } catch {
     $failureKind = Get-DreamSkinDirectLaunchFailureKind -Exception $_.Exception
-    throw [System.InvalidOperationException]::new(
-      "Codex $($Codex.Version) converted the CDP argument into a codex:// navigation path. Direct launch of the validated Store executable failed ($failureKind), so this Codex/Windows combination cannot expose the Dream Skin debugging endpoint without modifying the protected app package.",
-      $_.Exception)
+    $category = if ($failureKind -ceq 'access-denied') {
+      'cdp-direct-access-denied'
+    } else {
+      'cdp-launch-failed'
+    }
+    throw (New-DreamSkinStartException -Category $category `
+      -Message "Codex $($Codex.Version) converted the CDP argument into a codex:// navigation path. Direct launch of the validated Store executable failed ($failureKind), so this Codex/Windows combination cannot expose the Dream Skin debugging endpoint without modifying the protected app package." `
+      -InnerException $_.Exception)
   }
 
   $directStatus = Wait-DreamSkinCodexDebugArgumentStatus -Codex $Codex -Port $Port
@@ -782,9 +964,13 @@ function Start-DreamSkinCodexForDebugging {
     try {
       Stop-DreamSkinCodex -Codex $Codex -PreserveProcessIds $preservedProcessIds -AllowForce
     } catch {
-      throw "Direct Codex launch did not retain the CDP arguments and could not be closed safely: $($_.Exception.Message)"
+      throw (New-DreamSkinStartException -Category 'cdp-endpoint-unavailable' `
+        -Message 'Direct Codex launch did not retain the CDP arguments and could not be closed safely.' `
+        -InnerException $_.Exception)
     }
-    throw "Codex $($Codex.Version) did not retain the CDP argument during package activation or validated direct launch. Dream Skin cannot run without modifying the protected app package."
+    throw (New-DreamSkinStartException -Category 'cdp-endpoint-unavailable' `
+      -Message "Codex $($Codex.Version) did not retain the CDP argument during package activation or validated direct launch. Dream Skin cannot run without modifying the protected app package." `
+      -InnerException $null)
   }
 
   return [pscustomobject]@{

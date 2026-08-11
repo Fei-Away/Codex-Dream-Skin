@@ -432,8 +432,8 @@ try {
 
   # A legacy upgrade can already have a durable backup but no appearance
   # marker. If the marker commits and the config commit then fails, the marker
-  # must still be removed so restore continues to recognize the legacy light
-  # trio and recovers the saved appearanceTheme.
+  # must return to a logical-absence state so restore continues to recognize
+  # the legacy light trio and recovers the saved appearanceTheme.
   $realAtomicBytesWriter = (Get-Command Write-DreamSkinBytesAtomically -CommandType Function).ScriptBlock
   $legacyCommitFailureConfig = Join-Path $temporaryRoot 'legacy-commit-failure.toml'
   $legacyCommitFailureBackup = Join-Path $temporaryRoot 'legacy-commit-failure.before.toml'
@@ -474,13 +474,14 @@ try {
   } finally {
     Set-Item -Path Function:\Write-DreamSkinBytesAtomically -Value $realAtomicBytesWriter
   }
+  $legacyFailureMarker = Read-DreamSkinAppearanceMarker -BackupPath $legacyCommitFailureBackup
   if (-not $legacyCommitFailureRejected -or
     -not (Test-DreamSkinBytesEqual -Left $legacyOriginalBytes `
       -Right ([System.IO.File]::ReadAllBytes($legacyCommitFailureConfig))) -or
     -not (Test-DreamSkinBytesEqual -Left $legacyBackupBytes `
       -Right ([System.IO.File]::ReadAllBytes($legacyCommitFailureBackup))) -or
-    (Test-Path -LiteralPath (Get-DreamSkinAppearanceMarkerPath -BackupPath $legacyCommitFailureBackup))) {
-    throw 'Legacy config commit failure left an appearance marker or changed the recoverable backup.'
+    -not (Test-DreamSkinAppearanceMarkerLogicalAbsent -Marker $legacyFailureMarker)) {
+    throw 'Legacy config commit failure did not restore logical marker absence or changed the backup.'
   }
   Restore-DreamSkinBaseTheme -ConfigPath $legacyCommitFailureConfig `
     -BackupPath $legacyCommitFailureBackup
@@ -1470,6 +1471,10 @@ try {
   $node = Get-DreamSkinNodeRuntime
   & (Join-Path $PSScriptRoot 'community-theme-link.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'theme-zip-import.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'config-startup-rollback.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-result-contract.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-cdp-failure-appearance-recovery.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-post-launch-appearance-recovery.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-renderer-readiness.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-verified-skin-preserved.tests.ps1') -Root $Root
   $projectRoot = Split-Path -Parent $Root

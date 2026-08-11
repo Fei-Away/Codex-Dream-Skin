@@ -315,6 +315,36 @@ function Set-DreamSkinActiveThemeFromSnapshot {
   return $activeFingerprint
 }
 
+function Get-DreamSkinCommunityStartFailureMessage {
+  param(
+    [Parameter(Mandatory = $true)][string]$Category,
+    [Parameter(Mandatory = $true)][string]$AppearanceRecovery
+  )
+  $messageKey = switch ($Category) {
+    'cdp-launch-failed' { 'CommunityStartCdpLaunchFailed' }
+    'cdp-direct-access-denied' { 'CommunityStartCdpDirectAccessDenied' }
+    'cdp-endpoint-unavailable' { 'CommunityStartCdpEndpointUnavailable' }
+    'port-unavailable' { 'CommunityStartPortUnavailable' }
+    'state-reconciliation-failed' { 'CommunityStartStateReconciliationFailed' }
+    'injector-start-failed' { 'CommunityStartInjectorFailed' }
+    'renderer-verification-failed' { 'CommunityStartRendererVerificationFailed' }
+    'superseded' { 'CommunityStartSuperseded' }
+    default { 'CommunityStartInternalFailure' }
+  }
+  $message = Get-DreamSkinCommunityText -Key $messageKey
+  $recoveryKey = switch ($AppearanceRecovery) {
+    'restored' { 'CommunityStartAppearanceRestored' }
+    'conflict-preserved' { 'CommunityStartAppearanceConflictPreserved' }
+    'blocked' { 'CommunityStartAppearanceBlocked' }
+    'preserved-rendered' { 'CommunityStartAppearancePreservedRendered' }
+    default { $null }
+  }
+  if ($recoveryKey) {
+    $message += ' ' + (Get-DreamSkinCommunityText -Key $recoveryKey)
+  }
+  return $message
+}
+
 function Invoke-DreamSkinCommunityStartAndVerify {
   param(
     [ValidateRange(1000, 300000)]
@@ -325,20 +355,47 @@ function Invoke-DreamSkinCommunityStartAndVerify {
   if (-not (Test-Path -LiteralPath $startScript -PathType Leaf)) {
     throw 'The managed Dream Skin start script is missing.'
   }
+  $stateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+  $resultToken = [guid]::NewGuid().ToString('N')
+  $resultPath = Get-DreamSkinStartResultPath -StateRoot $stateRoot -Token $resultToken
+  if (Test-Path -LiteralPath $resultPath) {
+    throw (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult')
+  }
   $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
   $argumentLine = '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' +
     (ConvertTo-DreamSkinProcessArgument -Value $startScript) + ' -RestartExisting' +
     ' -RequireUnpaused -OperationLockTimeoutMilliseconds ' +
-    "$OperationLockTimeoutMilliseconds"
-  $startProcess = Start-Process -FilePath $powershell -ArgumentList $argumentLine `
-    -WindowStyle Hidden -PassThru
-  if (-not $startProcess.WaitForExit($OperationLockTimeoutMilliseconds)) {
-    try { Stop-Process -InputObject $startProcess -Force -ErrorAction SilentlyContinue } catch {}
-    [void]$startProcess.WaitForExit(15000)
-    throw "Dream Skin start verification did not finish within $OperationLockTimeoutMilliseconds ms."
-  }
-  if ($startProcess.ExitCode -ne 0) {
-    throw "Dream Skin could not start and visibly verify the active theme (exit code $($startProcess.ExitCode))."
+    "$OperationLockTimeoutMilliseconds" + ' -ResultToken ' + $resultToken
+  try {
+    $startProcess = Start-Process -FilePath $powershell -ArgumentList $argumentLine `
+      -WindowStyle Hidden -PassThru
+    if (-not $startProcess.WaitForExit($OperationLockTimeoutMilliseconds)) {
+      try { Stop-Process -InputObject $startProcess -Force -ErrorAction SilentlyContinue } catch {}
+      [void]$startProcess.WaitForExit(15000)
+      throw (Get-DreamSkinCommunityText -Key 'CommunityStartTimedOut')
+    }
+    try {
+      $result = Read-DreamSkinStartResult -StateRoot $stateRoot -Token $resultToken
+    } catch {
+      throw (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult')
+    }
+    $coherentSuccess = $startProcess.ExitCode -eq 0 -and "$($result.outcome)" -ceq 'success'
+    $coherentFailure = $startProcess.ExitCode -ne 0 -and "$($result.outcome)" -ceq 'failure'
+    if (-not ($coherentSuccess -or $coherentFailure)) {
+      throw (Get-DreamSkinCommunityText -Key 'CommunityStartInvalidResult')
+    }
+    if ($coherentFailure) {
+      $message = Get-DreamSkinCommunityStartFailureMessage `
+        -Category "$($result.category)" -AppearanceRecovery "$($result.appearanceRecovery)"
+      $exception = [System.InvalidOperationException]::new($message)
+      $exception.Data['DreamSkinStartCategory'] = "$($result.category)"
+      $exception.Data['DreamSkinAppearanceRecovery'] = "$($result.appearanceRecovery)"
+      throw $exception
+    }
+  } finally {
+    if (Test-Path -LiteralPath $resultPath) {
+      Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
+    }
   }
 }
 
@@ -667,7 +724,8 @@ function Invoke-DreamSkinCommunityThemeTransaction {
         -Recovery 'Superseded' -InnerException $startFailure.Exception)
     }
     throw (New-DreamSkinCommunityApplyException `
-      -Message 'The imported theme failed visible verification. The previous theme was reapplied and visibly verified.' `
+      -Message ("The imported theme failed visible verification: $($startFailure.Exception.Message) " +
+        'The previous theme was reapplied and visibly verified.') `
       -Recovery 'Verified' -InnerException $startFailure.Exception)
   }
 
