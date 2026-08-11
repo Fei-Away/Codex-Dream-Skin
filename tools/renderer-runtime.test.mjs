@@ -553,11 +553,14 @@ export async function runRendererRuntimeTest(assetRoot) {
   }
 
   const contrastCases = [
-    { accent: "#ffffff", expectedInk: "rgb(0 0 0)" },
-    { accent: "#000000", expectedInk: "rgb(255 255 255)" },
+    { accent: "#ffffff", lightInk: "rgb(0 0 0)", darkInk: "rgb(0 0 0)" },
+    { accent: "#000000", lightInk: "rgb(255 255 255)", darkInk: "rgb(255 255 255)" },
+    { accent: "#fff0", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
+    { accent: "#00000000", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
+    { accent: "rgba(255, 255, 255, 0.05)", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
   ];
   for (const nativeAppearance of ["light", "dark"]) {
-    for (const { accent, expectedInk } of contrastCases) {
+    for (const { accent, lightInk, darkInk } of contrastCases) {
       const contrast = makeFixture({ nativeAppearance });
       vm.runInNewContext(contrast.payloadFor({
         appearance: "auto",
@@ -568,7 +571,7 @@ export async function runRendererRuntimeTest(assetRoot) {
       assert.equal(contrast.rootStyle.values.get("--ds-green"), accent);
       assert.equal(
         contrast.rootStyle.values.get("--ds-on-accent"),
-        expectedInk,
+        nativeAppearance === "light" ? lightInk : darkInk,
         `Explicit ${accent} must keep readable button text in the ${nativeAppearance} shell`,
       );
     }

@@ -118,15 +118,31 @@
     if (!value || value === "transparent") return null;
     const hex = String(value).trim().match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
     if (hex) {
-      const rgbHex = hex[1].length <= 4
-        ? hex[1].slice(0, 3).split("").map((digit) => `${digit}${digit}`).join("")
-        : hex[1].slice(0, 6);
+      const digits = hex[1];
+      const rgbHex = digits.length <= 4
+        ? digits.slice(0, 3).split("").map((digit) => `${digit}${digit}`).join("")
+        : digits.slice(0, 6);
+      const alphaHex = digits.length === 4
+        ? `${digits[3]}${digits[3]}`
+        : digits.length === 8 ? digits.slice(6, 8) : "ff";
       const number = Number.parseInt(rgbHex, 16);
-      return { r: number >> 16, g: (number >> 8) & 255, b: number & 255 };
+      return {
+        r: number >> 16,
+        g: (number >> 8) & 255,
+        b: number & 255,
+        alpha: Number.parseInt(alphaHex, 16) / 255,
+      };
     }
-    const m = String(value).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+    const m = String(value).trim().match(
+      /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i,
+    );
     if (!m) return null;
-    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) };
+    return {
+      r: Number(m[1]),
+      g: Number(m[2]),
+      b: Number(m[3]),
+      alpha: m[4] === undefined ? 1 : Math.min(1, Math.max(0, Number(m[4]))),
+    };
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -152,10 +168,25 @@
     return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
   };
 
-  const readableAccentInk = (accent) => {
-    const rgb = parseRgb(accent);
-    if (!rgb) return null;
-    const luminance = relativeLuminance(rgb);
+  const compositeColor = (value, background) => {
+    const foreground = parseRgb(value);
+    if (!foreground) return background;
+    const alpha = clamp(foreground.alpha ?? 1, 0, 1);
+    return {
+      r: foreground.r * alpha + background.r * (1 - alpha),
+      g: foreground.g * alpha + background.g * (1 - alpha),
+      b: foreground.b * alpha + background.b * (1 - alpha),
+    };
+  };
+
+  const readableAccentInk = (accent, panel, background, shell) => {
+    let rendered = shell === "light"
+      ? { r: 250, g: 251, b: 251 }
+      : { r: 17, g: 19, b: 24 };
+    rendered = compositeColor(background, rendered);
+    rendered = compositeColor(panel, rendered);
+    rendered = compositeColor(accent, rendered);
+    const luminance = relativeLuminance(rendered);
     const whiteContrast = 1.05 / (luminance + 0.05);
     const blackContrast = (luminance + 0.05) / 0.05;
     return whiteContrast >= blackContrast ? "rgb(255 255 255)" : "rgb(0 0 0)";
@@ -286,7 +317,12 @@
       if (typeof value === "string" && value) setStyleProperty(root, name, value);
     }
     if (explicit.has("accent")) {
-      const accentInk = readableAccentInk(accent);
+      const accentInk = readableAccentInk(
+        accent,
+        variables["--ds-panel"],
+        variables["--ds-bg"],
+        shell,
+      );
       if (accentInk) setStyleProperty(root, "--ds-on-accent", accentInk);
     }
     const publicColors = {
