@@ -173,9 +173,9 @@
     if (!foreground) return background;
     const alpha = clamp(foreground.alpha ?? 1, 0, 1);
     return {
-      r: foreground.r * alpha + background.r * (1 - alpha),
-      g: foreground.g * alpha + background.g * (1 - alpha),
-      b: foreground.b * alpha + background.b * (1 - alpha),
+      r: clamp(foreground.r, 0, 255) * alpha + background.r * (1 - alpha),
+      g: clamp(foreground.g, 0, 255) * alpha + background.g * (1 - alpha),
+      b: clamp(foreground.b, 0, 255) * alpha + background.b * (1 - alpha),
     };
   };
 

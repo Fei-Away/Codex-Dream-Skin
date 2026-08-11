@@ -558,6 +558,7 @@ export async function runRendererRuntimeTest(assetRoot) {
     { accent: "#fff0", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
     { accent: "#00000000", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
     { accent: "rgba(255, 255, 255, 0.05)", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
+    { accent: "rgba(999, 999, 999, 0.1)", lightInk: "rgb(0 0 0)", darkInk: "rgb(255 255 255)" },
   ];
   for (const nativeAppearance of ["light", "dark"]) {
     for (const { accent, lightInk, darkInk } of contrastCases) {
@@ -575,6 +576,25 @@ export async function runRendererRuntimeTest(assetRoot) {
         `Explicit ${accent} must keep readable button text in the ${nativeAppearance} shell`,
       );
     }
+  }
+
+  for (const nativeAppearance of ["light", "dark"]) {
+    const transparentSurfaces = makeFixture({ nativeAppearance });
+    vm.runInNewContext(transparentSurfaces.payloadFor({
+      appearance: "auto",
+      colorMode: "explicit",
+      explicitColorKeys: ["background", "panel", "accent"],
+      colors: {
+        background: "rgba(255, 255, 255, 0)",
+        panel: "#0000",
+        accent: "rgba(0, 0, 0, 0)",
+      },
+    }), transparentSurfaces.context);
+    assert.equal(
+      transparentSurfaces.rootStyle.values.get("--ds-on-accent"),
+      nativeAppearance === "light" ? "rgb(0 0 0)" : "rgb(255 255 255)",
+      `Transparent theme surfaces must fall back to the ${nativeAppearance} shell canvas`,
+    );
   }
 
   const adaptiveAccent = makeFixture({ nativeAppearance: "dark" });
