@@ -168,10 +168,10 @@
     return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
   };
 
-  const compositeColor = (value, background) => {
+  const compositeColor = (value, background, alphaOverride = null) => {
     const foreground = parseRgb(value);
     if (!foreground) return background;
-    const alpha = clamp(foreground.alpha ?? 1, 0, 1);
+    const alpha = clamp(alphaOverride ?? foreground.alpha ?? 1, 0, 1);
     return {
       r: clamp(foreground.r, 0, 255) * alpha + background.r * (1 - alpha),
       g: clamp(foreground.g, 0, 255) * alpha + background.g * (1 - alpha),
@@ -179,16 +179,20 @@
     };
   };
 
-  const readableAccentInk = (accent, panel, background, shell) => {
-    let rendered = shell === "light"
-      ? { r: 250, g: 251, b: 251 }
-      : { r: 17, g: 19, b: 24 };
-    rendered = compositeColor(background, rendered);
-    rendered = compositeColor(panel, rendered);
-    rendered = compositeColor(accent, rendered);
-    const luminance = relativeLuminance(rendered);
-    const whiteContrast = 1.05 / (luminance + 0.05);
-    const blackContrast = (luminance + 0.05) / 0.05;
+  const readableAccentInk = (accent, panel) => {
+    // The send button sits on the composer surface, which renders panel RGB
+    // at 94% regardless of the panel color's declared alpha. Compare against
+    // both possible backdrop extremes so artwork cannot flip the decision.
+    const luminances = [0, 255].map((backdrop) => {
+      const surface = compositeColor(
+        panel,
+        { r: backdrop, g: backdrop, b: backdrop },
+        0.94,
+      );
+      return relativeLuminance(compositeColor(accent, surface));
+    });
+    const whiteContrast = Math.min(...luminances.map((value) => 1.05 / (value + 0.05)));
+    const blackContrast = Math.min(...luminances.map((value) => (value + 0.05) / 0.05));
     return whiteContrast >= blackContrast ? "rgb(255 255 255)" : "rgb(0 0 0)";
   };
 
@@ -320,8 +324,6 @@
       const accentInk = readableAccentInk(
         accent,
         variables["--ds-panel"],
-        variables["--ds-bg"],
-        shell,
       );
       if (accentInk) setStyleProperty(root, "--ds-on-accent", accentInk);
     }

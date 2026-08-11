@@ -346,6 +346,11 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
+    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
+    "Accent foreground contrast must model the composer panel's 94% RGB surface",
+  );
+  assert.match(
+    css,
     /:not\(:has\(main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\)\)\)[\s\S]{0,120}\[data-ds-part="sidebar"\]/,
     "Core CSS must style the validated generic sidebar when the exact shell selector is absent.",
   );
@@ -578,22 +583,24 @@ export async function runRendererRuntimeTest(assetRoot) {
     }
   }
 
-  for (const nativeAppearance of ["light", "dark"]) {
+  for (const { nativeAppearance, panel, expectedInk } of [
+    { nativeAppearance: "light", panel: "#0000", expectedInk: "rgb(255 255 255)" },
+    { nativeAppearance: "dark", panel: "#fff0", expectedInk: "rgb(0 0 0)" },
+  ]) {
     const transparentSurfaces = makeFixture({ nativeAppearance });
     vm.runInNewContext(transparentSurfaces.payloadFor({
       appearance: "auto",
       colorMode: "explicit",
-      explicitColorKeys: ["background", "panel", "accent"],
+      explicitColorKeys: ["panel", "accent"],
       colors: {
-        background: "rgba(255, 255, 255, 0)",
-        panel: "#0000",
+        panel,
         accent: "rgba(0, 0, 0, 0)",
       },
     }), transparentSurfaces.context);
     assert.equal(
       transparentSurfaces.rootStyle.values.get("--ds-on-accent"),
-      nativeAppearance === "light" ? "rgb(0 0 0)" : "rgb(255 255 255)",
-      `Transparent theme surfaces must fall back to the ${nativeAppearance} shell canvas`,
+      expectedInk,
+      `Transparent accent ink must model the ${panel} composer RGB surface`,
     );
   }
 
