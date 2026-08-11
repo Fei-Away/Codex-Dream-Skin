@@ -195,6 +195,7 @@ fi
 "$NODE" "$ROOT/tests/theme-import-publish.test.mjs"
 "$NODE" "$ROOT/tests/theme-zip-snapshot.test.mjs"
 "$NODE" "$ROOT/tests/bounded-community-http.test.mjs"
+"$NODE" "$PROJECT_ROOT/tools/cdp-discovery.test.mjs"
 if [ "${CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS:-0}" = "1" ]; then
   printf 'SKIP: community import identity integration requires an installed, signed ChatGPT runtime.\n'
 else
