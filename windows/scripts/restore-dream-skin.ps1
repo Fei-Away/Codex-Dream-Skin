@@ -13,6 +13,7 @@ $ErrorActionPreference = 'Stop'
 $PortExplicit = $PSBoundParameters.ContainsKey('Port')
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
+. (Join-Path $PSScriptRoot 'localization-windows.ps1')
 
 $operationLock = Enter-DreamSkinOperationLock
 try {
@@ -22,6 +23,7 @@ try {
   Assert-DreamSkinPort -Port $Port
 
   $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+  $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
   $StatePath = Join-Path $StateRoot 'state.json'
@@ -77,13 +79,13 @@ try {
   $forceAuthorized = [bool]$ForceRestart
   if ($shouldCloseCodex -and $PromptRestart) {
     $restartMessage = if ($NoRelaunch) {
-      'Restore will close Codex and remove Dream Skin plus its CDP session. Continue?'
+      Get-DreamSkinText -Key 'RestoreCloseNoRelaunch' -Language $language
     } else {
-      'Restore will close Codex, remove Dream Skin and its CDP session, then reopen the official app. Continue?'
+      Get-DreamSkinText -Key 'RestoreClose' -Language $language
     }
     $forceAuthorized = Confirm-DreamSkinRestart -Message $restartMessage
     if (-not $forceAuthorized) {
-      Write-Host 'Restore was cancelled; no state or configuration was changed.'
+      Write-Host (Get-DreamSkinText -Key 'RestoreCancelled' -Language $language)
       exit 0
     }
   }

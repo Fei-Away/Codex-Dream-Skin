@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName Microsoft.VisualBasic
+. (Join-Path $PSScriptRoot 'localization-windows.ps1')
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
 
@@ -57,12 +58,27 @@ try {
     )
   }
 
+  function Get-DreamSkinTrayText {
+    param(
+      [Parameter(Mandatory = $true)][string]$Key,
+      [object[]]$FormatArguments = @()
+    )
+    $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
+    Get-DreamSkinText -Key $Key -Language $language -FormatArguments $FormatArguments
+  }
+
   function Start-DreamSkinPowerShell {
     param([Parameter(Mandatory = $true)][string]$Script, [string[]]$Arguments = @())
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
     $argumentLine = '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
-    Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
+    $previousLanguage = $env:DREAMSKIN_LANG
+    try {
+      $env:DREAMSKIN_LANG = Resolve-DreamSkinLanguage -StateRoot $StateRoot
+      Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
+    } finally {
+      $env:DREAMSKIN_LANG = $previousLanguage
+    }
   }
 
   function Add-DreamSkinTrayItem {
@@ -85,6 +101,27 @@ try {
     }
     [void]$Items.Add($item)
     return $item
+  }
+
+  function Add-DreamSkinTrayLanguageMenu {
+    $preference = Get-DreamSkinLanguagePreference -StateRoot $StateRoot
+    $languageMenu = [System.Windows.Forms.ToolStripMenuItem]::new(
+      (Get-DreamSkinTrayText -Key 'Language')
+    )
+    foreach ($option in @(
+      @{ Value = 'system'; Label = (Get-DreamSkinTrayText -Key 'LanguageSystem') },
+      @{ Value = 'en-US'; Label = (Get-DreamSkinTrayText -Key 'LanguageEnglish') },
+      @{ Value = 'zh-CN'; Label = (Get-DreamSkinTrayText -Key 'LanguageChinese') }
+    )) {
+      $optionValue = $option.Value
+      $optionAction = {
+        Set-DreamSkinLanguage -Language $optionValue -StateRoot $StateRoot
+        Rebuild-DreamSkinTrayMenu
+      }.GetNewClosure()
+      $optionItem = Add-DreamSkinTrayItem -Items $languageMenu.DropDownItems -Text $option.Label -Action $optionAction
+      $optionItem.Checked = $preference -ceq $optionValue
+    }
+    [void]$menu.Items.Add($languageMenu)
   }
 
   function Invoke-DreamSkinTrayThemeOperation {
@@ -119,14 +156,20 @@ try {
     try { $state = Read-DreamSkinState -Path $paths.State } catch {}
     $active = $null
     try { $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata } catch {}
-    $status = if ($paused) { '状态：已暂停' } elseif ($state) { '状态：运行中' } else { '状态：未运行' }
+    $status = if ($paused) {
+      Get-DreamSkinTrayText -Key 'StatusPaused'
+    } elseif ($state) {
+      Get-DreamSkinTrayText -Key 'StatusRunning'
+    } else {
+      Get-DreamSkinTrayText -Key 'StatusStopped'
+    }
     if ($null -ne $active -and $null -ne $active.Theme -and $active.Theme.name) {
       $status += " · $($active.Theme.name)"
     }
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text $status -Action $null -Enabled $false
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
 
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '应用或重新应用' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Apply') -Action {
       $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
       $begin = $null
       if ($null -ne $session) {
@@ -136,14 +179,14 @@ try {
       # start-dream-skin is async; close the in-window loading so it does not stick for 180s.
       if ($null -ne $session -and $null -ne $begin -and $begin.Ok) {
         $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $begin.Token `
-          -UiState success -Message '已开始应用皮肤' -TimeoutMs 1500
+          -UiState success -Message (Get-DreamSkinTrayText -Key 'ApplyStarted') -TimeoutMs 1500
       }
-      $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '正在应用皮肤…', [System.Windows.Forms.ToolTipIcon]::Info)
+      $notify.ShowBalloonTip(1800, 'Codex Dream Skin', (Get-DreamSkinTrayText -Key 'Applying'), [System.Windows.Forms.ToolTipIcon]::Info)
     }
     # Match macOS menubar: pause = mark + live remove; resume lets the serialized
     # start path clear pause only after its safety checks and any restart consent.
     if ($paused) {
-      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '继续显示皮肤' -Action {
+      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Resume') -Action {
         # Keep pause set while the start path validates and prompts; show in-window
         # loading when the existing CDP session is still reachable.
         $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
@@ -154,37 +197,44 @@ try {
         Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
         if ($null -ne $session -and $null -ne $begin -and $begin.Ok) {
           $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $begin.Token `
-            -UiState success -Message '已开始重新应用皮肤' -TimeoutMs 1500
+          -UiState success -Message (Get-DreamSkinTrayText -Key 'ResumeStarted') -TimeoutMs 1500
         }
         $notify.ShowBalloonTip(
           1800,
           'Codex Dream Skin',
-          '正在重新应用皮肤…',
+          (Get-DreamSkinTrayText -Key 'Reapplying'),
           [System.Windows.Forms.ToolTipIcon]::Info
         )
       }
     } else {
-      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '暂停皮肤' -Action {
+      $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Pause') -Action {
         # Match macOS pause: marker + live remove with in-window loading / result.
+        $pauseNoSessionMessage = Get-DreamSkinTrayText -Key 'PauseNoSession'
+        $pauseSucceededMessage = Get-DreamSkinTrayText -Key 'PauseSucceeded'
+        $pauseFailedMessage = Get-DreamSkinTrayText -Key 'PauseFailed'
         $removal = Invoke-DreamSkinTrayThemeOperation -Action {
           Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot | Out-Null
-          Invoke-DreamSkinLiveRemove -StateRoot $StateRoot
+          Invoke-DreamSkinLiveRemove -StateRoot $StateRoot `
+            -PauseNoSessionMessage $pauseNoSessionMessage `
+            -PauseSucceededMessage $pauseSucceededMessage `
+            -PauseFailedMessage $pauseFailedMessage
         }
         $icon = if ($removal.Removed) {
           [System.Windows.Forms.ToolTipIcon]::Info
         } else {
           [System.Windows.Forms.ToolTipIcon]::Warning
         }
-        $notify.ShowBalloonTip(2800, 'Codex Dream Skin', $removal.Message, $icon)
+        $removalMessage = $removal.Message
+        $notify.ShowBalloonTip(2800, 'Codex Dream Skin', $removalMessage, $icon)
         if (-not $removal.Removed -and $removal.Attempted) {
-          Show-DreamSkinTrayError -Message $removal.Message
+          Show-DreamSkinTrayError -Message $removalMessage
         }
       }
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '更换背景图' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'ChangeBackground') -Action {
       $dialog = [System.Windows.Forms.OpenFileDialog]::new()
-      $dialog.Title = '选择 Codex Dream Skin 背景图'
-      $dialog.Filter = 'Image files|*.png;*.jpg;*.jpeg;*.webp|All files|*.*'
+      $dialog.Title = Get-DreamSkinTrayText -Key 'BackgroundTitle'
+      $dialog.Filter = Get-DreamSkinTrayText -Key 'ImageFilter'
       $dialog.Multiselect = $false
       try {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -193,38 +243,40 @@ try {
               -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', '背景图已更新。', [System.Windows.Forms.ToolTipIcon]::Info)
+          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', (Get-DreamSkinTrayText -Key 'BackgroundUpdated'), [System.Windows.Forms.ToolTipIcon]::Info)
         }
       } finally {
         $dialog.Dispose()
       }
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '导入主题 ZIP…' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'ImportZip') -Action {
       $dialog = [System.Windows.Forms.OpenFileDialog]::new()
-      $dialog.Title = '选择 Codex Dream Skin 主题 ZIP'
+      $dialog.Title = Get-DreamSkinTrayText -Key 'ImportTitle'
       $dialog.Filter = 'Dream Skin theme ZIP|*.zip'
       $dialog.Multiselect = $false
       try {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
           $imported = Import-DreamSkinThemeZip -ArchivePath $dialog.FileName -StateRoot $StateRoot
           if ($imported.Status -ceq 'Duplicate') {
-            $message = "主题已存在：$($imported.Name)。没有重复写入。"
+            $message = Get-DreamSkinTrayText -Key 'ThemeExists' -FormatArguments @($imported.Name)
           } elseif ($imported.Replaced) {
-            $message = "已更新已保存主题：$($imported.Name)。当前主题没有改变。"
+            $message = Get-DreamSkinTrayText -Key 'ThemeUpdated' -FormatArguments @($imported.Name)
           } else {
-            $message = "已导入：$($imported.Name)。当前主题没有改变。"
-            if ($imported.Renamed) { $message += " 新标识：$($imported.Id)。" }
-            if ($imported.NameCollision) { $message += ' 主题库中已有同名主题。' }
+            $message = Get-DreamSkinTrayText -Key 'ThemeImported' -FormatArguments @($imported.Name)
+            if ($imported.Renamed) {
+              $message += Get-DreamSkinTrayText -Key 'NewIdentifier' -FormatArguments @($imported.Id)
+            }
+            if ($imported.NameCollision) { $message += Get-DreamSkinTrayText -Key 'NameCollision' }
           }
           if ($imported.SafeCssStatus -ceq 'validated') {
-            $message += ' theme.css 已通过本机 Safe CSS 校验，切换到该主题时会一并生效。'
+            $message += Get-DreamSkinTrayText -Key 'CssValidated'
           }
-          if ($imported.SignatureIgnored) { $message += ' manifest.sig 是预留文件，当前版本已忽略。' }
+          if ($imported.SignatureIgnored) { $message += Get-DreamSkinTrayText -Key 'SignatureIgnored' }
           $cleanupProperty = $imported.PSObject.Properties['CleanupWarning']
           $hasCleanupWarning = $null -ne $cleanupProperty -and
             -not [string]::IsNullOrWhiteSpace("$($cleanupProperty.Value)")
           if ($hasCleanupWarning) {
-            $message += ' 主题已成功保存，但旧备份目录未能自动清理；新主题不会因此回滚。请稍后重启客户端并查看日志。'
+            $message += Get-DreamSkinTrayText -Key 'CleanupWarning'
           }
           $messageIcon = if ($hasCleanupWarning) {
             [System.Windows.Forms.ToolTipIcon]::Warning
@@ -237,20 +289,33 @@ try {
         $dialog.Dispose()
       }
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '保存当前主题' -Action {
-      $name = [Microsoft.VisualBasic.Interaction]::InputBox('输入主题名称：', '保存 Codex Dream Skin 主题', '')
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'SaveCurrent') -Action {
+      $name = [Microsoft.VisualBasic.Interaction]::InputBox(
+        (Get-DreamSkinTrayText -Key 'SavePrompt'),
+        (Get-DreamSkinTrayText -Key 'SaveTitle'),
+        ''
+      )
       if ($name.Trim()) {
         $saved = Invoke-DreamSkinTrayThemeOperation -Action {
           Save-DreamSkinCurrentTheme -Name $name -StateRoot $StateRoot
         }
-        $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已保存：$($saved.Theme.name)", [System.Windows.Forms.ToolTipIcon]::Info)
+        $notify.ShowBalloonTip(
+          1800,
+          'Codex Dream Skin',
+          (Get-DreamSkinTrayText -Key 'Saved' -FormatArguments @($saved.Theme.name)),
+          [System.Windows.Forms.ToolTipIcon]::Info
+        )
       }
     }
 
-    $savedMenu = [System.Windows.Forms.ToolStripMenuItem]::new('已保存主题')
+    $savedMenu = [System.Windows.Forms.ToolStripMenuItem]::new(
+      (Get-DreamSkinTrayText -Key 'SavedThemes')
+    )
     $savedThemes = @(Get-DreamSkinSavedThemes -StateRoot $StateRoot -SkipImageMetadata)
     if ($savedThemes.Count -eq 0) {
-      $empty = [System.Windows.Forms.ToolStripMenuItem]::new('暂无已保存主题')
+      $empty = [System.Windows.Forms.ToolStripMenuItem]::new(
+        (Get-DreamSkinTrayText -Key 'NoSavedThemes')
+      )
       $empty.Enabled = $false
       [void]$savedMenu.DropDownItems.Add($empty)
     } else {
@@ -262,49 +327,55 @@ try {
             $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedPath -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
-          $notify.ShowBalloonTip(1800, 'Codex Dream Skin', "已应用：$savedName", [System.Windows.Forms.ToolTipIcon]::Info)
+          $notify.ShowBalloonTip(
+            1800,
+            'Codex Dream Skin',
+            (Get-DreamSkinTrayText -Key 'Applied' -FormatArguments @($savedName)),
+            [System.Windows.Forms.ToolTipIcon]::Info
+          )
         }.GetNewClosure()
         $null = Add-DreamSkinTrayItem -Items $savedMenu.DropDownItems -Text $savedName -Action $savedAction
       }
     }
     [void]$menu.Items.Add($savedMenu)
 
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开主题文件夹' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'OpenThemes') -Action {
       $themeDirectoryToken = ConvertTo-DreamSkinProcessArgument -Value $paths.Saved
       Start-Process -FilePath explorer.exe -ArgumentList $themeDirectoryToken | Out-Null
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开图片文件夹' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'OpenImages') -Action {
       $imageDirectoryToken = ConvertTo-DreamSkinProcessArgument -Value $paths.Images
       Start-Process -FilePath explorer.exe -ArgumentList $imageDirectoryToken | Out-Null
     }
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '检查更新…' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'CheckUpdate') -Action {
       Start-DreamSkinPowerShell -Script $checkUpdateScript -Arguments @('-Interactive')
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '主题库 Gallery' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Gallery') -Action {
       Start-Process -FilePath 'https://dreamskin.cc/gallery' | Out-Null
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '在线 Studio' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Studio') -Action {
       Start-Process -FilePath 'https://dreamskin.cc/studio' | Out-Null
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '打开 DreamSkin.cc' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'OpenSite') -Action {
       Start-Process -FilePath 'https://dreamskin.cc' | Out-Null
     }
     $autoStartEnabled = Test-Path -LiteralPath $startupShortcut -PathType Leaf
     $autoStartAction = {
       Set-DreamSkinAutoStart -Enabled:(-not $autoStartEnabled)
     }.GetNewClosure()
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '登录时启动' `
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'LaunchAtLogin') `
       -Action $autoStartAction -Checked $autoStartEnabled
+    Add-DreamSkinTrayLanguageMenu
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '完全恢复 Codex' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Restore') -Action {
       Start-DreamSkinPowerShell -Script $restoreScript -Arguments @(
         '-Port', "$Port", '-RestoreBaseTheme', '-PromptRestart'
       )
       $notify.Visible = $false
       [System.Windows.Forms.Application]::Exit()
     }
-    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text '退出托盘' -Action {
+    $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Exit') -Action {
       $notify.Visible = $false
       [System.Windows.Forms.Application]::Exit()
     }

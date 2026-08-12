@@ -17,6 +17,19 @@ while IFS= read -r file; do "$NODE" --check "$file" >/dev/null; done < <(
 # the real failure behind a bogus "unbound variable" (#251).
 "$NODE" "$ROOT/tests/shell-braced-vars-before-cjk.test.mjs"
 
+ZH_COPY="$(DREAMSKIN_LANG=zh-CN /bin/bash -c '
+  . "$1/scripts/localization-macos.sh"
+  printf "%s|%s|%s" "$(dreamskin_language)" "$(dreamskin_text apply)" "$(dreamskin_text skin_applied)"
+' _ "$ROOT")"
+EN_COPY="$(DREAMSKIN_LANG=en-US /bin/bash -c '
+  . "$1/scripts/localization-macos.sh"
+  printf "%s|%s|%s" "$(dreamskin_language)" "$(dreamskin_text apply)" "$(dreamskin_text skin_applied)"
+' _ "$ROOT")"
+[ "$ZH_COPY" = 'zh|应用|皮肤已应用' ] \
+  || { printf 'Chinese runtime localization contract failed: %s\n' "$ZH_COPY" >&2; exit 1; }
+[ "$EN_COPY" = 'en|Apply|Skin applied' ] \
+  || { printf 'English runtime localization contract failed: %s\n' "$EN_COPY" >&2; exit 1; }
+
 if /usr/bin/grep -R -n -E 'dream-skin-skin|DREAM_SKIN_SKIN|1\.0\.0-rc2' \
   "$ROOT/scripts" "$ROOT/assets" >/dev/null; then
   printf 'Legacy release-candidate identifiers remain in runtime files.\n' >&2
@@ -77,7 +90,7 @@ fi
   "$ROOT/scripts/switch-theme-macos.sh"
 /usr/bin/grep -F -q 'CFBundleURLTypes.0.CFBundleURLSchemes.0' "$ROOT/scripts/build-dmg.sh"
 for required_runtime in apply-community-theme-macos.sh snapshot-active-theme-macos.sh \
-  theme-content-fingerprint.mjs theme-switch-lock-macos.sh; do
+  theme-content-fingerprint.mjs theme-switch-lock-macos.sh localization-macos.sh; do
   /usr/bin/grep -F -q "$required_runtime" "$ROOT/scripts/build-dmg.sh"
 done
 UPDATE_JSON="$({
@@ -86,7 +99,7 @@ UPDATE_JSON="$({
 })"
 "$NODE" -e '
   const value = JSON.parse(process.argv[1]);
-  if (value.currentVersion !== "v1.5.12" || value.latestVersion !== "v9.8.7") process.exit(1);
+  if (value.currentVersion !== "v1.5.13" || value.latestVersion !== "v9.8.7") process.exit(1);
   if (!value.updateAvailable) process.exit(1);
   if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
 ' "$UPDATE_JSON"
@@ -776,13 +789,17 @@ if [ -z "$HOT_LINE" ] || [ -z "$CONFIRM_LINE" ] || [ -z "$START_LINE" ] ||
 fi
 MENU_SOURCE="$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
 OPEN_CODEX_BODY="$(/usr/bin/sed -n '/@objc private func openCodex()/,/@objc private func openDreamSkinWebsite()/p' "$MENU_SOURCE")"
-/usr/bin/grep -F -q 'addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'addActionItem(copy.text(.openChatGPT), action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'showError(title: copy.text(.notFoundTitle), message: copy.text(.notFoundMessage))' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'addLanguageMenu()' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'DreamSkinLanguage.defaultsKey' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'environment["DREAMSKIN_LANG"] = DreamSkinLanguage.stored().environmentValue' \
+  "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/ScriptRunner.swift"
 /usr/bin/grep -F -q 'guard !engineNeedsInstall(),' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'let script = installedScript(named: "start-dream-skin-macos.sh") else {' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)' "$MENU_SOURCE"
 /usr/bin/grep -F -q 'ScriptRunner.run(script: script)' "$MENU_SOURCE"
-/usr/bin/grep -F -q 'title: "无法打开 ChatGPT",' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'title: self.copy.text(.openFailedTitle),' "$MENU_SOURCE"
 if /usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE" ||
    /usr/bin/grep -F -q 'runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")' "$MENU_SOURCE" ||
    /usr/bin/printf '%s\n' "$OPEN_CODEX_BODY" | /usr/bin/grep -F -q 'installBundledEngineIfNeeded(force:'; then
@@ -1138,7 +1155,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.12" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.13" ]' _ "$ROOT"
 if [ "${CODEX_DREAM_SKIN_SKIP_DOCTOR:-0}" = "1" ]; then
   printf 'SKIP: Doctor requires an installed, signed Codex app.\n'
   DOCTOR_RESULT="skipped"

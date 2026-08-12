@@ -201,6 +201,8 @@ Starting with Codex Store `26.715.10079.0`, the owl runtime may convert package-
 
 Field results in issue #235 now confirm two independent failures: WindowsApps returns `access-denied` for direct launch on `26.715.10079.0`, while `26.721.3404.0` retains the raw CDP arguments but its production runtime still opens no listener. Either result means that Codex/Windows combination cannot enable the skin within the project's safety boundary. The fallback is currently a safe diagnostic and rollback path, not a compatibility guarantee for affected owl builds. Do not take ownership of WindowsApps or patch the official package; keep the complete error and follow issue #235 for upstream compatibility status.
 
+If debug launch or visible renderer verification fails, the launcher first confirms that every Codex process started by this attempt is closed, then restores only this attempt's appearance-key values that are still unchanged. Newer config edits are preserved instead of replacing the whole file from an old backup. A bounded `preparing` transaction is saved before the marker/config commits; after a forced process termination, the next locked operation recovers by comparing the before, intended, and current values. If Codex cannot be confirmed closed or recovery cannot finish safely, one-click apply preserves the current theme files and exact prior-theme snapshot rather than racing the running app. This mechanism is not evidence that an affected official Codex build has restored CDP support.
+
 ### The skin stops working after a Codex update
 
 Run the installer and launch shortcut again. The scripts rediscover the currently registered Store package instead of trusting an executable path from an older app version.

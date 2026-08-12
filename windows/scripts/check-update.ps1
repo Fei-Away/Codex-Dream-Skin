@@ -9,6 +9,14 @@ $engineRoot = Split-Path -Parent $PSScriptRoot
 $versionPath = Join-Path $engineRoot 'VERSION'
 $repository = 'Fei-Away/Codex-Dream-Skin'
 $releasePage = "https://github.com/$repository/releases/latest"
+. (Join-Path $PSScriptRoot 'localization-windows.ps1')
+$stateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+$language = Resolve-DreamSkinLanguage -StateRoot $stateRoot
+
+function Get-DreamSkinUpdateText {
+  param([Parameter(Mandatory = $true)][string]$Key, [object[]]$FormatArguments = @())
+  Get-DreamSkinText -Key $Key -Language $language -FormatArguments $FormatArguments
+}
 
 function ConvertTo-DreamSkinVersion {
   param([Parameter(Mandatory = $true)][string]$Value)
@@ -31,8 +39,10 @@ function Show-DreamSkinUpdateResult {
   Add-Type -AssemblyName System.Windows.Forms
   if ($Result.updateAvailable) {
     $choice = [System.Windows.Forms.MessageBox]::Show(
-      "Codex Dream Skin $($Result.latestVersion) is available.`r`n`r`nOpen the GitHub download page?",
-      'Codex Dream Skin Update',
+      ((Get-DreamSkinUpdateText -Key 'UpdateAvailable' -FormatArguments @($Result.latestVersion)) +
+        [Environment]::NewLine + [Environment]::NewLine +
+        (Get-DreamSkinUpdateText -Key 'UpdateQuestion')),
+      (Get-DreamSkinUpdateText -Key 'UpdateTitle'),
       [System.Windows.Forms.MessageBoxButtons]::YesNo,
       [System.Windows.Forms.MessageBoxIcon]::Information
     )
@@ -42,8 +52,8 @@ function Show-DreamSkinUpdateResult {
     return
   }
   [void][System.Windows.Forms.MessageBox]::Show(
-    "Codex Dream Skin $($Result.currentVersion) is up to date.",
-    'Codex Dream Skin Update',
+    (Get-DreamSkinUpdateText -Key 'UpToDate' -FormatArguments @($Result.currentVersion)),
+    (Get-DreamSkinUpdateText -Key 'UpdateTitle'),
     [System.Windows.Forms.MessageBoxButtons]::OK,
     [System.Windows.Forms.MessageBoxIcon]::Information
   )
@@ -84,8 +94,9 @@ try {
   if ($Interactive) {
     Add-Type -AssemblyName System.Windows.Forms
     [void][System.Windows.Forms.MessageBox]::Show(
-      "Could not check for updates.`r`n`r`n$($_.Exception.Message)",
-      'Codex Dream Skin Update',
+      ((Get-DreamSkinUpdateText -Key 'UpdateFailed') + [Environment]::NewLine +
+        [Environment]::NewLine + $_.Exception.Message),
+      (Get-DreamSkinUpdateText -Key 'UpdateTitle'),
       [System.Windows.Forms.MessageBoxButtons]::OK,
       [System.Windows.Forms.MessageBoxIcon]::Warning
     )

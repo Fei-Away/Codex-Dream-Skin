@@ -36,7 +36,17 @@ if [ "$RESET_DEMO" = "true" ]; then
   "$NODE" "$SCRIPT_DIR/write-theme.mjs" reset-demo --output-dir "$THEME_DIR"
 else
   if [ -z "$IMAGE" ]; then
-    IMAGE="$(/usr/bin/osascript -e 'POSIX path of (choose file with prompt "选择一张主题图片（建议横向、宽度 2000px 以上）" of type {"public.image"})')" \
+    if [ "$(dreamskin_language)" = "zh" ]; then
+      IMAGE_PROMPT="选择一张主题图片（建议横向、宽度 2000px 以上）"
+    else
+      IMAGE_PROMPT="Choose a theme image (landscape, at least 2000 px wide recommended)"
+    fi
+    IMAGE="$(/usr/bin/osascript - "$IMAGE_PROMPT" <<'APPLESCRIPT'
+on run argv
+  POSIX path of (choose file with prompt (item 1 of argv) of type {"public.image"})
+end run
+APPLESCRIPT
+)" \
       || fail "Image selection was cancelled."
   fi
   [ -f "$IMAGE" ] || fail "Selected image does not exist: $IMAGE"
@@ -44,10 +54,33 @@ else
   [ "$SOURCE_BYTES" -le 52428800 ] || fail "Selected image is larger than 50 MB. Choose a smaller file."
 
   if [ -z "$THEME_NAME" ]; then
-    THEME_NAME="$(/usr/bin/osascript -e 'text returned of (display dialog "给这套主题起个名字" default answer "我的 Codex Dream Skin" buttons {"取消", "继续"} default button "继续")')" \
+    if [ "$(dreamskin_language)" = "zh" ]; then
+      NAME_PROMPT="给这套主题起个名字"
+      DEFAULT_NAME="我的 Codex Dream Skin"
+    else
+      NAME_PROMPT="Name this theme"
+      DEFAULT_NAME="My Codex Dream Skin"
+    fi
+    THEME_NAME="$(/usr/bin/osascript - "$NAME_PROMPT" "$DEFAULT_NAME" \
+      "$(dreamskin_text cancel)" "$(dreamskin_text continue)" <<'APPLESCRIPT'
+on run argv
+  set promptText to item 1 of argv
+  set defaultName to item 2 of argv
+  set cancelLabel to item 3 of argv
+  set continueLabel to item 4 of argv
+  text returned of (display dialog promptText default answer defaultName buttons {cancelLabel, continueLabel} default button continueLabel cancel button cancelLabel)
+end run
+APPLESCRIPT
+)" \
       || fail "Theme setup was cancelled."
   fi
-  if [ -z "$TAGLINE" ]; then TAGLINE="把喜欢的画面变成可交互的 Codex 工作台。"; fi
+  if [ -z "$TAGLINE" ]; then
+    if [ "$(dreamskin_language)" = "zh" ]; then
+      TAGLINE="把喜欢的画面变成可交互的 Codex 工作台。"
+    else
+      TAGLINE="Turn a favorite image into an interactive Codex workspace."
+    fi
+  fi
   if [ -z "$QUOTE" ]; then QUOTE="MAKE SOMETHING WONDERFUL"; fi
 
   /bin/mkdir -p "$THEME_DIR"
