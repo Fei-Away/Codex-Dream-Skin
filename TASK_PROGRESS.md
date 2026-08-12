@@ -1,5 +1,12 @@
 # Task Progress
 
+## Issue #352 fix and v1.5.14 release (2026-08-12)
+
+- [fix merged] PR #360 (`e3787857953998a1916c39b10942ac6c15978a25`) passed exact-head CI run `31558654733`: Static, macOS repository regressions plus universal DMG, Windows PowerShell 7, and Windows PowerShell 5.1 plus Setup.exe. It was squash-merged with the authorized same-owner review bypass at `2026-08-12T03:06:37Z` as `main@69a5a2e4b68174b1c0c70a2fa62adf1aca1eff2a`.
+- [release branch] This isolated worktree is `codex/release-v1.5.14` from that exact merge commit. Only the six version sources, two version-bound macOS assertions, both platform changelogs, and this durable progress record are in scope. All six version sources equal `1.5.14`.
+- [local gate] Portable Node regressions pass 103/103; runtime asset sync, macOS/Windows payload checks, Node/Bash syntax, version consistency, and `git diff --check` pass. `CODEX_DREAM_SKIN_SKIP_DOCTOR=1 bash macos/tests/run-tests.sh` passes with only the documented full-Xcode XCTest and installed signed Codex Doctor branches skipped.
+- [next] Commit and push the version branch, open a Ready PR, require exact-head CI, merge it, then verify the sole Release workflow creates `v1.5.14` from the exact main merge and publishes non-empty DMG, Setup.exe, and `SHA256SUMS.txt`. Only after public asset/checksum verification will #352 receive the customer reply; keep it open pending field confirmation.
+
 ## Issue #352 Windows one-click cold-session baseline (2026-08-12)
 
 - [root cause] The reporter's exact `One-click apply requires an existing
