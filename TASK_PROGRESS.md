@@ -1,5 +1,53 @@
 # Task Progress
 
+## Issue #352 Windows one-click cold-session baseline (2026-08-12)
+
+- [root cause] The reporter's exact `One-click apply requires an existing
+  verified Dream Skin session.` failure is the cold-session guard introduced
+  by PR #245 (`c44b434`, merged as `71f30f0`), not PR #357. The guard conflicts
+  with the documented one-click start/restart path by rejecting before that
+  path can run. Upstream Issue #235 remains a separate limitation: current
+  Store Codex may still fail to expose a verified CDP endpoint after startup.
+- [local implementation] Isolated worktree
+  `/private/tmp/dreamskin-issue352-baseline`, branch
+  `codex/fix-352-one-click-baseline`, starts from exact public v1.5.13
+  `main@6ae42e645c15f6ac91f5fa54a9c37dbc57af646c`. The Windows community apply
+  path now classifies only a missing session as bootstrap-eligible, releases
+  the operation lock while invoking the existing start-and-verify child, then
+  reacquires the lock and revalidates the complete old-theme baseline and its
+  fingerprint. All other baseline failures remain fail-closed.
+- [safety/order] User confirmation still precedes startup. Old-theme baseline
+  establishment and visible verification precede temporary work-root creation,
+  ZIP download, import, snapshot, or active-theme write. The transaction keeps
+  its second baseline check to reject a concurrent pause/theme/session change.
+  A baseline failure therefore performs zero candidate download/import/write,
+  and no longer claims that nonexistent download files were cleaned up.
+- [tests] Before the final orchestration assertion, focused PowerShell suites passed for community apply, both appearance
+  recovery paths, renderer readiness, verified-skin preservation, config
+  rollback, and the structured start-result contract. All 11 Windows scripts
+  parse; Windows Node tests pass 27/27, tools Node tests 2/2, and the focused
+  macOS ZIP validator passes. The final portable Node set passes 103/103,
+  runtime asset sync, dual payload checks, Node syntax, and `git diff --check`
+  pass. The portable macOS set previously passed 73/74 in one
+  parallel run with only a host subprocess exit 141, and that exact ZIP case
+  passed alone. Full Windows wrapper and one ZIP guard remain native-Windows CI
+  gates because macOS lacks `Get-AuthenticodeSignature` and resolves `/var`
+  through a symlink. This shell no longer has `pwsh` installed, so the final
+  test-only orchestration ordering assertion has not been executed locally and
+  remains an explicit exact-head Windows CI gate.
+- [independent review] Final read-only review found no P0/P1. It confirmed
+  lock release before child startup, bounded lock reacquisition, exact
+  fingerprint revalidation, download-before-baseline prevention, accurate
+  cleanup messaging, and PowerShell 5.1-compatible syntax. Residual evidence
+  required before merge is exact-head Windows PowerShell 5.1/7 CI plus Setup.
+- [current truth] Six implementation/test/documentation/progress files are modified and
+  uncommitted. No push, PR, merge, version bump, tag, Release, or Issue reply
+  exists for this fix yet. Next: rerun the corrected focused/static gates,
+  review the final diff, commit/push, open a Ready PR, and require all four
+  exact-head CI jobs before merge. Then prepare v1.5.14 through the sole Release
+  workflow, verify tag/assets/checksums/public status, and reply to #352 without
+  closing it until the reporter confirms the field fix.
+
 ## Issue #354 Windows failed-start appearance recovery (2026-08-12)
 
 - [current local implementation] All prior independent-audit findings are

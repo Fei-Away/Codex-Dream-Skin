@@ -278,6 +278,7 @@ foreach ($requiredSafety in @(
   '-ExpectedArchiveBytes $metadata.PackageBytes',
   '-ExpectedArchiveSha256 $metadata.PackageSha256',
   'Copy-DreamSkinImportedThemeSnapshot',
+  'Ensure-DreamSkinCommunityActiveBaseline',
   'Assert-DreamSkinCommunityActiveBaseline',
   'Set-DreamSkinActiveThemeFromSnapshot',
   'Get-DreamSkinThemeRuntimeContentFingerprint',
@@ -322,6 +323,11 @@ $transactionAst = $applyAst.Find({
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Invoke-DreamSkinCommunityThemeTransaction'
 }, $true)
+$applyHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Invoke-DreamSkinCommunityApply'
+}, $true)
 $exceptionHelperAst = $applyAst.Find({
   param($node)
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -331,6 +337,11 @@ $baselineHelperAst = $applyAst.Find({
   param($node)
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Assert-DreamSkinCommunityActiveBaseline'
+}, $true)
+$baselineStartHelperAst = $applyAst.Find({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Ensure-DreamSkinCommunityActiveBaseline'
 }, $true)
 $activeStateHelperAst = $applyAst.Find({
   param($node)
@@ -357,11 +368,50 @@ $startAndVerifyHelperAst = $applyAst.Find({
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Invoke-DreamSkinCommunityStartAndVerify'
 }, $true)
-if ($null -eq $transactionAst -or $null -eq $exceptionHelperAst -or
-  $null -eq $baselineHelperAst -or $null -eq $activeStateHelperAst -or
+if ($null -eq $transactionAst -or $null -eq $applyHelperAst -or
+  $null -eq $exceptionHelperAst -or
+  $null -eq $baselineHelperAst -or $null -eq $baselineStartHelperAst -or
+  $null -eq $activeStateHelperAst -or
   $null -eq $moveRollbackHelperAst -or $null -eq $startFailureMessageHelperAst -or
   $null -eq $startStateExceptionHelperAst -or $null -eq $startAndVerifyHelperAst) {
   throw 'A testable community apply transaction, baseline, state, or recovery helper is missing.'
+}
+$applyHelperSource = $applyHelperAst.Extent.Text
+$applyMetadataIndex = $applyHelperSource.IndexOf(
+  '$metadataResponse = Get-DreamSkinCommunityHttpResponse', [System.StringComparison]::Ordinal
+)
+$applyConfirmIndex = $applyHelperSource.IndexOf(
+  'Confirm-DreamSkinCommunityApply', [System.StringComparison]::Ordinal
+)
+$applyCanceledReturnIndex = $applyHelperSource.IndexOf(
+  'Canceled = $true', [System.StringComparison]::Ordinal
+)
+$applyBaselineIndex = $applyHelperSource.IndexOf(
+  'Ensure-DreamSkinCommunityActiveBaseline', [System.StringComparison]::Ordinal
+)
+$applyWorkRootIndex = $applyHelperSource.IndexOf(
+  "('.community-apply-' + [guid]::NewGuid().ToString('N'))",
+  [System.StringComparison]::Ordinal
+)
+$applyDownloadIndex = $applyHelperSource.IndexOf(
+  '$downloadResponse = Get-DreamSkinCommunityHttpResponse',
+  [System.StringComparison]::Ordinal
+)
+$applyImportIndex = $applyHelperSource.IndexOf(
+  'Import-DreamSkinThemeZip', [System.StringComparison]::Ordinal
+)
+$applyTransactionIndex = $applyHelperSource.IndexOf(
+  'Invoke-DreamSkinCommunityThemeTransaction', [System.StringComparison]::Ordinal
+)
+if ($applyMetadataIndex -lt 0 -or $applyConfirmIndex -le $applyMetadataIndex -or
+  $applyCanceledReturnIndex -le $applyConfirmIndex -or
+  $applyBaselineIndex -le $applyCanceledReturnIndex -or
+  $applyWorkRootIndex -le $applyBaselineIndex -or
+  $applyDownloadIndex -le $applyWorkRootIndex -or
+  $applyImportIndex -le $applyDownloadIndex -or
+  $applyTransactionIndex -le $applyImportIndex) {
+  throw ('Community apply must confirm before establishing the old-theme baseline, and the ' +
+    'baseline must succeed before work-root creation, download, import, or active writes.')
 }
 $transactionSource = $transactionAst.Extent.Text
 $transactionLockIndex = $transactionSource.IndexOf(
@@ -486,6 +536,7 @@ if ($transactionSource.Contains('Set-DreamSkinPaused -Paused $false')) {
 
 Invoke-Expression $exceptionHelperAst.Extent.Text
 Invoke-Expression $baselineHelperAst.Extent.Text
+Invoke-Expression $baselineStartHelperAst.Extent.Text
 Invoke-Expression $activeStateHelperAst.Extent.Text
 Invoke-Expression $moveRollbackHelperAst.Extent.Text
 Invoke-Expression $transactionAst.Extent.Text
@@ -619,7 +670,7 @@ function Invoke-DreamSkinNative {
   if ($script:communityMode -ceq 'baseline-pause-during-verify') {
     $script:communityPaused = $true
   }
-  $exitCode = if ($script:communityMode -ceq 'baseline-renderer-mismatch') { 1 } else { 0 }
+  $exitCode = if ($script:communityMode -in @('baseline-renderer-mismatch', 'baseline-bootstrap-no-session')) { 1 } else { 0 }
   return [pscustomobject]@{ ExitCode = $exitCode; Output = @('{}') }
 }
 
@@ -652,6 +703,13 @@ function Invoke-DreamSkinCommunityStartAndVerify {
   }
   $script:communityStartCalls += 1
   $script:communityStartTimeouts += $OperationLockTimeoutMilliseconds
+  if ($script:communityMode -ceq 'baseline-off') {
+    $script:communitySessionAvailable = $true
+    return
+  }
+  if ($script:communityMode -ceq 'baseline-bootstrap-failure') {
+    throw 'forced baseline start failure'
+  }
   if ($script:communityMode -in @(
       'startup-failure', 'rollback-write-failure', 'recovery-lock-timeout', 'pause-superseded'
     ) -and
@@ -696,7 +754,9 @@ function Reset-CommunityTransactionFixture {
   $script:communityBaselineVerifyCalls = 0
   $script:communityBaselineVerifyArguments = @()
   $script:communityPaused = $Mode -ceq 'baseline-paused'
-  $script:communitySessionAvailable = $Mode -cne 'baseline-off'
+  $script:communitySessionAvailable = $Mode -notin @(
+    'baseline-off', 'baseline-bootstrap-failure', 'baseline-bootstrap-no-session'
+  )
   $script:communityLockDepth = 0
   $script:communityMaxLockDepth = 0
   $script:communityLockTimeouts = @()
@@ -715,7 +775,6 @@ function Assert-CommunityIntSequence {
 
 foreach ($baselineCase in @(
   @{ Mode = 'baseline-paused'; VerifyCalls = 0 },
-  @{ Mode = 'baseline-off'; VerifyCalls = 0 },
   @{ Mode = 'baseline-session-mismatch'; VerifyCalls = 0 },
   @{ Mode = 'baseline-renderer-mismatch'; VerifyCalls = 1 },
   @{ Mode = 'baseline-selection-changed'; VerifyCalls = 1 },
@@ -735,6 +794,36 @@ foreach ($baselineCase in @(
   }
   Assert-CommunityIntSequence -Actual $script:communityLockTimeouts -Expected @(0) `
     -Label "Click-time baseline $($baselineCase.Mode) lock"
+}
+
+Reset-CommunityTransactionFixture -Mode 'baseline-off'
+$coldBaseline = Ensure-DreamSkinCommunityActiveBaseline -Paths $mockPaths `
+  -StateRoot 'state'
+$coldStartSuccess = Invoke-DreamSkinCommunityThemeTransaction -Imported $mockImported `
+  -Paths $mockPaths -WorkRoot 'work' -StateRoot 'state'
+if ($coldBaseline.ContentFingerprint -cne $script:communityRollbackFingerprint -or
+  $coldStartSuccess.ContentFingerprint -cne $script:communityExpectedFingerprint -or
+  $script:communityStartCalls -ne 2 -or $script:communityBaselineVerifyCalls -ne 2 -or
+  $script:communitySnapshotCalls -ne 1 -or $script:communityWriteCalls -ne 1 -or
+  $script:communityRestoreCalls -ne 0 -or $script:communityLockDepth -ne 0 -or
+  $script:communityMaxLockDepth -ne 1) {
+  throw 'A missing live session did not establish and verify the old-theme baseline before applying.'
+}
+Assert-CommunityIntSequence -Actual $script:communityStartTimeouts `
+  -Expected @(180000, 180000) -Label 'Cold-session baseline and candidate starts'
+Assert-CommunityIntSequence -Actual $script:communityLockTimeouts `
+  -Expected @(0, 180000, 0, 180000) -Label 'Cold-session baseline locks'
+
+foreach ($coldFailureMode in @('baseline-bootstrap-failure', 'baseline-bootstrap-no-session')) {
+  Reset-CommunityTransactionFixture -Mode $coldFailureMode
+  Assert-CommunityValueRejected -Label $coldFailureMode -Action {
+    Ensure-DreamSkinCommunityActiveBaseline -Paths $mockPaths -StateRoot 'state'
+  }
+  if ($script:communityStartCalls -ne 1 -or $script:communitySnapshotCalls -ne 0 -or
+    $script:communityWriteCalls -ne 0 -or $script:communityRestoreCalls -ne 0 -or
+    $script:communityPauseWriteCalls -ne 0 -or $script:communityLockDepth -ne 0) {
+    throw "Cold-session failure $coldFailureMode changed active state or retried without a baseline."
+  }
 }
 
 Reset-CommunityTransactionFixture -Mode 'baseline-snapshot-changed'
