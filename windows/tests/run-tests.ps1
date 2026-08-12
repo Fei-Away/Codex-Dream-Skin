@@ -432,8 +432,8 @@ try {
 
   # A legacy upgrade can already have a durable backup but no appearance
   # marker. If the marker commits and the config commit then fails, the marker
-  # must still be removed so restore continues to recognize the legacy light
-  # trio and recovers the saved appearanceTheme.
+  # must return to a logical-absence state so restore continues to recognize
+  # the legacy light trio and recovers the saved appearanceTheme.
   $realAtomicBytesWriter = (Get-Command Write-DreamSkinBytesAtomically -CommandType Function).ScriptBlock
   $legacyCommitFailureConfig = Join-Path $temporaryRoot 'legacy-commit-failure.toml'
   $legacyCommitFailureBackup = Join-Path $temporaryRoot 'legacy-commit-failure.before.toml'
@@ -474,13 +474,14 @@ try {
   } finally {
     Set-Item -Path Function:\Write-DreamSkinBytesAtomically -Value $realAtomicBytesWriter
   }
+  $legacyFailureMarker = Read-DreamSkinAppearanceMarker -BackupPath $legacyCommitFailureBackup
   if (-not $legacyCommitFailureRejected -or
     -not (Test-DreamSkinBytesEqual -Left $legacyOriginalBytes `
       -Right ([System.IO.File]::ReadAllBytes($legacyCommitFailureConfig))) -or
     -not (Test-DreamSkinBytesEqual -Left $legacyBackupBytes `
       -Right ([System.IO.File]::ReadAllBytes($legacyCommitFailureBackup))) -or
-    (Test-Path -LiteralPath (Get-DreamSkinAppearanceMarkerPath -BackupPath $legacyCommitFailureBackup))) {
-    throw 'Legacy config commit failure left an appearance marker or changed the recoverable backup.'
+    -not (Test-DreamSkinAppearanceMarkerLogicalAbsent -Marker $legacyFailureMarker)) {
+    throw 'Legacy config commit failure did not restore logical marker absence or changed the backup.'
   }
   Restore-DreamSkinBaseTheme -ConfigPath $legacyCommitFailureConfig `
     -BackupPath $legacyCommitFailureBackup
@@ -971,15 +972,19 @@ try {
       return 'not-forwarded'
     }
     $directArgumentFailureReported = $false
+    $directArgumentFailureCategory = $null
     try {
       $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
         -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
     } catch {
       $directArgumentFailureReported = $_.Exception.Message.Contains(
         'package activation or validated direct launch')
+      $directArgumentFailureCategory = Get-DreamSkinStartFailureCategory `
+        -Exception $_.Exception
     }
-    if (-not $directArgumentFailureReported) {
-      throw 'A direct fallback that also dropped the CDP argument did not fail closed.'
+    if (-not $directArgumentFailureReported -or
+      $directArgumentFailureCategory -cne 'cdp-endpoint-unavailable') {
+      throw 'A direct fallback that also dropped the CDP argument did not preserve its result category.'
     }
 
     Set-Item 'function:Wait-DreamSkinCodexDebugArgumentStatus' -Value { param($Codex, $Port) return 'protocol-redirected' }
@@ -987,14 +992,18 @@ try {
       throw [System.UnauthorizedAccessException]::new('denied')
     }
     $accessDeniedReported = $false
+    $accessDeniedCategory = $null
     try {
       $null = Start-DreamSkinCodexForDebugging -Codex $fakeInstall `
         -Arguments @('--remote-debugging-port=9335') -Port 9335 -PreserveProcessIds @()
     } catch {
       $accessDeniedReported = $_.Exception.Message.Contains('(access-denied)') -and
         $_.Exception.Message.Contains('protected app package')
+      $accessDeniedCategory = Get-DreamSkinStartFailureCategory -Exception $_.Exception
     }
-    if (-not $accessDeniedReported) { throw 'A blocked direct Store launch did not produce the compatibility error.' }
+    if (-not $accessDeniedReported -or $accessDeniedCategory -cne 'cdp-direct-access-denied') {
+      throw 'A blocked direct Store launch did not preserve its result category.'
+    }
   } finally {
     foreach ($functionName in $launcherFunctionNames) {
       Set-Item ("function:$functionName") -Value $originalLauncherFunctions[$functionName]
@@ -1470,6 +1479,10 @@ try {
   $node = Get-DreamSkinNodeRuntime
   & (Join-Path $PSScriptRoot 'community-theme-link.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'theme-zip-import.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'config-startup-rollback.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-result-contract.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-cdp-failure-appearance-recovery.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-post-launch-appearance-recovery.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-renderer-readiness.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-verified-skin-preserved.tests.ps1') -Root $Root
   $projectRoot = Split-Path -Parent $Root
