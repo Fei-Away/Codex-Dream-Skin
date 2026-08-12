@@ -168,8 +168,11 @@ function makeFixture({
       register(messageSelector, partFixtures.userMessage);
       register(messageSelector, partFixtures.assistantMessage);
     }
-    register(".composer-surface-chrome", partFixtures.composer);
-    register('.composer-surface-chrome [class*="_footer_"]', partFixtures.composerToolbar);
+    register(':is(.composer-surface-chrome, [class*="_ComposerLayoutBody_"])', partFixtures.composer);
+    register(
+      ':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutBody_"] [class*="_ComposerLayoutFooter_"])',
+      partFixtures.composerToolbar,
+    );
   }
   const makeStyleNode = () => {
     const node = {
@@ -337,6 +340,18 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\):not\(:has\(\[role="main"\]\)\)/);
   assert.match(css, /header:is\(\.app-header-tint, \[data-app-shell-header-edge-scroll\], \[class\*=\"_Header_\"\]\)/);
   assert.match(css, /:is\(\.app-shell-main-content-top-fade, \[data-app-shell-main-content-top-fade\], \[class\*=\"_MainContentTopFade_\"\]\)/);
+  assert.match(
+    css,
+    /:is\(\.composer-surface-chrome, \[class\*=\"_ComposerLayoutBody_\"\]\)/,
+    "Core CSS must style the Codex 26.803 Owl composer body in focused and unfocused states.",
+  );
+  assert.match(
+    css,
+    /:is\(\[class\*=\"_homeUtilityBar_\"\], \[class\*=\"_ComposerHomeUtilityBar_\"\]\)/,
+    "Core CSS must join the Codex 26.803 Owl project utility row to the composer body.",
+  );
+  assert.match(template, /_ComposerLayoutFooter_/,
+    "The Safe CSS bridge must expose the Codex 26.803 Owl composer toolbar.");
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
   assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
   assert.match(css, /content:\s*var\(--dream-skin-status/);

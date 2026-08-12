@@ -16,8 +16,26 @@ assert.equal(
 );
 assert.match(selectorFor("shell-main"), /\[class\*=\"_MainContentSurface_\"\]/);
 assert.match(selectorFor("header-tint"), /\[class\*=\"_Header_\"\]/);
+assert.equal(
+  selectorFor("composer-chrome"),
+  ':is(.composer-surface-chrome, [class*="_ComposerLayoutBody_"])',
+  "The composer contract must preserve the legacy surface and support Codex 26.803 Owl.",
+);
+assert.equal(
+  selectorFor("composer-toolbar"),
+  ':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutBody_"] [class*="_ComposerLayoutFooter_"])',
+  "The composer toolbar contract must support both legacy and Owl layout modules.",
+);
+assert.equal(
+  selectorFor("home-utility"),
+  ':is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"])',
+  "The home composer utility row must support both legacy and Codex 26.803 Owl modules.",
+);
 assert.doesNotMatch(selectorFor("shell-main"), /_[A-Za-z]+_[a-z0-9]{4,}/);
 assert.doesNotMatch(selectorFor("header-tint"), /_[A-Za-z]+_[a-z0-9]{4,}/);
+assert.doesNotMatch(selectorFor("composer-chrome"), /_ComposerLayoutBody_[a-z0-9]{4,}/);
+assert.doesNotMatch(selectorFor("composer-toolbar"), /_ComposerLayoutFooter_[a-z0-9]{4,}/);
+assert.doesNotMatch(selectorFor("home-utility"), /_ComposerHomeUtilityBar_[a-z0-9]{4,}/);
 assert.equal(
   selectorFor("main-content-top-fade"),
   ':is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*="_MainContentTopFade_"])',
