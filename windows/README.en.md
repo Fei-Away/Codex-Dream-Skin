@@ -98,10 +98,12 @@ in app** to open `dreamskin://apply?version=...`. Windows shows a native
 confirmation first. After confirmation, the client downloads that exact version
 only from `https://api.dreamskin.cc`, checks the reviewed metadata, actual byte
 count, and SHA-256, then runs the same manifest, image, ZIP, and Safe CSS checks
-as manual import before switching. Codex may restart when it is open without a
-usable skin session, so save unfinished input first. The link cannot provide an
-arbitrary download URL, file path, command, or silent-apply option. Incomplete
-legacy themes remain rejected by the client.
+as manual import before switching. If there is no verifiable skin session, the
+client first starts or restarts Codex and verifies that the on-disk active theme
+is the one visibly rendered; only then does it write the downloaded theme, so a
+rollback baseline is always available. Save unfinished input first. The link
+cannot provide an arbitrary download URL, file path, command, or silent-apply
+option. Incomplete legacy themes remain rejected by the client.
 
 Import a UI-free wallpaper rather than a preview containing a window, sidebar, composer, text, or buttons. Images may be at most 10 MB, 16384 pixels on either side, and 50 million total pixels.
 

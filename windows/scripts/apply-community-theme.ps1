@@ -452,7 +452,11 @@ function Assert-DreamSkinCommunityActiveBaseline {
     -ThemeDirectory $Paths.Active
   $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
   if ($null -eq $session) {
-    throw 'One-click apply requires an existing verified Dream Skin session.'
+    $exception = [System.InvalidOperationException]::new(
+      'One-click apply requires an existing verified Dream Skin session.'
+    )
+    $exception.Data['DreamSkinBaselineCategory'] = 'session-unavailable'
+    throw $exception
   }
   if (-not (Test-DreamSkinPathEqual -Left $session.Paths.Active -Right $Paths.Active)) {
     throw 'The active Dream Skin session does not use the selected theme directory.'
@@ -477,6 +481,59 @@ function Assert-DreamSkinCommunityActiveBaseline {
     throw 'The selected theme changed during baseline renderer verification.'
   }
   return [pscustomobject]@{ ContentFingerprint = $verifiedFingerprint }
+}
+
+function Ensure-DreamSkinCommunityActiveBaseline {
+  param(
+    [Parameter(Mandatory = $true)][object]$Paths,
+    [Parameter(Mandatory = $true)][string]$StateRoot,
+    [ValidateRange(1000, 300000)]
+    [int]$OperationLockTimeoutMilliseconds = 180000
+  )
+  $baseline = $null
+  $baselineFingerprint = $null
+  $startRequired = $false
+  $operationLock = $null
+  try {
+    $operationLock = Enter-DreamSkinOperationLock
+    try {
+      $baseline = Assert-DreamSkinCommunityActiveBaseline -Paths $Paths `
+        -StateRoot $StateRoot
+    } catch {
+      if ("$($_.Exception.Data['DreamSkinBaselineCategory'])" -cne 'session-unavailable') {
+        throw
+      }
+      $startRequired = $true
+      $baselineFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint `
+        -ThemeDirectory $Paths.Active
+    } finally {
+      Exit-DreamSkinOperationLock -Mutex $operationLock
+      $operationLock = $null
+    }
+  }
+  catch {
+    if ($null -ne $operationLock) {
+      try { Exit-DreamSkinOperationLock -Mutex $operationLock } catch {}
+    }
+    throw
+  }
+  if (-not $startRequired) { return $baseline }
+
+  Invoke-DreamSkinCommunityStartAndVerify `
+    -OperationLockTimeoutMilliseconds $OperationLockTimeoutMilliseconds
+
+  $operationLock = Enter-DreamSkinOperationLock `
+    -TimeoutMilliseconds $OperationLockTimeoutMilliseconds
+  try {
+    $verified = Assert-DreamSkinCommunityActiveBaseline -Paths $Paths `
+      -StateRoot $StateRoot
+    if ($verified.ContentFingerprint -cne $baselineFingerprint) {
+      throw 'The active theme changed while the verified Dream Skin baseline was being established.'
+    }
+    return $verified
+  } finally {
+    Exit-DreamSkinOperationLock -Mutex $operationLock
+  }
 }
 
 function Get-DreamSkinCommunityActiveState {
@@ -827,6 +884,8 @@ function Invoke-DreamSkinCommunityApply {
     }
 
     $paths = Get-DreamSkinThemePaths -StateRoot $stateRoot
+    $null = Ensure-DreamSkinCommunityActiveBaseline -Paths $paths `
+      -StateRoot $stateRoot -OperationLockTimeoutMilliseconds 180000
     Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
     $workRoot = Join-Path $paths.Root ('.community-apply-' + [guid]::NewGuid().ToString('N'))
     Ensure-DreamSkinManagedDirectory -Path $workRoot -Root $paths.Root
@@ -920,7 +979,7 @@ try {
   }
   $cleanupMessage = if ($workRootRetained) {
     Get-DreamSkinCommunityText -Key 'RecoveryWorkRetained'
-  } else {
+  } elseif ($null -ne $workRoot) {
     Get-DreamSkinCommunityText -Key 'DownloadCleaned'
   }
   $rollbackMessage = if ($rollbackPath) {
@@ -930,9 +989,9 @@ try {
   }
   $summary = @(
     (Get-DreamSkinCommunityText -Key 'CommunityApplyFailed'),
-    $cleanupMessage,
     $recoveryMessage
   )
+  if ($cleanupMessage) { $summary += $cleanupMessage }
   if ($rollbackMessage) { $summary += $rollbackMessage }
   Show-DreamSkinCommunityMessage -Kind Error -Message (
     (($summary -join [Environment]::NewLine) + [Environment]::NewLine +
