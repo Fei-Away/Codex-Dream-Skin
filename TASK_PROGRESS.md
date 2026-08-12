@@ -54,10 +54,12 @@
   exact-head CI jobs before merge. Then prepare v1.5.14 through the sole Release
   workflow, verify tag/assets/checksums/public status, and reply to #352 without
   closing it until the reporter confirms the field fix.
+
 ## Issue #235 Windows Chromium 136+ CDP profile compatibility (2026-08-12)
 
-- [implemented locally] Branch `fix/windows-owl-cdp-compat` is being rebased on
-  current `origin/main@95423d8` / tag `v1.5.14`. Windows start now supplies the persistent,
+- [rebased and committed] Branch `fix/windows-owl-cdp-compat` is based on
+  current `origin/main@95423d8` / tag `v1.5.14`; functional commit `2682d1b`
+  supplies the persistent,
   non-default `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile` required by Chromium
   136+ whenever the caller did not explicitly provide `-ProfilePath`.
 - [root cause verified] Current host runs Store Codex `26.803.10989.0` with
@@ -71,17 +73,16 @@
 - [regression added] The failed-start fixture now asserts one exact managed
   `--user-data-dir` argument and verifies the directory exists before launch.
   Focused red/green execution passes after the implementation.
-- [tests passed] Full `windows/tests/run-tests.ps1` passed with its production
-  process-identity checks enabled; `node --check` passed for `injector.mjs` and
-  `renderer-inject.js`; `git diff --check` passed. The unrestricted suite took
-  about six minutes because it includes archive, rollback, and watcher fixtures.
-- [publication path] Upstream reports `push: false`, and exact connector lookup
-  confirms `cjmarklll/Codex-Dream-Skin` does not exist. GitHub CLI authentication
-  is now valid; create the fork after the v1.5.14 rebase and regression gate,
-  push the tested branch, and open a draft PR against upstream `main`.
-- [next] Finish the conflict-free v1.5.14 rebase, rerun the Windows regression
-  gate, then publish the fork branch and draft PR with the root-cause and real
-  Chromium 151 injection evidence.
+- [tests passed] On the rebased v1.5.14 tree, full
+  `windows/tests/run-tests.ps1` passed with production process-identity checks
+  enabled in 301 seconds; the focused managed-profile regression, both Node
+  syntax checks, and `git diff --check origin/main...HEAD` also passed.
+- [pushed / draft PR open] Fork `cjmarklll/Codex-Dream-Skin` now exists and the
+  tested branch is pushed. Draft PR #363 targets upstream `main`:
+  `https://github.com/Fei-Away/Codex-Dream-Skin/pull/363`.
+- [next] Require exact-head CI and maintainer review before merge. This task does
+  not authorize merging, versioning, tagging, releasing, or closing #235 before
+  field confirmation.
 
 ## Issue #354 Windows failed-start appearance recovery (2026-08-12)
 
