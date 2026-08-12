@@ -9,6 +9,7 @@
 ### 修复
 
 - 修复 Windows 首次或冷启动状态下从 DreamSkin.cc 一键换肤被错误拒绝的问题。客户端现在会在下载主题包前安全启动并验证当前主题；如果官方 Codex 未提供可用 CDP 端点，则在任何主题库或活动主题写入前返回明确失败。
+- 修复 Codex `26.803.10989.0` / Chromium 151 上 Dream Skin 无法打开 CDP、主题完全不生效的问题（#235）：Chromium 136 起会忽略指向默认数据目录的 `--remote-debugging-port`，Windows 启动器此前默认只传调试端口，未同时传非默认 `--user-data-dir`。现在默认创建并复用 `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile`，保持官方 Codex profile 隔离且不修改 WindowsApps；实机已验证 `app://-/index.html` renderer、主题注入和完整结构检查通过。显式 `-ProfilePath` 仍可覆盖默认目录。
 - 修复透明或极端显式强调色下按钮文字对比度不稳定的问题：共享渲染器现在按真实 composer 面板表面和最坏背景计算前景色，并正确处理 alpha 与 RGB 夹取（#351）。
 - 修复 Windows 启动失败后只留下颜色、背景等部分外观状态的问题（#354、#357）：新增有界持久 journal 和三方恢复，保留较新的用户编辑；一键换肤在慢启动、超时或渲染未确认时不强杀仍运行的子进程，也不留下混合的活动主题文件，并提供可区分的有界失败原因。该修复处理本地失败启动的状态一致性，不改变官方 Codex 的 CDP 能力。
 - 修复 Windows PowerShell 5.1 在中文、日文等非 ASCII 临时目录下读取

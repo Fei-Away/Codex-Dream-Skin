@@ -30,10 +30,11 @@
 | 源码（本整理包） | `Codex-Dream-Skin/windows/` |
 | 安装后的受管运行时 | `%LOCALAPPDATA%\CodexDreamSkin\engine` |
 | 状态 / 日志 | `%LOCALAPPDATA%\CodexDreamSkin` |
+| 受管 CDP profile | `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile` |
 | Codex 配置 | `%USERPROFILE%\.codex\config.toml` |
 | 默认 CDP 端口 | 首选 `9335`，冲突时自动选空闲口（Mac 包默认从 `9341` 起） |
 
-Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` 包清单解析 AppUserModelId，并通过系统应用包激活接口完成。若新版 owl runtime 明确把 CDP 参数转换成 `codex://` 路径，调试启动会对同一个已验证 Store 包内的精确 `app\ChatGPT.exe` 做一次原始参数回退；ACL 拒绝或参数保留后仍无可信监听都会停止并回滚，不修改或接管 WindowsApps 权限。Issue #235 已在 `26.715.10079.0` 与 `26.721.3404.0` 分别实机确认这两种失败，因此该回退只作安全诊断，不代表受影响 owl 版本已恢复兼容。
+Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` 包清单解析 AppUserModelId，并通过系统应用包激活接口完成。调试启动会额外使用独立的受管 CDP profile，因为 Chromium 136 起只有同时传入非默认 `--user-data-dir` 才接受 `--remote-debugging-port`。若 owl runtime 明确把参数转换成 `codex://` 路径，启动器会对同一个已验证 Store 包内的精确 `app\ChatGPT.exe` 做一次原始参数回退；ACL 拒绝或最终仍无可信监听都会停止并回滚，不修改或接管 WindowsApps 权限。Issue #235 已在 `26.803.10989.0` / Chromium 151 实机确认该隔离 profile 能恢复 CDP、识别 `app://-/index.html` 并通过真实主题注入验证。
 
 ## 能力矩阵
 

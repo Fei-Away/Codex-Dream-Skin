@@ -54,6 +54,34 @@
   exact-head CI jobs before merge. Then prepare v1.5.14 through the sole Release
   workflow, verify tag/assets/checksums/public status, and reply to #352 without
   closing it until the reporter confirms the field fix.
+## Issue #235 Windows Chromium 136+ CDP profile compatibility (2026-08-12)
+
+- [implemented locally] Branch `fix/windows-owl-cdp-compat` is being rebased on
+  current `origin/main@95423d8` / tag `v1.5.14`. Windows start now supplies the persistent,
+  non-default `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile` required by Chromium
+  136+ whenever the caller did not explicitly provide `-ProfilePath`.
+- [root cause verified] Current host runs Store Codex `26.803.10989.0` with
+  Chromium `151.0.7922.76`. Port-only launch produced no endpoint; the same exact
+  signed Store executable with an isolated `--user-data-dir` exposed a loopback
+  Browser WebSocket and the `app://-/index.html` renderer.
+- [real injection verified] Repository injector 1.5.13 connected to the isolated
+  renderer on port 9348, installed the active theme, reported `stylePresent:
+  true`, recognized shell/sidebar/main, and returned `pass: true`. Only probe-
+  created PIDs were stopped afterward; the existing Codex session was preserved.
+- [regression added] The failed-start fixture now asserts one exact managed
+  `--user-data-dir` argument and verifies the directory exists before launch.
+  Focused red/green execution passes after the implementation.
+- [tests passed] Full `windows/tests/run-tests.ps1` passed with its production
+  process-identity checks enabled; `node --check` passed for `injector.mjs` and
+  `renderer-inject.js`; `git diff --check` passed. The unrestricted suite took
+  about six minutes because it includes archive, rollback, and watcher fixtures.
+- [publication path] Upstream reports `push: false`, and exact connector lookup
+  confirms `cjmarklll/Codex-Dream-Skin` does not exist. GitHub CLI authentication
+  is now valid; create the fork after the v1.5.14 rebase and regression gate,
+  push the tested branch, and open a draft PR against upstream `main`.
+- [next] Finish the conflict-free v1.5.14 rebase, rerun the Windows regression
+  gate, then publish the fork branch and draft PR with the root-cause and real
+  Chromium 151 injection evidence.
 
 ## Issue #354 Windows failed-start appearance recovery (2026-08-12)
 
