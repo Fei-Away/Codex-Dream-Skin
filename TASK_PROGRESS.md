@@ -46,17 +46,18 @@
   `codex/fix-354-appearance-rollback@fa3e53822a4158d56dc1ae10efa8f288b2d73a88`.
   Exact-head run `31531028135` passed Static, macOS/DMG, Windows PowerShell 7,
   and Windows PowerShell 5.1/Setup.
-- [local commit] The 15 implementation, test, and Windows documentation files
-  are committed as `54933c3678034333a4e00c0a93c9d4da5d2ded6d` on
-  `codex/fix-354-appearance-rollback`. This commit has not been pushed yet; PR
-  #357 and run `31531028135` still refer to the older remote head `fa3e538`.
+- [pushed checkpoint] The 15 implementation, test, and Windows documentation
+  files are committed as `54933c3678034333a4e00c0a93c9d4da5d2ded6d`; the
+  first verification checkpoint is `8ad35f2`. Both were pushed to
+  `codex/fix-354-appearance-rollback` for Draft PR #357. Run `31531028135`
+  remains historical evidence for older head `fa3e538`, not the new changes.
 - [scope] The PR fixes only caught Windows failed-start partial appearance,
   rollback ownership/concurrency, and bounded one-click diagnostics. It does
   not claim that official Store Codex `26.803.5235.0` restored a supported CDP
   endpoint. User authorization covers scoped commit, push, PR merge, and issue
   handling, but not a version, tag, Release, deployment, or external config.
-- [remaining] Commit this progress checkpoint, then push the two scoped commits.
-  Require all four CI jobs green on that exact head before marking #357 Ready
+- [remaining] Push this progress-only checkpoint and update the PR body. Require
+  all four CI jobs green on the resulting exact head before marking #357 Ready
   and squash-merging with head protection. Verify post-merge `main` CI, then
   update only #235, #352, and #354. Native Windows 5.1/7 and Setup are CI-only
   evidence on this macOS host.
