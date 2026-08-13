@@ -7,7 +7,8 @@ param(
   [switch]$ForegroundInjector,
   [ValidateRange(0, 300000)][int]$OperationLockTimeoutMilliseconds = 0,
   [switch]$RequireUnpaused,
-  [ValidatePattern('^[a-f0-9]{32}$')][string]$ResultToken
+  [ValidatePattern('^[a-f0-9]{32}$')][string]$ResultToken,
+  [switch]$RecoverExisting
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,6 +77,9 @@ try {
   $currentCodex = Get-DreamSkinCodexInstall
   $codex = $currentCodex
   $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
+  if ($RecoverExisting -and ($RestartExisting -or $PromptRestart)) {
+    throw (Get-DreamSkinText -Key 'RecoverCannotRestart' -Language $language)
+  }
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
   $StatePath = Join-Path $StateRoot 'state.json'
@@ -84,6 +88,10 @@ try {
   $VerifyPath = Join-Path $StateRoot 'verify.log'
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot
   $pauseWasSet = Test-DreamSkinPaused -StateRoot $StateRoot
+  if ($RecoverExisting -and $pauseWasSet) {
+    $startFailureCategory = 'superseded'
+    throw (Get-DreamSkinText -Key 'RecoverPaused' -Language $language)
+  }
   if ($RequireUnpaused -and $pauseWasSet) {
     $startFailureCategory = 'superseded'
     throw 'A newer pause request superseded this theme apply before renderer verification.'
@@ -146,9 +154,28 @@ try {
       }
     }
   }
+  if ($RecoverExisting) {
+    if ($null -eq $previousState -or -not $previousState.browserId) {
+      $startFailureCategory = 'state-reconciliation-failed'
+      throw (Get-DreamSkinText -Key 'RecoverNoState' -Language $language)
+    }
+    if (Test-DreamSkinRecordedInjectorRunning -State $previousState) {
+      $startFailureCategory = 'superseded'
+      throw (Get-DreamSkinText -Key 'RecoverWatcherRunning' -Language $language)
+    }
+    if ($null -ne $cdpIdentity -and
+      "$($cdpIdentity.BrowserId)" -ceq "$($previousState.browserId)") {
+      $startFailureCategory = 'superseded'
+      throw (Get-DreamSkinText -Key 'RecoverSameSession' -Language $language)
+    }
+  }
   $pendingAppearanceTransaction = Test-DreamSkinPendingAppearanceTransaction `
     -BackupPath $BackupPath
   if ($pendingAppearanceTransaction) {
+    if ($RecoverExisting) {
+      $startFailureCategory = 'state-reconciliation-failed'
+      throw (Get-DreamSkinText -Key 'RecoverPendingAppearance' -Language $language)
+    }
     # A previous process ended before it could commit or recover appearance.
     # Do not reuse its live session: the locked restart path closes Codex first,
     # then Install-DreamSkinBaseTheme performs the durable three-way recovery.
@@ -162,6 +189,10 @@ try {
     Get-DreamSkinCodexProcesses -Codex $codexToStop
   }
   $closedExistingCodex = $false
+  if ($RecoverExisting -and -not $debugReady) {
+    $startFailureCategory = 'cdp-endpoint-unavailable'
+    throw (Get-DreamSkinText -Key 'RecoverNoSession' -Language $language)
+  }
   if (-not $debugReady -and $codexProcesses.Count -gt 0) {
     $restartAuthorized = [bool]$RestartExisting
     if (-not $restartAuthorized -and $PromptRestart) {
@@ -204,7 +235,12 @@ try {
         throw 'Interrupted startup appearance could not be recovered safely; config was preserved.'
       }
     }
-    if ($null -eq (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex)) {
+    $existingIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
+    if ($RecoverExisting -and $null -eq $existingIdentity) {
+      $startFailureCategory = 'cdp-endpoint-unavailable'
+      throw (Get-DreamSkinText -Key 'RecoverSessionClosed' -Language $language)
+    }
+    if ($null -eq $existingIdentity) {
       # Codex is closed on this path; sync the appearanceTheme pin to the
       # active theme before launching (config writes race the app while it runs).
       try {
@@ -244,6 +280,10 @@ try {
     $startFailureCategory = 'cdp-endpoint-unavailable'
     $deadline = (Get-Date).AddSeconds(45)
     $cdpIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
+    if ($RecoverExisting -and ($null -eq $cdpIdentity -or
+      "$($cdpIdentity.BrowserId)" -cne "$($existingIdentity.BrowserId)")) {
+      throw (Get-DreamSkinText -Key 'RecoverSessionClosed' -Language $language)
+    }
     while ($null -eq $cdpIdentity) {
       $argumentStatus = Get-DreamSkinCodexDebugArgumentStatus `
         -Processes @(Get-DreamSkinCodexProcesses -Codex $codex) -Port $Port
@@ -300,8 +340,15 @@ try {
     }
     # Keep a paused, already-running watcher paused until all state checks and
     # restart consent have succeeded. A cancelled prompt stays side-effect free.
-    Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-    $pauseCleared = $true
+    if ($RecoverExisting) {
+      if (Test-DreamSkinPaused -StateRoot $StateRoot) {
+        $startFailureCategory = 'superseded'
+        throw (Get-DreamSkinText -Key 'RecoverPaused' -Language $language)
+      }
+    } else {
+      Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
+      $pauseCleared = $true
+    }
   } catch {
     if ($launchedWithCdp) {
       $stateRollbackClosed = $false

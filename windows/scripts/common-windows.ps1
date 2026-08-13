@@ -1270,6 +1270,62 @@ function Get-DreamSkinProcessStartedAt {
   }
 }
 
+function Test-DreamSkinRecordedInjectorRunning {
+  param([AllowNull()][object]$State)
+  if ($null -eq $State -or -not $State.injectorPid -or -not $State.injectorStartedAt) {
+    return $false
+  }
+
+  $processId = [int]$State.injectorPid
+  $processHandle = Get-Process -Id $processId -ErrorAction SilentlyContinue
+  if ($null -eq $processHandle) { return $false }
+  try {
+    try {
+      $startedAt = $processHandle.StartTime.ToUniversalTime().ToString('o')
+    } catch {
+      if ($processHandle.HasExited) { return $false }
+      throw "The recorded injector PID $processId is running, but its start time cannot be inspected. State was preserved."
+    }
+    return $startedAt -ceq "$($State.injectorStartedAt)"
+  } finally {
+    $processHandle.Dispose()
+  }
+}
+
+function Get-DreamSkinInjectorRecoveryContext {
+  param([AllowNull()][object]$State)
+  if ($null -eq $State -or -not $State.port -or -not $State.injectorPid -or
+    -not $State.injectorStartedAt -or -not $State.browserId) {
+    return $null
+  }
+  if (Test-DreamSkinRecordedInjectorRunning -State $State) { return $null }
+
+  $port = 0
+  if (-not [int]::TryParse("$($State.port)", [ref]$port)) { return $null }
+  Assert-DreamSkinPort -Port $port
+  if (Test-DreamSkinPortAvailable -Port $port) { return $null }
+
+  $codex = Get-DreamSkinCodexInstallFromState -State $State
+  $identity = if ($null -ne $codex) {
+    Get-DreamSkinVerifiedCdpIdentity -Port $port -Codex $codex
+  } else {
+    $null
+  }
+  if ($null -eq $identity) {
+    $registered = Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $port
+    if ($null -eq $registered) { return $null }
+    $codex = $registered.Codex
+    $identity = $registered.Identity
+  }
+  if ("$($identity.BrowserId)" -ceq "$($State.browserId)") { return $null }
+
+  return [pscustomobject]@{
+    Port = $port
+    BrowserId = $identity.BrowserId
+    Codex = $codex
+  }
+}
+
 function Stop-DreamSkinRecordedInjector {
   param([AllowNull()][object]$State)
   if ($null -eq $State -or -not $State.injectorPid) { return $true }
