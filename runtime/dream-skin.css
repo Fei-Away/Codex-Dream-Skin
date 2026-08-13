@@ -248,7 +248,8 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [class*="text-token
   color: rgb(var(--ds-muted-rgb) / .92) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ svg {
+/* Preserve native inline semantic colors for sidebar indicators. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ svg:not([style*="color"]) {
   color: rgb(var(--ds-muted-rgb) / .96) !important;
 }
 
@@ -259,8 +260,8 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ a:hover {
   transform: none !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ button:hover svg,
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ a:hover svg {
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ button:hover svg:not([style*="color"]),
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ a:hover svg:not([style*="color"]) {
   color: var(--ds-accent) !important;
 }
 
@@ -287,7 +288,7 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [aria-current="page
   color: var(--ds-text) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [aria-current="page"] svg {
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [aria-current="page"] svg:not([style*="color"]) {
   color: var(--ds-accent) !important;
 }
 
