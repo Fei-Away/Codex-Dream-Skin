@@ -114,6 +114,43 @@ test("compiles validated declarations into the controlled community cascade laye
   }
 });
 
+test("compiles composer borders into controlled runtime bridge variables", () => {
+  const source = `[data-ds-part="composer"] {
+  background-color: rgba(244, 250, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.28);
+  border-width: 1px;
+  border-style: solid;
+  backdrop-filter: blur(8px) saturate(1.06);
+}
+[data-ds-part="composer"]:hover {
+  border-color: rgba(255, 255, 255, 0.36);
+}`;
+  for (const validator of validators) {
+    const runtime = validator.compileSafeCss(source);
+    assert.match(runtime, /\[data-ds-part="composer"\] \{/);
+    assert.match(runtime, /background-color: rgba\(244, 250, 255, 0.10\) !important;/);
+    assert.match(runtime, /border-color: rgba\(255, 255, 255, 0.28\) !important;/);
+    assert.match(runtime, /border-width: 1px !important;/);
+    assert.match(runtime, /border-style: solid !important;/);
+    assert.match(runtime, /--ds-community-composer-border-color: rgba\(255, 255, 255, 0.28\) !important;/);
+    assert.match(runtime, /--ds-community-composer-border-width: 1px !important;/);
+    assert.match(runtime, /--ds-community-composer-border-style: solid !important;/);
+    assert.match(runtime, /\[data-ds-part="composer"\]:hover \{[\s\S]*--ds-community-composer-border-color: rgba\(255, 255, 255, 0.36\) !important;/);
+    assert.doesNotMatch(runtime, /(?:\[data-ds-part="composer"\]){2}/);
+    assert.doesNotMatch(runtime, /\n\s*border:/);
+    assert.match(runtime, /backdrop-filter: blur\(8px\) saturate\(1.06\) !important;/);
+  }
+});
+
+test("does not bridge state-only composer borders without a base value", () => {
+  const source = `[data-ds-part="composer"]:hover { border-color: #ffffff; }`;
+  for (const validator of validators) {
+    const runtime = validator.compileSafeCss(source);
+    assert.match(runtime, /border-color: #ffffff !important;/);
+    assert.doesNotMatch(runtime, /--ds-community-composer-border-color:/);
+  }
+});
+
 test("compiles bounded root and toolbar bridges for visible inherited styling", () => {
   const source = `[data-ds-part="root"] {
   background-color: #112233;

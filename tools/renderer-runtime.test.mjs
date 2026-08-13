@@ -5,11 +5,22 @@ import vm from "node:vm";
 
 function styleDeclaration() {
   const values = new Map();
+  const priorities = new Map();
   return {
-    values,
+    priorities, values,
     getPropertyValue(name) { return values.get(name) || ""; },
-    setProperty(name, value) { values.set(name, String(value)); },
-    removeProperty(name) { values.delete(name); },
+    getPropertyPriority(name) { return priorities.get(name) || ""; },
+    setProperty(name, value, priority = "") {
+      values.set(name, String(value));
+      if (priority) priorities.set(name, String(priority));
+      else priorities.delete(name);
+    },
+    removeProperty(name) {
+      const previous = values.get(name) || "";
+      values.delete(name);
+      priorities.delete(name);
+      return previous;
+    },
     [Symbol.iterator]() { return values.keys(); },
   };
 }
@@ -30,7 +41,8 @@ function classList(initial) {
 function makeFixture({
   nativeAppearance = "dark", settings = false, settingsPanel = false, adopted = true,
   generic = false, genericComposer = true, genericHome = false, genericSearch = false,
-  modernMessages = false,
+  genericNestedComposer = false, genericSemanticComposer = false,
+  modernComposer = false, modernMessages = false,
 } = {}) {
   const attrs = new Map();
   const rootStyle = styleDeclaration();
@@ -51,6 +63,7 @@ function makeFixture({
     const node = {
       name,
       parentElement,
+      style: styleDeclaration(),
       get attributes() { return attributesFor(values); },
       getAttribute(attribute) { return values.get(attribute) ?? null; },
       setAttribute(attribute, value) { values.set(attribute, String(value)); },
@@ -111,7 +124,25 @@ function makeFixture({
       partFixtures.composer = makeDomNode(
         "generic-composer", partFixtures.main, new Map(), [composerSelector],
       );
-      partFixtures.input = makeDomNode("generic-input", partFixtures.composer, new Map(), [inputSelector]);
+      const inputOwner = genericSemanticComposer
+        ? (partFixtures.composerSemantic = makeDomNode(
+          "generic-composer-semantic", partFixtures.composer, new Map(), [
+            '.composer-surface-chrome, [data-composer-surface-variant][data-composer-radius-variant], ' +
+              '[class*="_ComposerLayoutRoot_"]',
+            composerSelector,
+          ],
+        )) : genericNestedComposer
+        ? (partFixtures.composerInner = makeDomNode(
+          "generic-composer-inner", partFixtures.composer, new Map(), [composerSelector],
+        )) : partFixtures.composer;
+      const inputParent = genericSemanticComposer
+        ? (partFixtures.composerToolbar = makeDomNode(
+          "generic-composer-toolbar", inputOwner, new Map(), [
+            '[data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"]',
+            composerSelector,
+          ],
+        )) : inputOwner;
+      partFixtures.input = makeDomNode("generic-input", inputParent, new Map(), [inputSelector]);
     }
     partFixtures.unrelatedAside = makeDomNode(
       "generic-content-aside", partFixtures.main, new Map(), [sidebarSelector],
@@ -129,6 +160,10 @@ function makeFixture({
     register(mainSelector, partFixtures.main);
     if (genericSearch) register(inputSelector, partFixtures.searchInput);
     if (genericComposer) register(inputSelector, partFixtures.input);
+    if (genericSemanticComposer) register(
+      '[data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"]',
+      partFixtures.composerToolbar,
+    );
     register(inputSelector, partFixtures.dialogInput);
     register(sidebarSelector, partFixtures.sidebar);
     register(sidebarSelector, partFixtures.unrelatedAside);
@@ -168,8 +203,19 @@ function makeFixture({
       register(messageSelector, partFixtures.userMessage);
       register(messageSelector, partFixtures.assistantMessage);
     }
-    register(".composer-surface-chrome", partFixtures.composer);
-    register('.composer-surface-chrome [class*="_footer_"]', partFixtures.composerToolbar);
+    const composerSelector =
+      ':is(.composer-surface-chrome, [data-composer-surface-variant][data-composer-radius-variant])';
+    const toolbarSelector = `${composerSelector} :is([data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"])`;
+    register(composerSelector, partFixtures.composer);
+    register(toolbarSelector, partFixtures.composerToolbar);
+    if (modernComposer) {
+      partFixtures.composerFooter = makeDomNode("composer-footer", partFixtures.composer);
+      partFixtures.input = makeDomNode(
+        "composer-input", partFixtures.composerFooter, new Map(),
+        ['textarea, [contenteditable="true"], [role="textbox"]'],
+      );
+      register('textarea, [contenteditable="true"], [role="textbox"]', partFixtures.input);
+    }
   }
   const makeStyleNode = () => {
     const node = {
@@ -247,10 +293,10 @@ function makeFixture({
     clearInterval(id) { intervals.delete(id); },
     console,
   };
-  const payloadFor = (theme = {}) => {
+  const payloadFor = (theme = {}, cssText = ".fixture { color: red; }") => {
     const template = fixture.template;
     return template
-      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(".fixture { color: red; }"))
+      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(cssText))
       .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
       .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify({ id: "fixture", appearance: "auto", ...theme }))
       .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify("test"))
@@ -270,9 +316,24 @@ function makeFixture({
     register(messageSelector, node);
     return node;
   };
+  const replaceComposer = () => {
+    const composerSelector = [...selectorNodes.keys()].find((selector) =>
+      selector.includes("data-composer-surface-variant"),
+    );
+    const toolbarSelector = [...selectorNodes.keys()].find((selector) =>
+      selector.includes("data-composer-footer-responsive"),
+    );
+    if (!composerSelector || !toolbarSelector) throw new Error("Composer fixture is unavailable");
+    const composer = makeDomNode("replacement-composer", partFixtures.main);
+    const composerToolbar = makeDomNode("replacement-composer-toolbar", composer);
+    selectorNodes.set(composerSelector, [composer]);
+    selectorNodes.set(toolbarSelector, [composerToolbar]);
+    return { composer, composerToolbar };
+  };
   return {
     addDynamicMessage, attrs, context, document, domNodes, flushTimers, intervals, listeners,
-    nodes, observers, partFixtures, payloadFor, revoked, root, rootClasses, rootStyle, timers, window,
+    nodes, observers, partFixtures, payloadFor, replaceComposer, revoked, root, rootClasses,
+    rootStyle, timers, window,
   };
 }
 
@@ -346,8 +407,13 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
-    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
+    /:is\(\.composer-surface-chrome, \[data-composer-surface-variant\]\[data-composer-radius-variant\]\)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
     "Accent foreground contrast must model the composer panel's 94% RGB surface",
+  );
+  assert.match(
+    css,
+    /data-composer-utility-bar-variant="home"\][\s\S]{0,120}> \[class\*="_ComposerLayoutBody_"\][\s\S]{0,180}background:\s*transparent\s*!important;[\s\S]{0,180}backdrop-filter:\s*none\s*!important;/,
+    "The current home-only native body surface must stay transparent behind the public composer root.",
   );
   assert.match(
     css,
@@ -426,6 +492,67 @@ export async function runRendererRuntimeTest(assetRoot) {
     assert.equal(home.partFixtures[fixtureKey].getAttribute("data-ds-part"), part,
       `${part} must be exposed through the public Safe CSS bridge`);
   }
+  for (const property of ["border-color", "border-width", "border-style"]) {
+    assert.equal(home.partFixtures.composer.style.getPropertyValue(property), "",
+      "Themes without community CSS must retain the default DreamSkin composer border.");
+  }
+
+  const composerBridgeCss = `@layer dreamskin-community {
+    [data-ds-part="composer"] {
+      --ds-community-composer-border-color: rgba(255, 255, 255, 0.28) !important;
+      --ds-community-composer-border-width: 1px !important;
+      --ds-community-composer-border-style: solid !important;
+    }
+    [data-ds-part="composer"]:hover {
+      --ds-community-composer-border-color: rgba(255, 255, 255, 0.36) !important;
+    }
+  }`;
+  const bridgedComposer = makeFixture({ nativeAppearance: "dark" });
+  bridgedComposer.partFixtures.composer.style.setProperty("border-color", "red");
+  bridgedComposer.partFixtures.composer.style.setProperty("border-width", "2px", "important");
+  bridgedComposer.partFixtures.composer.style.setProperty("border-style", "dashed");
+  vm.runInNewContext(bridgedComposer.payloadFor({}, composerBridgeCss), bridgedComposer.context);
+  for (const property of ["border-color", "border-width", "border-style"]) {
+    assert.equal(
+      bridgedComposer.partFixtures.composer.style.getPropertyValue(property),
+      `var(--ds-community-composer-${property})`,
+    );
+    assert.equal(
+      bridgedComposer.partFixtures.composer.style.getPropertyPriority(property), "important",
+    );
+  }
+  const bridgedPartObserver = bridgedComposer.observers.find((observer) =>
+    observer.options?.childList,
+  );
+  const originalComposer = bridgedComposer.partFixtures.composer;
+  const replacementComposer = bridgedComposer.replaceComposer().composer;
+  bridgedPartObserver.callback([{ type: "childList" }]);
+  bridgedComposer.flushTimers(80);
+  assert.equal(originalComposer.style.getPropertyValue("border-color"), "red");
+  assert.equal(originalComposer.style.getPropertyPriority("border-color"), "");
+  assert.equal(originalComposer.style.getPropertyValue("border-width"), "2px");
+  assert.equal(originalComposer.style.getPropertyPriority("border-width"), "important");
+  assert.equal(originalComposer.style.getPropertyValue("border-style"), "dashed");
+  assert.equal(originalComposer.style.getPropertyPriority("border-style"), "");
+  assert.equal(replacementComposer.getAttribute("data-ds-part"), "composer");
+  assert.equal(
+    replacementComposer.style.getPropertyValue("border-color"),
+    "var(--ds-community-composer-border-color)",
+  );
+  assert.equal(bridgedComposer.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+  for (const property of ["border-color", "border-width", "border-style"]) {
+    assert.equal(replacementComposer.style.getPropertyValue(property), "");
+    assert.equal(replacementComposer.style.getPropertyPriority(property), "");
+  }
+
+  const modernComposer = makeFixture({ nativeAppearance: "dark", modernComposer: true });
+  vm.runInNewContext(modernComposer.payloadFor(), modernComposer.context);
+  assert.equal(modernComposer.partFixtures.composer.getAttribute("data-ds-part"), "composer",
+    "Codex 26.803 ComposerLayoutRoot must expose the public composer surface.");
+  assert.equal(modernComposer.partFixtures.composerToolbar.getAttribute("data-ds-part"), "composer-toolbar",
+    "Codex 26.803 ComposerLayoutFooter must expose the public toolbar part.");
+  assert.equal(modernComposer.partFixtures.composerFooter.getAttribute("data-ds-part"), null,
+    "The current footer content must not replace the public visual composer surface.");
   const dynamicMessage = home.addDynamicMessage();
   partObserver.callback([{ type: "childList" }]);
   home.flushTimers(80);
@@ -453,6 +580,26 @@ export async function runRendererRuntimeTest(assetRoot) {
     "An aside inside the main content must not be exposed as the app sidebar.");
   assert.equal(generic.partFixtures.dialogInput.getAttribute("data-ds-part"), null,
     "Dialog inputs must not be mistaken for the app composer.");
+
+  const nestedGeneric = makeFixture({
+    nativeAppearance: "dark", generic: true, genericNestedComposer: true,
+  });
+  vm.runInNewContext(nestedGeneric.payloadFor(), nestedGeneric.context);
+  assert.equal(nestedGeneric.partFixtures.composer.getAttribute("data-ds-part"), "composer",
+    "Fallback discovery must expose the outermost coherent composer owner.");
+  assert.equal(nestedGeneric.partFixtures.composerInner.getAttribute("data-ds-part"), null,
+    "Fallback discovery must not attach the public surface to an inner composer layer.");
+
+  const semanticGeneric = makeFixture({
+    nativeAppearance: "dark", generic: true, genericSemanticComposer: true,
+  });
+  vm.runInNewContext(semanticGeneric.payloadFor(), semanticGeneric.context);
+  assert.equal(semanticGeneric.partFixtures.composerSemantic.getAttribute("data-ds-part"), "composer",
+    "Fallback discovery must prefer a semantic ComposerLayoutRoot over broader composer owners.");
+  assert.equal(semanticGeneric.partFixtures.composer.getAttribute("data-ds-part"), null,
+    "A broader composer container must not replace an available semantic root.");
+  assert.equal(semanticGeneric.partFixtures.composerToolbar.getAttribute("data-ds-part"), "composer-toolbar",
+    "Fallback discovery must expose the responsive footer within the selected composer root.");
 
   const genericSearch = makeFixture({
     nativeAppearance: "dark", generic: true, genericComposer: false, genericSearch: true,

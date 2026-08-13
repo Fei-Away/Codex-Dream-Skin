@@ -193,16 +193,35 @@ test("Windows payload uses the same compiled Safe CSS cascade as macOS", async (
       appearance: "auto",
     }), "utf8");
     const source = `[data-ds-part="sidebar"] { background-color: #123456; }
-[data-ds-part="composer"] { border-radius: 17px; }`;
+  [data-ds-part="composer"] {
+    background-color: rgba(244, 250, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.28);
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 17px;
+    backdrop-filter: blur(8px) saturate(1.06);
+  }`;
     await fs.writeFile(path.join(themeDir, "theme.css"), source, "utf8");
     const loaded = await loadPayload(themeDir);
     const captured = extractPayloadArguments(loaded.payload);
     assert.equal(loaded.safeCssStatus, "validated");
     assert.match(captured.cssText, /@layer dreamskin-accessibility, dreamskin-community;/);
     assert.match(captured.cssText, /@layer dreamskin-community\s*\{/);
+    assert.match(captured.cssText, /\[data-ds-part="composer"\] \{/);
     assert.ok(captured.cssText.includes("background-color: #123456 !important;"));
     assert.ok(captured.cssText.includes("background-image: none !important;"));
+    assert.ok(captured.cssText.includes("background-color: rgba(244, 250, 255, 0.10) !important;"));
     assert.ok(captured.cssText.includes("border-radius: 17px !important;"));
+    assert.ok(captured.cssText.includes(
+      "--ds-community-composer-border-color: rgba(255, 255, 255, 0.28) !important;",
+    ));
+    assert.ok(captured.cssText.includes(
+      "--ds-community-composer-border-width: 1px !important;",
+    ));
+    assert.ok(captured.cssText.includes(
+      "--ds-community-composer-border-style: solid !important;",
+    ));
+    assert.ok(captured.cssText.includes("backdrop-filter: blur(8px) saturate(1.06) !important;"));
     assert.ok(!captured.cssText.includes("background-color: #123456; }"));
   } finally {
     await fs.rm(themeDir, { recursive: true, force: true });

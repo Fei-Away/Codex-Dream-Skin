@@ -1,5 +1,37 @@
 # Task Progress
 
+## Composer Safe CSS client parity investigation (2026-08-12)
+
+- [scope] Investigate `blue-archive-arona` against the exact public
+  `v1.5.14` source and the running Windows Codex renderer before changing
+  runtime code. The supplied ZIP was inspected directly; its Composer rule
+  uses only allowed Safe CSS properties and contains no `!important`.
+- [environment] Source, installed runtime, and public tag all resolve to
+  commit `95423d849f74b9824db2ba0c1121cc7a13b56d10` / v1.5.14. The live client
+  is Windows Codex `26.803.10989.0` with a verified loopback-only CDP target.
+- [root cause] Codex 26.803 no longer exposes `.composer-surface-chrome`.
+  The old fallback tagged `_ComposerLayoutFooter_*`; the visual surface is
+  `_ComposerLayoutRoot_*`, with `_ComposerLayoutBody_*` adding the native home
+  surface. The leaked native control colors are `rgba(45,45,45,.96)` in dark
+  mode and `rgba(255,246,251,.96)` in light mode.
+- [implementation] The public `composer` selector now targets the semantic
+  Root and `composer-toolbar` targets its responsive Footer. The home Body is
+  transparent. The Safe CSS compiler retains the existing restricted contract
+  while exporting private Composer border variables; the renderer uses those
+  variables through an inline-important bridge only when a theme provides a
+  base border declaration, and restores previous inline values/priority during
+  cleanup or Composer replacement.
+- [tests] Added shared compiler, payload and renderer coverage for the current
+  semantic Composer, fallback discovery, no-community-CSS defaults, hover
+  variables, replacement restoration and platform payload parity. Focused
+  Safe CSS, macOS/Windows renderer, payload integrity, asset-sync, JavaScript
+  syntax and `git diff --check` pass. The Windows aggregate suite passed its
+  transaction half before the outer local 180-second command limit; its
+  remaining execution is an exact-head Windows CI gate. Live Windows CDP
+  verification passed for light Thread and dark Home: Composer Root has the
+  theme background, blur, radius, shadow and border; the Home Body is
+  transparent, and Composer controls remain visible and pointer-enabled.
+
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
 - [fix merged] PR #360 (`e3787857953998a1916c39b10942ac6c15978a25`) passed exact-head CI run `31558654733`: Static, macOS repository regressions plus universal DMG, Windows PowerShell 7, and Windows PowerShell 5.1 plus Setup.exe. It was squash-merged with the authorized same-owner review bypass at `2026-08-12T03:06:37Z` as `main@69a5a2e4b68174b1c0c70a2fa62adf1aca1eff2a`.

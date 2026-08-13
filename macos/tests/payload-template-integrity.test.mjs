@@ -176,7 +176,12 @@ test("payload injects only the compiled Safe CSS cascade, on both clients", asyn
   font-weight: 700;
 }
 [data-ds-part="composer"] {
+  background-color: rgba(244, 250, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.28);
+  border-width: 1px;
+  border-style: solid;
   border-radius: 17px;
+  backdrop-filter: blur(8px) saturate(1.06);
 }
 [data-ds-part="composer-toolbar"] {
   color: #abcdef;
@@ -188,11 +193,17 @@ test("payload injects only the compiled Safe CSS cascade, on both clients", asyn
   assert.equal(loaded.safeCssStatus, "validated");
   assert.match(captured.cssText, /@layer dreamskin-accessibility, dreamskin-community;/);
   assert.match(captured.cssText, /@layer dreamskin-community\s*\{/);
+  assert.match(captured.cssText, /\[data-ds-part="composer"\] \{/);
   for (const declaration of [
     "background-color: #123456 !important;",
     "color: var(--ds-theme-color-text) !important;",
     "font-weight: 700 !important;",
+    "background-color: rgba(244, 250, 255, 0.10) !important;",
     "border-radius: 17px !important;",
+    "--ds-community-composer-border-color: rgba(255, 255, 255, 0.28) !important;",
+    "--ds-community-composer-border-width: 1px !important;",
+    "--ds-community-composer-border-style: solid !important;",
+    "backdrop-filter: blur(8px) saturate(1.06) !important;",
     "color: #abcdef !important;",
   ]) assert.ok(captured.cssText.includes(declaration), declaration);
   assert.ok(captured.cssText.includes("background-image: none !important;"));

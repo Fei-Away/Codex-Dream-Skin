@@ -901,6 +901,18 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__::before { content: none !important; }
 
+/* Codex 26.803+ moves the home surface paint from the semantic composer root
+   onto its body child. Keep one public visual surface: the renderer exposes
+   the root as data-ds-part="composer", while this internal native layer stays
+   transparent so base and Community Safe CSS paint the same node. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__[data-composer-utility-bar-variant="home"]
+  > [class*="_ComposerLayoutBody_"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
 /* Newer app shells may no longer expose the selector contract above. The
    renderer assigns these parts only from one coherent main/composer/sidebar
    structure; keep the minimum background and transparency contract functional
