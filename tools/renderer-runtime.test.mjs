@@ -344,6 +344,21 @@ export async function runRendererRuntimeTest(assetRoot) {
   // and the measured fossil selector must be absent from the canonical CSS.
   assert.doesNotMatch(css, /(?:^|[.#\s])(?:codex-dream-skin|dream-skin-home|dream-home|dream-task)(?:[\s.#:{>]|$)|home-suggestion-list-item/);
   assert.match(css, /html\[data-dream-skin="active"\]/);
+  assert.match(
+    css,
+    /(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) svg:not\(\[style\*="color"\]\)\s*\{\s*color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.96\) !important;/,
+    "Sidebar base icon tint must preserve native inline semantic colors.",
+  );
+  assert.match(
+    css,
+    /(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) button:hover svg:not\(\[style\*="color"\]\),\s*[\s\S]{0,160}(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) a:hover svg:not\(\[style\*="color"\]\)\s*\{\s*color:\s*var\(--ds-accent\) !important;/,
+    "Sidebar hover tint must preserve native inline semantic colors.",
+  );
+  assert.match(
+    css,
+    /(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) \[aria-current="page"\] svg:not\(\[style\*="color"\]\)\s*\{\s*color:\s*var\(--ds-accent\) !important;/,
+    "Sidebar current-page tint must preserve native inline semantic colors.",
+  );
   // Home gating must stay single-level: CSS forbids :has() inside :has(),
   // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
