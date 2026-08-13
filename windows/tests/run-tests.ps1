@@ -1485,6 +1485,8 @@ try {
   & (Join-Path $PSScriptRoot 'start-post-launch-appearance-recovery.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-renderer-readiness.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-verified-skin-preserved.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'reopen-recovery.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'start-recover-existing.tests.ps1') -Root $Root
   $projectRoot = Split-Path -Parent $Root
   $syncToolPath = Join-Path $projectRoot 'tools\sync-runtime-assets.mjs'
   $syncToolResult = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @($syncToolPath, '--check')

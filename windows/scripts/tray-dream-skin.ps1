@@ -24,6 +24,11 @@ $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
 $acquired = $false
 $notify = $null
 $trayIcon = $null
+$recoveryTimer = $null
+$recoveryMonitor = @{
+  Process = $null
+  NextAttemptAt = [datetime]::MinValue
+}
 try {
   try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
   if (-not $acquired) { exit 0 }
@@ -68,17 +73,47 @@ try {
   }
 
   function Start-DreamSkinPowerShell {
-    param([Parameter(Mandatory = $true)][string]$Script, [string[]]$Arguments = @())
+    param(
+      [Parameter(Mandatory = $true)][string]$Script,
+      [string[]]$Arguments = @(),
+      [switch]$PassThru
+    )
     $scriptToken = ConvertTo-DreamSkinProcessArgument -Value $Script
     $argumentLine = '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + $scriptToken
     if ($Arguments.Count -gt 0) { $argumentLine += ' ' + ($Arguments -join ' ') }
     $previousLanguage = $env:DREAMSKIN_LANG
     try {
       $env:DREAMSKIN_LANG = Resolve-DreamSkinLanguage -StateRoot $StateRoot
-      Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
+      $process = Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden -PassThru
+      if ($PassThru) { return $process }
+      $process.Dispose()
     } finally {
       $env:DREAMSKIN_LANG = $previousLanguage
     }
+  }
+
+  function Invoke-DreamSkinTrayRecovery {
+    if (Test-DreamSkinPaused -StateRoot $StateRoot) { return }
+    if ($null -ne $recoveryMonitor.Process) {
+      try {
+        if (-not $recoveryMonitor.Process.HasExited) { return }
+        $recoveryMonitor.Process.Dispose()
+      } catch {}
+      $recoveryMonitor.Process = $null
+    }
+
+    $now = Get-Date
+    if ($now -lt $recoveryMonitor.NextAttemptAt) { return }
+    $state = Read-DreamSkinState -Path $paths.State
+    $context = Get-DreamSkinInjectorRecoveryContext -State $state
+    if ($null -eq $context) { return }
+
+    # The locked start path repeats official-package and Browser ownership
+    # checks. RecoverExisting cannot launch, restart, or resume Codex.
+    $recoveryMonitor.NextAttemptAt = $now.AddSeconds(30)
+    $recoveryMonitor.Process = Start-DreamSkinPowerShell -Script $startScript -Arguments @(
+      '-Port', "$($context.Port)", '-RecoverExisting'
+    ) -PassThru
   }
 
   function Add-DreamSkinTrayItem {
@@ -389,8 +424,25 @@ try {
       Show-DreamSkinTrayError -Message $_.Exception.Message
     }
   })
+  $recoveryTimer = [System.Windows.Forms.Timer]::new()
+  $recoveryTimer.Interval = 5000
+  $recoveryTimer.add_Tick({
+    try {
+      Invoke-DreamSkinTrayRecovery
+    } catch {
+      $recoveryMonitor.NextAttemptAt = (Get-Date).AddSeconds(30)
+    }
+  })
+  $recoveryTimer.Start()
   [System.Windows.Forms.Application]::Run()
 } finally {
+  if ($null -ne $recoveryTimer) {
+    $recoveryTimer.Stop()
+    $recoveryTimer.Dispose()
+  }
+  if ($null -ne $recoveryMonitor.Process) {
+    try { $recoveryMonitor.Process.Dispose() } catch {}
+  }
   if ($null -ne $notify) { $notify.Dispose() }
   if ($null -ne $trayIcon) { $trayIcon.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
