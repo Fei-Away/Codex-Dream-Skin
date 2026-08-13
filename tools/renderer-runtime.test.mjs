@@ -422,6 +422,11 @@ export async function runRendererRuntimeTest(assetRoot) {
   );
   assert.match(
     css,
+    /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*="_MainContentSurface_"\]\)\s+\[data-vscode-context\]\[tabindex="0"\]:focus-visible\s*\{[^}]*outline:\s*none\s*!important;/,
+    "The non-interactive Codex route focus container must not draw a window-sized native focus outline over an embedded webview.",
+  );
+  assert.match(
+    css,
     /:not\(:has\(main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\)\)\)[\s\S]{0,120}\[data-ds-part="sidebar"\]/,
     "Core CSS must style the validated generic sidebar when the exact shell selector is absent.",
   );

@@ -1107,6 +1107,14 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   backdrop-filter: blur(8px) saturate(104%) !important;
 }
 
+/* Codex moves focus to this non-interactive route wrapper after Shift.
+   Its native automatic outline spans the entire content pane, including an
+   embedded webview; keep focus feedback on the actual controls instead. */
+html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+  [data-vscode-context][tabindex="0"]:focus-visible {
+  outline: none !important;
+}
+
 html[data-dream-skin="active"][data-dream-art-wide="true"] :is(.composer-surface-chrome, [data-composer-surface-variant][data-composer-radius-variant]) {
   background: var(--ds-immersive-composer-solid) !important;
   border: 0 !important;
