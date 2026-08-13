@@ -417,6 +417,11 @@ export async function runRendererRuntimeTest(assetRoot) {
   );
   assert.match(
     css,
+    /\[data-codex-composer-root\]\[data-composer-placement="home"\][\s\S]{0,160}\[data-composer-home-utility-bar-position="above"\][\s\S]{0,220}background:\s*rgb\(var\(--ds-panel-rgb\)\s*\/\s*\.94\)\s*!important;[\s\S]{0,220}border-bottom:\s*0\s*!important;/,
+    "The semantic Home utility bar must share the Composer glass surface instead of retaining its native paint.",
+  );
+  assert.match(
+    css,
     /:not\(:has\(main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\)\)\)[\s\S]{0,120}\[data-ds-part="sidebar"\]/,
     "Core CSS must style the validated generic sidebar when the exact shell selector is absent.",
   );

@@ -913,6 +913,19 @@ html[data-dream-skin="active"] :is(.composer-surface-chrome, [data-composer-surf
   backdrop-filter: none !important;
 }
 
+/* The current Home utility bar is a sibling above ComposerLayoutRoot. Its
+   native surface otherwise keeps its own appearance token, breaking the
+   single Composer panel into a pink/blue stack on light themes. */
+html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placement="home"]
+  [data-composer-home-utility-bar-position="above"] {
+  background: rgb(var(--ds-panel-rgb) / .94) !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
+  border-bottom: 0 !important;
+  border-radius: 22px 22px 0 0 !important;
+  box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
+  backdrop-filter: blur(16px) saturate(108%) !important;
+}
+
 /* Newer app shells may no longer expose the selector contract above. The
    renderer assigns these parts only from one coherent main/composer/sidebar
    structure; keep the minimum background and transparency contract functional
