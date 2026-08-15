@@ -422,8 +422,80 @@ git commit -m "feat(linux): port common-macos.sh to common-linux.sh"
 ### Task 4: linux-launch.sh（Codex 发现、验签、渲染 flags、启动）
 
 **Files:**
-- Create: `linux/scripts/linux-launch.sh`（全量新代码）
+- Create: `linux/scripts/linux-launch.sh`（全量新代码；**不包含** codex_main_pids/pid_is_codex_executable/pid_is_codex_descendant —— 这三个保留在 common-linux.sh，由本任务 Step 0 修订）
+- Modify: `linux/scripts/common-linux.sh`（Step 0 修订：进程探测 /proc 化 + 发现守卫 + AppImage 身份 + 端口默认值 + NODE 守卫）
 - Test: `linux/tests/linux-launch.test.sh`
+
+**Step 0（前置修订 common-linux.sh，Task 3 代码审查结论）:**
+
+0a. `codex_main_pids` 整段替换为 /proc 版（含发现守卫与 AppImage cmdline 回退）：
+
+```bash
+codex_main_pids() {
+  local pid
+  local exe
+  local exe_canonical
+  local expected_canonical
+  local cmdline
+  # ensure_node_runtime no longer triggers discovery (unlike macOS), so every
+  # probe function must resolve the Codex executable itself first.
+  [ -n "${CODEX_EXE:-}" ] || discover_codex_app
+  expected_canonical="$(canonical_existing_path "$CODEX_EXE" 2>/dev/null || true)"
+  while read -r pid; do
+    [ -n "$pid" ] || continue
+    exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+    if [ -n "$exe" ]; then
+      exe_canonical="$(canonical_existing_path "$exe" 2>/dev/null || true)"
+      [ -n "$exe_canonical" ] && [ "$exe_canonical" = "$expected_canonical" ] \
+        && printf '%s\n' "$pid" && continue
+    fi
+    # AppImage: the process exe resolves inside the FUSE mount, so fall back
+    # to matching the AppImage path in the command line.
+    cmdline="$(/usr/bin/tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    case " $cmdline " in
+      *" $CODEX_EXE "*) printf '%s\n' "$pid" ;;
+    esac
+  done < <(/bin/ps -eo pid= 2>/dev/null)
+}
+```
+
+0b. `pid_is_codex_executable` 整段替换为（exe 路径优先、AppImage cmdline 回退）：
+
+```bash
+pid_is_codex_executable() {
+  local actual
+  local actual_canonical
+  local expected_canonical
+  local cmdline
+  actual="$(process_executable_path "$1")"
+  actual_canonical="$(canonical_existing_path "$actual" 2>/dev/null || true)"
+  expected_canonical="$(canonical_existing_path "$CODEX_EXE" 2>/dev/null || true)"
+  if [ -n "$actual_canonical" ] && [ "$actual_canonical" = "$expected_canonical" ]; then
+    return 0
+  fi
+  cmdline="$(/usr/bin/tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null || true)"
+  case " $cmdline " in
+    *" $CODEX_EXE "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+```
+
+0c. `pid_is_codex_descendant` 函数体第一行（`local current="$1"` 后）加：
+
+```bash
+  [ -n "${CODEX_EXE:-}" ] || discover_codex_app
+```
+
+0d. `hot_reapply_theme` 的 `local port="${1:-9341}"` 改为 `local port="${1:-9335}"`。
+
+0e. `write_operation_state` 中 Node 调用前加 NODE 守卫（函数开头 `ensure_state_root` 之前）：
+
+```bash
+  [ -n "${NODE:-}" ] && [ -x "$NODE" ] || ensure_node_runtime
+```
+
+
 
 - [ ] **Step 1: 写失败测试**
 
@@ -646,20 +718,6 @@ record_appimage_approval() {
     fs.renameSync(temporary, file);
   ' "$approval_file" "$CODEX_EXE" "$sha"
   printf 'Recorded one-time approval for unsigned Codex install: %s\n' "$CODEX_EXE" >&2
-}
-
-codex_main_pids() {
-  local pid
-  local exe
-  # common-linux.sh 的 ensure_node_runtime 不再隐式触发 discovery（与 macOS 不同），
-  # 因此所有使用 CODEX_EXE 的探测函数必须先自行确保已发现（Task 3 审查结论）。
-  [ -n "${CODEX_EXE:-}" ] || discover_codex_app
-  while read -r pid; do
-    [ -n "$pid" ] || continue
-    exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
-    [ -n "$exe" ] && [ "$exe" = "$(readlink -f "$CODEX_EXE" 2>/dev/null || printf '%s' "$CODEX_EXE")" ] \
-      && printf '%s\n' "$pid"
-  done < <(/bin/ps -eo pid= 2>/dev/null)
 }
 
 listener_pids() {
