@@ -511,11 +511,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 [ "$(session_type_of x11 wayland)" = "x11" ]
 [ "$(session_type_of wayland x11)" = "wayland" ]
 [ "$(session_type_of '' wayland)" = "wayland" ]
+[ "$(session_type_of '' wayland-0)" = "wayland" ]
+[ "$(session_type_of '' bogus)" = "x11" ]
 [ "$(session_type_of bogus x11)" = "x11" ]
 
 # nvidia detection is rooted at a caller-supplied base (testable anywhere)
 NV_ROOT="$(mktemp -d /tmp/dreamskin-nv.XXXXXX)"
-trap 'rm -rf "$NV_ROOT"' EXIT
+FLAGS_FILE="$(mktemp /tmp/dreamskin-flags.XXXXXX)"
+trap 'rm -rf "$NV_ROOT" "$FLAGS_FILE"' EXIT
 mkdir -p "$NV_ROOT/sys/module/nvidia" "$NV_ROOT/sys/module/nvidia_drm"
 [ "$(is_nvidia_present "$NV_ROOT")" = "true" ]
 [ "$(is_nvidia_present "$NV_ROOT/empty")" = "false" ]
@@ -536,6 +539,34 @@ case "$(assemble_renderer_flags wayland false wayland)" in *"--ozone-platform=wa
 # appimage approval path is a pure string helper
 [ -n "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" ]
 case "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" in *.json) ;; *) exit 1 ;; esac
+[ "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" = "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" ]
+[ "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" != "$(appimage_approval_path sha256dead /tmp/Foo.AppImage)" ]
+
+# electron_flags_lines integration: source common-linux.sh in a subshell so
+# the test stays hermetic (ELECTRON_FLAGS_PATH is reset at source time, so the
+# env overrides are applied on the call itself).
+printf -- '--disable-gpu-compositing\n' > "$FLAGS_FILE"
+FLAGS_X11_LINES="$(/bin/bash -c '
+  . "$1/scripts/common-linux.sh"
+  XDG_SESSION_TYPE=x11 ELECTRON_FLAGS_PATH="$2" electron_flags_lines
+' _ "$ROOT" "$FLAGS_FILE")"
+case "$FLAGS_X11_LINES" in *"--disable-gpu-compositing"*) ;; *) exit 1 ;; esac
+case "$FLAGS_X11_LINES" in *"--ozone-platform=x11"*) ;; *) exit 1 ;; esac
+FLAGS_WL_OVERRIDE="$(/bin/bash -c '
+  . "$1/scripts/common-linux.sh"
+  is_nvidia_present() { printf "false"; }
+  XDG_SESSION_TYPE=x11 CODEX_RENDERER=wayland ELECTRON_FLAGS_PATH="$2" electron_flags_lines
+' _ "$ROOT" "$FLAGS_FILE")"
+case "$FLAGS_WL_OVERRIDE" in *"--ozone-platform=wayland"*) ;; *) exit 1 ;; esac
+case "$FLAGS_WL_OVERRIDE" in *"ozone-platform=x11"*) exit 1 ;; esac
+
+# invalid renderer override must fail; fail() is normally provided by
+# common-linux.sh, so stub it while sourcing linux-launch.sh alone. The call
+# runs in a subshell because fail() exits the shell it runs in.
+if ! command -v fail >/dev/null 2>&1; then
+  fail() { printf 'Dream Skin: %s\n' "$*" >&2; exit 1; }
+fi
+if ( assemble_renderer_flags wayland false bogus 2>/dev/null ); then exit 1; fi
 
 printf 'linux-launch tests passed\n'
 ```
@@ -564,14 +595,23 @@ session_type_of() {
     wayland) printf 'wayland' ;;
     x11) printf 'x11' ;;
     *)
-      if [ -n "$wayland_display" ]; then printf 'wayland'; else printf 'x11'; fi
+      # Only trust the fallback display when it looks like a Wayland socket
+      # (e.g. wayland-0); anything else means an X11 session.
+      case "$wayland_display" in
+        wayland*) printf 'wayland' ;;
+        *) printf 'x11' ;;
+      esac
       ;;
   esac
 }
 
 is_nvidia_present() {
   local root="${1:-/}"
-  [ -d "$root/sys/module/nvidia" ] && [ -d "$root/sys/module/nvidia_drm" ]
+  if [ -d "$root/sys/module/nvidia" ] && [ -d "$root/sys/module/nvidia_drm" ]; then
+    printf 'true'
+  else
+    printf 'false'
+  fi
 }
 
 assemble_renderer_flags() {
@@ -591,6 +631,7 @@ assemble_renderer_flags() {
       if [ "$nvidia" = "true" ]; then
         printf -- '--ozone-platform=x11\n'
       else
+        printf -- '--ozone-platform=wayland\n'
         printf -- '--enable-wayland-ime\n'
       fi
       ;;
@@ -636,7 +677,7 @@ discover_codex_app() {
           | /usr/bin/grep -E '/(bin|lib)/[^/]*(codex|chatgpt)[^/]*$' | /usr/bin/grep -v -E '\.(so|1)$' \
           | /usr/bin/head -n 1 || true)"
         if [ -n "$candidate" ] && [ -x "$candidate" ]; then
-          CODEX_EXE="$candidate"
+          CODEX_EXE="$(readlink -f "$candidate")"
           CODEX_VERSION="$(/usr/bin/dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)"
           CODEX_PACKAGE="$pkg"
           CODEX_LAUNCH_KIND="deb"
@@ -707,6 +748,7 @@ verify_appimage_approval() {
 }
 
 record_appimage_approval() {
+  ensure_state_root
   local sha=""
   sha="$("$NODE" -e 'const c=require("node:crypto");const fs=require("node:fs");process.stdout.write(c.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));' "$CODEX_EXE" 2>/dev/null || true)"
   [ -n "$sha" ] || fail "Could not hash $CODEX_EXE"
@@ -725,12 +767,16 @@ record_appimage_approval() {
 listener_pids() {
   local port="$1"
   local pids=""
+  local lsof_bin=""
   if command -v ss >/dev/null 2>&1; then
     pids="$(/usr/bin/ss -ltnHp "sport = :$port" 2>/dev/null \
       | /usr/bin/sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | /usr/bin/sort -u || true)"
   fi
-  if [ -z "$pids" ] && command -v lsof >/dev/null 2>&1; then
-    pids="$(/usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | /usr/bin/sort -u || true)"
+  # Debian/Ubuntu ship lsof at /usr/bin (not /usr/sbin); resolve it instead
+  # of hardcoding a path and only run it when the resolver found a binary.
+  lsof_bin="$(command -v lsof 2>/dev/null || true)"
+  if [ -z "$pids" ] && [ -n "$lsof_bin" ]; then
+    pids="$( "$lsof_bin" -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | /usr/bin/sort -u || true)"
   fi
   printf '%s\n' "$pids"
 }
@@ -744,7 +790,7 @@ electron_flags_lines() {
   local nvidia="false"
   local override="${CODEX_RENDERER:-}"
   session="$(session_type_of "${XDG_SESSION_TYPE:-}" "${WAYLAND_DISPLAY:-}")"
-  if is_nvidia_present; then nvidia="true"; fi
+  nvidia="$(is_nvidia_present)"
   if [ -f "$ELECTRON_FLAGS_PATH" ]; then
     /usr/bin/grep -v -E '^\s*#|^\s*$' "$ELECTRON_FLAGS_PATH" || true
     printf '\n'
@@ -754,13 +800,19 @@ electron_flags_lines() {
 
 launch_codex_with_cdp() {
   local port="$1"
+  local flags=""
   : > "$APP_LOG"
   : > "$APP_ERROR_LOG"
-  /usr/bin/nohup "$CODEX_EXE" \
-    --remote-debugging-address=127.0.0.1 \
-    --remote-debugging-port="$port" \
-    $(electron_flags_lines) \
-    >>"$APP_LOG" 2>>"$APP_ERROR_LOG" &
+  flags="$(electron_flags_lines)"
+  # Disable pathname expansion for the flag list (word splitting only), so a
+  # user flag can never be interpreted as a glob pattern.
+  ( set -f
+    /usr/bin/nohup "$CODEX_EXE" \
+      --remote-debugging-address=127.0.0.1 \
+      --remote-debugging-port="$port" \
+      $flags \
+      >>"$APP_LOG" 2>>"$APP_ERROR_LOG" &
+  )
 }
 
 launch_codex_normally() {
@@ -768,7 +820,7 @@ launch_codex_normally() {
 }
 ```
 
-注意：`electron_flags_lines` 中用户自定义 `electron-flags.conf` 每行一个 flag；`$(...)` 不带引号展开使每个 flag 成为独立 argv（flag 不含空白是写入约定，若含空白会被拆开——这是 Linux 端明确接受的限制，同社区 `ilysenko/codex-desktop-linux` 约定）。
+注意：`electron_flags_lines` 中用户自定义 `electron-flags.conf` 每行一个 flag；flag 列表经换行分词成为独立 argv（`set -f` 禁用路径名展开，flag 不含空白是写入约定，若含空白会被拆开——这是 Linux 端明确接受的限制，同社区 `ilysenko/codex-desktop-linux` 约定）。
 
 - [ ] **Step 4: 运行测试确认通过**
 
@@ -1965,3 +2017,5 @@ gh pr create --title "feat(linux): Dream Skin for Ubuntu / Pop!_OS" \
 - [ ] Ubuntu 24.04（CI 容器）deb 安装/卸载干净
 - [ ] tar.gz 无 root 解压 + install.sh
 - [ ] 三端 VERSION 一致、CI 全绿、Release 资产（deb/tar.gz/SHA256SUMS）可下载
+- [ ] `readlink /usr/bin/codex-desktop` 输出指向真实二进制路径（确认 deb 布局符号链接假设成立）
+- [ ] 终端里裸命令启动 `codex-desktop` 后 `codex_is_running` 必须能发现（argv[0] 不带路径的场景）

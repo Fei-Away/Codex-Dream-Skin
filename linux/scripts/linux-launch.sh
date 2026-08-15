@@ -94,7 +94,9 @@ discover_codex_app() {
           | /usr/bin/grep -E '/(bin|lib)/[^/]*(codex|chatgpt)[^/]*$' | /usr/bin/grep -v -E '\.(so|1)$' \
           | /usr/bin/head -n 1 || true)"
         if [ -n "$candidate" ] && [ -x "$candidate" ]; then
-          CODEX_EXE="$candidate"
+          # Resolve the launcher symlink (e.g. /usr/bin/codex-desktop) to the
+          # real binary so /proc/pid/exe canonical comparisons match.
+          CODEX_EXE="$(readlink -f "$candidate")"
           CODEX_VERSION="$(/usr/bin/dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)"
           CODEX_PACKAGE="$pkg"
           CODEX_LAUNCH_KIND="deb"
@@ -165,6 +167,7 @@ verify_appimage_approval() {
 }
 
 record_appimage_approval() {
+  ensure_state_root
   local sha=""
   sha="$("$NODE" -e 'const c=require("node:crypto");const fs=require("node:fs");process.stdout.write(c.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));' "$CODEX_EXE" 2>/dev/null || true)"
   [ -n "$sha" ] || fail "Could not hash $CODEX_EXE"
@@ -183,12 +186,16 @@ record_appimage_approval() {
 listener_pids() {
   local port="$1"
   local pids=""
+  local lsof_bin=""
   if command -v ss >/dev/null 2>&1; then
     pids="$(/usr/bin/ss -ltnHp "sport = :$port" 2>/dev/null \
       | /usr/bin/sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | /usr/bin/sort -u || true)"
   fi
-  if [ -z "$pids" ] && command -v lsof >/dev/null 2>&1; then
-    pids="$(/usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | /usr/bin/sort -u || true)"
+  # Debian/Ubuntu ship lsof at /usr/bin (not /usr/sbin); resolve it instead
+  # of hardcoding a path and only run it when the resolver found a binary.
+  lsof_bin="$(command -v lsof 2>/dev/null || true)"
+  if [ -z "$pids" ] && [ -n "$lsof_bin" ]; then
+    pids="$( "$lsof_bin" -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | /usr/bin/sort -u || true)"
   fi
   printf '%s\n' "$pids"
 }
@@ -212,13 +219,19 @@ electron_flags_lines() {
 
 launch_codex_with_cdp() {
   local port="$1"
+  local flags=""
   : > "$APP_LOG"
   : > "$APP_ERROR_LOG"
-  /usr/bin/nohup "$CODEX_EXE" \
-    --remote-debugging-address=127.0.0.1 \
-    --remote-debugging-port="$port" \
-    $(electron_flags_lines) \
-    >>"$APP_LOG" 2>>"$APP_ERROR_LOG" &
+  flags="$(electron_flags_lines)"
+  # Disable pathname expansion for the flag list (word splitting only), so a
+  # user flag can never be interpreted as a glob pattern.
+  ( set -f
+    /usr/bin/nohup "$CODEX_EXE" \
+      --remote-debugging-address=127.0.0.1 \
+      --remote-debugging-port="$port" \
+      $flags \
+      >>"$APP_LOG" 2>>"$APP_ERROR_LOG" &
+  )
 }
 
 launch_codex_normally() {

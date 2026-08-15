@@ -333,14 +333,20 @@ stop_codex() {
   local pid
   codex_is_running || return 0
   while IFS= read -r pid; do
-    [ -n "$pid" ] && /bin/kill -TERM "$pid" 2>/dev/null || true
+    [ -n "$pid" ] || continue
+    # Re-verify the identity right before signalling; a PID from the initial
+    # scan could have been recycled in between (stop_recorded_injector standard).
+    pid_is_codex_executable "$pid" || continue
+    /bin/kill -TERM "$pid" 2>/dev/null || true
   done < <(codex_main_pids)
   deadline=$((SECONDS + 15))
   while codex_is_running && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.25; done
   codex_is_running || return 0
   [ "$allow_force" = "true" ] || fail "Codex did not close within 15 seconds; explicit restart authorization is required for a forced stop."
   while IFS= read -r pid; do
-    [ -n "$pid" ] && /bin/kill -KILL "$pid" 2>/dev/null || true
+    [ -n "$pid" ] || continue
+    pid_is_codex_executable "$pid" || continue
+    /bin/kill -KILL "$pid" 2>/dev/null || true
   done < <(codex_main_pids)
   /bin/sleep 0.5
   codex_is_running && fail "Codex could not be stopped safely."

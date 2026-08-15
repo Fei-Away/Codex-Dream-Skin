@@ -7,11 +7,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 [ "$(session_type_of x11 wayland)" = "x11" ]
 [ "$(session_type_of wayland x11)" = "wayland" ]
 [ "$(session_type_of '' wayland)" = "wayland" ]
+[ "$(session_type_of '' wayland-0)" = "wayland" ]
+[ "$(session_type_of '' bogus)" = "x11" ]
 [ "$(session_type_of bogus x11)" = "x11" ]
 
 # nvidia detection is rooted at a caller-supplied base (testable anywhere)
 NV_ROOT="$(mktemp -d /tmp/dreamskin-nv.XXXXXX)"
-trap 'rm -rf "$NV_ROOT"' EXIT
+FLAGS_FILE="$(mktemp /tmp/dreamskin-flags.XXXXXX)"
+trap 'rm -rf "$NV_ROOT" "$FLAGS_FILE"' EXIT
 mkdir -p "$NV_ROOT/sys/module/nvidia" "$NV_ROOT/sys/module/nvidia_drm"
 [ "$(is_nvidia_present "$NV_ROOT")" = "true" ]
 [ "$(is_nvidia_present "$NV_ROOT/empty")" = "false" ]
@@ -32,5 +35,33 @@ case "$(assemble_renderer_flags wayland false wayland)" in *"--ozone-platform=wa
 # appimage approval path is a pure string helper
 [ -n "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" ]
 case "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" in *.json) ;; *) exit 1 ;; esac
+[ "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" = "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" ]
+[ "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" != "$(appimage_approval_path sha256dead /tmp/Foo.AppImage)" ]
+
+# electron_flags_lines integration: source common-linux.sh in a subshell so
+# the test stays hermetic (ELECTRON_FLAGS_PATH is reset at source time, so the
+# env overrides are applied on the call itself).
+printf -- '--disable-gpu-compositing\n' > "$FLAGS_FILE"
+FLAGS_X11_LINES="$(/bin/bash -c '
+  . "$1/scripts/common-linux.sh"
+  XDG_SESSION_TYPE=x11 ELECTRON_FLAGS_PATH="$2" electron_flags_lines
+' _ "$ROOT" "$FLAGS_FILE")"
+case "$FLAGS_X11_LINES" in *"--disable-gpu-compositing"*) ;; *) exit 1 ;; esac
+case "$FLAGS_X11_LINES" in *"--ozone-platform=x11"*) ;; *) exit 1 ;; esac
+FLAGS_WL_OVERRIDE="$(/bin/bash -c '
+  . "$1/scripts/common-linux.sh"
+  is_nvidia_present() { printf "false"; }
+  XDG_SESSION_TYPE=x11 CODEX_RENDERER=wayland ELECTRON_FLAGS_PATH="$2" electron_flags_lines
+' _ "$ROOT" "$FLAGS_FILE")"
+case "$FLAGS_WL_OVERRIDE" in *"--ozone-platform=wayland"*) ;; *) exit 1 ;; esac
+case "$FLAGS_WL_OVERRIDE" in *"ozone-platform=x11"*) exit 1 ;; esac
+
+# invalid renderer override must fail; fail() is normally provided by
+# common-linux.sh, so stub it while sourcing linux-launch.sh alone. The call
+# runs in a subshell because fail() exits the shell it runs in.
+if ! command -v fail >/dev/null 2>&1; then
+  fail() { printf 'Dream Skin: %s\n' "$*" >&2; exit 1; }
+fi
+if ( assemble_renderer_flags wayland false bogus 2>/dev/null ); then exit 1; fi
 
 printf 'linux-launch tests passed\n'
