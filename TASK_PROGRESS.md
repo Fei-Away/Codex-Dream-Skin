@@ -1,5 +1,14 @@
 # Task Progress
 
+## feat/linux-support Linux 移植 (2026-08-16)
+
+- 分支 `feat/linux-support`，依据 `docs/superpowers/plans/2026-08-16-linux-support.md` 逐任务移植 macOS 引擎到 `linux/`。
+- [complete] Task 1-4: `tools/sync-runtime-assets.mjs` 生成 `linux/assets/`（8 文件对齐 macos）；骨架/VERSION/本地化（localization-linux.sh）；common-linux.sh；linux-launch.sh（Codex 发现、验签、渲染 flags、启动）。均已提交。
+- [complete] Task 5: 移植 `linux/scripts/injector.mjs`（唯一补丁：`readOperationState` 直读 JSON，并删除仅被 plutil 调用使用的 `execFile`/`promisify`/`execFileAsync` 引入）与 7 个平台无关 Node 模块（theme-config/write-theme/stage-theme/snapshot-theme-zip/theme-content-fingerprint/publish-theme-import/check-image-dimensions，原样复制）。平台 API 门禁（plutil//usr/bin/open/launchctl/codesign/osascript）grep 无匹配。
+- [complete] Task 5 测试: 9 个测试移植到 `linux/tests/`。路径适配：相对自身位置的引用（injector-bootstrap/theme-config/renderer-inject）不改；safe-css-validator 与 runtime-css-nested-has 改引 `linux/assets/`（sync 生成、字节一致）；theme-package-validator 改引 linux injector/validator/assets 并与 windows injector 保持交叉校验，darwin-only 的 macOS shell importer 集成块保留并显式指向 `macos/scripts/import-theme-zip-macos.sh`（Linux 上 SKIP）；image-metadata 的 portal 改引 `linux/assets/`，gothic 预设因 `linux/presets/` 尚未填充而保持单一来源引用 `macos/presets/`。断言未改弱。
+- [verified] 9 个移植测试单独运行全部通过；`bash linux/tests/run-tests.sh` 整体通过（`linux tests passed`）。
+- [next] Task 6（start/restore/pause/status/verify 脚本移植）。
+
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
 - [fix merged] PR #360 (`e3787857953998a1916c39b10942ac6c15978a25`) passed exact-head CI run `31558654733`: Static, macOS repository regressions plus universal DMG, Windows PowerShell 7, and Windows PowerShell 5.1 plus Setup.exe. It was squash-merged with the authorized same-owner review bypass at `2026-08-12T03:06:37Z` as `main@69a5a2e4b68174b1c0c70a2fa62adf1aca1eff2a`.
