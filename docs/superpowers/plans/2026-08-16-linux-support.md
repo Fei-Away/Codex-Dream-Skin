@@ -221,6 +221,7 @@ git commit -m "feat(linux): skeleton, VERSION and localization with tests"
 **Files:**
 - Create: `linux/scripts/common-linux.sh`（copy `macos/scripts/common-macos.sh` 后按下方补丁逐段改写）
 - Create: `linux/tests/shell-braced-vars-before-cjk.test.mjs`（copy 自 macos 同名测试，改路径常量）
+- Create: `linux/tests/localization-parity.test.mjs`（新：断言 linux 本地化表与 macos 源键集合一致——zh/en 键集对称、最少 35 键，忽略已批准的 2 处差异，防止未来两表漂移）
 
 - [ ] **Step 1: 复制两份文件**
 
@@ -406,8 +407,10 @@ Expected: 无匹配（注释里的平台名说明除外；若命中真实调用�
 
 - [ ] **Step 8: 语法与测试**
 
-Run: `bash -n linux/scripts/common-linux.sh && node linux/tests/shell-braced-vars-before-cjk.test.mjs`
+Run: `bash -n linux/scripts/common-linux.sh && node linux/tests/shell-braced-vars-before-cjk.test.mjs && node linux/tests/localization-parity.test.mjs`
 Expected: 退出码 0
+
+`localization-parity.test.mjs` 实现：解析 `linux/scripts/localization-linux.sh` 与 `macos/scripts/localization-macos.sh` 的 `case "$language:$key"` 分支，提取 `zh:`/`en:` 键集合；断言 (a) linux 表 zh 键集 == linux 表 en 键集（对称）；(b) linux zh 键集 == macos zh 键集（逐键一致）；(c) 键数 ≥ 35。用正则 `^\s*(zh|en):([a-z_0-9]+)\)` 提取，不解析 bash 语义。
 
 - [ ] **Step 9: Commit**
 
@@ -1469,6 +1472,7 @@ git commit -m "feat(linux): install, check-update and one-click community apply"
 **Files:**
 - Create: `linux/installer/control`、`linux/installer/postinst`、`linux/installer/prerm`、`linux/installer/postrm`、`linux/installer/codex-dream-skin.desktop`
 - Create: `linux/scripts/build-deb.sh`
+- Modify: `linux/tests/run-tests.sh`（bash -n 循环追加 `linux/installer` 无扩展名脚本：postinst/prerm/postrm，以及 node 版本 ≥ 18 检查）
 - Test: `linux/tests/deb-content.test.sh`
 
 - [ ] **Step 1: 写失败测试（deb 内容断言）**
