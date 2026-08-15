@@ -15,8 +15,9 @@ EN_COPY="$(DREAMSKIN_LANG=en-US /bin/bash -c '
 [ "$EN_COPY" = 'en|Apply|Skin applied' ] \
   || { printf 'English runtime localization contract failed: %s\n' "$EN_COPY" >&2; exit 1; }
 
-# Fallback follows LANG when DREAMSKIN_LANG is unset
-LANG_COPY="$(LANG=zh_CN.UTF-8 /bin/bash -c '
+# Fallback follows LANG when DREAMSKIN_LANG is unset (and LC_ALL/LC_MESSAGES
+# must not leak in from the caller, since they outrank LANG)
+LANG_COPY="$(env -u LC_ALL -u LC_MESSAGES LANG=zh_CN.UTF-8 /bin/bash -c '
   . "$1/scripts/localization-linux.sh"
   dreamskin_language
 ' _ "$ROOT")"
