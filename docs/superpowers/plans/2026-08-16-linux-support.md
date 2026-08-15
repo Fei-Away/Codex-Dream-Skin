@@ -681,7 +681,9 @@ verify_codex_install() {
           | /usr/bin/grep -qi 'platform\.openai\.com' \
           || fail "The installed Codex package does not come from the official OpenAI repository. Restore or reinstall the official app before continuing."
       fi
-      if /usr/bin/dpkg -V "$CODEX_PACKAGE" 2>/dev/null | /usr/bin/grep -v -E '^$' | /usr/bin/grep -q .; then
+      local integrity_output=""
+      integrity_output="$(/usr/bin/dpkg -V "$CODEX_PACKAGE" 2>/dev/null || true)"
+      if [ -n "$integrity_output" ]; then
         fail "The installed Codex package files fail the dpkg integrity check. Reinstall the official app before continuing."
       fi
       ;;

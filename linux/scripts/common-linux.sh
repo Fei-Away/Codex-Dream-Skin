@@ -123,6 +123,7 @@ write_operation_state() {
     operation_token="$(new_operation_token)"
   fi
   operation_token_is_valid "$operation_token" || return 1
+  [ -n "${NODE:-}" ] && [ -x "$NODE" ] || ensure_node_runtime
   ensure_state_root
   lock_path="$STATE_ROOT/.operation-state.lock"
   while ! /bin/mkdir "$lock_path" 2>/dev/null; do
@@ -240,13 +241,29 @@ seed_bundled_presets() {
 
 codex_main_pids() {
   local pid
-  local command_line
-  while read -r pid command_line; do
+  local exe
+  local exe_canonical
+  local expected_canonical
+  local cmdline
+  # ensure_node_runtime no longer triggers discovery (unlike macOS), so every
+  # probe function must resolve the Codex executable itself first.
+  [ -n "${CODEX_EXE:-}" ] || discover_codex_app
+  expected_canonical="$(canonical_existing_path "$CODEX_EXE" 2>/dev/null || true)"
+  while read -r pid; do
     [ -n "$pid" ] || continue
-    case "$command_line" in
-      "$CODEX_EXE"*) pid_is_codex_executable "$pid" && printf '%s\n' "$pid" ;;
+    exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+    if [ -n "$exe" ]; then
+      exe_canonical="$(canonical_existing_path "$exe" 2>/dev/null || true)"
+      [ -n "$exe_canonical" ] && [ "$exe_canonical" = "$expected_canonical" ] \
+        && printf '%s\n' "$pid" && continue
+    fi
+    # AppImage: the process exe resolves inside the FUSE mount, so fall back
+    # to matching the AppImage path in the command line.
+    cmdline="$(/usr/bin/tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    case " $cmdline " in
+      *" $CODEX_EXE "*) printf '%s\n' "$pid" ;;
     esac
-  done < <(/bin/ps -axo pid=,command=)
+  done < <(/bin/ps -eo pid= 2>/dev/null)
 }
 
 codex_is_running() {
@@ -348,14 +365,23 @@ pid_is_codex_executable() {
   local actual
   local actual_canonical
   local expected_canonical
+  local cmdline
   actual="$(process_executable_path "$1")"
   actual_canonical="$(canonical_existing_path "$actual" 2>/dev/null || true)"
   expected_canonical="$(canonical_existing_path "$CODEX_EXE" 2>/dev/null || true)"
-  [ -n "$actual_canonical" ] && [ "$actual_canonical" = "$expected_canonical" ]
+  if [ -n "$actual_canonical" ] && [ "$actual_canonical" = "$expected_canonical" ]; then
+    return 0
+  fi
+  cmdline="$(/usr/bin/tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null || true)"
+  case " $cmdline " in
+    *" $CODEX_EXE "*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 pid_is_codex_descendant() {
   local current="$1"
+  [ -n "${CODEX_EXE:-}" ] || discover_codex_app
   local command_line=""
   local parent=""
   local depth=0
@@ -641,7 +667,7 @@ ensure_node_runtime() {
 # Fast path when CDP is already open: restart injector + one-shot inject.
 # Returns 0 on success, 1 if CDP is not ready (caller should full-start).
 hot_reapply_theme() {
-  local port="${1:-9341}"
+  local port="${1:-9335}"
   local timeout_ms="${2:-8000}"
   local operation_token="${3:-}"
   local operation_args=()
