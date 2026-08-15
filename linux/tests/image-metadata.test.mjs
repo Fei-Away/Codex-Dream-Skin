@@ -27,11 +27,11 @@ const malformedPng = Buffer.from(portal);
 malformedPng[0] = 0;
 assert.equal(readImageMetadata(malformedPng, ".png"), null);
 
-// linux/presets is populated by a later pipeline task; keep the macOS preset
-// as the single source so the two platform copies cannot drift.
+// linux/presets mirrors macos/presets (copied byte-identical in the task 5
+// follow-up), so linux tests read their own platform fixtures.
 const gothic = await fs.readFile(path.join(
   projectRoot,
-  "macos",
+  "linux",
   "presets",
   "preset-gothic-void-crusade",
   "background.jpg",
