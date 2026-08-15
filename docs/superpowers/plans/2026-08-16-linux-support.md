@@ -651,6 +651,9 @@ record_appimage_approval() {
 codex_main_pids() {
   local pid
   local exe
+  # common-linux.sh 的 ensure_node_runtime 不再隐式触发 discovery（与 macOS 不同），
+  # 因此所有使用 CODEX_EXE 的探测函数必须先自行确保已发现（Task 3 审查结论）。
+  [ -n "${CODEX_EXE:-}" ] || discover_codex_app
   while read -r pid; do
     [ -n "$pid" ] || continue
     exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
