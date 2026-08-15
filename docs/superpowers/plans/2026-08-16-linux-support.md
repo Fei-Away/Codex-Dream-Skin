@@ -19,9 +19,17 @@
 
 - [ ] **Step 1: 在 outputs 数组里为每个条目追加 linux 路径**
 
-`tools/sync-runtime-assets.mjs` 尾部 outputs 数组中共 6 个条目，每个的 `paths` 数组都追加对应 linux 路径，最终为：
+`tools/sync-runtime-assets.mjs` outputs 数组共 9 个条目，其中 8 个涉及 macos/assets 或 macos/scripts，`paths` 都追加对应 linux 路径（`compileWindowsImageMetadata` 条目除外），最终为：
 
 ```js
+  {
+    content: selectorSource,
+    paths: ["macos/assets/selectors.json", "windows/assets/selectors.json", "linux/assets/selectors.json"],
+  },
+  {
+    content: compileSelectorTokens(sourceCss, "runtime/dream-skin.css"),
+    paths: ["macos/assets/dream-skin.css", "windows/assets/dream-skin.css", "linux/assets/dream-skin.css"],
+  },
   {
     content: compileRuntime(sourceRuntime),
     paths: ["macos/assets/renderer-inject.js", "windows/assets/renderer-inject.js", "linux/assets/renderer-inject.js"],
@@ -75,7 +83,16 @@ mkdir -p linux/assets linux/scripts linux/tests linux/presets
 - [ ] **Step 3: 运行 sync 并确认生成**
 
 Run: `node tools/sync-runtime-assets.mjs`
-Expected: 输出含 6 行 `updated=linux/...`；`ls linux/assets/` 有 4 个文件、`ls linux/scripts/` 有 `image-metadata.mjs` 与 `validate-safe-css-file.mjs`
+Expected: 输出含 8 行 `updated=linux/...`；`ls linux/assets/` 有 6 个文件（renderer-inject.js、selectors.json、dream-skin.css、theme-package-validator.mjs、safe-css-validator.mjs、safe-css-policy.json）、`ls linux/scripts/` 有 `image-metadata.mjs` 与 `validate-safe-css-file.mjs`
+
+- [ ] **Step 3b: 补齐默认主题资产（非 sync 生成，同 macos 直接入库）**
+
+```bash
+cp macos/assets/theme.json macos/assets/portal-hero.png linux/assets/
+git add linux/assets/theme.json linux/assets/portal-hero.png
+```
+
+（macos/assets 有 8 个入库文件：6 个 sync 生成 + theme.json + portal-hero.png；linux 对齐后同为 8 个。）
 
 - [ ] **Step 4: 用 --check 验证幂等**
 
