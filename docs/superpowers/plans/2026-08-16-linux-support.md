@@ -15,9 +15,9 @@
 ### Task 1: 扩展 sync 工具生成 linux/assets/
 
 **Files:**
-- Modify: `tools/sync-runtime-assets.mjs`（outputs 数组，5 处加 `linux/...` 路径）
+- Modify: `tools/sync-runtime-assets.mjs`（outputs 数组 9 条目中 8 个 macos 相关条目加 `linux/...` 路径）
 
-- [ ] **Step 1: 在 outputs 数组里为每个条目追加 linux 路径**
+- [x] **Step 1: 在 outputs 数组里为每个条目追加 linux 路径**
 
 `tools/sync-runtime-assets.mjs` outputs 数组共 9 个条目，其中 8 个涉及 macos/assets 或 macos/scripts，`paths` 都追加对应 linux 路径（`compileWindowsImageMetadata` 条目除外），最终为：
 
@@ -74,18 +74,18 @@
 
 （`compileWindowsImageMetadata` 条目不变，Windows 有独立的 image-metadata 变体。）
 
-- [ ] **Step 2: 先建 linux 骨架目录再生成**
+- [x] **Step 2: 先建 linux 骨架目录再生成**
 
 ```bash
 mkdir -p linux/assets linux/scripts linux/tests linux/presets
 ```
 
-- [ ] **Step 3: 运行 sync 并确认生成**
+- [x] **Step 3: 运行 sync 并确认生成**
 
 Run: `node tools/sync-runtime-assets.mjs`
 Expected: 输出含 8 行 `updated=linux/...`；`ls linux/assets/` 有 6 个文件（renderer-inject.js、selectors.json、dream-skin.css、theme-package-validator.mjs、safe-css-validator.mjs、safe-css-policy.json）、`ls linux/scripts/` 有 `image-metadata.mjs` 与 `validate-safe-css-file.mjs`
 
-- [ ] **Step 3b: 补齐默认主题资产（非 sync 生成，同 macos 直接入库）**
+- [x] **Step 3b: 补齐默认主题资产（非 sync 生成，同 macos 直接入库）**
 
 ```bash
 cp macos/assets/theme.json macos/assets/portal-hero.png linux/assets/
@@ -94,12 +94,12 @@ git add linux/assets/theme.json linux/assets/portal-hero.png
 
 （macos/assets 有 8 个入库文件：6 个 sync 生成 + theme.json + portal-hero.png；linux 对齐后同为 8 个。）
 
-- [ ] **Step 4: 用 --check 验证幂等**
+- [x] **Step 4: 用 --check 验证幂等**
 
 Run: `node tools/sync-runtime-assets.mjs --check`
 Expected: 退出码 0，无 `out-of-date=` 输出
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/sync-runtime-assets.mjs linux/assets linux/scripts/image-metadata.mjs linux/scripts/validate-safe-css-file.mjs
@@ -828,7 +828,7 @@ Expected: 无匹配（`xdg-open` 允许）
 Run: `bash -n linux/scripts/*.sh`
 Expected: 退出码 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add linux/scripts/start-dream-skin-linux.sh linux/scripts/restore-dream-skin-linux.sh linux/scripts/pause-dream-skin-linux.sh linux/scripts/status-dream-skin-linux.sh linux/scripts/verify-dream-skin-linux.sh linux/scripts/snapshot-active-theme-linux.sh linux/scripts/recover-theme-imports-linux.sh
@@ -871,7 +871,7 @@ Expected: 无匹配
 Run: `bash linux/tests/theme-zip-extract.test.sh && bash linux/tests/theme-import-identity.test.sh && bash linux/tests/community-apply-transaction.test.sh && node linux/tests/theme-zip-snapshot.test.mjs`
 Expected: 全部通过；若有失败逐条修（失败只能来自路径/平台适配，禁止改弱安全断言）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add linux/scripts/import-theme-zip-linux.sh linux/scripts/extract-theme-zip-linux.sh linux/scripts/switch-theme-linux.sh linux/scripts/theme-switch-lock-linux.sh linux/scripts/load-image-theme-linux.sh linux/scripts/apply-community-theme-linux.sh linux/tests/theme-zip-extract.test.sh linux/tests/theme-import-identity.test.sh linux/tests/community-apply-transaction.test.sh linux/tests/theme-zip-snapshot.test.mjs
@@ -1084,7 +1084,7 @@ main "$@"
 Run: `bash linux/tests/dreamskin-dispatch.test.sh`
 Expected: `dreamskin dispatch tests passed`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add linux/scripts/dreamskin.sh linux/tests/dreamskin-dispatch.test.sh
@@ -1807,7 +1807,7 @@ Expected: PASS（linux/VERSION=1.5.14 与 macos 一致）
 Run: `python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/ci.yml')); yaml.safe_load(open('.github/workflows/release.yml'))"`（若环境无 PyYAML 则用 `ruby -ryaml -e 'YAML.load_file(".github/workflows/ci.yml")'` 或跳过并标注）
 Expected: 无解析错误
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add macos/tests/release-workflow.test.mjs .github/workflows/ci.yml .github/workflows/release.yml
