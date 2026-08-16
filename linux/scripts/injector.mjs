@@ -1782,6 +1782,11 @@ async function runWatch(options) {
         record.needsLoadFallback = !nextIdentifier;
         await applyToSession(session, current.payload);
         if (controlOnly || mutationEpoch !== refreshEpoch) continue;
+        // The macOS flow activates the app window before verifying; on Linux
+        // a minimized or background window reports visibilityState hidden, so
+        // the home-route visibility checks would fail closed. Raise the page
+        // target so verification matches what the user sees.
+        try { await session.send("Page.bringToFront"); } catch {}
         const verification = await waitForVerifiedSession(
           session,
           Math.min(options.timeoutMs, 8000),
@@ -2040,6 +2045,12 @@ async function runWatch(options) {
             await invalidateEarly(record);
             continue;
           }
+          // Linux port: the macOS flow activates the app window before
+          // verifying; a minimized or background window reports
+          // visibilityState hidden and the home-route visibility checks fail
+          // closed. Raise the page target so verification matches what the
+          // user sees.
+          try { await session.send("Page.bringToFront"); } catch {}
           const verification = await waitForVerifiedSession(
             session,
             Math.min(options.timeoutMs, 8000),

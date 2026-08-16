@@ -428,7 +428,9 @@ pid_is_codex_executable() {
   if [ -n "$actual_canonical" ] && [ "$actual_canonical" = "$expected_canonical" ]; then
     return 0
   fi
-  cmdline="$(/usr/bin/tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null || true)"
+  # stderr redirect first: a PID dying between the scan and this read must
+  # fail silently, not spam the terminal.
+  cmdline="$(/usr/bin/tr '\0' ' ' 2>/dev/null < "/proc/$1/cmdline" || true)"
   case " $cmdline " in
     *" $CODEX_EXE "*) return 0 ;;
     *) return 1 ;;
