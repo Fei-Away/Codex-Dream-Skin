@@ -58,20 +58,26 @@ jobs:
           event_sha="$(git rev-parse HEAD)"
           version="$(tr -d '[:space:]' < macos/VERSION)"
           windows_version="$(tr -d '[:space:]' < windows/VERSION)"
+          linux_version="$(tr -d '[:space:]' < linux/VERSION)"
           package_version="$(node -p "JSON.parse(require('fs').readFileSync('macos/package.json', 'utf8')).version")"
           common_version="$(sed -n 's/^SKIN_VERSION=\"\([^\"]*\)\"$/\1/p' macos/scripts/common-macos.sh)"
           macos_injector_version="$(sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p' macos/scripts/injector.mjs)"
           windows_injector_version="$(sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p' windows/scripts/injector.mjs)"
-          for value in "$version" "$windows_version" "$package_version" "$common_version" "$macos_injector_version" "$windows_injector_version"; do
+          linux_common_version="$(sed -n 's/^SKIN_VERSION=\"\([^\"]*\)\"$/\1/p' linux/scripts/common-linux.sh)"
+          linux_injector_version="$(sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p' linux/scripts/injector.mjs)"
+          for value in "$version" "$windows_version" "$linux_version" "$package_version" \
+            "$common_version" "$macos_injector_version" "$windows_injector_version" \
+            "$linux_common_version" "$linux_injector_version"; do
             [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
               echo "A platform version is not semantic: $value" >&2
               exit 1
             }
           done
-          if [[ "$windows_version" != "$version" || "$package_version" != "$version" ||
-                "$common_version" != "$version" || "$macos_injector_version" != "$version" ||
-                "$windows_injector_version" != "$version" ]]; then
-            echo "The six release version sources do not match." >&2
+          if [[ "$windows_version" != "$version" || "$linux_version" != "$version" ||
+                "$package_version" != "$version" || "$common_version" != "$version" ||
+                "$macos_injector_version" != "$version" || "$windows_injector_version" != "$version" ||
+                "$linux_common_version" != "$version" || "$linux_injector_version" != "$version" ]]; then
+            echo "The nine release version sources do not match." >&2
             exit 1
           fi
 
@@ -113,13 +119,18 @@ jobs:
             }
             tagged_macos="$(git show "$tag_commit:macos/VERSION" | tr -d '[:space:]')"
             tagged_windows="$(git show "$tag_commit:windows/VERSION" | tr -d '[:space:]')"
+            tagged_linux="$(git show "$tag_commit:linux/VERSION" | tr -d '[:space:]')"
             tagged_package="$(git show "$tag_commit:macos/package.json" | node -e 'let s=""; process.stdin.on("data", (chunk) => s += chunk); process.stdin.on("end", () => process.stdout.write(JSON.parse(s).version));')"
             tagged_common="$(git show "$tag_commit:macos/scripts/common-macos.sh" | sed -n 's/^SKIN_VERSION=\"\([^\"]*\)\"$/\1/p')"
             tagged_macos_injector="$(git show "$tag_commit:macos/scripts/injector.mjs" | sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p')"
             tagged_windows_injector="$(git show "$tag_commit:windows/scripts/injector.mjs" | sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p')"
+            tagged_linux_common="$(git show "$tag_commit:linux/scripts/common-linux.sh" | sed -n 's/^SKIN_VERSION=\"\([^\"]*\)\"$/\1/p')"
+            tagged_linux_injector="$(git show "$tag_commit:linux/scripts/injector.mjs" | sed -n 's/^const SKIN_VERSION = \"\([^\"]*\)\";$/\1/p')"
             [[ "$tagged_macos" == "$version" && "$tagged_windows" == "$version" &&
-               "$tagged_package" == "$version" && "$tagged_common" == "$version" &&
-               "$tagged_macos_injector" == "$version" && "$tagged_windows_injector" == "$version" ]] || {
+               "$tagged_linux" == "$version" && "$tagged_package" == "$version" &&
+               "$tagged_common" == "$version" && "$tagged_macos_injector" == "$version" &&
+               "$tagged_windows_injector" == "$version" && "$tagged_linux_common" == "$version" &&
+               "$tagged_linux_injector" == "$version" ]] || {
               echo "Existing $tag does not contain a consistent $version payload." >&2
               exit 1
             }
@@ -505,9 +516,11 @@ jobs:
           - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
 
           The packages are currently unsigned. Follow the graphical first-run steps in
-          [macOS installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-macos.md)
-          or [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md).
-          No terminal trust command is required for ordinary users.
+          [macOS installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-macos.md),
+          [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md),
+          or [Linux installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-linux.md).
+          No terminal trust command is required for ordinary users, except Linux AppImage users:
+          approve the official download once with \`dreamskin start --allow-unsigned\`.
 
           This release was built automatically from ${RELEASE_SHA} after the version bump reached main.
           EOF

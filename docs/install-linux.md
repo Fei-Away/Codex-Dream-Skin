@@ -33,7 +33,7 @@ sudo apt install codex-desktop
    `sudo apt install ./codex-dream-skin_<version>_amd64.deb`。
    备选：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`，若提示依赖缺失再运行
    `sudo apt install -f` 补齐。依赖（`bash`、`coreutils`、`curl`、`nodejs`（>= 18）、
-   `xdg-utils`、`iproute2`）会由包管理器自动安装。
+   `unzip`、`xdg-utils`、`iproute2`）会由包管理器自动安装。
 3. 在终端运行 `dreamskin`，出现交互菜单。
 
 包会安装到 `/opt/codex-dream-skin`，提供 `/usr/bin/dreamskin` 命令，并自动注册
@@ -41,8 +41,9 @@ sudo apt install codex-desktop
 （Recommends）：只有更换背景图时源图不是 JPEG 才需要它做转换，JPEG 直通不受影响；
 缺少它时换背景图会明确报错，`sudo apt install ffmpeg` 即可补齐。
 
-deb 不会预置主题库。第一次换肤前请先准备一个主题：菜单 3「更换背景图」选一张纯背景
-（保存并立即应用），或菜单 4 导入主题 ZIP、再到菜单 5 应用。之后日常用菜单 1 一键启动。
+deb 安装时不预置主题库。第一次启动 `dreamskin` 时会自动播种内置预设主题并预选
+Gothic Void Crusade，无需手动准备；想要其他主题时再手动导入（菜单 4）。之后日常用
+菜单 1 一键启动。
 
 ### 方式二：`tar.gz`（不需要 root）
 
@@ -63,8 +64,8 @@ deb 不会预置主题库。第一次换肤前请先准备一个主题：菜单 
    `export PATH="$HOME/.local/bin:$PATH"` 加入 `~/.profile`、`~/.bashrc` 或 `~/.zshrc`
    （或重新登录一次）。
 
-tar.gz 用户需要自装依赖：`nodejs`（>= 18）与 `curl`（启动探测与检查更新需要）；`rsync`
-（安装脚本用）一般已随系统预装。
+tar.gz 用户需要自装依赖：`nodejs`（>= 18）与 `curl`（启动探测与检查更新需要）；`unzip`
+（导入主题 ZIP 需要）；`rsync`（安装脚本用）一般已随系统预装。
 
 ## 日常使用
 
@@ -89,7 +90,7 @@ tar.gz 用户需要自装依赖：`nodejs`（>= 18）与 `curl`（启动探测�
 
 | 命令 | 作用 |
 |------|------|
-| `dreamskin start` | 启动 Codex 并应用当前主题；可用 `--renderer wayland` 或 `--renderer x11` 强制渲染后端，`--restart-existing` 重启已运行的 Codex |
+| `dreamskin start` | 启动 Codex 并应用当前主题；可用 `--renderer wayland` 或 `--renderer x11` 强制渲染后端，`--restart-existing` 重启已运行的 Codex，`--allow-unsigned` 一次性信任 AppImage/二进制 Codex（见下方「AppImage 与二进制安装」） |
 | `dreamskin pause` | 暂停换肤 |
 | `dreamskin restore` | 恢复官方外观并正常重启 Codex（同菜单 7） |
 | `dreamskin import` | 导入主题 ZIP（交互式输入路径） |
@@ -154,9 +155,10 @@ Dream Skin 优先使用官方 apt 源安装的 Codex：启动前会校验包的�
 （`platform.openai.com/codex` 或 `*.oaistatic.com/codex-app-prod`）并用 `dpkg -V` 检查
 包文件完整性；来源不是官方仓库的安装会被拒绝换肤。AppImage（放在 `~/Applications/`，
 或通过 `CODEX_APP_IMAGE` 指定）也能被发现，但下载文件没有仓库签名可溯源。出于安全，
-换肤前需要一次性确认该文件来自官方下载并记录其 SHA-256；本版本的确认入口尚未开放
-（启动时会停下来提示需要确认），因此 AppImage 用户请暂时改用官方 apt 源安装，后续版本
-会提供一次性确认命令。
+换肤前需要一次性确认该文件是官方下载：核对来源后运行一次
+`dreamskin start --allow-unsigned`，工具会记录该文件的 SHA-256 审批（模式 0600，存于
+状态根目录），之后启动无需再带该参数。审批只对当时确认的文件有效，更新 AppImage 后需
+再确认一次；deb 安装走 dpkg 完整性 + 官方源校验，该参数会被忽略。
 
 ## 卸载与恢复
 
