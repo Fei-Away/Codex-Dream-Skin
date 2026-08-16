@@ -1317,3 +1317,133 @@ html[data-dream-skin="active"] [data-ds-part="message"] { border-radius: 16px; }
     }
   }
 }
+
+/* Codex 26.x gives the composer submit button a literal foreground fill.
+   That becomes a white disk when the button loses focus, so keep the action
+   on the same themed glass/accent scale in every interaction state. */
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ) {
+  background: rgb(var(--ds-accent-rgb) / .72) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .72) !important;
+  border: 1px solid rgb(var(--ds-text-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  box-shadow: 0 3px 10px rgb(var(--ds-bg-rgb) / .30) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ):hover,
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ):focus-visible {
+  background: rgb(var(--ds-accent-rgb) / .94) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .94) !important;
+  color: var(--ds-text) !important;
+  box-shadow: 0 3px 12px rgb(var(--ds-accent-rgb) / .42) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ):disabled {
+  background: rgb(var(--ds-panel-2-rgb) / .72) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .72) !important;
+  border-color: rgb(var(--ds-line-rgb) / .68) !important;
+  color: rgb(var(--ds-muted-rgb) / .92) !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+
+/* Keep native text selection and selected dialog controls from reintroducing
+   a pale/white slab over the wallpaper. */
+html[data-dream-skin="active"] ::selection {
+  background: rgb(var(--ds-accent-rgb) / .52) !important;
+  color: var(--ds-text) !important;
+  text-shadow: none !important;
+}
+html[data-dream-skin="active"]
+  :is([aria-selected="true"], [data-state="selected"], [data-selected="true"]) {
+  background: rgb(var(--ds-accent-rgb) / .30) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .30) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .56) !important;
+  color: var(--ds-text) !important;
+  text-shadow: 0 1px 3px rgb(var(--ds-bg-rgb) / .42) !important;
+}
+
+/* Dialog actions must keep their fill when the modal loses focus. Newer
+   builds use literal white foreground utilities for the confirm action. */
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]) {
+  background: rgb(var(--ds-panel-2-rgb) / .78) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .78) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .52) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .38) !important;
+}
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]):hover,
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]):focus-visible {
+  background: rgb(var(--ds-accent-rgb) / .88) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .88) !important;
+  color: var(--ds-text) !important;
+}
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]):disabled {
+  background: rgb(var(--ds-panel-2-rgb) / .54) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .54) !important;
+  border-color: rgb(var(--ds-line-rgb) / .52) !important;
+  color: rgb(var(--ds-muted-rgb) / .88) !important;
+}

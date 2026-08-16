@@ -6,21 +6,22 @@
  * integration rather than becoming a core skin dependency.
  */
 
-export const STATE_SOURCE_MODES = Object.freeze(["auto", "dom", "app-server"]);
+export const STATE_SOURCE_MODES = Object.freeze(["dom", "dom-plus"]);
 
 export function normalizeStateSource(value) {
-  const normalized = String(value || "auto").trim().toLowerCase();
-  return STATE_SOURCE_MODES.includes(normalized) ? normalized : "auto";
+  const normalized = String(value || "dom").trim().toLowerCase();
+  if (normalized === "dom-plus" || normalized === "auto" || normalized === "app-server") return "dom-plus";
+  return "dom";
 }
 
-export function createStateSourcePolicy(stateSource = "auto") {
+export function createStateSourcePolicy(stateSource = "dom") {
   const mode = normalizeStateSource(stateSource);
   return Object.freeze({
     mode,
     allowDom: true,
-    allowAppServer: mode !== "dom",
-    requireAppServer: mode === "app-server",
-    fallbackToDom: mode === "auto",
+    allowAppServer: mode === "dom-plus",
+    requireAppServer: mode === "dom-plus",
+    fallbackToDom: false,
   });
 }
 
@@ -167,7 +168,7 @@ export function selectPetState({
   appServerState,
   appServerFlags,
   appServerEvents,
-  stateSource = "auto",
+  stateSource = "dom",
 } = {}) {
   const selected = resolveSelectedThread(uiProbe, knownThreadIds);
   const policy = createStateSourcePolicy(stateSource);

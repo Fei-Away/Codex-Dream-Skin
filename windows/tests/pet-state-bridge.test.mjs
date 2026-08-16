@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { appServerEventToPetState, selectPetState } from "../scripts/codex-state-bridge.mjs";
+import { appServerEventToPetState, normalizeStateSource, selectPetState } from "../scripts/codex-state-bridge.mjs";
 import { createPetStateBridge } from "../scripts/pet-state-bridge.mjs";
 
 const threadId = "019fd5ae-eb5b-7e01-bb4e-32b021aefd56";
@@ -46,7 +46,7 @@ assert.deepEqual(domModeIgnoresServerFlag, {
 const enhancedFlag = selectPetState({
   uiProbe: runningProbe,
   appServerFlags: ["commandExecution"],
-  stateSource: "auto",
+  stateSource: "dom-plus",
 });
 assert.deepEqual(enhancedFlag, {
   threadId,
@@ -93,7 +93,7 @@ assert.equal(bridge.runtime.state, "idle");
 assert.deepEqual(transitions, [["idle", "reasoning"], ["reasoning", "idle"]]);
 
 const enhancedBridge = createPetStateBridge({
-  stateSource: "app-server",
+  stateSource: "dom-plus",
   stateMap: { idle: {}, reasoning: {}, commandExecution: {} },
 });
 enhancedBridge.sync({ uiProbe: runningProbe });
@@ -102,5 +102,8 @@ enhancedBridge.ingestAppServer({
   params: { threadId, item: { type: "commandExecution" } },
 });
 assert.equal(enhancedBridge.runtime.state, "commandExecution");
+assert.equal(normalizeStateSource("auto"), "dom-plus");
+assert.equal(normalizeStateSource("app-server"), "dom-plus");
+assert.equal(normalizeStateSource("dom"), "dom");
 
 console.log("pet-state-bridge tests passed");

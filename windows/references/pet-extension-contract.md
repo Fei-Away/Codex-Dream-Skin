@@ -1,15 +1,15 @@
 # Optional pet state extension
 
 The Windows skin injector does not require a desktop pet. Pet integrations can
-use `windows/scripts/` as a small arbitration layer, with three source modes:
+use `windows/scripts/` as a small arbitration layer, with two source modes:
 
 - `dom`: no app-server dependency; suitable for selected-thread, running-marker,
   visible approval, and visible user-input behavior.
-- `app-server`: structured event mode for custom pets that need detailed states
+- `dom-plus`: structured event mode for custom pets that need detailed states
   such as `commandExecution`, `fileRead`, `fileChange`, `mcpToolCall`,
   `webSearch`, `plan`, `reasoning`, `completed`, `failed`, and `aborted`.
-- `auto`: use app-server events when supplied, while retaining DOM as the
-  fallback and as the authority for the selected-thread activity gate.
+The legacy inputs `auto` and `app-server` are accepted by the JavaScript
+normalizer as aliases for `dom-plus`, but they are not product modes.
 
 The intended adapter boundary is:
 
@@ -28,10 +28,11 @@ visible approval or user-input card takes precedence over a generic reasoning
 event from app-server.
 
 DOM alone cannot reliably reproduce every structured execution item. The
-app-server mode is therefore intentionally preserved as an optional capability
-for enhanced pets; it is not required by the core theme injector. The pet
-package owns the app-server process/transport lifecycle and can fall back to
-`dom` when that process is unavailable.
+`dom-plus` is intentionally preserved as an optional capability for enhanced
+pets; it is not required by the core theme injector. The pet package owns the
+app-server process/transport lifecycle. If that process cannot be started,
+the enhanced mode reports the failure instead of silently pretending that
+structured events are available.
 
 The core project intentionally does not bundle pet art or start a pet process.
 A pet package can provide its own spritesheet, state map, renderer, and window

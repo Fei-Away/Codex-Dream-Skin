@@ -6,7 +6,7 @@ import { createPetRuntime } from "./pet-runtime.mjs";
  * adapter that collects snapshots from Codex; this object is safe to use from
  * a CDP watcher, a native host, or a future extension process.
  */
-export function createPetStateBridge({ stateMap = { idle: {} }, onStateChange, stateSource = "auto" } = {}) {
+export function createPetStateBridge({ stateMap = { idle: {} }, onStateChange, stateSource = "dom" } = {}) {
   const runtime = createPetRuntime({ stateMap, onStateChange });
   const mode = normalizeStateSource(stateSource);
   let lastSnapshot = { stateSource: mode };
