@@ -15,12 +15,32 @@ esac
 
 ensure_node_runtime
 ensure_state_root
+# Browser-launched clicks run with Terminal=false (no terminal at all):
+# log everything into the state root and surface the outcome as a desktop
+# notification. Menu/terminal invocations keep their inline output.
+COMMUNITY_LOGFILE="$STATE_ROOT/community-apply.log"
+NOTIFICATION_MODE="false"
+if [ ! -t 1 ]; then
+  NOTIFICATION_MODE="true"
+  exec >>"$COMMUNITY_LOGFILE" 2>&1
+fi
+cleanup() { [ -n "${TRANSACTION_ROOT:-}" ] && /bin/rm -rf "$TRANSACTION_ROOT"; }
+notify_outcome() {
+  local message="$1"
+  [ "$NOTIFICATION_MODE" = "true" ] || return 0
+  command -v notify-send >/dev/null 2>&1 \
+    && notify-send "Dream Skin" "$message" >/dev/null 2>&1 || true
+}
+COMMUNITY_SUCCESS=""
+trap 'cleanup
+  if [ "$NOTIFICATION_MODE" = "true" ]; then
+    if [ -n "$COMMUNITY_SUCCESS" ]; then notify_outcome "已应用主题「${COMMUNITY_SUCCESS}」"
+    else notify_outcome "一键换肤失败，详见 $COMMUNITY_LOGFILE"; fi
+  fi' EXIT
 # apply-community-theme-linux.sh validates that the transaction root sits in
 # the reserved "$STATE_ROOT"/.community-apply-* namespace, so the template
 # must carry the leading dot and the hyphen.
 TRANSACTION_ROOT="$(/bin/mktemp -d "$STATE_ROOT/.community-apply-XXXXXX")"
-cleanup() { /bin/rm -rf "$TRANSACTION_ROOT"; }
-trap cleanup EXIT
 
 "$NODE" "$SCRIPT_DIR/community-apply.mjs" "$URL" "$TRANSACTION_ROOT"
 
@@ -60,3 +80,6 @@ ACTIVE_ID="$( "$SCRIPT_DIR/status-dream-skin-linux.sh" --json --deep 2>/dev/null
   --expect-fingerprint "$FINGERPRINT" \
   --expect-active-id "$ACTIVE_ID" \
   --transaction-root "$TRANSACTION_ROOT"
+
+COMMUNITY_SUCCESS="$(read_package_field name)"
+[ -n "$COMMUNITY_SUCCESS" ] || COMMUNITY_SUCCESS="$THEME_ID"

@@ -125,7 +125,7 @@ if [ "$CREATE_LAUNCHERS" = "true" ]; then
     'Name=Dream Skin' \
     'Comment=External themes for Codex desktop' \
     "Exec=$SCRIPT_DIR/dreamskin.sh community %u" \
-    'Terminal=true' \
+    'Terminal=false' \
     'Categories=Utility;Development;' \
     'MimeType=x-scheme-handler/dreamskin;' \
     > "$HOME/.local/share/applications/codex-dream-skin.desktop"

@@ -32,8 +32,8 @@ sudo apt install codex-desktop
 2. 安装（推荐，apt 会自动解析依赖）：
    `sudo apt install ./codex-dream-skin_<version>_amd64.deb`。
    备选：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`，若提示依赖缺失再运行
-   `sudo apt install -f` 补齐。依赖（`bash`、`coreutils`、`curl`、`nodejs`（>= 18）、
-   `unzip`、`xdg-utils`、`iproute2`）会由包管理器自动安装。
+   `sudo apt install -f` 补齐。依赖（`bash`、`coreutils`、`curl`、`libnotify-bin`、
+   `nodejs`（>= 18）、`unzip`、`xdg-utils`、`iproute2`）会由包管理器自动安装。
 3. 在终端运行 `dreamskin`，出现交互菜单。
 
 包会安装到 `/opt/codex-dream-skin`，提供 `/usr/bin/dreamskin` 命令，并自动注册
@@ -65,7 +65,8 @@ Gothic Void Crusade，无需手动准备；想要其他主题时再手动导入�
    （或重新登录一次）。
 
 tar.gz 用户需要自装依赖：`nodejs`（>= 18）与 `curl`（启动探测与检查更新需要）；`unzip`
-（导入主题 ZIP 需要）；`rsync`（安装脚本用）一般已随系统预装。
+（导入主题 ZIP 需要）；`libnotify-bin`（网站一键换肤的结果桌面通知需要）；`rsync`
+（安装脚本用）一般已随系统预装。
 
 ## 日常使用
 
@@ -127,7 +128,10 @@ SHA-256。`theme.css` 会在本机导入和应用时复验，通过后只作用�
 
 安装客户端后，DreamSkin.cc 上已通过审核并支持一键换肤的主题会显示“一键应用到客户端”。
 点击后，Linux 会把 `dreamskin://apply?version=...` 请求通过 `x-scheme-handler/dreamskin`
-交给 Dream Skin（deb 安装自动注册；tar.gz 由 `install.sh` 注册）。
+交给 Dream Skin（deb 安装自动注册；tar.gz 由 `install.sh` 注册）。浏览器确认后不会弹出
+终端：换肤在后台完成，结果以桌面通知呈现（成功显示主题名；失败提示并给出日志路径
+`~/.local/state/codex-dream-skin/community-apply.log`）。在终端里跑 `dreamskin community
+<链接>` 则照常在终端里显示过程输出。
 
 客户端不会使用网页提供的下载地址。它只连接固定的 DreamSkin.cc 官方 API，拒绝重定向，
 核对审核状态、一键兼容标记、下载字节数和 SHA-256，然后复用与手动导入完全相同的 ZIP、
