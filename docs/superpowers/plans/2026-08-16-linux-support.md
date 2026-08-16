@@ -1023,7 +1023,7 @@ git commit -m "feat(linux): port theme pipeline scripts with tests"
 - Create: `linux/scripts/dreamskin.sh`
 - Test: `linux/tests/dreamskin-dispatch.test.sh`
 
-- [ ] **Step 1: 写失败测试（子命令分发）**
+- [x] **Step 1: 写失败测试（子命令分发）**
 
 Create `linux/tests/dreamskin-dispatch.test.sh`：
 
@@ -1048,12 +1048,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 printf 'dreamskin dispatch tests passed\n'
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `bash linux/tests/dreamskin-dispatch.test.sh`
 Expected: FAIL（函数未定义）
 
-- [ ] **Step 3: 实现 dreamskin.sh**
+- [x] **Step 3: 实现 dreamskin.sh**
 
 Create `linux/scripts/dreamskin.sh`：
 
@@ -1115,6 +1115,7 @@ menu_loop() {
     printf ' 0  退出\n'
     printf ' 选择 > '
     read -r choice || { printf '\n'; exit 0; }
+    case "$choice" in ''|0) exit 0 ;; esac
     key="$(resolve_command "${choice:-}")"
     case "$key" in
       '') printf ' 无效选择：%s\n' "$choice"; continue ;;
@@ -1134,7 +1135,7 @@ dispatch() {
       printf ' 背景图路径 > '
       read -r image || return 0
       [ -n "$image" ] || { printf ' 未提供路径，已取消。\n'; return 0; }
-      "$SCRIPT_DIR/load-image-theme-linux.sh" --image "$image" \
+      "$SCRIPT_DIR/load-image-theme-linux.sh" --file "$image" \
         && "$SCRIPT_DIR/start-dream-skin-linux.sh"
       ;;
     import)
@@ -1142,7 +1143,7 @@ dispatch() {
       printf ' 主题 ZIP 路径 > '
       read -r zipfile || return 0
       [ -n "$zipfile" ] || { printf ' 未提供路径，已取消。\n'; return 0; }
-      "$SCRIPT_DIR/import-theme-zip-linux.sh" "$zipfile"
+      "$SCRIPT_DIR/import-theme-zip-linux.sh" --file "$zipfile"
       ;;
     theme)
       local sub="${1:-list}"
@@ -1191,7 +1192,7 @@ dispatch() {
         printf ' 开机自启已开启（%s）。\n' "$target"
       fi
       ;;
-    doctor) exec "$SCRIPT_DIR/status-dream-skin-linux.sh" --doctor ;;
+    doctor) exec "$SCRIPT_DIR/status-dream-skin-linux.sh" ;;
     update) exec "$SCRIPT_DIR/check-update-linux.sh" ;;
     status) exec "$SCRIPT_DIR/status-dream-skin-linux.sh" ;;
     community) exec "$SCRIPT_DIR/community-apply-linux.sh" "$@" ;;
@@ -1218,7 +1219,7 @@ main "$@"
 
 （`theme apply` 从菜单路径走时由 switch-theme 自身输出；子命令 `dreamskin theme apply <id>` 传 `--id`。`check-update-linux.sh` 在 Task 9 实现，先引用。）
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `bash linux/tests/dreamskin-dispatch.test.sh`
 Expected: `dreamskin dispatch tests passed`
