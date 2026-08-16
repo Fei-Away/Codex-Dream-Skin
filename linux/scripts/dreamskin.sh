@@ -88,7 +88,7 @@ dispatch() {
       printf ' 主题 ZIP 路径 > '
       read -r zipfile || return 0
       [ -n "$zipfile" ] || { printf ' 未提供路径，已取消。\n'; return 0; }
-      "$SCRIPT_DIR/import-theme-zip-linux.sh" "$zipfile"
+      "$SCRIPT_DIR/import-theme-zip-linux.sh" --file "$zipfile"
       ;;
     theme)
       local sub="${1:-list}"
@@ -138,7 +138,7 @@ dispatch() {
           '[Desktop Entry]' \
           'Type=Application' \
           'Name=Dream Skin' \
-          'Exec=/bin/sh -c "exec dreamskin start"' \
+          "Exec=/bin/bash \"$SCRIPT_DIR/dreamskin.sh\" start" \
           'X-GNOME-Autostart-enabled=true' \
           > "$target"
         printf ' 开机自启已开启（%s）。\n' "$target"

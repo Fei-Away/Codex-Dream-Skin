@@ -15,4 +15,19 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 
 # menu line rendering (no exec when --self-test-source)
 [ "$(render_menu_item 1 start '启动 Codex 并应用换肤')" = "1" ]
+
+# piped-stdin menu exit paths: 0, bare Enter, and invalid-then-0 all exit 0
+printf '0\n' | /bin/bash "$ROOT/scripts/dreamskin.sh" >/dev/null 2>&1
+printf '\n' | /bin/bash "$ROOT/scripts/dreamskin.sh" >/dev/null 2>&1
+menu_out="$(printf 'zzz\n0\n' | /bin/bash "$ROOT/scripts/dreamskin.sh" 2>&1)"
+[ "$(printf '%s\n' "$menu_out" | LC_ALL=C /usr/bin/grep -c '无效选择')" -eq 1 ]
+
+# unknown subcommand exits 2
+unknown_rc=0
+"$ROOT/scripts/dreamskin.sh" nonsense >/dev/null 2>&1 && unknown_rc=0 || unknown_rc=$?
+[ "$unknown_rc" -eq 2 ]
+
+# interface regression guards: import must pass --file, doctor must pass no flag
+/usr/bin/grep -q 'import-theme-zip-linux.sh" --file "$zipfile"' "$ROOT/scripts/dreamskin.sh"
+/usr/bin/grep -Eq 'doctor\) exec .*status-dream-skin-linux\.sh" ;;' "$ROOT/scripts/dreamskin.sh"
 printf 'dreamskin dispatch tests passed\n'
