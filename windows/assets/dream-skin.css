@@ -1447,3 +1447,54 @@ html[data-dream-skin="active"]
   border-color: rgb(var(--ds-line-rgb) / .52) !important;
   color: rgb(var(--ds-muted-rgb) / .88) !important;
 }
+
+/* Codex's text-selection action bar is a transient portal. Cover the stable
+   toolbar semantics and generated class families used by current builds. */
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-selection-toolbar="true"],
+    [role="toolbar"],
+    [class*="SelectionToolbar"],
+    [class*="selection-toolbar"],
+    [class*="ContextualToolbar"],
+    [class*="contextual-toolbar"]
+  ) {
+  background: rgb(var(--ds-panel-2-rgb) / .88) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .88) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .58) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 26px rgb(var(--ds-bg-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-selection-toolbar="true"],
+    [role="toolbar"],
+    [class*="SelectionToolbar"],
+    [class*="selection-toolbar"],
+    [class*="ContextualToolbar"],
+    [class*="contextual-toolbar"]
+  )
+  :is(button, [role="button"]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: rgb(var(--ds-line-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .46) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-selection-toolbar="true"],
+    [role="toolbar"],
+    [class*="SelectionToolbar"],
+    [class*="selection-toolbar"],
+    [class*="ContextualToolbar"],
+    [class*="contextual-toolbar"]
+  )
+  :is(button, [role="button"]):hover {
+  background: rgb(var(--ds-accent-rgb) / .22) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .22) !important;
+  color: var(--ds-text) !important;
+}

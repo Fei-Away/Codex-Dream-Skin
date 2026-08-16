@@ -58,6 +58,7 @@
   let rootObserver = null;
   let partObserver = null;
   let bodyReadyHandler = null;
+  let selectionChangeHandler = null;
   let styleMode = null;
   let styleNode = null;
   let styleSheet = null;
@@ -603,6 +604,47 @@
     }
   };
 
+  const paintSelectionToolbarNow = () => {
+    const marker = '[data-dream-skin-selection-toolbar="true"]';
+    for (const previous of document.querySelectorAll(marker)) {
+      previous.removeAttribute('data-dream-skin-selection-toolbar');
+      for (const property of ['background', 'background-color', 'border', 'border-radius', 'box-shadow', 'color', 'opacity']) {
+        previous.style.removeProperty(property);
+      }
+    }
+    const labels = [
+      /添加到对话|add to chat/i,
+      /更多详情|more details/i,
+      /在侧边聊天中提问|ask in side chat/i,
+    ];
+    const controls = [...document.querySelectorAll('button, [role="button"]')].filter((control) => {
+      const rect = control.getBoundingClientRect();
+      const text = String(control.innerText || control.getAttribute('aria-label') || '').trim();
+      return rect.width > 0 && rect.height > 0 && labels.some((pattern) => pattern.test(text));
+    });
+    if (controls.length < 2) return;
+    for (let node = controls[0].parentElement; node && node !== document.body; node = node.parentElement) {
+      if (!controls.every((control) => node.contains(control))) continue;
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 180 || rect.width > 900 || rect.height < 28 || rect.height > 140) continue;
+      node.setAttribute('data-dream-skin-selection-toolbar', 'true');
+      node.style.setProperty('background', 'rgb(var(--ds-panel-2-rgb) / .88)', 'important');
+      node.style.setProperty('background-color', 'rgb(var(--ds-panel-2-rgb) / .88)', 'important');
+      node.style.setProperty('border', '1px solid rgb(var(--ds-accent-rgb) / .58)', 'important');
+      node.style.setProperty('border-radius', '14px', 'important');
+      node.style.setProperty('box-shadow', '0 10px 26px rgb(var(--ds-bg-rgb) / .34)', 'important');
+      node.style.setProperty('color', 'var(--ds-text)', 'important');
+      node.style.setProperty('opacity', '1', 'important');
+      for (const control of node.querySelectorAll('button, [role="button"]')) {
+        control.style.setProperty('background', 'transparent', 'important');
+        control.style.setProperty('background-color', 'transparent', 'important');
+        control.style.setProperty('color', 'var(--ds-text)', 'important');
+        control.style.setProperty('opacity', '1', 'important');
+      }
+      return;
+    }
+  };
+
   installStyle();
 
   const applyRootState = (root) => {
@@ -614,6 +656,11 @@
     setStyleProperty(root, "--dream-skin-art", `url("${artUrl}")`);
     applyTheme(root, shell);
     applyArtMetadata(root);
+    if (!selectionChangeHandler) {
+      selectionChangeHandler = () => paintSelectionToolbarNow();
+      document.addEventListener("selectionchange", selectionChangeHandler);
+    }
+    paintSelectionToolbarNow();
     return shell;
   };
 
@@ -798,6 +845,10 @@
     if (bodyReadyHandler && typeof document.removeEventListener === "function") {
       document.removeEventListener("DOMContentLoaded", bodyReadyHandler);
     }
+    if (selectionChangeHandler && typeof document.removeEventListener === "function") {
+      document.removeEventListener("selectionchange", selectionChangeHandler);
+      selectionChangeHandler = null;
+    }
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (analysisTimer) clearTimeout(analysisTimer);
@@ -844,7 +895,10 @@
     // SPA route changes are observable as DOM mutations even when Chromium's
     // Navigation API emits no event. Keep verification scope and public parts
     // derived from the same post-mutation tree.
-    partObserver = new MutationObserver(() => scheduleEnsure({ scope: true, parts: true }, 80));
+    partObserver = new MutationObserver(() => {
+      paintSelectionToolbarNow();
+      scheduleEnsure({ scope: true, parts: true }, 80);
+    });
   }
 
   let mediaQuery = null;
