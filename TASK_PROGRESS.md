@@ -7,7 +7,10 @@
 - [complete] Task 5: 移植 `linux/scripts/injector.mjs`（唯一补丁：`readOperationState` 直读 JSON，并删除仅被 plutil 调用使用的 `execFile`/`promisify`/`execFileAsync` 引入）与 7 个平台无关 Node 模块（theme-config/write-theme/stage-theme/snapshot-theme-zip/theme-content-fingerprint/publish-theme-import/check-image-dimensions，原样复制）。平台 API 门禁（plutil//usr/bin/open/launchctl/codesign/osascript）grep 无匹配。
 - [complete] Task 5 测试: 9 个测试移植到 `linux/tests/`。路径适配：相对自身位置的引用（injector-bootstrap/theme-config/renderer-inject）不改；safe-css-validator 与 runtime-css-nested-has 改引 `linux/assets/`（sync 生成、字节一致）；theme-package-validator 改引 linux injector/validator/assets 并与 windows injector 保持交叉校验，darwin-only 的 macOS shell importer 集成块保留并显式指向 `macos/scripts/import-theme-zip-macos.sh`（Linux 上 SKIP）；image-metadata 的 portal 改引 `linux/assets/`，gothic 预设因 `linux/presets/` 尚未填充而保持单一来源引用 `macos/presets/`。断言未改弱。
 - [verified] 9 个移植测试单独运行全部通过；`bash linux/tests/run-tests.sh` 整体通过（`linux tests passed`）。
-- [next] Task 6（start/restore/pause/status/verify 脚本移植）。
+- [complete] Task 6: 移植 7 个生命周期脚本（start/restore/pause/status/verify/snapshot-active-theme/recover-theme-imports）。补丁：端口 9335、--renderer arg、activate_codex_window no-op、--prompt-restart 改终端确认（TTY + y/N，拒绝→cancelled 状态退出 0，--restart-existing 显式旁路）、runtime 函数重定向（require_linux_runtime/ensure_node_runtime/verify_codex_install）、plutil 读取替换（restore 备份改 presence 检查、pause ack/status 用 sed/JSON 读取）、restore 删除 macOS .command 清理块、status pgrep 加 codex-launcher、LC_ALL=C 锁定 lstart 两侧。门禁 grep 干净，全部测试绿。
+- [complete] Task 6 后续修复：codex_origin_is_official 纯函数（锚定 scheme+host，接受 platform.openai.com/codex 与 persistent.oaistatic.com/codex-app-prod 两个官方域，含 2 个恶意 URL 测试用例）；--prompt-restart 强制重启前真实确认；备份读取 presence 化。提交：ebaea26 / c4e7d14 / f0a15dc。
+- [verified] 本机实机（官方 chatgpt deb 26.803.81509，仓库 persistent.oaistatic.com/codex-app-prod/linux/deb）：discover→ORIGIN-OK→dpkg -V→VERIFY-OK；status 冒烟 session=off port=9335。
+- [next] Task 7（主题管线移植：import/extract/switch/theme-switch-lock/load-image/apply-community + 4 测试）。
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
