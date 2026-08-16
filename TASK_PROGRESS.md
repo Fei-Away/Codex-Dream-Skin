@@ -10,7 +10,9 @@
 - [complete] Task 6: 移植 7 个生命周期脚本（start/restore/pause/status/verify/snapshot-active-theme/recover-theme-imports）。补丁：端口 9335、--renderer arg、activate_codex_window no-op、--prompt-restart 改终端确认（TTY + y/N，拒绝→cancelled 状态退出 0，--restart-existing 显式旁路）、runtime 函数重定向（require_linux_runtime/ensure_node_runtime/verify_codex_install）、plutil 读取替换（restore 备份改 presence 检查、pause ack/status 用 sed/JSON 读取）、restore 删除 macOS .command 清理块、status pgrep 加 codex-launcher、LC_ALL=C 锁定 lstart 两侧。门禁 grep 干净，全部测试绿。
 - [complete] Task 6 后续修复：codex_origin_is_official 纯函数（锚定 scheme+host，接受 platform.openai.com/codex 与 persistent.oaistatic.com/codex-app-prod 两个官方域，含 2 个恶意 URL 测试用例）；--prompt-restart 强制重启前真实确认；备份读取 presence 化。提交：ebaea26 / c4e7d14 / f0a15dc。
 - [verified] 本机实机（官方 chatgpt deb 26.803.81509，仓库 persistent.oaistatic.com/codex-app-prod/linux/deb）：discover→ORIGIN-OK→dpkg -V→VERIFY-OK；status 冒烟 session=off port=9335。
-- [next] Task 7（主题管线移植：import/extract/switch/theme-switch-lock/load-image/apply-community + 4 测试）。
+- [complete] Task 7: 移植 6 个主题管线脚本（import/extract/switch/theme-switch-lock/load-image/apply-community）。补丁：common/localization source 改名、stat -f→stat -c、callee -macos→-linux、import 传 --platform linux；extract-theme-zip 改 zipinfo 列举（$1=perms/$4=size/$9+=name，DOS `?` 条目映射普通文件）+ unzip 提取 + 提取后 chmod u+rwX 规范化（unzip 恢复存储权限位，否则 mode-0 包让 cp -p 半途炸掉并残留部分输出）+ 列举期拒绝穿越/绝对路径（Linux unzip 遇 `../` 静默剥目录且退出 0，必须提前拦）；load-image 的 sips→ffmpeg（min(2400,·)+force_original_aspect_ratio=decrease，实测不上采样、方形也封顶；缺 ffmpeg 显式预检 fail）；theme-switch-lock 与 macos 仅一行 stat 参数 diff（锁协议字节一致，snapshot 脚本 source 之）。4 个测试移植（mkfile→truncate、jot→seq；穿越夹具因 Info-ZIP 拒造 `../` 改为 node 手搓 ZIP 二进制，防空转）+ backup_value_present 收编 common-linux.sh + common-backup-reader.test.sh。质量审查实测 13 种构造攻击全被列举期名拒绝→私有目录 unzip→提取后检查分层防线拦下；复审 APPROVED。提交 242c5fb + adc0fef（follow-up）。
+- [carry] sync 漂移遗留：runtime/theme-package-validator.mjs 仍只认 macos|windows（max 2），linux 副本已手补并加防漂移注释——Task 11 的 sync --check 闸门会因此失败，届时修 runtime/ 源并同步三端资产。ffmpeg 依赖记入 Task 13 文档；linux CI 由 Task 12 接入。
+- [next] Task 8（dreamskin.sh 主入口：交互菜单 + 子命令 dispatch）。
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
