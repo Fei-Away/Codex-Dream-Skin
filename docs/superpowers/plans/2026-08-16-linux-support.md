@@ -542,6 +542,13 @@ case "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" in *.json) ;; *) ex
 [ "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" = "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" ]
 [ "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" != "$(appimage_approval_path sha256dead /tmp/Foo.AppImage)" ]
 
+# official repo origin detection (codex_origin_is_official returns the grep
+# exit code, so these are asserted in if-form under set -e)
+if ! codex_origin_is_official '500 https://platform.openai.com/codex/debian stable main amd64 Packages'; then exit 1; fi
+if ! codex_origin_is_official '500 https://persistent.oaistatic.com/codex-app-prod/linux/deb stable/main amd64 Packages'; then exit 1; fi
+if codex_origin_is_official '500 http://evil.example.com/repo stable main amd64 Packages'; then exit 1; fi
+if codex_origin_is_official ''; then exit 1; fi
+
 # electron_flags_lines integration: source common-linux.sh in a subshell so
 # the test stays hermetic (ELECTRON_FLAGS_PATH is reset at source time, so the
 # env overrides are applied on the call itself).
@@ -650,6 +657,15 @@ appimage_approval_path() {
   /usr/bin/printf '%s/appimage-approval-%s.json' "${STATE_ROOT:-/tmp}" "$suffix"
 }
 
+# Pure helper: does apt-cache policy output come from an official OpenAI repo?
+# OpenAI serves the Linux app from either platform.openai.com/codex/debian
+# or persistent.oaistatic.com/codex-app-prod/linux/deb (verified on real installs).
+codex_origin_is_official() {
+  local policy_output="${1:-}"
+  /usr/bin/printf '%s' "$policy_output" \
+    | /usr/bin/grep -Eq 'platform\.openai\.com/codex|persistent\.oaistatic\.com/codex-app-prod'
+}
+
 require_linux_runtime() {
   local verification_mode="${1:-deep}"
   case "$verification_mode" in deep|quick) ;; *) fail "Unknown runtime verification mode: $verification_mode" ;; esac
@@ -718,8 +734,7 @@ verify_codex_install() {
   case "${CODEX_LAUNCH_KIND:-}" in
     deb)
       if command -v apt-cache >/dev/null 2>&1; then
-        apt-cache policy "$CODEX_PACKAGE" 2>/dev/null \
-          | /usr/bin/grep -qi 'platform\.openai\.com' \
+        codex_origin_is_official "$(apt-cache policy "$CODEX_PACKAGE" 2>/dev/null || true)" \
           || fail "The installed Codex package does not come from the official OpenAI repository. Restore or reinstall the official app before continuing."
       fi
       local integrity_output=""
@@ -2019,3 +2034,4 @@ gh pr create --title "feat(linux): Dream Skin for Ubuntu / Pop!_OS" \
 - [ ] 三端 VERSION 一致、CI 全绿、Release 资产（deb/tar.gz/SHA256SUMS）可下载
 - [ ] `readlink /usr/bin/codex-desktop` 输出指向真实二进制路径（确认 deb 布局符号链接假设成立）
 - [ ] 终端里裸命令启动 `codex-desktop` 后 `codex_is_running` 必须能发现（argv[0] 不带路径的场景）
+- [x] 官方仓库 origin 本机实机核实为 `persistent.oaistatic.com/codex-app-prod/linux/deb`（包名 `chatgpt`，二进制 `/usr/bin/chatgpt` → `/usr/lib/chatgpt/codex-launcher`）；`verify_codex_install` 的 origin 检查已按实机仓库修正并加纯函数测试
