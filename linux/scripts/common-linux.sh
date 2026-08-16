@@ -179,6 +179,18 @@ clear_operation_state() {
   /bin/rm -f "$OPERATION_STATE_PATH"
 }
 
+# Presence check for a recorded string value in the machine-written
+# theme-backup.json. theme-config.mjs stores the ORIGINAL config line as the
+# value, so real entries contain escaped quotes (\" ) and are unreliable to
+# extract with sed; the uninstall branch only needs to distinguish "a real
+# value was recorded" (present) from "null or missing" (absent), which the
+# macOS flow compared as the literal "null".
+backup_value_present() {
+  local key="$1"
+  [ -f "$THEME_BACKUP_PATH" ] || return 1
+  /usr/bin/grep -Eq '^[[:space:]]*"'"$key"'"[[:space:]]*:[[:space:]]*"' "$THEME_BACKUP_PATH"
+}
+
 begin_client_operation() {
   local port="$1"
   local kind="$2"

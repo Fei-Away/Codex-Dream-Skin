@@ -2,18 +2,7 @@
 
 set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-linux.sh"
-
-# Linux: presence check for a recorded string value in the machine-written
-# theme-backup.json. theme-config.mjs stores the ORIGINAL config line as the
-# value, so real entries contain escaped quotes (\" ) and are unreliable to
-# extract with sed; the uninstall branch below only needs to distinguish "a
-# real value was recorded" (present) from "null or missing" (absent), which
-# the macOS flow compared as the literal "null".
-backup_value_present() {
-  local key="$1"
-  [ -f "$THEME_BACKUP_PATH" ] || return 1
-  /usr/bin/grep -Eq '^[[:space:]]*"'"$key"'"[[:space:]]*:[[:space:]]*"' "$THEME_BACKUP_PATH"
-}
+# backup_value_present lives in common-linux.sh (Task 7).
 
 PORT=9335
 PORT_EXPLICIT="false"
