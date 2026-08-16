@@ -86,9 +86,21 @@ require_linux_runtime() {
   verify_codex_install
 }
 
+# Returns 0 when the candidate is the real Electron binary (an ELF
+# executable), not a launcher shell script or a directory. Deb layouts ship
+# both (e.g. /usr/lib/chatgpt/codex-launcher is a sh wrapper exec'ing
+# /usr/lib/chatgpt/ChatGPT); process identity compares /proc/pid/exe, which
+# always points at the ELF, so discovery must prefer it.
+codex_candidate_is_binary() {
+  local candidate="$1"
+  [ -f "$candidate" ] && [ -x "$candidate" ] || return 1
+  LC_ALL=C /usr/bin/file -b "$candidate" 2>/dev/null | /usr/bin/grep -q 'ELF.*executable'
+}
+
 discover_codex_app() {
   local candidate=""
   local configured="${CODEX_APP_IMAGE:-}"
+  local fallback_set="false"
   local pkg=""
   local pkg_status=""
 
@@ -101,18 +113,31 @@ discover_codex_app() {
     pkg_status="$(/usr/bin/dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null || true)"
     case "$pkg_status" in
       "install ok installed")
-        candidate="$(/usr/bin/dpkg-query -L "$pkg" 2>/dev/null \
-          | /usr/bin/grep -E '/(bin|lib)/[^/]*(codex|chatgpt)[^/]*$' | /usr/bin/grep -v -E '\.(so|1)$' \
-          | /usr/bin/head -n 1 || true)"
-        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
-          # Resolve the launcher symlink (e.g. /usr/bin/codex-desktop) to the
-          # real binary so /proc/pid/exe canonical comparisons match.
-          CODEX_EXE="$(readlink -f "$candidate")"
-          CODEX_VERSION="$(/usr/bin/dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)"
-          CODEX_PACKAGE="$pkg"
-          CODEX_LAUNCH_KIND="deb"
-          break
-        fi
+        fallback_set="false"
+        while IFS= read -r candidate; do
+          [ -n "$candidate" ] || continue
+          if codex_candidate_is_binary "$candidate"; then
+            # Resolve the launcher symlink (e.g. /usr/bin/codex-desktop) to
+            # the real binary so /proc/pid/exe canonical comparisons match.
+            CODEX_EXE="$(readlink -f "$candidate")"
+            CODEX_VERSION="$(/usr/bin/dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)"
+            CODEX_PACKAGE="$pkg"
+            CODEX_LAUNCH_KIND="deb"
+            break
+          fi
+          # Keep the first executable non-binary match as a last-resort
+          # fallback for layouts without a separate ELF binary. Never the
+          # package's chatgpt directory itself.
+          if [ "$fallback_set" = "false" ] && [ -x "$candidate" ] && [ ! -d "$candidate" ]; then
+            CODEX_EXE="$(readlink -f "$candidate")"
+            CODEX_VERSION="$(/usr/bin/dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)"
+            CODEX_PACKAGE="$pkg"
+            CODEX_LAUNCH_KIND="deb"
+            fallback_set="true"
+          fi
+        done < <(/usr/bin/dpkg-query -L "$pkg" 2>/dev/null \
+          | /usr/bin/grep -E -i '(codex|chatgpt)[^/]*$' | /usr/bin/grep -v -E '\.(so|1)$' || true)
+        [ -n "${CODEX_EXE:-}" ] && break
         ;;
     esac
   done

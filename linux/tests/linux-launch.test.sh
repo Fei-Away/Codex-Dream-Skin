@@ -73,4 +73,19 @@ if ! command -v fail >/dev/null 2>&1; then
 fi
 if ( assemble_renderer_flags wayland false bogus 2>/dev/null ); then exit 1; fi
 
+# deb discovery must prefer the real ELF binary: the official chatgpt deb
+# ships /usr/lib/chatgpt (dir), /usr/lib/chatgpt/codex-launcher (sh wrapper
+# exec'ing the ELF), and /usr/lib/chatgpt/ChatGPT (the ELF). Picking the dir
+# or the wrapper breaks launch and /proc/pid/exe identity. Real-machine
+# regression: the installed package's first match in dpkg -L order was the
+# directory, and nohup died with permission denied on it.
+LAUNCHER_STUB="$(mktemp /tmp/dreamskin-launcher.XXXXXX)"
+printf '#!/bin/sh\nexec /usr/lib/chatgpt/ChatGPT "$@"\n' > "$LAUNCHER_STUB"
+/bin/chmod 755 "$LAUNCHER_STUB"
+if codex_candidate_is_binary /usr/lib/chatgpt; then exit 1; fi
+if codex_candidate_is_binary "$LAUNCHER_STUB"; then exit 1; fi
+codex_candidate_is_binary /bin/bash \
+  || { printf 'ELF detection rejected a real binary\n' >&2; exit 1; }
+/bin/rm -f "$LAUNCHER_STUB"
+
 printf 'linux-launch tests passed\n'

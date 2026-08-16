@@ -89,12 +89,15 @@ injector_identity_matches() {
 }
 
 # Codex process: cheap name match only. Linux installs expose codex-desktop
-# or chatgpt-desktop (deb or AppImage), and the official deb launcher resolves
-# to /usr/lib/chatgpt/codex-launcher; the precise /proc exe identity check
-# lives in common-linux.sh for scripts that can afford the process scan.
+# or chatgpt-desktop (deb or AppImage); the official deb's /usr/bin/chatgpt
+# symlink resolves through the codex-launcher sh wrapper to the ChatGPT ELF,
+# so both process names appear depending on how the app was started. The
+# precise /proc exe identity check lives in common-linux.sh for scripts that
+# can afford the process scan.
 if /usr/bin/pgrep -x codex-desktop >/dev/null 2>&1 \
   || /usr/bin/pgrep -x chatgpt-desktop >/dev/null 2>&1 \
   || /usr/bin/pgrep -x codex-launcher >/dev/null 2>&1 \
+  || /usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 \
   || /usr/bin/pgrep -x codex >/dev/null 2>&1 \
   || /usr/bin/pgrep -x chatgpt >/dev/null 2>&1; then
   CODEX_RUNNING="true"

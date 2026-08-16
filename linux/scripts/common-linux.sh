@@ -295,8 +295,10 @@ codex_main_pids() {
         && printf '%s\n' "$pid" && continue
     fi
     # AppImage: the process exe resolves inside the FUSE mount, so fall back
-    # to matching the AppImage path in the command line.
-    cmdline="$(/usr/bin/tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    # to matching the AppImage path in the command line. The stderr redirect
+    # comes BEFORE the input redirect so a PID that dies between the ps scan
+    # and this read (cmdline vanishes) fails silently instead of spamming.
+    cmdline="$(/usr/bin/tr '\0' ' ' 2>/dev/null < "/proc/$pid/cmdline" || true)"
     case " $cmdline " in
       *" $CODEX_EXE "*) printf '%s\n' "$pid" ;;
     esac
