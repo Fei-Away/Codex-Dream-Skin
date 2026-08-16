@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 VERSION="$(/usr/bin/tr -d '[:space:]' < "$ROOT/VERSION")"
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --version) [ "$#" -ge 2 ] || { printf '--version requires a value\n' >&2; exit 2; }; VERSION="$2"; shift 2 ;;
+    --version) [ "$#" -ge 2 ] || { printf '%s\n' '--version requires a value' >&2; exit 2; }; VERSION="$2"; shift 2 ;;
     *) printf 'Unknown build-deb argument: %s\n' "$1" >&2; exit 2 ;;
   esac
 done
