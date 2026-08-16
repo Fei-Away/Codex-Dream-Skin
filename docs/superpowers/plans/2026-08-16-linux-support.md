@@ -1241,7 +1241,7 @@ git commit -m "feat(linux): main entry with interactive menu and subcommands"
 - Create: `linux/scripts/install-dream-skin-linux.sh`（copy `macos/scripts/install-dream-skin-macos.sh` + patch）
 - Create: `linux/tests/community-http-bounded.test.mjs`（新写：Swift 测试无法在 Linux 跑，用 Node 复刻同一契约场景）
 
-- [ ] **Step 1: 移植 check-update 与 install**
+- [x] **Step 1: 移植 check-update 与 install**
 
 ```bash
 cp macos/scripts/check-update-macos.sh linux/scripts/check-update-linux.sh
@@ -1259,7 +1259,7 @@ if [ "$CREATE_LAUNCHERS" = "true" ]; then
     'Type=Application' \
     'Name=Dream Skin' \
     'Comment=External themes for Codex desktop' \
-    "Exec=$SCRIPT_DIR/dreamskin.sh" \
+    "Exec=$SCRIPT_DIR/dreamskin.sh community %u" \
     'Terminal=true' \
     'Categories=Utility;Development;' \
     'MimeType=x-scheme-handler/dreamskin;' \
@@ -1272,7 +1272,7 @@ fi
 
 install 里 `--no-launch` 默认保持；`INSTALL_ROOT` 部署逻辑不变（走 common-linux.sh 的 `$HOME/.local/share/codex-dream-skin`）。
 
-- [ ] **Step 2: 写失败测试（复刻 Swift 契约）**
+- [x] **Step 2: 写失败测试（复刻 Swift 契约）**
 
 Create `linux/tests/community-http-bounded.test.mjs`（node:test + 本地 http 服务器；场景与 `macos/tests/bounded-community-http.test.swift` 一致）：
 
@@ -1351,7 +1351,7 @@ test("community metadata validation", () => {
 Run: `node linux/tests/community-http-bounded.test.mjs`
 Expected: FAIL（`community-http.mjs` 不存在）
 
-- [ ] **Step 3: 实现 community-http.mjs（契约来源已核实）**
+- [x] **Step 3: 实现 community-http.mjs（契约来源已核实）**
 
 契约来源（已从源码核实，勿凭记忆改）：`macos/menubar-app/Sources/DreamSkinCore/CommunityThemeLink.swift` 与 `macos/menubar-app/Sources/CodexDreamSkinMenuBar/BoundedCommunityHTTPClient.swift`：
 - 链接：`^dreamskin://apply\?version=(ver_[a-z0-9]{8,64})$`
@@ -1461,7 +1461,7 @@ export async function boundedFetchJson(url) {
 Run: `node linux/tests/community-http-bounded.test.mjs`
 Expected: 全部通过
 
-- [ ] **Step 4: 实现 community-apply.mjs + community-apply-linux.sh**
+- [x] **Step 4: 实现 community-apply.mjs + community-apply-linux.sh**
 
 Create `linux/scripts/community-apply.mjs`（CLI：`community-apply.mjs <dreamskin-url> <transaction-root>`）：
 
@@ -1539,7 +1539,8 @@ case "$URL" in
 esac
 
 ensure_node_runtime
-TRANSACTION_ROOT="$(/bin/mktemp -d "$STATE_ROOT/community-apply.XXXXXX")"
+ensure_state_root
+TRANSACTION_ROOT="$(/bin/mktemp -d "$STATE_ROOT/.community-apply-XXXXXX")"
 cleanup() { /bin/rm -rf "$TRANSACTION_ROOT"; }
 trap cleanup EXIT
 
@@ -1587,17 +1588,17 @@ ACTIVE_ID="$( "$SCRIPT_DIR/status-dream-skin-linux.sh" --json --deep 2>/dev/null
   --transaction-root "$TRANSACTION_ROOT"
 ```
 
-- [ ] **Step 5: 语法与测试**
+- [x] **Step 5: 语法与测试**
 
 Run: `node linux/tests/community-http-bounded.test.mjs && node --check linux/scripts/community-apply.mjs && bash -n linux/scripts/community-apply-linux.sh linux/scripts/install-dream-skin-linux.sh linux/scripts/check-update-linux.sh`
 Expected: 全部通过
 
-- [ ] **Step 3: 跑测试**
+- [x] **Step 3: 跑测试**
 
 Run: `node linux/tests/community-http-bounded.test.mjs && bash -n linux/scripts/community-apply-linux.sh linux/scripts/install-dream-skin-linux.sh linux/scripts/check-update-linux.sh`
 Expected: 全部通过
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add linux/scripts/check-update-linux.sh linux/scripts/install-dream-skin-linux.sh linux/scripts/community-apply-linux.sh linux/tests/community-http-bounded.test.mjs
@@ -1719,7 +1720,7 @@ Create `linux/installer/codex-dream-skin.desktop`：
 Type=Application
 Name=Dream Skin
 Comment=External themes for Codex desktop
-Exec=dreamskin
+Exec=dreamskin community %u
 Terminal=true
 Categories=Utility;Development;
 MimeType=x-scheme-handler/dreamskin;
