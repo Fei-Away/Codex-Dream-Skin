@@ -41,6 +41,16 @@ case "$CONTENTS" in
   *) printf 'usr/bin/dreamskin is not a symlink to scripts/dreamskin.sh\n' >&2; exit 1 ;;
 esac
 
+# Public release parity: the deb ships exactly one bundled preset (gothic),
+# and the separately recorded Arina preset must never enter the package.
+case "$CONTENTS" in
+  *"./opt/codex-dream-skin/presets/preset-gothic-void-crusade/theme.json"*) ;;
+  *) printf 'bundled gothic preset missing from deb\n' >&2; exit 1 ;;
+esac
+case "$CONTENTS" in
+  *"preset-arina-hashimoto"*) printf 'Restricted Arina preset entered the deb package.\n' >&2; exit 1 ;;
+esac
+
 INFO="$(dpkg-deb -f "$DEB" Package Depends Architecture)"
 case "$INFO" in
   *"codex-dream-skin"*) ;;

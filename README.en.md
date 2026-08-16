@@ -49,7 +49,7 @@ then download from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Ski
 
 - macOS: open `CodexDreamSkin-vX.Y.Z.dmg` and drag the app to Applications.
 - Windows: run `CodexDreamSkin-Setup-vX.Y.Z.exe` and follow the wizard.
-- Linux: run `sudo dpkg -i codex-dream-skin_<version>_amd64.deb`, or extract
+- Linux: run `sudo apt install ./codex-dream-skin_<version>_amd64.deb`, or extract
   `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` and run `./install.sh` (no root
   needed), then run `dreamskin` in a terminal.
 

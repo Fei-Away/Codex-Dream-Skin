@@ -17,7 +17,10 @@ STAGE="$(/bin/mktemp -d /tmp/dreamskin-tar.XXXXXX)"
 trap '/bin/rm -rf "$STAGE"' EXIT
 /usr/bin/mkdir -p "$STAGE/codex-dream-skin"
 /bin/chmod 755 "$STAGE/codex-dream-skin"
+# Public release parity with the macOS packages: the Arina preset is a
+# separately recorded distribution exception and never enters the tarball.
 /usr/bin/rsync -a --exclude 'installer/' --exclude 'tests/' --exclude 'release/' \
+  --exclude 'presets/preset-arina-hashimoto/' \
   --exclude '.gitattributes' \
   --exclude 'scripts/build-deb.sh' --exclude 'scripts/build-tarball.sh' \
   --exclude 'scripts/build-release-linux.sh' \
@@ -36,6 +39,15 @@ trap '/bin/rm -rf "$STAGE"' EXIT
 /usr/bin/find "$STAGE/codex-dream-skin" -type d -exec /bin/chmod 755 {} +
 /usr/bin/find "$STAGE/codex-dream-skin" -type f -exec /bin/chmod 644 {} +
 /usr/bin/find "$STAGE/codex-dream-skin" -type f -name '*.sh' -exec /bin/chmod 755 {} +
+
+# Post-stage verification (mirrors the macOS release builds): fail the build
+# if the restricted preset or any of its assets reached the staged tree.
+[ ! -e "$STAGE/codex-dream-skin/presets/preset-arina-hashimoto" ] \
+  || { printf 'Restricted Arina preset entered the Linux tarball.\n' >&2; exit 1; }
+if /usr/bin/find "$STAGE" -type f -name 'arina-hashimoto-*' -print -quit | /usr/bin/grep -q .; then
+  printf 'Restricted Arina asset entered the Linux tarball.\n' >&2
+  exit 1
+fi
 
 OUT_DIR="$ROOT/release"
 /usr/bin/mkdir -p "$OUT_DIR"

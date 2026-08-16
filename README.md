@@ -49,7 +49,7 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
 
 - macOS：打开 `CodexDreamSkin-vX.Y.Z.dmg`，把 App 拖进 Applications。
 - Windows：双击 `CodexDreamSkin-Setup-vX.Y.Z.exe`，按安装向导完成。
-- Linux：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`，或解压
+- Linux：`sudo apt install ./codex-dream-skin_<version>_amd64.deb`，或解压
   `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` 后运行 `./install.sh`（不需要 root），
   然后终端运行 `dreamskin`。
 

@@ -26,7 +26,10 @@ trap '/bin/rm -rf "$STAGE"' EXIT
 /usr/bin/mkdir -p "$STAGE/opt/codex-dream-skin" "$STAGE/usr/bin" \
   "$STAGE/usr/share/applications" "$STAGE/DEBIAN"
 # Stage the engine (scripts + assets + presets; exclude packaging-only dirs).
+# Public release parity with the macOS packages: the Arina preset is a
+# separately recorded distribution exception and never enters the deb.
 /usr/bin/rsync -a --exclude 'installer/' --exclude 'tests/' --exclude 'release/' \
+  --exclude 'presets/preset-arina-hashimoto/' \
   --exclude '.gitattributes' --exclude 'scripts/build-*.sh' \
   "$ROOT/" "$STAGE/opt/codex-dream-skin/"
 /usr/bin/ln -s /opt/codex-dream-skin/scripts/dreamskin.sh "$STAGE/usr/bin/dreamskin"
@@ -43,6 +46,15 @@ trap '/bin/rm -rf "$STAGE"' EXIT
 # rsync -a preserves source-tree directory modes, which vary with the build
 # host; normalize so the package never embeds group/world-writable dirs.
 /usr/bin/find "$STAGE/opt" -type d -exec /bin/chmod 755 {} \;
+
+# Post-stage verification (mirrors the macOS release builds): fail the build
+# if the restricted preset or any of its assets reached the staged tree.
+[ ! -e "$STAGE/opt/codex-dream-skin/presets/preset-arina-hashimoto" ] \
+  || { printf 'Restricted Arina preset entered the deb package.\n' >&2; exit 1; }
+if /usr/bin/find "$STAGE" -type f -name 'arina-hashimoto-*' -print -quit | /usr/bin/grep -q .; then
+  printf 'Restricted Arina asset entered the deb package.\n' >&2
+  exit 1
+fi
 
 OUT_DIR="$ROOT/release"
 /usr/bin/mkdir -p "$OUT_DIR"
