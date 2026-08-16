@@ -83,10 +83,25 @@ verify_codex_install
 
 if codex_is_running && [ "$DEBUG_READY" = "false" ]; then
   if [ "$PROMPT_RESTART" = "true" ] && [ "$RESTART_EXISTING" = "false" ]; then
-    # The Linux menu already asked for restart confirmation in the terminal,
-    # so there is no second dialog here; proceed with the authorized restart.
-    notify_user "$(dreamskin_text restart_prompt)"
-    RESTART_EXISTING="true"
+    # Restart consent gate: a force-kill restart must be confirmed by the
+    # user at the time it happens. --restart-existing is the documented
+    # explicit bypass; a non-interactive caller cannot silently restart.
+    if [ ! -t 0 ]; then
+      fail "Interactive confirmation is required; pass --restart-existing to force a restart."
+    fi
+    printf '%s [y/N] ' "$(dreamskin_text restart_prompt)"
+    read -r reply || reply="n"
+    case "$reply" in
+      y|Y|yes|YES) RESTART_EXISTING="true" ;;
+      *)
+        [ -n "${OPERATION_TOKEN:-}" ] && write_operation_state cancelled "$(dreamskin_text cancelled_unchanged)" "$OPERATION_TOKEN" 2>/dev/null || true
+        finish_client_operation "$PORT" cancelled "$(dreamskin_text cancelled_unchanged)" \
+          "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
+        OPERATION_FINISHED="true"
+        printf '%s\n' "$(dreamskin_text cancelled_unchanged)"
+        exit 0
+        ;;
+    esac
   fi
   [ "$RESTART_EXISTING" = "true" ] || fail "ChatGPT is already running without the verified skin CDP endpoint. Close it first or pass --restart-existing."
   stop_codex true

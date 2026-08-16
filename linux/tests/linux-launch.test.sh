@@ -43,6 +43,8 @@ case "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" in *.json) ;; *) ex
 if ! codex_origin_is_official '500 https://platform.openai.com/codex/debian stable main amd64 Packages'; then exit 1; fi
 if ! codex_origin_is_official '500 https://persistent.oaistatic.com/codex-app-prod/linux/deb stable/main amd64 Packages'; then exit 1; fi
 if codex_origin_is_official '500 http://evil.example.com/repo stable main amd64 Packages'; then exit 1; fi
+if codex_origin_is_official '500 https://evil.example.com/x/platform.openai.com/codex stable main amd64 Packages'; then exit 1; fi
+if codex_origin_is_official '500 https://platform.openai.com.evil.com/codex/ stable main amd64 Packages'; then exit 1; fi
 if codex_origin_is_official ''; then exit 1; fi
 
 # electron_flags_lines integration: source common-linux.sh in a subshell so

@@ -547,6 +547,8 @@ case "$(appimage_approval_path sha256sum /tmp/Foo.AppImage)" in *.json) ;; *) ex
 if ! codex_origin_is_official '500 https://platform.openai.com/codex/debian stable main amd64 Packages'; then exit 1; fi
 if ! codex_origin_is_official '500 https://persistent.oaistatic.com/codex-app-prod/linux/deb stable/main amd64 Packages'; then exit 1; fi
 if codex_origin_is_official '500 http://evil.example.com/repo stable main amd64 Packages'; then exit 1; fi
+if codex_origin_is_official '500 https://evil.example.com/x/platform.openai.com/codex stable main amd64 Packages'; then exit 1; fi
+if codex_origin_is_official '500 https://platform.openai.com.evil.com/codex/ stable main amd64 Packages'; then exit 1; fi
 if codex_origin_is_official ''; then exit 1; fi
 
 # electron_flags_lines integration: source common-linux.sh in a subshell so
@@ -658,12 +660,14 @@ appimage_approval_path() {
 }
 
 # Pure helper: does apt-cache policy output come from an official OpenAI repo?
-# OpenAI serves the Linux app from either platform.openai.com/codex/debian
-# or persistent.oaistatic.com/codex-app-prod/linux/deb (verified on real installs).
+# OpenAI serves the Linux app from either https://platform.openai.com/codex/
+# or an https://*.oaistatic.com/codex-app-prod/ host (verified on real
+# installs: persistent.oaistatic.com). The origin is anchored to scheme+host
+# so a hostile repo URL cannot smuggle the pattern into its path.
 codex_origin_is_official() {
   local policy_output="${1:-}"
   /usr/bin/printf '%s' "$policy_output" \
-    | /usr/bin/grep -Eq 'platform\.openai\.com/codex|persistent\.oaistatic\.com/codex-app-prod'
+    | /usr/bin/grep -Eq '(^|[[:space:]])https://platform\.openai\.com/codex/|(^|[[:space:]])https://([a-z0-9.-]+\.)?oaistatic\.com/codex-app-prod/'
 }
 
 require_linux_runtime() {
@@ -937,7 +941,7 @@ done
 每个文件：
 1. `sed -i 's/common-macos\.sh/common-linux.sh/g'` 该文件
 2. `sed -i 's/localization-macos\.sh/localization-linux.sh/g'` 该文件
-3. 默认端口：`start`、`pause`、`status`、`verify` 里的 `PORT=9341` 改为 `PORT=9335`；`start` 的 `--prompt-restart` 相关 `osascript` 交互块（若有）替换为 `notify_user` + 直接执行重启（Linux 菜单在终端里已确认，不需要二次弹窗）
+3. 默认端口：`start`、`pause`、`status`、`verify` 里的 `PORT=9341` 改为 `PORT=9335`；`start` 的 `--prompt-restart` 相关 `osascript` 交互块（若有）替换为终端交互确认门（`[ ! -t 0 ]` 时要求 `--restart-existing`；`read -r` y/N 确认；拒绝则写 cancelled 状态并 `exit 0`；`--restart-existing` 为显式跳过）
 4. `start` 里 `require_macos_runtime` → `require_linux_runtime`，`verify_macos_app_signature` → `verify_codex_install`（按调用处实际函数名对应）
 5. `start` 里 `activate_codex_window`（`open -a`）改为空操作 + 日志：`[ -z "${CODEX_EXE:-}" ] || true`
 6. `start` 的参数循环里加 `--renderer` 支持（映射到渲染覆盖环境变量）：
@@ -947,6 +951,8 @@ done
 ```
 
 7. `verify` 里 `--screenshot` 用 `/usr/bin/open` 打开图片的结尾改为 `xdg-open`
+8. `restore` 的 uninstall 早退分支里 `plutil -extract values.appearanceTheme ...` 读取改为 JSON 存在性检查 `backup_value_present`（真实值含转义引号、sed 提取不可靠；只需区分「有真实值」与「null/缺失」）
+9. `status` 的 pgrep 名单加 `codex-launcher`（官方 deb 二进制解析到 `/usr/lib/chatgpt/codex-launcher`）；`common-linux.sh` 的 `process_started_at` 与 `status` 的 lstart 读取加 `LC_ALL=C` 前缀（保证两端字节一致）
 
 - [ ] **Step 3: 平台 API 门禁**
 

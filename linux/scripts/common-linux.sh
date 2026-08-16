@@ -287,7 +287,7 @@ sync_appearance_pin() {
 }
 
 process_started_at() {
-  /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
+  LC_ALL=C /bin/ps -p "$1" -o lstart= 2>/dev/null | LC_ALL=C /usr/bin/awk '{$1=$1; print}'
 }
 
 recorded_injector_process_matches() {

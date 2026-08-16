@@ -84,15 +84,17 @@ injector_identity_matches() {
   # Requiring that following token prevents 93350 from matching saved port
   # 9335 via a loose prefix pattern.
   case "$command_lower" in *"--port $expected_port --theme-dir "*) ;; *) return 1 ;; esac
-  actual_start="$(/bin/ps -p "$pid" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
+  actual_start="$(LC_ALL=C /bin/ps -p "$pid" -o lstart= 2>/dev/null | LC_ALL=C /usr/bin/awk '{$1=$1; print}')"
   [ -n "$actual_start" ] && [ "$actual_start" = "$expected_start" ]
 }
 
 # Codex process: cheap name match only. Linux installs expose codex-desktop
-# or chatgpt-desktop (deb or AppImage); the precise /proc exe identity check
+# or chatgpt-desktop (deb or AppImage), and the official deb launcher resolves
+# to /usr/lib/chatgpt/codex-launcher; the precise /proc exe identity check
 # lives in common-linux.sh for scripts that can afford the process scan.
 if /usr/bin/pgrep -x codex-desktop >/dev/null 2>&1 \
   || /usr/bin/pgrep -x chatgpt-desktop >/dev/null 2>&1 \
+  || /usr/bin/pgrep -x codex-launcher >/dev/null 2>&1 \
   || /usr/bin/pgrep -x codex >/dev/null 2>&1 \
   || /usr/bin/pgrep -x chatgpt >/dev/null 2>&1; then
   CODEX_RUNNING="true"

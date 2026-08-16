@@ -3,14 +3,16 @@
 set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-linux.sh"
 
-# Linux: read a string field from the machine-written theme-backup.json
-# (JSON.stringify(..., null, 2), one key per line). Returns empty when the
-# key is missing or null. Equivalent to the macOS property-list extractor
-# read, which returned the literal "null" for a JSON null value.
-read_theme_backup_field() {
+# Linux: presence check for a recorded string value in the machine-written
+# theme-backup.json. theme-config.mjs stores the ORIGINAL config line as the
+# value, so real entries contain escaped quotes (\" ) and are unreliable to
+# extract with sed; the uninstall branch below only needs to distinguish "a
+# real value was recorded" (present) from "null or missing" (absent), which
+# the macOS flow compared as the literal "null".
+backup_value_present() {
   local key="$1"
-  /usr/bin/sed -n 's/^[[:space:]]*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)"[[:space:]]*,*$/\1/p' \
-    "$THEME_BACKUP_PATH" 2>/dev/null | /usr/bin/head -n 1
+  [ -f "$THEME_BACKUP_PATH" ] || return 1
+  /usr/bin/grep -Eq '^[[:space:]]*"'"$key"'"[[:space:]]*:[[:space:]]*"' "$THEME_BACKUP_PATH"
 }
 
 PORT=9335
@@ -38,14 +40,12 @@ if [ "$UNINSTALL" = "true" ] && [ ! -e "$STATE_PATH" ] &&
     printf 'No active Dream Skin session or config backup was found; safe engine-only cleanup.\n'
     exit 0
   fi
-  backup_appearance="$(read_theme_backup_field appearanceTheme)"
-  backup_dark_code="$(read_theme_backup_field appearanceDarkCodeThemeId)"
   # Install may have pinned appearanceTheme even when the backup recorded no
   # original line; a pinned config still needs the full restore below.
   # (macOS read these via its property-list extractor and compared against
-  # the literal "null"; the Linux JSON reader returns empty for null or
-  # absent values.)
-  if [ -z "$backup_appearance" ] && [ -z "$backup_dark_code" ] &&
+  # the literal "null"; Linux checks for a present string value directly —
+  # null and absent both mean "no override recorded".)
+  if ! backup_value_present appearanceTheme && ! backup_value_present appearanceDarkCodeThemeId &&
       ! /usr/bin/grep -E -q '^[[:space:]]*appearanceTheme[[:space:]]*=' "$CONFIG_PATH" 2>/dev/null; then
     /bin/rm -f "$THEME_BACKUP_PATH"
     printf 'The install created no config overrides; safe engine-only cleanup.\n'

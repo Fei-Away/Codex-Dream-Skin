@@ -68,12 +68,14 @@ appimage_approval_path() {
 }
 
 # Pure helper: does apt-cache policy output come from an official OpenAI repo?
-# OpenAI serves the Linux app from either platform.openai.com/codex/debian
-# or persistent.oaistatic.com/codex-app-prod/linux/deb (verified on real installs).
+# OpenAI serves the Linux app from either https://platform.openai.com/codex/
+# or an https://*.oaistatic.com/codex-app-prod/ host (verified on real
+# installs: persistent.oaistatic.com). The origin is anchored to scheme+host
+# so a hostile repo URL cannot smuggle the pattern into its path.
 codex_origin_is_official() {
   local policy_output="${1:-}"
   /usr/bin/printf '%s' "$policy_output" \
-    | /usr/bin/grep -Eq 'platform\.openai\.com/codex|persistent\.oaistatic\.com/codex-app-prod'
+    | /usr/bin/grep -Eq '(^|[[:space:]])https://platform\.openai\.com/codex/|(^|[[:space:]])https://([a-z0-9.-]+\.)?oaistatic\.com/codex-app-prod/'
 }
 
 require_linux_runtime() {
