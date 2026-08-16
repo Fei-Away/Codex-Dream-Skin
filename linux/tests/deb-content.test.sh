@@ -7,6 +7,8 @@ DEB="${1:-}"
 # self-contained (dpkg-deb over ~40 files); with an argument, assert against
 # that prebuilt deb instead (CI can pass its own artifact).
 if [ -z "$DEB" ]; then
+  command -v dpkg-deb >/dev/null 2>&1 && command -v rsync >/dev/null 2>&1 \
+    || { printf 'skip: dpkg-deb/rsync not available; deb content assertions skipped\n' >&2; exit 0; }
   /bin/bash "$ROOT/scripts/build-deb.sh"
   VERSION="$(/usr/bin/tr -d '[:space:]' < "$ROOT/VERSION")"
   DEB="$ROOT/release/codex-dream-skin_${VERSION}_amd64.deb"
@@ -26,10 +28,18 @@ for required in \
   'usr/bin/dreamskin' \
   'usr/share/applications/codex-dream-skin.desktop'; do
   case "$CONTENTS" in
-    *"$required"*) ;;
+    *"./$required"*) ;;
     *) printf 'missing from deb: %s\n' "$required" >&2; exit 1 ;;
   esac
 done
+
+# Type check: usr/bin/dreamskin must be a symlink to the real launcher. The
+# symlink's -> target contains the dreamskin.sh path, so an ln -> cp
+# regression would still satisfy the path checks above.
+case "$CONTENTS" in
+  *"lrwxrwxrwx root/root"*"./usr/bin/dreamskin -> /opt/codex-dream-skin/scripts/dreamskin.sh"*) ;;
+  *) printf 'usr/bin/dreamskin is not a symlink to scripts/dreamskin.sh\n' >&2; exit 1 ;;
+esac
 
 INFO="$(dpkg-deb -f "$DEB" Package Depends Architecture)"
 case "$INFO" in
@@ -37,7 +47,7 @@ case "$INFO" in
   *) printf 'bad package name\n' >&2; exit 1 ;;
 esac
 case "$INFO" in
-  *"nodejs"*) ;;
-  *) printf 'nodejs dependency missing\n' >&2; exit 1 ;;
+  *"nodejs (>= 18.0)"*) ;;
+  *) printf 'nodejs >= 18.0 dependency missing\n' >&2; exit 1 ;;
 esac
 printf 'deb content tests passed\n'

@@ -10,8 +10,9 @@ while IFS= read -r file; do /bin/bash -n "$file"; done < <(
   find "$ROOT" -type f -name '*.sh' ! -path '*/release/*' -print
 )
 # Installer maintenance scripts carry no .sh extension, so the find above
-# misses them; keep them syntax-checked alongside the rest.
-for file in "$ROOT"/installer/postinst "$ROOT"/installer/prerm "$ROOT"/installer/postrm; do
+# misses them; keep them syntax-checked alongside the rest. Extend the glob
+# when new maintainer scripts (e.g. preinst) land.
+for file in "$ROOT"/installer/{postinst,prerm,postrm,preinst}; do
   [ -f "$file" ] || continue
   /bin/bash -n "$file"
 done
