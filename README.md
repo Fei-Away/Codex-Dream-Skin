@@ -53,9 +53,9 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
   `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` 后运行 `./install.sh`（不需要 root），
   然后终端运行 `dreamskin`。
 
-不需要 clone 源码或手动改仓库脚本。首次放行、更新和卸载步骤见
-[macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md) /
-[Linux 安装说明](./docs/install-linux.md)。
+不需要 clone 源码或手动运行仓库脚本。macOS / Windows 的首次未签名放行、更新和卸载步骤见
+[macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md)；
+Linux 的安装、更新与卸载见 [Linux 安装说明](./docs/install-linux.md)。
 
 ## 主题库与社区
 
@@ -159,9 +159,9 @@ macOS 菜单栏、Windows 托盘和 Linux 终端菜单都有「主题库 Gallery
 - **真·可交互**：侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去
 - **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰
 - **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
-- **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
+- **可存主题**：macOS 菜单栏、Windows 系统托盘与 Linux 终端菜单都能保存/切换本地主题
 - **一键换肤**：在 [DreamSkin.cc](https://dreamskin.cc) 上点一下，客户端核对来源与校验和后直接装上
-- **可导入主题包**：两端都可直接选择普通 `.zip`，安全校验后加入本地主题库
+- **可导入主题包**：三端都可直接选择普通 `.zip`，安全校验后加入本地主题库
 - **可恢复**：一键还原官方外观
 - **相对安全**：本机回环 CDP 注入，不改官方二进制与签名
 
@@ -169,9 +169,9 @@ macOS 菜单栏、Windows 托盘和 Linux 终端菜单都有「主题库 Gallery
 
 ### 普通用户：下载安装包
 
-不需要 clone 仓库，也不需要安装 Node.js 或运行 `.sh` / `.ps1`。从
+不需要 clone 仓库。从
 [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载对应平台的最新安装包，
-按平台文档完成一次图形界面安装：
+按平台文档完成安装（macOS / Windows 是图形界面向导；Linux 是终端命令）：
 
 | 平台 | 下载 | 安装说明 |
 |------|------|----------|
@@ -180,8 +180,8 @@ macOS 菜单栏、Windows 托盘和 Linux 终端菜单都有「主题库 Gallery
 | Linux | `codex-dream-skin_<version>_amd64.deb` / `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` | [`docs/install-linux.md`](./docs/install-linux.md) |
 
 安装后从菜单栏（macOS）、系统托盘（Windows）或终端菜单（Linux）使用。更新时下载新安装包
-覆盖安装，主题和图片会保留；未签名的新下载文件在个别系统上仍可能再次出现一次安全提示，
-文档列出了放行方法。
+覆盖安装，主题和图片会保留；macOS / Windows 上未签名的新下载文件在个别系统上仍可能再次
+出现一次安全提示，文档列出了放行方法。
 
 ### 导入下载的主题
 

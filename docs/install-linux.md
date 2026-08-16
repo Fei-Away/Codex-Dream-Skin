@@ -29,9 +29,11 @@ sudo apt install codex-desktop
 
 1. 在 GitHub 的 [Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载最新的
    `codex-dream-skin_<version>_amd64.deb`。`SHA256SUMS.txt` 是可选的完整性校验文件。
-2. 安装：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`。依赖
-   （`bash`、`coreutils`、`curl`、`nodejs`（>= 18）、`xdg-utils`、`iproute2`）由 apt
-   自动解析；若提示依赖缺失，运行 `sudo apt install -f` 补齐。
+2. 安装（推荐，apt 会自动解析依赖）：
+   `sudo apt install ./codex-dream-skin_<version>_amd64.deb`。
+   备选：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`，若提示依赖缺失再运行
+   `sudo apt install -f` 补齐。依赖（`bash`、`coreutils`、`curl`、`nodejs`（>= 18）、
+   `xdg-utils`、`iproute2`）会由包管理器自动安装。
 3. 在终端运行 `dreamskin`，出现交互菜单。
 
 包会安装到 `/opt/codex-dream-skin`，提供 `/usr/bin/dreamskin` 命令，并自动注册
@@ -158,12 +160,17 @@ Dream Skin 优先使用官方 apt 源安装的 Codex：启动前会校验包的�
 
 ## 卸载与恢复
 
-1. 先运行 `dreamskin restore`（菜单 7），恢复 Codex 官方外观并以普通方式重启 Codex。
-2. deb：`sudo dpkg -r codex-dream-skin` 卸载；`sudo dpkg -P codex-dream-skin`（purge）
+1. 若开启过开机自启（菜单 A），先运行 `dreamskin autostart` 关闭它（该命令是开 / 关
+   切换），或手动删除 `~/.config/autostart/codex-dream-skin.desktop`。
+2. 运行 `dreamskin restore`（菜单 7），恢复 Codex 官方外观并以普通方式重启 Codex。
+3. deb：`sudo dpkg -r codex-dream-skin` 卸载；`sudo dpkg -P codex-dream-skin`（purge）
    会一并删除 `/opt/codex-dream-skin`。
-3. tar.gz：删除 `~/.local/share/codex-dream-skin`（引擎）、`~/.local/bin/dreamskin`
-   以及 `~/.local/share/applications/codex-dream-skin.desktop`。
-4. `~/.local/state/codex-dream-skin` 中的主题、图片与状态默认保留，方便重装；确认不再
+4. tar.gz：先运行
+   `xdg-mime uninstall ~/.local/share/applications/codex-dream-skin.desktop`
+   清理 `x-scheme-handler/dreamskin` 协议关联（若存在），再删除
+   `~/.local/share/codex-dream-skin`（引擎）、`~/.local/bin/dreamskin` 以及
+   `~/.local/share/applications/codex-dream-skin.desktop`。
+5. `~/.local/state/codex-dream-skin` 中的主题、图片与状态默认保留，方便重装；确认不再
    需要时手动删除该目录。
 
 ## 常见问题
@@ -171,8 +178,8 @@ Dream Skin 优先使用官方 apt 源安装的 Codex：启动前会校验包的�
 ### 白屏 / 卡在 logo
 
 通常是官方 Codex 应用的本地配置或缓存损坏：先退出 Codex，备份并清空 `~/.config/Codex/`
-（应用缓存目录）；仍不行时备份并重置 `~/.codex`（注意其中含登录凭据 `auth.json`，重置后
-需要重新登录），然后重新运行 `dreamskin`。
+（社区反馈的缓存目录，不存在可跳过）；仍不行时备份并重置 `~/.codex`（注意其中含登录
+凭据 `auth.json`，重置后需要重新登录），然后重新运行 `dreamskin`。
 
 ### Wayland 下界面模糊
 
@@ -207,6 +214,11 @@ deb 会通过依赖自动安装 `nodejs`（>= 18）。tar.gz 用户请自行安�
 
 官方 Codex 升级后重新运行 `dreamskin`（菜单 1）即可；Dream Skin 会在每次启动时重新校验
 官方包来源与完整性。仍异常时先菜单 7 恢复官方外观，再菜单 1 启动。
+
+### 提示「ChatGPT is already running … pass --restart-existing」
+
+先自行打开的 Codex 没有换肤所需的调试端口，菜单 1 会停下来并给出上述提示。先完全退出
+Codex 再按菜单 1；或直接运行 `dreamskin start --restart-existing` 让工具重启 Codex。
 
 开发者和高级用户可直接运行 [`linux/scripts/`](../linux/scripts/) 下的脚本（菜单入口为
 `dreamskin.sh`，安装入口为 `install-dream-skin-linux.sh`）；普通用户应优先使用 Release

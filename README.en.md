@@ -53,10 +53,10 @@ then download from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Ski
   `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` and run `./install.sh` (no root
   needed), then run `dreamskin` in a terminal.
 
-No source checkout is required. See the [macOS guide](./docs/install-macos.md),
-[Windows guide](./docs/install-windows.md), or
-[Linux guide](./docs/install-linux.md) for first-run approval, updates, and
-uninstall steps.
+No source checkout is required. See the [macOS guide](./docs/install-macos.md)
+or [Windows guide](./docs/install-windows.md) for unsigned first-run approval,
+updates, and uninstall steps; the [Linux guide](./docs/install-linux.md) covers
+Linux install, updates, and uninstall.
 
 ## Theme library & community
 
@@ -179,9 +179,9 @@ to use and save it for one-click switching.
 - **Real UI** — Sidebar, cards, project picker, and input stay native. Not a fake full-window screenshot.
 - **Continuous wallpaper** — One 16:9 image spans the full window; adaptive focus, safe-area, and route treatment keep native content readable.
 - **Swappable art** — Drop in a UI-free image you like and it becomes your theme.
-- **Saved themes** — Switch local themes from the macOS menu bar or Windows system tray.
+- **Saved themes** — Switch local themes from the macOS menu bar, Windows system tray, or Linux terminal menu.
 - **One-click apply** — Hit apply on [DreamSkin.cc](https://dreamskin.cc); the client verifies origin and checksum, then installs it.
-- **Theme ZIP import** — Pick an ordinary `.zip` on either platform and add a validated pack to the local library.
+- **Theme ZIP import** — Pick an ordinary `.zip` on any platform and add a validated pack to the local library.
 - **Restorable** — One-click restore to the stock look.
 - **Safer path** — Local-loopback CDP inject only. No official binary or signature changes.
 
@@ -189,10 +189,10 @@ to use and save it for one-click switching.
 
 ### For users: download an installer
 
-You do not need to clone the repository, install Node.js, or run `.sh` / `.ps1`
-files. Download the latest package for your platform from
-[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases), then
-follow the graphical first-run guide:
+You do not need to clone the repository. Download the latest package for your
+platform from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases),
+then follow the platform guide (graphical on macOS / Windows, terminal commands
+on Linux):
 
 | Platform | Download | Install guide |
 |------|------|----------|
@@ -202,9 +202,9 @@ follow the graphical first-run guide:
 
 After installation, use the menu bar (macOS), system tray (Windows), or
 terminal menu (Linux). Updates are manual: download the new package and install
-over the existing one; themes and images are preserved. Because the public
-packages are unsigned, a new download may show a one-time OS security warning;
-the guides explain the safe approval path.
+over the existing one; themes and images are preserved. On macOS / Windows the
+public packages are unsigned, so a new download may show a one-time OS security
+warning; the guides explain the safe approval path.
 
 ### Import a downloaded theme
 
