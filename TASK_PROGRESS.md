@@ -25,7 +25,8 @@
 - [verified] 最终回归：sync --check ✅、linux 套件 ✅、release-workflow ✅、全目录门禁 grep 零匹配、双包构建+内容断言 ✅。分支 48 commits，工作树干净。
 - [complete] 最终代码审查（全分支 49 commits 横切）：Ready to push ✅，零 Critical。4 项 Important 已修（d7df4e2）：install-linux.md 两处过期（惰性播种/--allow-unsigned 实际流程）、linux/presets/README.md 重写为 linux 专属（双包内不再误导）、release/ci guard 版本源 6→9（linux/VERSION + common-linux/injector 的 SKIN_VERSION）、unzip 进 Depends + 文档依赖表。验证：双包重建含新 README、arina=0、九源守卫模拟全部 1.5.14、YAML 解析 OK、套件绿。
 - [complete] 推送 + PR：`git push -u origin feat/linux-support`（51→52 commits）→ PR #1 https://github.com/Only-Funny/Codex-Dream-Skin/pull/1 。CI 首跑暴露 runner 无 /usr/bin/node（setup-node 只装 toolcache）→ build-release-linux.sh 改 PATH 解析（8aff633），linux job 转绿。Task 14 完结。
-- [carry] 遗留 polish（不阻塞）：菜单硬编码中文（未走 localization）、install 终消息 "signed Node.js" 措辞、ci.yml static-checks 未含 linux、xdg-mime uninstall 在 Debian 上不存在、并发首启锁冲突提示。PR 合并后实机验收清单（计划末尾）：装 deb 换肤可见、readlink 符号链接确认、裸命令启动可发现、导入/切换/恢复逐一确认、Ubuntu 24.04 deb 装/卸干净、三端 VERSION 一致、Release 资产可下载。
+- [complete] 实机验收（用户本机 Pop!_OS + 官方 chatgpt deb 26.803.81509，装 deb + dreamskin 菜单/子命令）：换肤端到端成功（Gothic Void 注入可见）。过程中抓到并修掉 4 个真实 bug：(1) 主入口经 /usr/bin/dreamskin 软链调用时 SCRIPT_DIR 算错（readlink -f 修复，eecc23b）；(2) deb 发现选到 /usr/lib/chatgpt 目录而非 ELF（codex_candidate_is_binary 优先 ELF + ChatGPT 名字匹配，f969fc3）；(3) /proc cmdline 竞态报错刷屏（重定向顺序，f969fc3）；(4) codex_main_pids|head -n 1 在多进程匹配时 SIGPIPE 退出 141（first_codex_pid 全量捕获后切片，9bd5723，实测修复后对运行中 Codex 正常 attach 报 active）。一键换肤协议注册已验证（xdg-mime query → codex-dream-skin.desktop）。
+- [carry] 遗留 polish（不阻塞）：菜单硬编码中文（未走 localization）、install 终消息 "signed Node.js" 措辞、ci.yml static-checks 未含 linux、xdg-mime uninstall 在 Debian 上不存在、并发首启锁冲突提示。验收清单剩余项：导入/切换/恢复逐一确认、Ubuntu 24.04 deb 装/卸干净、Release 资产可下载、社区一键换肤冷会话引导（macos/windows 已改进，linux 待跟进）。
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
