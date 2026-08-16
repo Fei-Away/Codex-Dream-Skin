@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+ln -sf /opt/codex-dream-skin/scripts/dreamskin.sh /usr/bin/dreamskin
+update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
+command -v xdg-mime >/dev/null 2>&1 \
+  && xdg-mime default codex-dream-skin.desktop x-scheme-handler/dreamskin >/dev/null 2>&1 || true
+exit 0

@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+command -v xdg-mime >/dev/null 2>&1 \
+  && xdg-mime uninstall /usr/share/applications/codex-dream-skin.desktop >/dev/null 2>&1 || true
+exit 0

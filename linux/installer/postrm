@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+rm -f /usr/bin/dreamskin
+if [ "$1" = "purge" ]; then
+  rm -rf /opt/codex-dream-skin
+fi
+exit 0
