@@ -415,9 +415,49 @@ jobs:
           path: ${{ runner.temp }}/codex-dream-skin-release/CodexDreamSkin-Setup-v${{ needs.guard.outputs.version }}.exe
           retention-days: 14
 
+  build-linux:
+    name: Build Linux packages
+    needs: [guard, create-tag]
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js for Linux regressions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+
+      - name: Build deb and tarball
+        shell: bash
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          ./linux/scripts/build-release-linux.sh
+          deb="linux/release/codex-dream-skin_${VERSION}_amd64.deb"
+          tarball="linux/release/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz"
+          test -s "$deb"
+          test -s "$tarball"
+          dpkg-deb --info "$deb" >/dev/null
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-linux
+          if-no-files-found: error
+          path: |
+            linux/release/codex-dream-skin_${{ needs.guard.outputs.version }}_amd64.deb
+            linux/release/CodexDreamSkin-v${{ needs.guard.outputs.version }}-linux-amd64.tar.gz
+          retention-days: 14
+
   publish-release:
     name: Validate and publish GitHub Release
-    needs: [guard, create-tag, build-macos, build-windows]
+    needs: [guard, create-tag, build-macos, build-windows, build-linux]
     if: needs.guard.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -445,10 +485,14 @@ jobs:
           set -euo pipefail
           test -s "dist/CodexDreamSkin-v${VERSION}.dmg"
           test -s "dist/CodexDreamSkin-Setup-v${VERSION}.exe"
+          test -s "dist/codex-dream-skin_${VERSION}_amd64.deb"
+          test -s "dist/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz"
           (
             cd dist
             sha256sum "CodexDreamSkin-v${VERSION}.dmg" \
-              "CodexDreamSkin-Setup-v${VERSION}.exe" > SHA256SUMS.txt
+              "CodexDreamSkin-Setup-v${VERSION}.exe" \
+              "codex-dream-skin_${VERSION}_amd64.deb" \
+              "CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz" > SHA256SUMS.txt
           )
           cat > release-notes.md <<EOF
           ## Codex Dream Skin v${VERSION}
@@ -457,6 +501,7 @@ jobs:
 
           - **macOS:** [CodexDreamSkin-v${VERSION}.dmg](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg)
           - **Windows:** [CodexDreamSkin-Setup-v${VERSION}.exe](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe)
+          - **Linux:** [codex-dream-skin_${VERSION}_amd64.deb](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/codex-dream-skin_${VERSION}_amd64.deb), [CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz)
           - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
 
           The packages are currently unsigned. Follow the graphical first-run steps in
@@ -489,6 +534,8 @@ jobs:
             gh release upload "$TAG" --clobber \
               dist/CodexDreamSkin-v${VERSION}.dmg \
               dist/CodexDreamSkin-Setup-v${VERSION}.exe \
+              dist/codex-dream-skin_${VERSION}_amd64.deb \
+              dist/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz \
               dist/SHA256SUMS.txt
             gh release edit "$TAG" --draft \
               --title "Codex Dream Skin v${VERSION}" \
@@ -501,6 +548,8 @@ jobs:
               --notes-file release-notes.md \
               dist/CodexDreamSkin-v${VERSION}.dmg \
               dist/CodexDreamSkin-Setup-v${VERSION}.exe \
+              dist/codex-dream-skin_${VERSION}_amd64.deb \
+              dist/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz \
               dist/SHA256SUMS.txt
           fi
 
@@ -515,6 +564,8 @@ jobs:
           const expected = [
             "CodexDreamSkin-v" + process.env.VERSION + ".dmg",
             "CodexDreamSkin-Setup-v" + process.env.VERSION + ".exe",
+            "codex-dream-skin_" + process.env.VERSION + "_amd64.deb",
+            "CodexDreamSkin-v" + process.env.VERSION + "-linux-amd64.tar.gz",
             "SHA256SUMS.txt",
           ];
           if (release.assets.length !== expected.length || !expected.every((name) => release.assets.some((asset) => asset.name === name))) {
@@ -535,6 +586,8 @@ jobs:
           const expected = [
             "CodexDreamSkin-v" + process.env.VERSION + ".dmg",
             "CodexDreamSkin-Setup-v" + process.env.VERSION + ".exe",
+            "codex-dream-skin_" + process.env.VERSION + "_amd64.deb",
+            "CodexDreamSkin-v" + process.env.VERSION + "-linux-amd64.tar.gz",
             "SHA256SUMS.txt",
           ];
           if (release.isDraft || release.isPrerelease || release.tagName !== "v" + process.env.VERSION ||
