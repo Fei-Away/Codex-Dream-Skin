@@ -501,7 +501,7 @@ jobs:
 
           - **macOS:** [CodexDreamSkin-v${VERSION}.dmg](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg)
           - **Windows:** [CodexDreamSkin-Setup-v${VERSION}.exe](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe)
-          - **Linux:** [codex-dream-skin_${VERSION}_amd64.deb](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/codex-dream-skin_${VERSION}_amd64.deb), [CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz)
+          - **Linux:** [codex-dream-skin_${VERSION}_amd64.deb](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/codex-dream-skin_${VERSION}_amd64.deb), [CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz) — see [Linux installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-linux.md)
           - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
 
           The packages are currently unsigned. Follow the graphical first-run steps in

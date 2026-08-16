@@ -49,9 +49,13 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
 
 - macOS：打开 `CodexDreamSkin-vX.Y.Z.dmg`，把 App 拖进 Applications。
 - Windows：双击 `CodexDreamSkin-Setup-vX.Y.Z.exe`，按安装向导完成。
+- Linux：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`，或解压
+  `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` 后运行 `./install.sh`（不需要 root），
+  然后终端运行 `dreamskin`。
 
-不需要 clone 源码、安装 Node.js 或手动运行 `.sh` / `.ps1`。首次未签名放行、更新和卸载步骤见
-[macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md)。
+不需要 clone 源码或手动改仓库脚本。首次放行、更新和卸载步骤见
+[macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md) /
+[Linux 安装说明](./docs/install-linux.md)。
 
 ## 主题库与社区
 
@@ -97,7 +101,7 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
   <sub>在线 Studio · 换一张喜欢的背景图，调好焦点与配色，就是你自己的主题</sub>
 </p>
 
-macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studio」入口，可以直接打开。
+macOS 菜单栏、Windows 托盘和 Linux 终端菜单都有「主题库 Gallery」和「在线 Studio」入口，可以直接打开。
 
 ### 一键换肤
 
@@ -173,9 +177,11 @@ macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studi
 |------|------|----------|
 | macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
 | Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
+| Linux | `codex-dream-skin_<version>_amd64.deb` / `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` | [`docs/install-linux.md`](./docs/install-linux.md) |
 
-安装后从菜单栏（macOS）或系统托盘（Windows）使用。更新时下载新安装包覆盖安装，主题和图片会保留；
-未签名的新下载文件在个别系统上仍可能再次出现一次安全提示，文档列出了放行方法。
+安装后从菜单栏（macOS）、系统托盘（Windows）或终端菜单（Linux）使用。更新时下载新安装包
+覆盖安装，主题和图片会保留；未签名的新下载文件在个别系统上仍可能再次出现一次安全提示，
+文档列出了放行方法。
 
 ### 导入下载的主题
 
@@ -199,6 +205,7 @@ macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studi
 
 - macOS：`~/Library/Application Support/CodexDreamSkinStudio/themes/`
 - Windows：`%LOCALAPPDATA%\CodexDreamSkin\themes\`
+- Linux：`~/.local/state/codex-dream-skin/themes/`
 
 菜单里有“打开主题文件夹”快捷入口。移动后重新打开菜单/托盘即可；不要再套一层目录，也不要放链接、
 嵌套压缩包或缺少三件套的文件夹。手动目录不会经过 ZIP 导入器的归档校验，请只使用可信内容。升级前
@@ -212,11 +219,13 @@ macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studi
 |------|------|------|
 | Apple Silicon / Intel Mac | [`macos/`](./macos/) | 双击 `Install Codex Dream Skin.command` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
+| Linux | [`linux/`](./linux/) | `scripts/install-dream-skin-linux.sh` → `scripts/dreamskin.sh` |
 
 更细的说明：
 
 - Mac：[`macos/README.md`](./macos/README.md)
 - Windows：[`windows/README.md`](./windows/README.md)
+- Linux：[`docs/install-linux.md`](./docs/install-linux.md)
 - 路径对照：[`docs/platforms.md`](./docs/platforms.md)
 - 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
 - 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)

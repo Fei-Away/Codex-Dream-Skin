@@ -49,11 +49,14 @@ then download from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Ski
 
 - macOS: open `CodexDreamSkin-vX.Y.Z.dmg` and drag the app to Applications.
 - Windows: run `CodexDreamSkin-Setup-vX.Y.Z.exe` and follow the wizard.
+- Linux: run `sudo dpkg -i codex-dream-skin_<version>_amd64.deb`, or extract
+  `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` and run `./install.sh` (no root
+  needed), then run `dreamskin` in a terminal.
 
-No source checkout, Node.js install, `.sh`, or `.ps1` command is required. See
-the [macOS guide](./docs/install-macos.md) or
-[Windows guide](./docs/install-windows.md) for unsigned first-run approval,
-updates, and uninstall steps.
+No source checkout is required. See the [macOS guide](./docs/install-macos.md),
+[Windows guide](./docs/install-windows.md), or
+[Linux guide](./docs/install-linux.md) for first-run approval, updates, and
+uninstall steps.
 
 ## Theme library & community
 
@@ -101,8 +104,8 @@ updates, and uninstall steps.
   <sub>Online Studio · swap in a background you like, dial in the focal point and palette — now it's your theme</sub>
 </p>
 
-The macOS menu bar and Windows tray both link straight to **Gallery** and
-**Online Studio**.
+The macOS menu bar, Windows tray, and Linux terminal menu all link straight to
+**Gallery** and **Online Studio**.
 
 ### One-click apply
 
@@ -195,12 +198,13 @@ follow the graphical first-run guide:
 |------|------|----------|
 | macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
 | Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
+| Linux | `codex-dream-skin_<version>_amd64.deb` / `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` | [`docs/install-linux.md`](./docs/install-linux.md) |
 
-After installation, use the menu bar (macOS) or system tray (Windows). Updates
-are manual: download the new package and install over the existing one; themes
-and images are preserved. Because the public packages are unsigned, a new
-download may show a one-time OS security warning; the guides explain the safe
-GUI approval path.
+After installation, use the menu bar (macOS), system tray (Windows), or
+terminal menu (Linux). Updates are manual: download the new package and install
+over the existing one; themes and images are preserved. Because the public
+packages are unsigned, a new download may show a one-time OS security warning;
+the guides explain the safe approval path.
 
 ### Import a downloaded theme
 
@@ -235,6 +239,7 @@ containing `theme.json`, `theme.css`, and its image into the saved-theme folder:
 
 - macOS: `~/Library/Application Support/CodexDreamSkinStudio/themes/`
 - Windows: `%LOCALAPPDATA%\CodexDreamSkin\themes\`
+- Linux: `~/.local/state/codex-dream-skin/themes/`
 
 Both controls include **Open Themes Folder**. Reopen the menu/tray after moving
 the directory. Do not add another wrapper level, links, nested archives, or an
@@ -249,11 +254,13 @@ Platform scripts are ready — different plumbing, same goal: theme Codex.
 |------|------|------|
 | Apple Silicon / Intel Mac | [`macos/`](./macos/) | Double-click `Install Codex Dream Skin.command` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
+| Linux | [`linux/`](./linux/) | `scripts/install-dream-skin-linux.sh` → `scripts/dreamskin.sh` |
 
 More detail:
 
 - Mac: [`macos/README.md`](./macos/README.md)
 - Windows: [`windows/README.md`](./windows/README.en.md)
+- Linux: [`docs/install-linux.md`](./docs/install-linux.md)
 - Paths: [`docs/platforms.md`](./docs/platforms.md)
 - Copy-ready reference prompt guide: [`docs/reference-background-prompt-guide.en.md`](./docs/reference-background-prompt-guide.en.md)
 - Eight concept prompt breakdowns: [`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
