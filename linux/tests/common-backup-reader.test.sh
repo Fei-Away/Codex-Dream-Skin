@@ -67,4 +67,17 @@ expect_absent malformed-missing-value
 /bin/rm -f "$THEME_BACKUP_PATH"
 expect_absent missing-backup-file
 
+# first_codex_pid must survive multi-match scans: an early-exit `head -n 1`
+# consumer SIGPIPEs the producer under pipefail (exit 141) once a second
+# process matches. Real-machine regression: dreamskin start died with
+# exit=141 because the ChatGPT process group matches several times.
+codex_main_pids() { /usr/bin/printf '111\n222\n333\n'; }
+[ "$(first_codex_pid)" = "111" ]
+codex_main_pids() { /usr/bin/printf '111\n'; }
+[ "$(first_codex_pid)" = "111" ]
+codex_main_pids() { :; }
+[ -z "$(first_codex_pid)" ]
+# The real function is restored by re-sourcing at the next test run; the
+# stub above only lives in this process.
+
 printf 'PASS: common backup reader distinguishes recorded, null, and missing config values.\n'

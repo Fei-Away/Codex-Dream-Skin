@@ -168,7 +168,7 @@ fi
 /bin/kill -0 "$INJECTOR_PID" 2>/dev/null || fail "The injector exited during startup. See $INJECTOR_ERROR_LOG"
 INJECTOR_STARTED_AT="$(process_started_at "$INJECTOR_PID")"
 [ -n "$INJECTOR_STARTED_AT" ] || fail "Could not record the injector process start time."
-CODEX_PID="$(codex_main_pids | /usr/bin/head -n 1)"
+CODEX_PID="$(first_codex_pid)"
 write_state "$PORT" "$INJECTOR_PID" "$INJECTOR_STARTED_AT" "$CODEX_PID"
 
 # Commit active only after the renderer, exact theme, and payload revision verify.

@@ -309,6 +309,17 @@ codex_is_running() {
   [ -n "$(codex_main_pids)" ]
 }
 
+# First Codex main PID without an early-exit pipeline: `head -n 1` closes the
+# pipe after one line, which SIGPIPEs the producer under `set -o pipefail`
+# (exit 141) whenever more than one process matches the identity check.
+# Capture the full list, then slice the first line.
+first_codex_pid() {
+  local pids=""
+  pids="$(codex_main_pids 2>/dev/null || true)"
+  [ -n "$pids" ] || return 0
+  printf '%s\n' "${pids%%$'\n'*}"
+}
+
 active_theme_appearance() {
   "$NODE" -e '
 const fs = require("node:fs");
@@ -753,7 +764,7 @@ hot_reapply_theme() {
   inj_pid="$(launch_injector_daemon "$port")"
   /bin/kill -0 "$inj_pid" 2>/dev/null || return 1
   started_at="$(process_started_at "$inj_pid")"
-  codex_pid="$(codex_main_pids 2>/dev/null | /usr/bin/head -n 1)"
+  codex_pid="$(first_codex_pid)"
   [ -n "$started_at" ] || started_at="$(/bin/date)"
   write_state "$port" "$inj_pid" "$started_at" "${codex_pid:-0}" active
   write_operation_state success "$(dreamskin_text skin_applied)" "$operation_token" || return 1
