@@ -30,7 +30,7 @@ deploy_project() {
     --exclude 'release/' \
     --exclude 'runtime/' \
     "$PROJECT_ROOT/" "$temporary/"
-  /bin/chmod 700 "$temporary"/*.command "$temporary"/scripts/*.sh 2>/dev/null || true
+  /bin/chmod 700 "$temporary"/scripts/*.sh 2>/dev/null || true
   /bin/rm -rf "$previous"
   if [ -e "$INSTALL_ROOT" ]; then /bin/mv "$INSTALL_ROOT" "$previous"; fi
   if ! /bin/mv "$temporary" "$INSTALL_ROOT"; then
