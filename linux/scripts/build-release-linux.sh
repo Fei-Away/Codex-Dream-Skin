@@ -8,12 +8,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 LINUX_ROOT="$ROOT/linux"
 
+# CI runners get node from setup-node's toolcache (PATH only, no /usr/bin/node);
+# user machines get it from the nodejs package. Resolve either way.
+NODE="${NODE:-$(command -v node || true)}"
+[ -n "$NODE" ] || { printf 'node is required to build Linux releases.\n' >&2; exit 1; }
+
 # The gate fires before any regeneration so an out-of-date platform copy
 # aborts the build instead of being silently rewritten.
-/usr/bin/node "$ROOT/tools/sync-runtime-assets.mjs" --check \
+"$NODE" "$ROOT/tools/sync-runtime-assets.mjs" --check \
   || { printf 'Shared runtime assets are out of date; run sync and commit the regeneration.\n' >&2; exit 1; }
 
-/usr/bin/node "$ROOT/tools/sync-runtime-assets.mjs"
+"$NODE" "$ROOT/tools/sync-runtime-assets.mjs"
 
 /bin/bash "$LINUX_ROOT/tests/run-tests.sh"
 
