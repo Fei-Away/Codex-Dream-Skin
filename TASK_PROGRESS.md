@@ -21,6 +21,9 @@
 - [complete] Task 13: docs/install-linux.md（213 行，单中文文件——仓库实际无双语 .en 惯例，README.en 也链中文文档）+ platforms.md 能力矩阵/路径表 + README 双语安装段 + release.yml 文档链接。文档实施者按真实脚本核实并修了计划的多处错误：autostart 是无参切换（非 on|off）、--renderer 只收空格分隔（= 形式会报 Unknown argument）、electron-flags.conf 真实路径与语法（Wayland 自动加 --enable-wayland-ime、NVIDIA 自动强制 x11）。提交 6c979d3。
 - [carry→Task 14] 文档任务暴露 3 个产品级缺口（已核实，Task 14 必修再推送）：(1) `--allow-unsigned` 未接线——linux-launch.sh 的 record_appimage_approval/verify_appimage_approval 完整存在但 start 脚本不认这个参数，AppImage/binary 用户被硬阻断（fail 文案还叫用户用它）；(2) deb 首跑无预设主题——postinst 不 seed（tar.gz 的 install.sh 走 seed_bundled_presets），新装 deb 菜单 1 会因缺 theme.json 失败；(3) linux 包携带 presets/arina-hashimoto 而 macos/windows 公开安装器排除了它——需核对 macos 排除原因并镜像到 build-deb/build-tarball 的 rsync。
 - [next] Task 14（全量回归 + 上述 3 缺口修复 + 门禁 + 推送 + PR）。
+- [complete] Task 14 缺口修复：--allow-unsigned 接线（start 解析 + appimage|binary 门控 + record/verify 同 sha 派生防 TOCTOU，实测假 AppImage 闭环）；ensure_first_run_theme 惰性播种（common-linux.sh，幂等/custom-* 保护/--no-apply，deb 首跑对齐 macos 安装即送预设）；arina-hashimoto 双包排除（rsync + 构建后校验，镜像 macos 发布策略；install 脚本与 macos 一致不排除）；README 安装命令对齐 apt 形式。spec+质量双审查 APPROVED（并发首启 fail-closed 终态确定；小项 polish 留后续）。提交 9f2999c + 030a296。
+- [verified] 最终回归：sync --check ✅、linux 套件 ✅、release-workflow ✅、全目录门禁 grep 零匹配、双包构建+内容断言 ✅。分支 48 commits，工作树干净。
+- [next] 最终代码审查（全分支）→ 推送 → PR。
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
