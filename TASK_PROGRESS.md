@@ -23,7 +23,8 @@
 - [next] Task 14（全量回归 + 上述 3 缺口修复 + 门禁 + 推送 + PR）。
 - [complete] Task 14 缺口修复：--allow-unsigned 接线（start 解析 + appimage|binary 门控 + record/verify 同 sha 派生防 TOCTOU，实测假 AppImage 闭环）；ensure_first_run_theme 惰性播种（common-linux.sh，幂等/custom-* 保护/--no-apply，deb 首跑对齐 macos 安装即送预设）；arina-hashimoto 双包排除（rsync + 构建后校验，镜像 macos 发布策略；install 脚本与 macos 一致不排除）；README 安装命令对齐 apt 形式。spec+质量双审查 APPROVED（并发首启 fail-closed 终态确定；小项 polish 留后续）。提交 9f2999c + 030a296。
 - [verified] 最终回归：sync --check ✅、linux 套件 ✅、release-workflow ✅、全目录门禁 grep 零匹配、双包构建+内容断言 ✅。分支 48 commits，工作树干净。
-- [next] 最终代码审查（全分支）→ 推送 → PR。
+- [complete] 最终代码审查（全分支 49 commits 横切）：Ready to push ✅，零 Critical。4 项 Important 已修（d7df4e2）：install-linux.md 两处过期（惰性播种/--allow-unsigned 实际流程）、linux/presets/README.md 重写为 linux 专属（双包内不再误导）、release/ci guard 版本源 6→9（linux/VERSION + common-linux/injector 的 SKIN_VERSION）、unzip 进 Depends + 文档依赖表。验证：双包重建含新 README、arina=0、九源守卫模拟全部 1.5.14、YAML 解析 OK、套件绿。
+- [next] 推送 + PR（待用户确认）。遗留 polish（不阻塞）：菜单硬编码中文（未走 localization）、install 终消息 "signed Node.js" 措辞、ci.yml static-checks 未含 linux、xdg-mime uninstall 在 Debian 上不存在、并发首启锁冲突提示。PR 合并后实机验收清单（计划末尾）。
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
