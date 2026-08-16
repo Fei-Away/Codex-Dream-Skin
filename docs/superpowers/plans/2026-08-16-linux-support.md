@@ -1337,7 +1337,7 @@ test("community metadata validation", () => {
   };
   assert.deepEqual(validateCommunityMetadata(base, "ver_abc12345"), base);
   assert.throws(() => validateCommunityMetadata({ ...base, id: "ver_other1" }, "ver_abc12345"));
-  assert.throws(() => validateCommunityMetadata({ ...base, name: "x y" }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, name: "xy" }, "ver_abc12345"));
   assert.throws(() => validateCommunityMetadata({ ...base, name: "x‮y" }, "ver_abc12345"));
   assert.throws(() => validateCommunityMetadata({ ...base, packageSha256: "zz" }, "ver_abc12345"));
   assert.throws(() => validateCommunityMetadata({ ...base, packageBytes: 0 }, "ver_abc12345"));
