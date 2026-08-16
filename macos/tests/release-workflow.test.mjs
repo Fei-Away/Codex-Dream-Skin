@@ -29,4 +29,10 @@ assert.doesNotMatch(
   "The release candidate must not be rebound to a later origin/main tip.",
 );
 
+// Cross-platform version parity: the Linux packages published by release.yml
+// must carry the same version as the macOS payload.
+const macosVersion = (await fs.readFile(path.resolve(here, "../VERSION"), "utf8")).trim();
+const linuxVersion = (await fs.readFile(path.resolve(here, "../../linux/VERSION"), "utf8")).trim();
+assert.equal(linuxVersion, macosVersion, "linux/VERSION must match macos/VERSION");
+
 console.log("PASS: Release workflow binds assets and tag to the exact event commit.");

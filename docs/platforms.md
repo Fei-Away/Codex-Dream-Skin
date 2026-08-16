@@ -35,23 +35,40 @@
 
 Windows 普通启动、失败回滚与恢复重开均从已注册的 `OpenAI.Codex` 包清单解析 AppUserModelId，并通过系统应用包激活接口完成。若新版 owl runtime 明确把 CDP 参数转换成 `codex://` 路径，调试启动会对同一个已验证 Store 包内的精确 `app\ChatGPT.exe` 做一次原始参数回退；ACL 拒绝或参数保留后仍无可信监听都会停止并回滚，不修改或接管 WindowsApps 权限。Issue #235 已在 `26.715.10079.0` 与 `26.721.3404.0` 分别实机确认这两种失败，因此该回退只作安全诊断，不代表受影响 owl 版本已恢复兼容。
 
+### Linux
+
+| 用途 | 路径 |
+|------|------|
+| 源码（本整理包） | `Codex-Dream-Skin/linux/` |
+| 安装后引擎 | deb：`/opt/codex-dream-skin`；tar.gz：`~/.local/share/codex-dream-skin` |
+| 状态 / 日志 | `~/.local/state/codex-dream-skin`（themes/、images/、injector.log 等） |
+| Codex 配置 | `~/.codex/config.toml`（仅外观相关项可能被改，可恢复） |
+| 默认 CDP 端口 | 首选 `9335`，冲突时自动选空闲口 |
+| Electron 参数覆盖 | `~/.local/state/codex-dream-skin/electron-flags.conf`（每行一个参数） |
+
+Linux 由 `dreamskin.sh`（交互菜单）直接启动已发现的官方 Codex 可执行文件；渲染参数按会话
+类型自动装配（Wayland 附加 `--enable-wayland-ime`，检测到 NVIDIA 驱动时强制 X11）。deb 安装
+的 Codex 在每次启动前校验 apt 源溯源（`platform.openai.com/codex` / `*.oaistatic.com/codex-app-prod`）
+与 `dpkg -V` 包完整性；AppImage / PATH 二进制安装需要一次性确认（见 `docs/install-linux.md`）。
+安装来源不是官方仓库的 Codex 会被拒绝换肤。
+
 ## 能力矩阵
 
-| 功能 | macOS | Windows |
-|------|:-----:|:-------:|
-| 普通用户安装包 | ✅ DMG | ✅ Setup.exe |
-| 原生控制入口 | ✅ 菜单栏 App | ✅ 系统托盘 |
-| 安装脚本 | ✅ | ✅ |
-| 启动 + 注入 | ✅ | ✅ |
-| 一键恢复 | ✅ | ✅ |
-| 实机 verify / 截图 | ✅ | ✅ |
-| 用户选图定制 | ✅ | ✅（系统托盘「更换背景图」） |
-| 本地主题保存 / 切换 | ✅（菜单栏） | ✅（系统托盘） |
-| 普通 `.zip` 主题导入 | ✅（菜单栏） | ✅（系统托盘） |
-| Gallery / 在线 Studio 入口 | ✅（菜单栏） | ✅（系统托盘） |
-| 官方签名校验 | ✅ | Store 签名类型 + 包身份 |
-| 客户部署提示词 | ✅ | ❌（可用 Mac 文案改写） |
-| 旧版离线 ZIP | ✅ `build-client-release.sh` | 不再建议手动压缩源码 |
+| 功能 | macOS | Windows | Linux |
+|------|:-----:|:-------:|:-----:|
+| 普通用户安装包 | ✅ DMG | ✅ Setup.exe | ✅ `.deb` + `tar.gz` |
+| 原生控制入口 | ✅ 菜单栏 App | ✅ 系统托盘 | ✅ 终端菜单（`dreamskin`） |
+| 安装脚本 | ✅ | ✅ | ✅ |
+| 启动 + 注入 | ✅ | ✅ | ✅ |
+| 一键恢复 | ✅ | ✅ | ✅ |
+| 实机 verify / 截图 | ✅ | ✅ | ⚠️ 冒烟验证（发现 / 验签 / 状态），无整窗截图 |
+| 用户选图定制 | ✅ | ✅（系统托盘「更换背景图」） | ✅（菜单「更换背景图」） |
+| 本地主题保存 / 切换 | ✅（菜单栏） | ✅（系统托盘） | ✅（菜单） |
+| 普通 `.zip` 主题导入 | ✅（菜单栏） | ✅（系统托盘） | ✅（菜单） |
+| Gallery / 在线 Studio 入口 | ✅（菜单栏） | ✅（系统托盘） | ✅（菜单 8 / 9） |
+| 官方签名校验 | ✅ | Store 签名类型 + 包身份 | ✅ apt 源溯源 + `dpkg -V` |
+| 客户部署提示词 | ✅ | ❌（可用 Mac 文案改写） | ❌（可用 Mac 文案改写） |
+| 旧版离线 ZIP | ✅ `build-client-release.sh` | 不再建议手动压缩源码 | 不再建议（由 deb + tar.gz 取代） |
 
 ## 自适应图像主题契约
 

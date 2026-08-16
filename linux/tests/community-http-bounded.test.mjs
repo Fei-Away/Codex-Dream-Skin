@@ -1,0 +1,92 @@
+import assert from "node:assert/strict";
+import http from "node:http";
+import process from "node:process";
+import test from "node:test";
+import { boundedFetchBuffer, parseCommunityLink, validateCommunityMetadata } from "../scripts/community-http.mjs";
+
+const server = http.createServer((request, response) => {
+  switch (request.url) {
+    case "/ok":
+      response.writeHead(200, { "Content-Type": "application/octet-stream" });
+      response.end("ok");
+      break;
+    case "/redirect":
+      response.writeHead(302, { Location: "/ok" });
+      response.end();
+      break;
+    case "/oversize-header":
+      response.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": "33" });
+      response.end("0".repeat(33));
+      break;
+    case "/oversize-body":
+      response.writeHead(200, { "Content-Type": "application/octet-stream" });
+      response.end("x".repeat(64));
+      break;
+    case "/not-found":
+      response.writeHead(404);
+      response.end();
+      break;
+    default:
+      response.writeHead(500);
+      response.end();
+  }
+});
+
+test("bounded fetch contract", async (t) => {
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => server.close());
+
+  assert.deepEqual(await boundedFetchBuffer(`${base}/ok`, { maximumBytes: 32 }), Buffer.from("ok"));
+  await assert.rejects(boundedFetchBuffer(`${base}/redirect`, { maximumBytes: 32 }));
+  await assert.rejects(boundedFetchBuffer(`${base}/oversize-header`, { maximumBytes: 32 }));
+  await assert.rejects(boundedFetchBuffer(`${base}/oversize-body`, { maximumBytes: 32 }));
+  await assert.rejects(boundedFetchBuffer(`${base}/not-found`, { maximumBytes: 32 }));
+});
+
+test("community link parsing", () => {
+  assert.equal(parseCommunityLink("dreamskin://apply?version=ver_abc12345"), "ver_abc12345");
+  assert.equal(parseCommunityLink("dreamskin://apply?version=ver_ABC&x=1"), null);
+  assert.equal(parseCommunityLink("https://dreamskin.cc/apply?version=ver_abc12345"), null);
+  assert.equal(parseCommunityLink("dreamskin://apply?version=ver_"), null);
+});
+
+test("community metadata validation", () => {
+  const base = {
+    id: "ver_abc12345", themeId: "t-1", name: "N", version: "1.0.0",
+    authorDisplayName: "A", license: "MIT",
+    packageSha256: "a".repeat(64), packageBytes: 10, applyCompatible: true,
+  };
+  assert.deepEqual(validateCommunityMetadata(base, "ver_abc12345"), base);
+  assert.throws(() => validateCommunityMetadata({ ...base, id: "ver_other1" }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, name: "x\u0000y" }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, name: "x‮y" }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, packageSha256: "zz" }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, packageBytes: 0 }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, packageBytes: 33 * 1024 * 1024 }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, applyCompatible: false }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, version: "not-semver" }, "ver_abc12345"));
+});
+
+test("community metadata cap boundaries", () => {
+  const base = {
+    id: "ver_abc12345", themeId: "t-1", name: "N", version: "1.0.0",
+    authorDisplayName: "A", license: "MIT",
+    packageSha256: "a".repeat(64), packageBytes: 10, applyCompatible: true,
+  };
+  // Safe text caps: exactly at the limit passes, one over throws.
+  assert.deepEqual(
+    validateCommunityMetadata({ ...base, name: "N".repeat(120) }, "ver_abc12345").name,
+    "N".repeat(120),
+  );
+  assert.throws(() => validateCommunityMetadata({ ...base, name: "N".repeat(121) }, "ver_abc12345"));
+  // Semver length: 32 chars pass, 33 throw.
+  const version32 = `1.0.${"0".repeat(28)}`;
+  assert.deepEqual(validateCommunityMetadata({ ...base, version: version32 }, "ver_abc12345").version, version32);
+  assert.throws(() => validateCommunityMetadata({ ...base, version: `1.0.${"0".repeat(29)}` }, "ver_abc12345"));
+  // Non-integer byte counts throw.
+  assert.throws(() => validateCommunityMetadata({ ...base, packageBytes: 1.5 }, "ver_abc12345"));
+  // Control characters in authorDisplayName / license throw.
+  assert.throws(() => validateCommunityMetadata({ ...base, authorDisplayName: "A\u0001B" }, "ver_abc12345"));
+  assert.throws(() => validateCommunityMetadata({ ...base, license: "L\u0002I" }, "ver_abc12345"));
+});

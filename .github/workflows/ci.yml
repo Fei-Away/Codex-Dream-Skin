@@ -113,16 +113,22 @@ jobs:
         run: |
           expected="$(tr -d '\r\n' < macos/VERSION)"
           windows_version="$(tr -d '\r\n' < windows/VERSION)"
+          linux_version="$(tr -d '\r\n' < linux/VERSION)"
           package_version="$(node -p "JSON.parse(require('fs').readFileSync('macos/package.json','utf8')).version")"
           common="$(sed -n 's/^SKIN_VERSION="\([^"]*\)"$/\1/p' macos/scripts/common-macos.sh)"
           macos_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' macos/scripts/injector.mjs)"
           windows_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' windows/scripts/injector.mjs)"
+          linux_common="$(sed -n 's/^SKIN_VERSION="\([^"]*\)"$/\1/p' linux/scripts/common-linux.sh)"
+          linux_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' linux/scripts/injector.mjs)"
           test -n "$expected"
           test "$windows_version" = "$expected"
+          test "$linux_version" = "$expected"
           test "$package_version" = "$expected"
           test "$common" = "$expected"
           test "$macos_injector" = "$expected"
           test "$windows_injector" = "$expected"
+          test "$linux_common" = "$expected"
+          test "$linux_injector" = "$expected"
 
       - name: Run portable Node.js regressions
         shell: bash
@@ -219,3 +225,31 @@ jobs:
           name: CodexDreamSkin-dmg
           path: macos/release/*.dmg
           retention-days: 7
+
+  linux-tests:
+    name: Linux repository regressions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      - name: Sync check
+        shell: bash
+        run: node tools/sync-runtime-assets.mjs --check
+
+      - name: Linux tests
+        shell: bash
+        run: bash linux/tests/run-tests.sh
+
+      - name: Linux release build
+        shell: bash
+        run: bash linux/scripts/build-release-linux.sh
+
+      - name: Upload linux artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-packages
+          path: linux/release/*
+          if-no-files-found: error

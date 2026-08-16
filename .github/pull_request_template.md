@@ -26,6 +26,7 @@ Security: loopback CDP only — do not patch official .app / asar / WindowsApps;
 
 - [ ] macOS
 - [ ] Windows
+- [ ] Linux
 - [ ] Both / 双平台
 - [ ] Docs / repo only / 仅文档或仓库元数据
 
@@ -49,6 +50,13 @@ Check what you actually ran. Skip items that do not apply and say so under Notes
 
 - [ ] Relevant `install` / `start` / `verify` / `restore` scripts exercised / 已按改动跑过对应脚本
 - [ ] Environment noted below (OS build, Codex source) / 下方注明环境
+
+### Linux (when code under `linux/` changes)
+
+- [ ] `bash linux/tests/run-tests.sh` passed / 已通过
+- [ ] `node tools/sync-runtime-assets.mjs --check` passed / 已通过
+- [ ] `bash linux/scripts/build-release-linux.sh` passed (if packaging changed) / 若改了打包则已通过
+- [ ] Environment noted below (distro, Codex source) / 下方注明环境（发行版、Codex 来源）
 
 ### User-facing / 用户可见变更
 
