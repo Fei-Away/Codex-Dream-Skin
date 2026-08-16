@@ -96,10 +96,14 @@ case "$ext" in
     ;;
   *)
     # macOS resamples with `sips -Z 2400 -s formatOptions 82`; this ffmpeg
-    # equivalent keeps the largest side at or below 2400 px without upscaling
-    # and encodes JPEG in the same high-quality band.
+    # equivalent caps every orientation at 2400 px (square images included)
+    # without upscaling smaller sources and encodes JPEG in the same
+    # high-quality band. The min() caps make force_original_aspect_ratio
+    # decrease-only instead of filling a 2400x2400 box upward.
+    [ -x /usr/bin/ffmpeg ] \
+      || fail "ffmpeg is required to load custom images. Install it with: sudo apt install ffmpeg"
     /usr/bin/ffmpeg -y -loglevel error -i "$IMAGE" \
-      -vf "scale='if(gt(iw,ih),min(2400,iw),-2)':'if(gt(ih,iw),min(2400,ih),-2)'" \
+      -vf "scale='min(2400,iw)':'min(2400,ih)':force_original_aspect_ratio=decrease" \
       -q:v 3 "$temporary" >/dev/null \
       || fail "Could not convert image. Use PNG/JPEG/HEIC/TIFF/WebP."
     [ -s "$temporary" ] || fail "Converted image is empty."

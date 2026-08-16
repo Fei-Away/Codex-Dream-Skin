@@ -103,6 +103,9 @@ function parseArguments(argv) {
   for (const key of ["source", "stage", "platform", "client-version"]) {
     if (!values[key]) fail(`Missing --${key}`);
   }
+  // PATCHED AFTER sync-runtime-assets: linux added here and in the manifest
+  // platforms set. Keep in sync with runtime/theme-package-validator.mjs
+  // until the runtime source accepts linux.
   if (!new Set(["macos", "windows", "linux"]).has(values.platform)) {
     fail(`Unsupported platform: ${values.platform}`);
   }
@@ -354,6 +357,9 @@ function validateManifest(value, platform, clientVersion) {
   if (compareSemver(requiredClient, installedClient) > 0) {
     fail(`Theme requires Dream Skin ${manifest.minClientVersion} or newer; installed version is ${clientVersion}`);
   }
+  // PATCHED AFTER sync-runtime-assets: linux added here and in the --platform
+  // argument set. Keep in sync with runtime/theme-package-validator.mjs
+  // until the runtime source accepts linux.
   const platforms = assertStringSet(manifest.platforms, "manifest.platforms", {
     min: 1,
     max: 3,

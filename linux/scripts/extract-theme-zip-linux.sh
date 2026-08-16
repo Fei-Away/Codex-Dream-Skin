@@ -142,6 +142,13 @@ PROBE_COUNT_FILE=""
 # Symlinks are rejected by the listing pass and re-checked below.
 LC_ALL=C /usr/bin/unzip -q -d "$EXTRACT_ROOT" "$ARCHIVE" </dev/null >/dev/null \
   || fail_extract "Theme ZIP extraction was blocked because an entry was unsafe or damaged."
+# bsdtar extracted with --no-same-permissions, so files were readable no matter
+# what modes the archive stored. Plain unzip restores stored modes, and a
+# crafted archive with mode-0 entries could otherwise poison the staging walk
+# or make `cp -p` die after partially filling the destination. Normalize
+# owner read/write (and directory traversal) before any walk or copy; X adds
+# execute only to directories and already-executable files.
+/bin/chmod -R u+rwX "$EXTRACT_ROOT"
 
 [ -z "$(/usr/bin/find "$EXTRACT_ROOT" -xdev -type l -print -quit)" ] \
   || fail_extract "Theme ZIP contains a symbolic link."

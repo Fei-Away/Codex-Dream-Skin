@@ -35,6 +35,33 @@ make_safe_css() {
     > "$1"
 }
 
+# zip reads files at creation time, so a mode-0 entry cannot be zipped
+# directly; rewrite the named entries' external attributes in the central
+# directory afterwards. unzip then restores the stored mode-0 permissions.
+# Only the permission bits are zeroed (the Unix regular-file type bit stays),
+# matching what a real archive with a 000-mode file would carry.
+zero_zip_entries() {
+  local archive="$1"
+  shift
+  "$NODE" -e '
+const fs = require("node:fs");
+const [archive, ...targets] = process.argv.slice(1);
+const bytes = fs.readFileSync(archive);
+for (let e = 0; e + 46 <= bytes.length; e++) {
+  if (bytes.readUInt32LE(e) !== 0x02014b50) continue;
+  const madeBy = bytes.readUInt16LE(e + 4);
+  if ((madeBy >> 8) !== 3) continue; // unix host (Info-ZIP writes 0x031e)
+  const nameLen = bytes.readUInt16LE(e + 28);
+  const extraLen = bytes.readUInt16LE(e + 30);
+  const commentLen = bytes.readUInt16LE(e + 32);
+  if (nameLen < 1 || nameLen > 200 || e + 46 + nameLen + extraLen + commentLen > bytes.length) continue;
+  const name = bytes.subarray(e + 46, e + 46 + nameLen).toString("utf8");
+  if (targets.includes(name)) bytes.writeUInt32LE(0x80000000, e + 38); // S_IFREG | mode 000
+}
+fs.writeFileSync(archive, bytes);
+' "$archive" "$@"
+}
+
 /bin/mkdir -p "$TMP/root-pack" "$TMP/root-out"
 make_theme_json "$TMP/root-pack/theme.json"
 make_safe_css "$TMP/root-pack/theme.css"
@@ -82,6 +109,38 @@ expect_rejected "$TMP/official-without-css.zip" official-without-css
   /usr/bin/zip -q "$TMP/simple-without-css.zip" theme.json background.jpg
 )
 expect_rejected "$TMP/simple-without-css.zip" simple-without-css
+
+# unzip restores stored Unix modes. A valid pack whose theme.json is stored
+# mode-0 must still import cleanly (the extractor normalizes modes like
+# bsdtar's --no-same-permissions), with exactly three staged files and no
+# partial output.
+/bin/mkdir -p "$TMP/mode-pack" "$TMP/mode-mixed-out"
+make_theme_json "$TMP/mode-pack/theme.json"
+/bin/cp "$TMP/root-pack/theme.css" "$TMP/mode-pack/theme.css"
+/bin/cp "$TMP/root-pack/background.jpg" "$TMP/mode-pack/background.jpg"
+(
+  cd "$TMP/mode-pack"
+  /usr/bin/zip -q "$TMP/mode-mixed.zip" theme.json theme.css background.jpg
+)
+zero_zip_entries "$TMP/mode-mixed.zip" theme.json
+"$EXTRACTOR" "$TMP/mode-mixed.zip" "$TMP/mode-mixed-out"
+/usr/bin/cmp -s "$TMP/mode-pack/theme.json" "$TMP/mode-mixed-out/theme.json"
+/usr/bin/cmp -s "$TMP/mode-pack/theme.css" "$TMP/mode-mixed-out/theme.css"
+/usr/bin/cmp -s "$TMP/mode-pack/background.jpg" "$TMP/mode-mixed-out/background.jpg"
+[ "$(/usr/bin/find "$TMP/mode-mixed-out" -mindepth 1 -maxdepth 1 -type f | /usr/bin/wc -l | /usr/bin/tr -d ' ')" = 3 ] \
+  || { printf 'Mode-0 pack staged extra or partial output.\n' >&2; exit 1; }
+
+# A rejected all-mode-0 pack must leave its destination completely empty;
+# mode-0 files must not be able to hide partial staging behind a failed copy.
+/bin/mkdir -p "$TMP/mode-zero-pack"
+make_theme_json "$TMP/mode-zero-pack/theme.json"
+/usr/bin/printf 'img\n' > "$TMP/mode-zero-pack/background.jpg"
+(
+  cd "$TMP/mode-zero-pack"
+  /usr/bin/zip -q "$TMP/mode-zero.zip" theme.json background.jpg
+)
+zero_zip_entries "$TMP/mode-zero.zip" theme.json background.jpg
+expect_rejected "$TMP/mode-zero.zip" mode-zero-missing-css
 
 /bin/cp "$TMP/root.zip" "$TMP/legacy.dreamskin"
 expect_rejected "$TMP/legacy.dreamskin" dreamskin-extension
