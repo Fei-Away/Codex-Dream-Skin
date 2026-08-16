@@ -4,7 +4,9 @@
 # With arguments: subcommand dispatch. Sourceable for tests via --self-test-source.
 
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# Resolve the script's own symlinks: /usr/bin/dreamskin and ~/.local/bin/dreamskin
+# are symlinks into the engine tree, so BASH_SOURCE may be the link path.
+SCRIPT_DIR="$(cd "$(dirname "$(/usr/bin/readlink -f "${BASH_SOURCE[0]}")")" && pwd -P)"
 . "$SCRIPT_DIR/common-linux.sh"
 
 resolve_command() {
