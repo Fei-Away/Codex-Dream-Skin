@@ -27,6 +27,9 @@
 - [complete] 推送 + PR：`git push -u origin feat/linux-support`（51→52 commits）→ PR #1 https://github.com/Only-Funny/Codex-Dream-Skin/pull/1 。CI 首跑暴露 runner 无 /usr/bin/node（setup-node 只装 toolcache）→ build-release-linux.sh 改 PATH 解析（8aff633），linux job 转绿。Task 14 完结。
 - [complete] 实机验收（用户本机 Pop!_OS + 官方 chatgpt deb 26.803.81509，装 deb + dreamskin 菜单/子命令）：换肤端到端成功（Gothic Void 注入可见）。过程中抓到并修掉 4 个真实 bug：(1) 主入口经 /usr/bin/dreamskin 软链调用时 SCRIPT_DIR 算错（readlink -f 修复，eecc23b）；(2) deb 发现选到 /usr/lib/chatgpt 目录而非 ELF（codex_candidate_is_binary 优先 ELF + ChatGPT 名字匹配，f969fc3）；(3) /proc cmdline 竞态报错刷屏（重定向顺序，f969fc3）；(4) codex_main_pids|head -n 1 在多进程匹配时 SIGPIPE 退出 141（first_codex_pid 全量捕获后切片，9bd5723，实测修复后对运行中 Codex 正常 attach 报 active）。一键换肤协议注册已验证（xdg-mime query → codex-dream-skin.desktop）。
 - [carry] 遗留 polish（不阻塞）：菜单硬编码中文（未走 localization）、install 终消息 "signed Node.js" 措辞、ci.yml static-checks 未含 linux、xdg-mime uninstall 在 Debian 上不存在、并发首启锁冲突提示。验收清单剩余项：导入/切换/恢复逐一确认、Ubuntu 24.04 deb 装/卸干净、Release 资产可下载、社区一键换肤冷会话引导（macos/windows 已改进，linux 待跟进）。
+- [complete] 实机验收第二轮（通知化一键换肤 + 全链路证明）：浏览器点击不再弹终端，桌面通知报结果（Terminal=false + notify-send + 状态根日志，libnotify-bin 进 Depends，453c5e4）。手工构造声明 linux 的官方测试包实机全链路通过：导入 → Safe CSS/平台校验 → 切换 → 渲染验证 → active（失败根因确认为站点包 platforms 只含 macos/windows——dreamskin.cc 属原作者基础设施，非本仓库可控）。
+- [complete] 上游 PR：feat/linux-support 与上游 main（95423d8，零偏差）无冲突，向原作者仓库开 PR #370 https://github.com/Fei-Away/Codex-Dream-Skin/pull/370（按上游 PR 模板双语填写；PR 模板本身补了 Linux 栏并提交 3762e68）。等上游 CI + 作者评审。
+- [next] 跟进上游 PR #370：CI 绿、作者意见、合并后站点包 platforms 加 linux 重新发布即可全平台一键换肤。本 fork 内 PR #1 保留作自用发行。
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
