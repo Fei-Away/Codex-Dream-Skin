@@ -251,6 +251,31 @@ seed_bundled_presets() {
   done
 }
 
+# First-run lazy seed for package installs. The tar.gz installer seeds bundled
+# presets at install time (install-dream-skin-linux.sh), but the deb postinst
+# must not: it runs as root and would write into root's state tree. The start
+# flow therefore calls this after ensure_state_root and before it needs a
+# staged active theme. Idempotent and safe to call repeatedly: it seeds only
+# when the theme library holds no preset pack with a theme.json, stages the
+# default preset only when no active theme is staged, and never touches
+# user-made custom-* packs.
+ensure_first_run_theme() {
+  ensure_state_root
+  local themes_root="$STATE_ROOT/themes"
+  local preset=""
+  local seeded="false"
+  for preset in "$themes_root"/preset-*/; do
+    [ -d "$preset" ] || continue
+    [ -f "${preset}theme.json" ] || continue
+    seeded="true"
+    break
+  done
+  [ "$seeded" = "true" ] || seed_bundled_presets
+  if [ ! -f "$THEME_DIR/theme.json" ]; then
+    "$SCRIPT_DIR/switch-theme-linux.sh" --id preset-gothic-void-crusade --no-apply >/dev/null
+  fi
+}
+
 codex_main_pids() {
   local pid
   local exe

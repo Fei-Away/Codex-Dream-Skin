@@ -39,12 +39,14 @@ PORT_EXPLICIT="false"
 RESTART_EXISTING="false"
 PROMPT_RESTART="false"
 FOREGROUND_INJECTOR="false"
+ALLOW_UNSIGNED="false"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --port) PORT="${2:-}"; PORT_EXPLICIT="true"; shift 2 ;;
     --restart-existing) RESTART_EXISTING="true"; shift ;;
     --prompt-restart) PROMPT_RESTART="true"; shift ;;
     --foreground-injector) FOREGROUND_INJECTOR="true"; shift ;;
+    --allow-unsigned) ALLOW_UNSIGNED="true"; shift ;;
     --renderer) case "${2:-}" in wayland|x11) CODEX_RENDERER="$2"; export CODEX_RENDERER ;; *) fail "Unknown renderer: ${2:-}" ;; esac; shift 2 ;;
     *) fail "Unknown start argument: $1" ;;
   esac
@@ -53,6 +55,11 @@ case "$PORT" in ''|*[!0-9]*) fail "Invalid port: $PORT" ;; esac
 [ "$PORT" -ge 1024 ] && [ "$PORT" -le 65535 ] || fail "Port must be between 1024 and 65535."
 
 ensure_state_root
+# Deb installs seed no bundled presets at install time (postinst runs as root
+# and must not write into the user's state tree), so the first start lazily
+# seeds the theme library and stages the default preset. Idempotent: skips
+# when bundled presets are already present and never touches custom-* packs.
+ensure_first_run_theme
 if [ "$FOREGROUND_INJECTOR" != "true" ]; then
   OPERATION_TOKEN="$(new_operation_token)"
   write_operation_state applying "$(dreamskin_text applying_skin)" "$OPERATION_TOKEN" \
@@ -62,6 +69,19 @@ discover_codex_app
 # Linux has no bundled signed Node inside the app; the system Node (>= 18)
 # resolved here is the runtime used for the injector and state helpers.
 ensure_node_runtime
+
+# --allow-unsigned records a one-time approval for the exact discovered
+# AppImage/binary executable so the install verification below can pass. It
+# only applies to the appimage|binary launch kinds: deb installs are verified
+# via dpkg integrity + official apt origin instead, so the flag is a no-op
+# there. The record runs after discovery resolved CODEX_EXE and before
+# verify_codex_install; discovery fails closed on a missing executable, and
+# record_appimage_approval fails closed if the file cannot be hashed.
+if [ "$ALLOW_UNSIGNED" = "true" ]; then
+  case "${CODEX_LAUNCH_KIND:-}" in
+    appimage|binary) record_appimage_approval ;;
+  esac
+fi
 
 if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then
   saved_port="$(state_field port)" || fail "Could not read the existing state port."
