@@ -1,17 +1,26 @@
 #!/bin/bash
 
-# Full Linux release pipeline: sync shared assets, run the test suite,
-# then build tar.gz and deb. Fails fast if anything is out of date.
+# Full Linux release pipeline: fail fast on uncommitted runtime-asset
+# drift, regenerate deterministically, run the test suite, then build
+# tar.gz and deb with a fresh checksum file.
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 LINUX_ROOT="$ROOT/linux"
 
-/usr/bin/node "$ROOT/tools/sync-runtime-assets.mjs"
+# The gate fires before any regeneration so an out-of-date platform copy
+# aborts the build instead of being silently rewritten.
 /usr/bin/node "$ROOT/tools/sync-runtime-assets.mjs" --check \
-  || { printf 'Shared runtime assets are out of date; sync them first.\n' >&2; exit 1; }
+  || { printf 'Shared runtime assets are out of date; run sync and commit the regeneration.\n' >&2; exit 1; }
+
+/usr/bin/node "$ROOT/tools/sync-runtime-assets.mjs"
 
 /bin/bash "$LINUX_ROOT/tests/run-tests.sh"
+
+# Drop stale artifacts (and any stale SHA256SUMS.txt) so the checksum file
+# only ever covers the two artifacts built below.
+/bin/rm -f "$LINUX_ROOT"/release/*.deb "$LINUX_ROOT"/release/*.tar.gz \
+  "$LINUX_ROOT"/release/SHA256SUMS.txt
 
 /bin/bash "$LINUX_ROOT/scripts/build-tarball.sh"
 /bin/bash "$LINUX_ROOT/scripts/build-deb.sh"

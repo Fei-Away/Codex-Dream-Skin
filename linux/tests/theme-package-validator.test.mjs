@@ -340,6 +340,24 @@ try {
   await expectRejected(future.source, "macos", /requires Dream Skin 9\.9\.9/, "future-client");
   const wrongPlatform = await makeOfficial("wrong-platform", { platforms: ["macos"] });
   await expectRejected(wrongPlatform.source, "windows", /does not support windows/, "wrong-platform");
+  const linuxOnly = await makeOfficial("linux-only", { platforms: ["linux"] });
+  const linuxResult = await validate(linuxOnly.source, "linux", "official-linux");
+  assert.equal(linuxResult.output.format, "official");
+  const allPlatforms = await makeOfficial("all-platforms", {
+    platforms: ["macos", "windows", "linux"],
+  });
+  await validate(allPlatforms.source, "linux", "official-all-platforms");
+  const unsupportedValue = await makeOfficial("unsupported-platform-value", {
+    platforms: ["linux", "freebsd"],
+  });
+  await expectRejected(
+    unsupportedValue.source,
+    "linux",
+    /contains an unsupported value/,
+    "unsupported-platform-value",
+  );
+  const linuxMissing = await makeOfficial("linux-missing", { platforms: ["macos"] });
+  await expectRejected(linuxMissing.source, "linux", /does not support linux/, "linux-missing");
   const wrongId = await makeOfficial("wrong-id", { manifestThemeId: "different.theme" });
   await expectRejected(wrongId.source, "macos", /themeId does not match/, "wrong-id");
   const wrongImage = await makeOfficial("wrong-image", { themeImage: "background.jpg" });
