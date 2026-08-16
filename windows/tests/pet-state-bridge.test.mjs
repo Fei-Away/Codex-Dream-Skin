@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createStateSourcePolicy, selectPetState } from "../scripts/codex-state-bridge.mjs";
+import { selectPetState } from "../scripts/codex-state-bridge.mjs";
 import { createPetStateBridge } from "../scripts/pet-state-bridge.mjs";
 
 const threadId = "019fd5ae-eb5b-7e01-bb4e-32b021aefd56";
@@ -12,21 +12,8 @@ const finishedProbe = {
   details: [{ id: threadId, running: false, title: "finished task" }],
 };
 
-const appServerApproval = selectPetState({
-  policy: createStateSourcePolicy("auto"),
-  uiProbe: runningProbe,
-  appServerFlags: ["waitingOnApproval"],
-});
-assert.deepEqual(appServerApproval, {
-  threadId,
-  state: "waitingOnApproval",
-  source: "app-server",
-});
-
 const staleCompletion = selectPetState({
-  policy: createStateSourcePolicy("auto"),
   uiProbe: finishedProbe,
-  appServerFlags: ["waitingOnUserInput"],
 });
 assert.deepEqual(staleCompletion, {
   threadId,
@@ -35,14 +22,23 @@ assert.deepEqual(staleCompletion, {
 });
 
 const domOnly = selectPetState({
-  policy: createStateSourcePolicy("dom"),
   uiProbe: runningProbe,
   domActivity: "waitingOnApproval",
-  appServerFlags: ["waitingOnUserInput"],
 });
 assert.deepEqual(domOnly, {
   threadId,
   state: "waitingOnApproval",
+  source: "dom",
+});
+
+const staleServerFlagIsIgnored = selectPetState({
+  uiProbe: runningProbe,
+  domActivity: null,
+  appServerFlags: ["waitingOnApproval"],
+});
+assert.deepEqual(staleServerFlagIsIgnored, {
+  threadId,
+  state: "reasoning",
   source: "dom",
 });
 
@@ -52,7 +48,7 @@ const bridge = createPetStateBridge({
   onStateChange: (next, previous) => transitions.push([previous, next]),
 });
 bridge.sync({ uiProbe: runningProbe, domActivity: "active" });
-bridge.sync({ uiProbe: finishedProbe, appServerFlags: ["waitingOnApproval"] });
+bridge.sync({ uiProbe: finishedProbe });
 assert.equal(bridge.runtime.state, "idle");
 assert.deepEqual(transitions, [["idle", "reasoning"], ["reasoning", "idle"]]);
 
