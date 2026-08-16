@@ -25,8 +25,10 @@ if (!versionID) {
   console.error("这个一键换肤链接无效。");
   process.exit(1);
 }
-const metadataURL = `${COMMUNITY_API_ORIGIN}/v1/themes/${versionID}`;
-const downloadURL = `${COMMUNITY_API_ORIGIN}/v1/themes/${versionID}/download`;
+// Fixed official API in production; tests override via the environment.
+const API_ORIGIN = process.env.DREAMSKIN_COMMUNITY_API_ORIGIN || COMMUNITY_API_ORIGIN;
+const metadataURL = `${API_ORIGIN}/v1/themes/${versionID}`;
+const downloadURL = `${API_ORIGIN}/v1/themes/${versionID}/download`;
 try {
   const metadata = validateCommunityMetadata(await boundedFetchJson(metadataURL), versionID);
   const body = await boundedFetchBuffer(downloadURL, { maximumBytes: metadata.packageBytes });

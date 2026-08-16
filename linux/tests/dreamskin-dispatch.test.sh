@@ -30,4 +30,7 @@ unknown_rc=0
 # interface regression guards: import must pass --file, doctor must pass no flag
 /usr/bin/grep -q 'import-theme-zip-linux.sh" --file "$zipfile"' "$ROOT/scripts/dreamskin.sh"
 /usr/bin/grep -Eq 'doctor\) exec .*status-dream-skin-linux\.sh" ;;' "$ROOT/scripts/dreamskin.sh"
+# one-click dreamskin:// links must route to the community pipeline with the
+# URL intact (resolve_command has no such case and dispatch would drop $1).
+/usr/bin/grep -F -q 'dreamskin://*) dispatch community "$@"' "$ROOT/scripts/dreamskin.sh"
 printf 'dreamskin dispatch tests passed\n'

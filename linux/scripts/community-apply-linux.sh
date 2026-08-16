@@ -9,7 +9,7 @@ set -euo pipefail
 
 URL="${1:-}"
 case "$URL" in
-  dreamskin://apply?*) ;;
+  dreamskin://apply?version=*) ;;
   *) fail "Unsupported Dream Skin link." ;;
 esac
 
@@ -31,33 +31,29 @@ read_package_field() {
   ' "$TRANSACTION_ROOT/community-package.json" "$1"
 }
 
+# Read one JSON field from stdin, accumulating chunks before parsing so a
+# multi-chunk write cannot yield an empty value.
+json_field_from_stdin() {
+  "$NODE" -e '
+    let body = "";
+    process.stdin.on("data", (chunk) => { body += chunk.toString("utf8"); });
+    process.stdin.on("end", () => {
+      let value = "";
+      try { value = String(JSON.parse(body)[process.argv[1]] || ""); } catch {}
+      process.stdout.write(value);
+    });
+  ' "$1"
+}
+
 # Import validates the ZIP contract, manifest, image, Safe CSS and the exact
 # downloaded byte identity; its JSON output carries the content fingerprint.
 IMPORT_RESULT="$("$SCRIPT_DIR/import-theme-zip-linux.sh" \
   --file "$TRANSACTION_ROOT/package.zip" \
   --expected-sha256 "$(read_package_field packageSha256)" \
   --expected-bytes "$(read_package_field packageBytes)")"
-THEME_ID="$(printf '%s' "$IMPORT_RESULT" | "$NODE" -e '
-  let id = "";
-  process.stdin.on("data", (chunk) => {
-    try { id = String(JSON.parse(chunk.toString("utf8")).id || ""); } catch {}
-  });
-  process.stdin.on("end", () => process.stdout.write(id));
-')"
-FINGERPRINT="$(printf '%s' "$IMPORT_RESULT" | "$NODE" -e '
-  let fp = "";
-  process.stdin.on("data", (chunk) => {
-    try { fp = String(JSON.parse(chunk.toString("utf8")).contentFingerprint || ""); } catch {}
-  });
-  process.stdin.on("end", () => process.stdout.write(fp));
-')"
-ACTIVE_ID="$( "$SCRIPT_DIR/status-dream-skin-linux.sh" --json --deep 2>/dev/null | "$NODE" -e '
-  let id = "";
-  process.stdin.on("data", (chunk) => {
-    try { id = String(JSON.parse(chunk.toString("utf8")).appliedThemeId || ""); } catch {}
-  });
-  process.stdin.on("end", () => process.stdout.write(id));
-')"
+THEME_ID="$(printf '%s' "$IMPORT_RESULT" | json_field_from_stdin id)"
+FINGERPRINT="$(printf '%s' "$IMPORT_RESULT" | json_field_from_stdin contentFingerprint)"
+ACTIVE_ID="$( "$SCRIPT_DIR/status-dream-skin-linux.sh" --json --deep 2>/dev/null | json_field_from_stdin appliedThemeId)"
 
 "$SCRIPT_DIR/apply-community-theme-linux.sh" \
   --id "$THEME_ID" \

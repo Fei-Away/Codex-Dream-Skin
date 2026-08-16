@@ -160,6 +160,12 @@ main() {
   fi
   if [ "$#" -gt 0 ]; then
     local key=""
+    # One-click dreamskin:// links bypass resolve_command so dispatch keeps
+    # the URL as its argument (the desktop entry runs "dreamskin community %u",
+    # but a bare "dreamskin dreamskin://apply?..." must work too).
+    case "${1:-}" in
+      dreamskin://*) dispatch community "$@" || exit 1; return 0 ;;
+    esac
     key="$(resolve_command "$1")"
     [ -n "$key" ] || { printf '未知子命令：%s\n' "$1" >&2; exit 2; }
     dispatch "$key" "${@:2}" || exit 1

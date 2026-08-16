@@ -113,13 +113,18 @@ sync_appearance_pin
 
 if [ "$CREATE_LAUNCHERS" = "true" ]; then
   /bin/mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
-  /bin/ln -sf "$SCRIPT_DIR/dreamskin.sh" "$HOME/.local/bin/dreamskin"
+  if [ -e "$HOME/.local/bin/dreamskin" ] && [ ! -L "$HOME/.local/bin/dreamskin" ]; then
+    printf 'Skipping launcher link: %s exists and is not a symbolic link.\n' \
+      "$HOME/.local/bin/dreamskin" >&2
+  else
+    /bin/ln -sf "$SCRIPT_DIR/dreamskin.sh" "$HOME/.local/bin/dreamskin"
+  fi
   /usr/bin/printf '%s\n' \
     '[Desktop Entry]' \
     'Type=Application' \
     'Name=Dream Skin' \
     'Comment=External themes for Codex desktop' \
-    "Exec=$SCRIPT_DIR/dreamskin.sh" \
+    "Exec=$SCRIPT_DIR/dreamskin.sh community %u" \
     'Terminal=true' \
     'Categories=Utility;Development;' \
     'MimeType=x-scheme-handler/dreamskin;' \

@@ -4,10 +4,12 @@
 
 import http from "node:http";
 import https from "node:https";
+import process from "node:process";
 
 export const COMMUNITY_API_ORIGIN = "https://api.dreamskin.cc";
 const MAX_HEADER_BYTES = 8 * 1024;
 const MAXIMUM_PACKAGE_BYTES = 32 * 1024 * 1024;
+const USER_AGENT = `DreamSkinLinux/${process.env.SKIN_VERSION || "1.5.14"}`;
 const VERSION_ID_PATTERN = /^ver_[a-z0-9]{8,64}$/;
 const LINK_PATTERN = /^dreamskin:\/\/apply\?version=(ver_[a-z0-9]{8,64})$/;
 const UNSAFE_CODEPOINTS = new Set([
@@ -47,34 +49,58 @@ export function validateCommunityMetadata(metadata, expectedVersionID) {
   return metadata;
 }
 
-async function rawRequest(url, redirectsRemaining, maximumBytes, onChunk) {
+async function rawRequest(url, redirectsRemaining, maximumBytes) {
   if (redirectsRemaining < 0) throw new Error("这个一键换肤链接无效。");
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("这个一键换肤链接无效。");
   const transport = parsed.protocol === "https:" ? https : http;
   return await new Promise((resolve, reject) => {
-    const request = transport.get(parsed, { headers: { Accept: "*/*" } }, (response) => {
-      let headerBytes = 0;
+    const request = transport.get(parsed, {
+      headers: { Accept: "*/*", "User-Agent": USER_AGENT },
+      maxHeaderSize: MAX_HEADER_BYTES,
+    }, (response) => {
       let bodyBytes = 0;
       const chunks = [];
       if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
+        // ZERO redirects for boundedFetchBuffer. Destroy on every reject
+        // path: a trickling redirect response must not hold the socket
+        // (and keep resetting the idle timeout) after the promise settled.
+        if (redirectsRemaining <= 0) {
+          response.destroy();
+          reject(new Error("这个一键换肤链接无效。"));
+          return;
+        }
         response.resume();
-        if (redirectsRemaining <= 0) { reject(new Error("这个一键换肤链接无效。")); return; }
         const location = response.headers.location;
-        if (!location) { reject(new Error("这个一键换肤链接无效。")); return; }
+        if (!location) {
+          response.destroy();
+          reject(new Error("这个一键换肤链接无效。"));
+          return;
+        }
         const next = new URL(location, parsed);
-        if (next.origin !== parsed.origin) { reject(new Error("这个一键换肤链接无效。")); return; }
-        rawRequest(next.href, redirectsRemaining - 1, maximumBytes, onChunk).then(resolve, reject);
+        if (next.origin !== parsed.origin) {
+          response.destroy();
+          reject(new Error("这个一键换肤链接无效。"));
+          return;
+        }
+        rawRequest(next.href, redirectsRemaining - 1, maximumBytes).then(resolve, reject);
         return;
       }
-      if (response.statusCode !== 200) { response.resume(); reject(new Error("这个一键换肤链接无效。")); return; }
+      if (response.statusCode !== 200) {
+        response.destroy();
+        reject(new Error("这个一键换肤链接无效。"));
+        return;
+      }
       const declared = Number(response.headers["content-length"] || 0);
-      if (declared > maximumBytes) { response.resume(); reject(new Error("这个一键换肤链接无效。")); return; }
+      if (declared > maximumBytes) {
+        response.destroy();
+        reject(new Error("这个一键换肤链接无效。"));
+        return;
+      }
       response.on("data", (chunk) => {
         bodyBytes += chunk.length;
         if (bodyBytes > maximumBytes) { response.destroy(); reject(new Error("这个一键换肤链接无效。")); return; }
         chunks.push(chunk);
-        onChunk?.(chunk);
       });
       response.on("end", () => resolve(Buffer.concat(chunks)));
       response.on("error", reject);
