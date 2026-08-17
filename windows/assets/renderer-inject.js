@@ -645,6 +645,109 @@
     }
   };
 
+  const paintNotificationToastsNow = () => {
+    const marker = '[data-dream-skin-notification-toast="true"]';
+    const properties = [
+      'background', 'background-color', 'border', 'border-radius',
+      'box-shadow', 'color', 'opacity', 'text-shadow',
+    ];
+    for (const previous of document.querySelectorAll(marker)) {
+      previous.removeAttribute('data-dream-skin-notification-toast');
+      for (const property of properties) previous.style.removeProperty(property);
+      for (const control of previous.querySelectorAll('button, [role="button"]')) {
+        for (const property of properties) control.style.removeProperty(property);
+      }
+    }
+    const candidates = document.querySelectorAll(
+      '[data-radix-toast-root], [data-sonner-toast], [role="alert"], [class*="Toast"], [class*="toast"]',
+    );
+    for (const node of candidates) {
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 180 || rect.width > 900 || rect.height < 24 || rect.height > 180 || rect.top > 260) continue;
+      const style = getComputedStyle(node);
+      const inToastViewport = Boolean(node.closest?.('[data-radix-toast-viewport], [data-sonner-toaster]'));
+      const fixed = style.position === 'fixed' || inToastViewport || node.matches?.('[data-radix-toast-root], [data-sonner-toast], [role="alert"]');
+      if (!fixed) continue;
+      node.setAttribute('data-dream-skin-notification-toast', 'true');
+      node.style.setProperty('background', 'rgb(var(--ds-panel-2-rgb) / .92)', 'important');
+      node.style.setProperty('background-color', 'rgb(var(--ds-panel-2-rgb) / .92)', 'important');
+      node.style.setProperty('border', '1px solid rgb(var(--ds-accent-rgb) / .58)', 'important');
+      node.style.setProperty('border-radius', '14px', 'important');
+      node.style.setProperty('box-shadow', '0 10px 26px rgb(var(--ds-bg-rgb) / .34)', 'important');
+      node.style.setProperty('color', 'var(--ds-text)', 'important');
+      node.style.setProperty('opacity', '1', 'important');
+      node.style.setProperty('text-shadow', '0 1px 2px rgb(var(--ds-bg-rgb) / .42)', 'important');
+      for (const control of node.querySelectorAll('button, [role="button"]')) {
+        control.style.setProperty('background', 'rgb(var(--ds-panel-rgb) / .54)', 'important');
+        control.style.setProperty('background-color', 'rgb(var(--ds-panel-rgb) / .54)', 'important');
+        control.style.setProperty('border', '1px solid rgb(var(--ds-accent-rgb) / .52)', 'important');
+        control.style.setProperty('border-radius', '10px', 'important');
+        control.style.setProperty('color', 'var(--ds-text)', 'important');
+        control.style.setProperty('opacity', '1', 'important');
+      }
+    }
+    const dynamicTopToasts = [...document.querySelectorAll('body *')]
+      .filter((node) => {
+        const rect = node.getBoundingClientRect();
+        const text = String(node.innerText || node.textContent || '').trim().replace(/\s+/g, ' ');
+        return rect.width >= 180 && rect.width <= 900 && rect.height >= 24 && rect.height <= 180
+          && rect.top <= 260 && text.length <= 240
+          && /已归档|归档的聊天|archived|撤销|undo|对话中途切换模型|切换模型会降低性能|model switch|switching models|reduces performance/i.test(text)
+          && node.querySelector?.('button, [role="button"]');
+      })
+      .sort((left, right) => {
+        const a = left.getBoundingClientRect();
+        const b = right.getBoundingClientRect();
+        return a.width * a.height - b.width * b.height;
+      });
+    for (const node of dynamicTopToasts.slice(0, 2)) {
+      for (const surface of [node, node.parentElement, node.parentElement?.parentElement]) {
+        if (!surface || surface === document.body || surface === document.documentElement) continue;
+        const rect = surface.getBoundingClientRect();
+        if (rect.width < 180 || rect.width > 900 || rect.height < 24 || rect.height > 180 || rect.top > 260) continue;
+        surface.setAttribute('data-dream-skin-notification-toast', 'true');
+        surface.style.setProperty('background', 'rgb(var(--ds-panel-2-rgb) / .92)', 'important');
+        surface.style.setProperty('background-color', 'rgb(var(--ds-panel-2-rgb) / .92)', 'important');
+        surface.style.setProperty('border', '1px solid rgb(var(--ds-accent-rgb) / .58)', 'important');
+        surface.style.setProperty('border-radius', '14px', 'important');
+        surface.style.setProperty('box-shadow', '0 10px 26px rgb(var(--ds-bg-rgb) / .34)', 'important');
+        surface.style.setProperty('color', 'var(--ds-text)', 'important');
+        surface.style.setProperty('opacity', '1', 'important');
+        surface.style.setProperty('text-shadow', '0 1px 2px rgb(var(--ds-bg-rgb) / .42)', 'important');
+        for (const control of surface.querySelectorAll('button, [role="button"]')) {
+          control.style.setProperty('background', 'rgb(var(--ds-panel-rgb) / .54)', 'important');
+          control.style.setProperty('background-color', 'rgb(var(--ds-panel-rgb) / .54)', 'important');
+          control.style.setProperty('border', '1px solid rgb(var(--ds-accent-rgb) / .52)', 'important');
+          control.style.setProperty('border-radius', '10px', 'important');
+          control.style.setProperty('color', 'var(--ds-text)', 'important');
+          control.style.setProperty('opacity', '1', 'important');
+        }
+      }
+    }
+  };
+
+  const paintDialogSendButtonsNow = () => {
+    const marker = '[data-dream-skin-dialog-send="true"]';
+    for (const previous of document.querySelectorAll(marker)) {
+      previous.removeAttribute('data-dream-skin-dialog-send');
+      for (const property of ['background', 'background-color', 'border', 'box-shadow', 'color', 'opacity']) {
+        previous.style.removeProperty(property);
+      }
+    }
+    for (const control of document.querySelectorAll('button, [role="button"]')) {
+      const text = String(control.innerText || control.getAttribute('aria-label') || '').trim();
+      const rect = control.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0 || !/^(发送|send)$/i.test(text)) continue;
+      control.setAttribute('data-dream-skin-dialog-send', 'true');
+      control.style.setProperty('background', 'rgb(var(--ds-accent-rgb) / .72)', 'important');
+      control.style.setProperty('background-color', 'rgb(var(--ds-accent-rgb) / .72)', 'important');
+      control.style.setProperty('border', '1px solid rgb(var(--ds-text-rgb) / .34)', 'important');
+      control.style.setProperty('box-shadow', '0 3px 10px rgb(var(--ds-bg-rgb) / .30)', 'important');
+      control.style.setProperty('color', 'var(--ds-text)', 'important');
+      control.style.setProperty('opacity', '1', 'important');
+    }
+  };
+
   installStyle();
 
   const applyRootState = (root) => {
@@ -661,6 +764,8 @@
       document.addEventListener("selectionchange", selectionChangeHandler);
     }
     paintSelectionToolbarNow();
+    paintNotificationToastsNow();
+    paintDialogSendButtonsNow();
     return shell;
   };
 
@@ -897,6 +1002,8 @@
     // derived from the same post-mutation tree.
     partObserver = new MutationObserver(() => {
       paintSelectionToolbarNow();
+      paintNotificationToastsNow();
+      paintDialogSendButtonsNow();
       scheduleEnsure({ scope: true, parts: true }, 80);
     });
   }
