@@ -30,7 +30,8 @@ function classList(initial) {
 function makeFixture({
   nativeAppearance = "dark", settings = false, settingsPanel = false, adopted = true,
   generic = false, genericComposer = true, genericHome = false, genericSearch = false,
-  modernMessages = false,
+  modernMessages = false, modernComposerLayout = false,
+  pathname = "/index.html", initialRoute = "",
 } = {}) {
   const attrs = new Map();
   const rootStyle = styleDeclaration();
@@ -103,15 +104,22 @@ function makeFixture({
     const sidebarSelector = 'aside, nav[aria-label]';
     const composerSelector = '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
       '[class*="composer" i], [class*="prompt" i]';
+    const composerLayoutRootSelector = '[class*="_ComposerLayoutRoot_"]';
     const overlaySelector = '[role="dialog"], [aria-modal="true"]';
     partFixtures.shell = makeDomNode("generic-shell", body);
     partFixtures.sidebar = makeDomNode("generic-sidebar", partFixtures.shell, new Map(), [sidebarSelector]);
     partFixtures.main = makeDomNode("generic-main", partFixtures.shell, new Map(), [mainSelector]);
     if (genericComposer) {
       partFixtures.composer = makeDomNode(
-        "generic-composer", partFixtures.main, new Map(), [composerSelector],
+        "generic-composer", partFixtures.main, new Map(),
+        [modernComposerLayout ? composerLayoutRootSelector : composerSelector],
       );
-      partFixtures.input = makeDomNode("generic-input", partFixtures.composer, new Map(), [inputSelector]);
+      const inputParent = modernComposerLayout
+        ? (partFixtures.composerFooter = makeDomNode(
+          "generic-composer-footer", partFixtures.composer, new Map(), [composerSelector],
+        ))
+        : partFixtures.composer;
+      partFixtures.input = makeDomNode("generic-input", inputParent, new Map(), [inputSelector]);
     }
     partFixtures.unrelatedAside = makeDomNode(
       "generic-content-aside", partFixtures.main, new Map(), [sidebarSelector],
@@ -168,8 +176,8 @@ function makeFixture({
       register(messageSelector, partFixtures.userMessage);
       register(messageSelector, partFixtures.assistantMessage);
     }
-    register(".composer-surface-chrome", partFixtures.composer);
-    register('.composer-surface-chrome [class*="_footer_"]', partFixtures.composerToolbar);
+    register(':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"])', partFixtures.composer);
+    register(':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutRoot_"] [class*="_ComposerLayoutFooter_"])', partFixtures.composerToolbar);
   }
   const makeStyleNode = () => {
     const node = {
@@ -231,6 +239,11 @@ function makeFixture({
   const context = {
     window,
     document,
+    location: {
+      protocol: "app:",
+      pathname,
+      search: initialRoute ? `?initialRoute=${encodeURIComponent(initialRoute)}` : "",
+    },
     MutationObserver: MockMutationObserver,
     CSSStyleSheet: adopted ? MockSheet : undefined,
     Blob,
@@ -240,6 +253,7 @@ function makeFixture({
       createObjectURL() { nextBlob += 1; return `blob:fixture-${nextBlob}`; },
       revokeObjectURL(value) { revoked.push(value); },
     },
+    URLSearchParams,
     performance: { now: () => 1 },
     setTimeout(callback, delay) { const id = ++nextId; timers.set(id, { callback, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
@@ -346,7 +360,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
-    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
+    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome, \[class\*="_ComposerLayoutRoot_"\]\)|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
     "Accent foreground contrast must model the composer panel's 94% RGB surface",
   );
   assert.match(
@@ -426,6 +440,33 @@ export async function runRendererRuntimeTest(assetRoot) {
     assert.equal(home.partFixtures[fixtureKey].getAttribute("data-ds-part"), part,
       `${part} must be exposed through the public Safe CSS bridge`);
   }
+
+  const petOverlay = makeFixture({ nativeAppearance: "dark", initialRoute: "/avatar-overlay" });
+  vm.runInNewContext(petOverlay.payloadFor(), petOverlay.context);
+  assert.equal(petOverlay.window.__CODEX_DREAM_SKIN_STATE__, undefined,
+    "The avatar overlay must reject Dream Skin before installing renderer state.");
+  assert.equal(petOverlay.window.__CODEX_DREAM_SKIN_DISABLED__, true);
+  assert.equal(petOverlay.document.adoptedStyleSheets.length, 0);
+  assert.equal(petOverlay.attrs.get("data-dream-skin"), undefined);
+
+  const petComposition = makeFixture({
+    nativeAppearance: "dark", pathname: "/avatar-overlay-composition-surface.html",
+  });
+  vm.runInNewContext(petComposition.payloadFor(), petComposition.context);
+  assert.equal(petComposition.window.__CODEX_DREAM_SKIN_STATE__, undefined,
+    "Pet composition surfaces must remain transparent and unthemed.");
+  assert.equal(petComposition.document.adoptedStyleSheets.length, 0);
+
+  const navigatedPet = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(navigatedPet.payloadFor(), navigatedPet.context);
+  navigatedPet.context.location.pathname = "/avatar-overlay-composition-surface.html";
+  vm.runInNewContext(navigatedPet.payloadFor(), navigatedPet.context);
+  assert.equal(navigatedPet.window.__CODEX_DREAM_SKIN_STATE__, undefined,
+    "Reapplying on a Pet route must clean an older renderer injection.");
+  assert.equal(navigatedPet.document.adoptedStyleSheets.length, 0);
+  assert.equal(navigatedPet.attrs.get("data-dream-skin"), undefined);
+  assert.equal(navigatedPet.revoked.length, 1,
+    "Pet cleanup must revoke the previous wallpaper blob URL.");
   const dynamicMessage = home.addDynamicMessage();
   partObserver.callback([{ type: "childList" }]);
   home.flushTimers(80);
@@ -453,6 +494,15 @@ export async function runRendererRuntimeTest(assetRoot) {
     "An aside inside the main content must not be exposed as the app sidebar.");
   assert.equal(generic.partFixtures.dialogInput.getAttribute("data-ds-part"), null,
     "Dialog inputs must not be mistaken for the app composer.");
+
+  const modernComposer = makeFixture({
+    nativeAppearance: "dark", generic: true, modernComposerLayout: true,
+  });
+  vm.runInNewContext(modernComposer.payloadFor(), modernComposer.context);
+  assert.equal(modernComposer.partFixtures.composer.getAttribute("data-ds-part"), "composer",
+    "The ComposerLayoutRoot wrapper must receive the public composer part.");
+  assert.equal(modernComposer.partFixtures.composerFooter.getAttribute("data-ds-part"), null,
+    "The broad composer fallback must not stop at ComposerLayoutFooter.");
 
   const genericSearch = makeFixture({
     nativeAppearance: "dark", generic: true, genericComposer: false, genericSearch: true,

@@ -13,6 +13,19 @@
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
     "data-dream-art-ready",
   ];
+  const initialRoute = new URLSearchParams(String(location.search || ""))
+    .get("initialRoute") || "";
+  const pathname = String(location.pathname || "");
+  const excludedPetSurface = location.protocol === "app:" && (
+    pathname.endsWith("/avatar-overlay-composition-surface.html") ||
+    initialRoute === "/avatar-overlay" || initialRoute.startsWith("/avatar-overlay/")
+  );
+  if (excludedPetSurface) {
+    const previous = window[STATE_KEY];
+    if (typeof previous?.cleanup === "function") previous.cleanup();
+    window[DISABLED_KEY] = true;
+    return;
+  }
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
   const PAYLOAD_REVISION = __DREAM_SKIN_PAYLOAD_REVISION_JSON__;
@@ -670,6 +683,8 @@
       const main = resolvedMainNode();
       for (const input of genericInputNodes()) {
         if (main && !main.contains?.(input)) continue;
+        const layoutRoot = input.closest?.('[class*="_ComposerLayoutRoot_"]');
+        if (layoutRoot && (!main || main.contains?.(layoutRoot))) return [layoutRoot];
         const owner = input.closest?.(
           '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
           '[class*="composer" i], [class*="prompt" i]',

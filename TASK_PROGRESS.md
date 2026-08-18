@@ -1,5 +1,56 @@
 # Task Progress
 
+## Codex composer and Pet surface compatibility (2026-08-18)
+
+- [goal] Fix current Codex renderer drift where the composer fallback binds to
+  `_ComposerLayoutFooter_` instead of `_ComposerLayoutRoot_`, and prevent Dream
+  Skin from injecting wallpaper/CSS into `/avatar-overlay` and Pet composition
+  surfaces that must remain transparent.
+- [scope] Isolated clone
+  `/Users/huangjinnan/Desktop/Codex-Dream-Skin-pr-composer-pet-fix`, branch
+  `codex/fix-composer-pet-scope`, based on exact `origin/main@95423d8` (v1.5.14).
+  Shared runtime source, generated dual-platform assets, focused regressions,
+  and this progress record are in scope. User-specific theme colors are not.
+- [field evidence] Live macOS Codex exposed `_ComposerLayoutRoot_*` around the
+  active ProseMirror while the v1.5.14 fallback marked `_ComposerLayoutFooter_*`.
+  The avatar overlay plus Pet composition surfaces carried
+  `data-dream-skin="active"`; three bodies had the theme wallpaper instead of a
+  transparent background. Local runtime guards and explicit cleanup restored
+  all five Pet-related surfaces to transparent without changing Pet assets.
+- [implemented] Canonical selector contract now accepts both legacy
+  `.composer-surface-chrome` and `_ComposerLayoutRoot_`, with the matching
+  toolbar selector. The generic fallback also prefers `_ComposerLayoutRoot_`
+  before broad composer/prompt ownership so `_ComposerLayoutFooter_` cannot
+  capture the public composer part.
+- [implemented] Shared renderer payload self-excludes `/avatar-overlay` and
+  Pet composition-surface routes before installing style/art state, cleaning a
+  previous payload first when present. Both platform injectors classify those
+  targets explicitly, and one-shot plus watcher discovery reuse the existing
+  remove-and-verify path to clean already contaminated Pet renderers.
+- [tests] Shared renderer regressions cover fresh Pet exclusion, cleanup after
+  prior injection, ComposerLayoutRoot selection, and footer non-selection.
+  macOS/Windows bootstrap regressions cover probe exclusion and require both
+  discovery paths to call verified cleanup. Focused dual-platform renderer,
+  bootstrap, selector-doctor, syntax, sync, payload, and diff checks pass.
+- [tests] Portable Node set passes 102/103 in the default sandbox; the sole
+  Swift bounded-HTTP test was blocked by module-cache permission/toolchain
+  setup there and passes when rerun outside the sandbox, yielding 103/103
+  covered tests. The complete macOS wrapper passes outside the sandbox with
+  its documented signed-runtime, full-Xcode, and Doctor branches skipped.
+- [skill] User Skill `~/.codex/skills/dream-skin-repair` is installed. Its
+  read-only audit reports the main renderer themed, all five Pet-related
+  targets transparent/unmarked, and no anomalies; `quick_validate.py` passes.
+- [review] Independent code/spec/security review found no Critical, High,
+  Medium, or Low issues. It confirmed renderer self-exclusion, verified cleanup
+  in one-shot and watcher paths, ComposerLayoutRoot selection, generated asset
+  synchronization, and focused dual-platform coverage.
+- [current] Implementation, generated assets, tests, and review are complete.
+  No commit, push, or PR yet. Fork `hjnnjh/Codex-Dream-Skin` now exists for the
+  contribution branch.
+- [next] Inspect and stage the final diff, create an atomic commit, push the
+  fork branch, and open a Ready PR with exact test/gap evidence. Native Windows
+  PowerShell 5.1/7 remains a CI gate.
+
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
 - [fix merged] PR #360 (`e3787857953998a1916c39b10942ac6c15978a25`) passed exact-head CI run `31558654733`: Static, macOS repository regressions plus universal DMG, Windows PowerShell 7, and Windows PowerShell 5.1 plus Setup.exe. It was squash-merged with the authorized same-owner review bypass at `2026-08-12T03:06:37Z` as `main@69a5a2e4b68174b1c0c70a2fa62adf1aca1eff2a`.
