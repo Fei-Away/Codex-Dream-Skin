@@ -44,12 +44,17 @@
   Medium, or Low issues. It confirmed renderer self-exclusion, verified cleanup
   in one-shot and watcher paths, ComposerLayoutRoot selection, generated asset
   synchronization, and focused dual-platform coverage.
-- [current] Implementation, generated assets, tests, and review are complete.
-  No commit, push, or PR yet. Fork `hjnnjh/Codex-Dream-Skin` now exists for the
-  contribution branch.
-- [next] Inspect and stage the final diff, create an atomic commit, push the
-  fork branch, and open a Ready PR with exact test/gap evidence. Native Windows
-  PowerShell 5.1/7 remains a CI gate.
+- [committed/pushed] Implementation and test commit
+  `c4c3a7e90c0def8c4a6961ca013ec2ac36ca15b8` plus changelog commit
+  `c1433be12252b868b4a0cabc338ed03afdf04a9f` are pushed to
+  `hjnnjh/Codex-Dream-Skin:codex/fix-composer-pet-scope`. The public compare is
+  3 commits ahead of upstream after this progress checkpoint and 0 behind.
+- [blocked] PR title/body and template evidence are prepared, but the final
+  GitHub web submission is blocked because the macOS session locked while
+  Safari held the authenticated GitHub state. No PR exists yet.
+- [next] Unlock the Mac, open a Ready PR against `Fei-Away/main`, then record
+  the PR URL and require exact-head CI. Native Windows PowerShell 5.1/7 remains
+  a CI gate.
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
