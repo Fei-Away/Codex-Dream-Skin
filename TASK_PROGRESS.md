@@ -49,12 +49,13 @@
   `c1433be12252b868b4a0cabc338ed03afdf04a9f` are pushed to
   `hjnnjh/Codex-Dream-Skin:codex/fix-composer-pet-scope`. The public compare is
   3 commits ahead of upstream after this progress checkpoint and 0 behind.
-- [blocked] PR title/body and template evidence are prepared, but the final
-  GitHub web submission is blocked because the macOS session locked while
-  Safari held the authenticated GitHub state. No PR exists yet.
-- [next] Unlock the Mac, open a Ready PR against `Fei-Away/main`, then record
-  the PR URL and require exact-head CI. Native Windows PowerShell 5.1/7 remains
-  a CI gate.
+- [PR open] Ready PR #372 targets `Fei-Away/main`:
+  `https://github.com/Fei-Away/Codex-Dream-Skin/pull/372`. The implementation,
+  changelog, and first progress checkpoint are pushed; the PR is not merged or
+  released.
+- [next] Push this PR-status checkpoint, then require exact-head Static,
+  macOS/DMG, Windows PowerShell 7, and Windows PowerShell 5.1/Setup CI before
+  any merge decision. Native Windows verification remains a CI gate.
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
