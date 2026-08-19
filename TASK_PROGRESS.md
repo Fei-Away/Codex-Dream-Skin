@@ -6,9 +6,8 @@
   `_ComposerLayoutFooter_` instead of `_ComposerLayoutRoot_`, and prevent Dream
   Skin from injecting wallpaper/CSS into `/avatar-overlay` and Pet composition
   surfaces that must remain transparent.
-- [scope] Isolated clone
-  `/Users/huangjinnan/Desktop/Codex-Dream-Skin-pr-composer-pet-fix`, branch
-  `codex/fix-composer-pet-scope`, based on exact `origin/main@95423d8` (v1.5.14).
+- [scope] Isolated branch `codex/fix-composer-pet-scope`, based on exact
+  `origin/main@95423d8` (v1.5.14).
   Shared runtime source, generated dual-platform assets, focused regressions,
   and this progress record are in scope. User-specific theme colors are not.
 - [field evidence] Live macOS Codex exposed `_ComposerLayoutRoot_*` around the
@@ -44,6 +43,8 @@
   Medium, or Low issues. It confirmed renderer self-exclusion, verified cleanup
   in one-shot and watcher paths, ComposerLayoutRoot selection, generated asset
   synchronization, and focused dual-platform coverage.
+- [review response] Removed the host-specific absolute clone path from this
+  progress record after PR review; no product code changes were requested.
 - [committed/pushed] Implementation and test commit
   `c4c3a7e90c0def8c4a6961ca013ec2ac36ca15b8` plus changelog commit
   `c1433be12252b868b4a0cabc338ed03afdf04a9f` are pushed to
