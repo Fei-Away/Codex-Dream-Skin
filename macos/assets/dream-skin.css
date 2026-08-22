@@ -248,8 +248,9 @@ html[data-dream-skin="active"] aside.app-shell-left-panel [class*="text-token-in
   color: rgb(var(--ds-muted-rgb) / .92) !important;
 }
 
-/* Preserve native inline semantic colors for sidebar indicators. */
-html[data-dream-skin="active"] aside.app-shell-left-panel svg:not([style*="color"]) {
+/* Preserve native inline color declarations for sidebar indicators without
+   mistaking background-color or custom properties for a foreground color. */
+html[data-dream-skin="active"] aside.app-shell-left-panel svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: rgb(var(--ds-muted-rgb) / .96) !important;
 }
 
@@ -260,8 +261,8 @@ html[data-dream-skin="active"] aside.app-shell-left-panel a:hover {
   transform: none !important;
 }
 
-html[data-dream-skin="active"] aside.app-shell-left-panel button:hover svg:not([style*="color"]),
-html[data-dream-skin="active"] aside.app-shell-left-panel a:hover svg:not([style*="color"]) {
+html[data-dream-skin="active"] aside.app-shell-left-panel button:hover svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]),
+html[data-dream-skin="active"] aside.app-shell-left-panel a:hover svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: var(--ds-accent) !important;
 }
 
@@ -288,7 +289,7 @@ html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] 
   color: var(--ds-text) !important;
 }
 
-html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] svg:not([style*="color"]) {
+html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: var(--ds-accent) !important;
 }
 
