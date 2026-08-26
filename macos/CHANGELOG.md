@@ -10,6 +10,7 @@
 
 ### 修复
 
+- 修复新版 Codex 把输入框壳迁移到 `_ComposerLayoutRoot_` 后，Dream Skin 误把 `_ComposerLayoutFooter_` 标记为 composer、导致主题输入框样式只落在底部工具栏的问题；同时排除 `/avatar-overlay` 与 Pet composition surface，并在发现旧注入时执行移除与验证，避免主题壁纸污染透明 Pet 窗口形成矩形背景。
 - 修复透明或极端显式强调色下按钮文字对比度不稳定的问题：共享渲染器现在按真实 composer 面板表面和最坏背景计算前景色，并正确处理 alpha 与 RGB 夹取（#351）。
 - 修复菜单栏「重新应用皮肤」与「打开 ChatGPT」入口语义不一致的问题（#341）：重新应用现在会先尝试热重载，失败才回退到完整重启；打开 ChatGPT 复用已安装的 Dream Skin 启动脚本而不是直接原生拉起。
 - 渲染器可见性校验加固（#294）：从仅检查宽高与 `display` 改为同时校验 `checkVisibility()`、`opacity`、`content-visibility` 与视口相交，减少"校验通过但皮肤实际不可见"的假阳性。已核实社区主题的 Safe CSS 沙盒不允许 `opacity` 低于 0.65、且不开放 `display`/`visibility`/`position`，不会被这次加固误伤。
@@ -19,6 +20,7 @@
 
 ### 内部
 
+- 同步 v1.5.15 版本号，发布 Codex 26.814-26.818 composer 根节点与 Pet 透明 surface 兼容修复、原生侧栏图标颜色保留，以及受限 Safe CSS composer 边框桥接（#372、#368、#366）。
 - 同步 v1.5.14 版本号，发布 Windows 一键换肤冷启动会话基线修复（#352、#360）；macOS 运行时代码相对 v1.5.13 无行为变化。
 - 同步 v1.5.13 版本号，发布本轮双端语言与对比度修复，以及 Windows 失败启动外观回滚修复（#351、#357）。
 - 同步 v1.5.12 版本号，发布菜单栏重组、更新通知与上述修复。

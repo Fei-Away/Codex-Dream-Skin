@@ -5,11 +5,17 @@ import vm from "node:vm";
 
 function styleDeclaration() {
   const values = new Map();
+  const priorities = new Map();
   return {
-    values,
+    priorities, values,
     getPropertyValue(name) { return values.get(name) || ""; },
-    setProperty(name, value) { values.set(name, String(value)); },
-    removeProperty(name) { values.delete(name); },
+    getPropertyPriority(name) { return priorities.get(name) || ""; },
+    setProperty(name, value, priority = "") {
+      values.set(name, String(value));
+      if (priority) priorities.set(name, String(priority));
+      else priorities.delete(name);
+    },
+    removeProperty(name) { values.delete(name); priorities.delete(name); },
     [Symbol.iterator]() { return values.keys(); },
   };
 }
@@ -30,7 +36,8 @@ function classList(initial) {
 function makeFixture({
   nativeAppearance = "dark", settings = false, settingsPanel = false, adopted = true,
   generic = false, genericComposer = true, genericHome = false, genericSearch = false,
-  modernMessages = false,
+  modernMessages = false, modernComposerLayout = false,
+  pathname = "/index.html", initialRoute = "",
 } = {}) {
   const attrs = new Map();
   const rootStyle = styleDeclaration();
@@ -51,6 +58,7 @@ function makeFixture({
     const node = {
       name,
       parentElement,
+      style: styleDeclaration(),
       get attributes() { return attributesFor(values); },
       getAttribute(attribute) { return values.get(attribute) ?? null; },
       setAttribute(attribute, value) { values.set(attribute, String(value)); },
@@ -103,15 +111,22 @@ function makeFixture({
     const sidebarSelector = 'aside, nav[aria-label]';
     const composerSelector = '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
       '[class*="composer" i], [class*="prompt" i]';
+    const composerLayoutRootSelector = '[class*="_ComposerLayoutRoot_"]';
     const overlaySelector = '[role="dialog"], [aria-modal="true"]';
     partFixtures.shell = makeDomNode("generic-shell", body);
     partFixtures.sidebar = makeDomNode("generic-sidebar", partFixtures.shell, new Map(), [sidebarSelector]);
     partFixtures.main = makeDomNode("generic-main", partFixtures.shell, new Map(), [mainSelector]);
     if (genericComposer) {
       partFixtures.composer = makeDomNode(
-        "generic-composer", partFixtures.main, new Map(), [composerSelector],
+        "generic-composer", partFixtures.main, new Map(),
+        [modernComposerLayout ? composerLayoutRootSelector : composerSelector],
       );
-      partFixtures.input = makeDomNode("generic-input", partFixtures.composer, new Map(), [inputSelector]);
+      const inputParent = modernComposerLayout
+        ? (partFixtures.composerFooter = makeDomNode(
+          "generic-composer-footer", partFixtures.composer, new Map(), [composerSelector],
+        ))
+        : partFixtures.composer;
+      partFixtures.input = makeDomNode("generic-input", inputParent, new Map(), [inputSelector]);
     }
     partFixtures.unrelatedAside = makeDomNode(
       "generic-content-aside", partFixtures.main, new Map(), [sidebarSelector],
@@ -168,8 +183,8 @@ function makeFixture({
       register(messageSelector, partFixtures.userMessage);
       register(messageSelector, partFixtures.assistantMessage);
     }
-    register(".composer-surface-chrome", partFixtures.composer);
-    register('.composer-surface-chrome [class*="_footer_"]', partFixtures.composerToolbar);
+    register(':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])', partFixtures.composer);
+    register(':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutRoot_"] [class*="_ComposerLayoutFooter_"], [data-composer-surface-variant][data-composer-radius-variant] :is([data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"]))', partFixtures.composerToolbar);
   }
   const makeStyleNode = () => {
     const node = {
@@ -231,6 +246,11 @@ function makeFixture({
   const context = {
     window,
     document,
+    location: {
+      protocol: "app:",
+      pathname,
+      search: initialRoute ? `?initialRoute=${encodeURIComponent(initialRoute)}` : "",
+    },
     MutationObserver: MockMutationObserver,
     CSSStyleSheet: adopted ? MockSheet : undefined,
     Blob,
@@ -240,6 +260,7 @@ function makeFixture({
       createObjectURL() { nextBlob += 1; return `blob:fixture-${nextBlob}`; },
       revokeObjectURL(value) { revoked.push(value); },
     },
+    URLSearchParams,
     performance: { now: () => 1 },
     setTimeout(callback, delay) { const id = ++nextId; timers.set(id, { callback, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
@@ -247,10 +268,10 @@ function makeFixture({
     clearInterval(id) { intervals.delete(id); },
     console,
   };
-  const payloadFor = (theme = {}) => {
+  const payloadFor = (theme = {}, cssText = ".fixture { color: red; }") => {
     const template = fixture.template;
     return template
-      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(".fixture { color: red; }"))
+      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(cssText))
       .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
       .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify({ id: "fixture", appearance: "auto", ...theme }))
       .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify("test"))
@@ -330,6 +351,38 @@ export async function runRendererRuntimeTest(assetRoot) {
   // and the measured fossil selector must be absent from the canonical CSS.
   assert.doesNotMatch(css, /(?:^|[.#\s])(?:codex-dream-skin|dream-skin-home|dream-home|dream-task)(?:[\s.#:{>]|$)|home-suggestion-list-item/);
   assert.match(css, /html\[data-dream-skin="active"\]/);
+  const sidebar = "(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\\.app-shell-left-panel)";
+  const noInlineColor = "svg:not\\(\\[style\\^=[\"']color:[\"']\\]\\):not\\(\\[style\\*=[\"'];color:[\"']\\]\\):not\\(\\[style\\*=[\"']; color:[\"']\\]\\)";
+  assert.match(
+    css,
+    new RegExp(`${sidebar} ${noInlineColor}\\s*\\{\\s*color:\\s*rgb\\(var\\(--ds-muted-rgb\\) / \\.96\\) !important;`),
+    "Sidebar base icon tint must exempt only an inline color declaration.",
+  );
+  assert.match(
+    css,
+    new RegExp(`${sidebar} button:hover ${noInlineColor},\\s*[\\s\\S]{0,160}${sidebar} a:hover ${noInlineColor}\\s*\\{\\s*color:\\s*var\\(--ds-accent\\) !important;`),
+    "Sidebar hover tint must exempt only an inline color declaration.",
+  );
+  assert.match(
+    css,
+    new RegExp(`${sidebar} \\[aria-current=\\\"page\\\"\\] ${noInlineColor}\\s*\\{\\s*color:\\s*var\\(--ds-accent\\) !important;`),
+    "Sidebar current-page tint must exempt only an inline color declaration.",
+  );
+  assert.doesNotMatch(
+    css,
+    /(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) svg\s*\{\s*color:\s*rgb\(var\(--ds-muted-rgb\) \/ \.96\) !important;/,
+    "Sidebar base tint must not override every SVG.",
+  );
+  assert.doesNotMatch(
+    css,
+    /(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) button:hover svg\s*,\s*[\s\S]{0,160}(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) a:hover svg\s*\{\s*color:\s*var\(--ds-accent\) !important;/,
+    "Sidebar hover tint must not override every SVG.",
+  );
+  assert.doesNotMatch(
+    css,
+    /(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\.app-shell-left-panel) \[aria-current="page"\] svg\s*\{\s*color:\s*var\(--ds-accent\) !important;/,
+    "Sidebar current-page tint must not override every SVG.",
+  );
   // Home gating must stay single-level: CSS forbids :has() inside :has(),
   // and Chromium drops any rule that nests it (the v1.3.1 regression).  The
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
@@ -346,8 +399,18 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
-    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
+    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome,[^)]*\)|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
     "Accent foreground contrast must model the composer panel's 94% RGB surface",
+  );
+  assert.match(
+    css,
+    /data-composer-utility-bar-variant="home"\][\s\S]{0,180}> \[class\*="_ComposerLayoutBody_"\][\s\S]{0,220}background:\s*transparent\s*!important;[\s\S]{0,180}backdrop-filter:\s*none\s*!important;/,
+    "The Home-only native Composer body must stay transparent behind the public root.",
+  );
+  assert.match(
+    css,
+    /(?:__DREAM_SELECTOR_SHELL_MAIN__|main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*="_MainContentSurface_"\]\))[\s\S]{0,180}\[data-vscode-context\]\[tabindex="0"\]:focus-visible[\s\S]{0,120}outline:\s*none\s*!important;/,
+    "The non-interactive Codex route wrapper must not draw a window-sized focus outline.",
   );
   assert.match(
     css,
@@ -426,6 +489,57 @@ export async function runRendererRuntimeTest(assetRoot) {
     assert.equal(home.partFixtures[fixtureKey].getAttribute("data-ds-part"), part,
       `${part} must be exposed through the public Safe CSS bridge`);
   }
+
+  const composerBridgeCss = `@layer dreamskin-community {
+    [data-ds-part="composer"] {
+      --ds-community-composer-border-color: rgba(255, 255, 255, 0.28) !important;
+      --ds-community-composer-border-width: 1px !important;
+      --ds-community-composer-border-style: solid !important;
+    }
+  }`;
+  const bridgedComposer = makeFixture({ nativeAppearance: "dark" });
+  bridgedComposer.partFixtures.composer.style.setProperty("border-color", "red");
+  bridgedComposer.partFixtures.composer.style.setProperty("border-width", "2px", "important");
+  bridgedComposer.partFixtures.composer.style.setProperty("border-style", "dashed");
+  vm.runInNewContext(bridgedComposer.payloadFor({}, composerBridgeCss), bridgedComposer.context);
+  for (const property of ["border-color", "border-width", "border-style"]) {
+    assert.equal(
+      bridgedComposer.partFixtures.composer.style.getPropertyValue(property),
+      `var(--ds-community-composer-${property})`,
+      `${property} must be bridged to the validated community cascade`,
+    );
+    assert.equal(bridgedComposer.partFixtures.composer.style.getPropertyPriority(property), "important");
+  }
+  assert.equal(bridgedComposer.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+  assert.equal(bridgedComposer.partFixtures.composer.style.getPropertyValue("border-color"), "red");
+  assert.equal(bridgedComposer.partFixtures.composer.style.getPropertyPriority("border-width"), "important");
+
+  const petOverlay = makeFixture({ nativeAppearance: "dark", initialRoute: "/avatar-overlay" });
+  vm.runInNewContext(petOverlay.payloadFor(), petOverlay.context);
+  assert.equal(petOverlay.window.__CODEX_DREAM_SKIN_STATE__, undefined,
+    "The avatar overlay must reject Dream Skin before installing renderer state.");
+  assert.equal(petOverlay.window.__CODEX_DREAM_SKIN_DISABLED__, true);
+  assert.equal(petOverlay.document.adoptedStyleSheets.length, 0);
+  assert.equal(petOverlay.attrs.get("data-dream-skin"), undefined);
+
+  const petComposition = makeFixture({
+    nativeAppearance: "dark", pathname: "/avatar-overlay-composition-surface.html",
+  });
+  vm.runInNewContext(petComposition.payloadFor(), petComposition.context);
+  assert.equal(petComposition.window.__CODEX_DREAM_SKIN_STATE__, undefined,
+    "Pet composition surfaces must remain transparent and unthemed.");
+  assert.equal(petComposition.document.adoptedStyleSheets.length, 0);
+
+  const navigatedPet = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(navigatedPet.payloadFor(), navigatedPet.context);
+  navigatedPet.context.location.pathname = "/avatar-overlay-composition-surface.html";
+  vm.runInNewContext(navigatedPet.payloadFor(), navigatedPet.context);
+  assert.equal(navigatedPet.window.__CODEX_DREAM_SKIN_STATE__, undefined,
+    "Reapplying on a Pet route must clean an older renderer injection.");
+  assert.equal(navigatedPet.document.adoptedStyleSheets.length, 0);
+  assert.equal(navigatedPet.attrs.get("data-dream-skin"), undefined);
+  assert.equal(navigatedPet.revoked.length, 1,
+    "Pet cleanup must revoke the previous wallpaper blob URL.");
   const dynamicMessage = home.addDynamicMessage();
   partObserver.callback([{ type: "childList" }]);
   home.flushTimers(80);
@@ -453,6 +567,15 @@ export async function runRendererRuntimeTest(assetRoot) {
     "An aside inside the main content must not be exposed as the app sidebar.");
   assert.equal(generic.partFixtures.dialogInput.getAttribute("data-ds-part"), null,
     "Dialog inputs must not be mistaken for the app composer.");
+
+  const modernComposer = makeFixture({
+    nativeAppearance: "dark", generic: true, modernComposerLayout: true,
+  });
+  vm.runInNewContext(modernComposer.payloadFor(), modernComposer.context);
+  assert.equal(modernComposer.partFixtures.composer.getAttribute("data-ds-part"), "composer",
+    "The ComposerLayoutRoot wrapper must receive the public composer part.");
+  assert.equal(modernComposer.partFixtures.composerFooter.getAttribute("data-ds-part"), null,
+    "The broad composer fallback must not stop at ComposerLayoutFooter.");
 
   const genericSearch = makeFixture({
     nativeAppearance: "dark", generic: true, genericComposer: false, genericSearch: true,

@@ -75,6 +75,11 @@ const STYLE_PROPERTIES = new Set([
   "border-bottom-style",
   "border-left-style",
 ]);
+const COMPOSER_BORDER_BRIDGE_PROPERTIES = new Set([
+  ...[...COLOR_PROPERTIES].filter((property) => property.startsWith("border-")),
+  ...WIDTH_PROPERTIES,
+  ...STYLE_PROPERTIES,
+]);
 const RADIUS_PROPERTIES = new Set([
   "border-radius",
   "border-top-left-radius",
@@ -521,6 +526,15 @@ function validationResult(parsed) {
 
 function compileRuntimeCss(parsed) {
   const compiledRules = [];
+  const composerBaseBorderProperties = new Set();
+  for (const { selector, declarations } of parsed.rules) {
+    if (selector.part !== "composer" || selector.state) continue;
+    for (const { property } of declarations) {
+      if (COMPOSER_BORDER_BRIDGE_PROPERTIES.has(property)) {
+        composerBaseBorderProperties.add(property);
+      }
+    }
+  }
   for (const { selector: selectorRecord, declarations } of parsed.rules) {
     const { part, selector } = selectorRecord;
     const runtimeDeclarations = [];
@@ -531,6 +545,15 @@ function compileRuntimeCss(parsed) {
         && CORE_BACKGROUND_IMAGE_PARTS.has(part)
       ) {
         runtimeDeclarations.push({ property: "background-image", value: "none" });
+      }
+      if (
+        part === "composer"
+        && composerBaseBorderProperties.has(declaration.property)
+      ) {
+        runtimeDeclarations.push({
+          property: `--ds-community-composer-${declaration.property}`,
+          value: declaration.value,
+        });
       }
     }
     const body = runtimeDeclarations

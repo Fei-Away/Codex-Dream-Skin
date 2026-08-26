@@ -1,18 +1,40 @@
 // Canonical cross-platform renderer. Run tools/sync-runtime-assets.mjs after editing.
 ((cssText, artDataUrl, themeConfig) => {
-  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main:is(.main-surface, [data-app-shell-main-surface], [class*=\"_MainContentSurface_\"])","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*=\"_Header_\"])","tier":"L1","scope":"all","required":true},{"key":"main-content-top-fade","selector":":is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*=\"_MainContentTopFade_\"])","tier":"L2","scope":"all","required":false},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"home-banners","selector":".home-banners","tier":"L2","scope":"home","required":false},{"key":"composer-chrome","selector":".composer-surface-chrome","tier":"L2","scope":"home+thread","required":false},{"key":"composer-toolbar","selector":".composer-surface-chrome [class*=\"_footer_\"]","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":"[class*=\"_homeUtilityBar_\"]","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"thread-surface","selector":".thread-scroll-container","tier":"L2","scope":"thread","required":false},{"key":"message","selector":":is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])","tier":"L2","scope":"thread","required":false},{"key":"settings-panel","selector":"[data-settings-panel-slug=\"general-settings\"]","tier":"L2","scope":"settings","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
+  const SELECTOR_CONTRACT = {"schema":"codex-dream-skin-selectors/1","selectors":[{"key":"shell-main","selector":"main:is(.main-surface, [data-app-shell-main-surface], [class*=\"_MainContentSurface_\"])","tier":"L1","scope":"all","required":true},{"key":"left-panel","selector":"aside.app-shell-left-panel","tier":"L1","scope":"all","required":true},{"key":"header-tint","selector":"header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*=\"_Header_\"])","tier":"L1","scope":"all","required":true},{"key":"main-content-top-fade","selector":":is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*=\"_MainContentTopFade_\"])","tier":"L2","scope":"all","required":false},{"key":"home-icon","selector":"[data-testid=\"home-icon\"]","tier":"L1","scope":"home","required":true},{"key":"home-route","selector":"[role=\"main\"]:has([data-testid=\"home-icon\"])","tier":"L1","scope":"home","required":true},{"key":"home-route-css","selector":"[role=\"main\"]","tier":"L1","scope":"home","required":true},{"key":"home-banners","selector":".home-banners","tier":"L2","scope":"home","required":false},{"key":"composer-chrome","selector":":is(.composer-surface-chrome, [class*=\"_ComposerLayoutRoot_\"], [data-composer-surface-variant][data-composer-radius-variant])","tier":"L2","scope":"home+thread","required":false},{"key":"composer-toolbar","selector":":is(.composer-surface-chrome [class*=\"_footer_\"], [class*=\"_ComposerLayoutRoot_\"] [class*=\"_ComposerLayoutFooter_\"], [data-composer-surface-variant][data-composer-radius-variant] :is([data-composer-footer-responsive], [class*=\"_ComposerLayoutFooter_\"], [class*=\"_footer_\"]))","tier":"L2","scope":"home+thread","required":false},{"key":"home-utility","selector":":is([class*=\"_homeUtilityBar_\"], [class*=\"_ComposerHomeUtilityBar_\"])","tier":"L2","scope":"home","required":false},{"key":"game-source","selector":"[data-feature=\"game-source\"]","tier":"L2","scope":"home","required":false},{"key":"home-suggestions","selector":".group\\/home-suggestions","tier":"L2","scope":"home","required":false},{"key":"project-selector","selector":".group\\/project-selector","tier":"L2","scope":"home config","required":false},{"key":"markdown","selector":"[class*=\"_markdown\"]","tier":"L2","scope":"thread","required":false},{"key":"thread-surface","selector":".thread-scroll-container","tier":"L2","scope":"thread","required":false},{"key":"message","selector":":is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])","tier":"L2","scope":"thread","required":false},{"key":"settings-panel","selector":"[data-settings-panel-slug=\"general-settings\"]","tier":"L2","scope":"settings","required":false},{"key":"appearance-radio","selector":"input[name=\"appearance-theme\"]","tier":"L2","scope":"settings","required":false},{"key":"overlay-menu","selector":"[role=\"menu\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-dialog","selector":"[role=\"dialog\"]","tier":"L2","scope":"overlay","required":false},{"key":"overlay-popper","selector":"[data-radix-popper-content-wrapper]","tier":"L2","scope":"overlay","required":false}],"stableTestids":["app-shell-header-context-menu-surface","home-icon","theme-preview"]};
   const STATE_KEY = "__CODEX_DREAM_SKIN_STATE__";
   const DISABLED_KEY = "__CODEX_DREAM_SKIN_DISABLED__";
   const STYLE_REGISTRY_KEY = "__CODEX_DREAM_SKIN_STYLE_SHEETS__";
   const STYLE_ID = "codex-dream-skin-style";
   const SHELL_ATTR = "data-dream-shell";
   const PART_ATTR = "data-ds-part";
+  const COMPOSER_BORDER_BRIDGES = [
+    "border-color", "border-top-color", "border-right-color", "border-bottom-color",
+    "border-left-color", "border-width", "border-top-width", "border-right-width",
+    "border-bottom-width", "border-left-width", "border-style", "border-top-style",
+    "border-right-style", "border-bottom-style", "border-left-style",
+  ].map((property) => ({
+    property,
+    variable: `--ds-community-composer-${property}`,
+  })).filter(({ variable }) => cssText.includes(`${variable}:`));
   const ROOT_ATTRS = [
     "data-dream-skin", SHELL_ATTR,
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
     "data-dream-art-ready",
   ];
+  const initialRoute = new URLSearchParams(String(location.search || ""))
+    .get("initialRoute") || "";
+  const pathname = String(location.pathname || "");
+  const excludedPetSurface = location.protocol === "app:" && (
+    pathname.endsWith("/avatar-overlay-composition-surface.html") ||
+    initialRoute === "/avatar-overlay" || initialRoute.startsWith("/avatar-overlay/")
+  );
+  if (excludedPetSurface) {
+    const previous = window[STATE_KEY];
+    if (typeof previous?.cleanup === "function") previous.cleanup();
+    window[DISABLED_KEY] = true;
+    return;
+  }
   const VERSION = __DREAM_SKIN_VERSION_JSON__;
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
   const PAYLOAD_REVISION = __DREAM_SKIN_PAYLOAD_REVISION_JSON__;
@@ -630,6 +652,7 @@
   };
 
   const partNodes = new Set();
+  const composerBorderRestores = new Map();
   const queryAll = (selector) => {
     if (!selector) return [];
     try { return [...document.querySelectorAll(selector)]; } catch { return []; }
@@ -670,19 +693,68 @@
       const main = resolvedMainNode();
       for (const input of genericInputNodes()) {
         if (main && !main.contains?.(input)) continue;
-        const owner = input.closest?.(
-          '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
-          '[class*="composer" i], [class*="prompt" i]',
+        const layoutRoot = input.closest?.('[class*="_ComposerLayoutRoot_"]');
+        if (layoutRoot && (!main || main.contains?.(layoutRoot))) return [layoutRoot];
+        const semanticOwner = input.closest?.(
+          '.composer-surface-chrome, [data-composer-surface-variant][data-composer-radius-variant], ' +
+          '[class*="_ComposerLayoutRoot_"]',
         );
-        if (owner && (!main || main.contains?.(owner))) return [owner];
+        if (semanticOwner && (!main || main.contains?.(semanticOwner))) return [semanticOwner];
+        const ownerSelector =
+          '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
+          '[class*="composer" i], [class*="prompt" i]';
+        const nearest = input.closest?.(ownerSelector);
+        if (!nearest || (main && !main.contains?.(nearest))) continue;
+        let owner = nearest;
+        for (let parent = nearest.parentElement; parent && parent !== main;
+          parent = parent.parentElement) {
+          if (parent.matches?.(ownerSelector)) owner = parent;
+        }
+        return [owner];
       }
       return [];
     })();
+  const fallbackComposerToolbarNodes = (composerNodes) => {
+    if (selectorNodes("composer-toolbar").length || !composerNodes.length) return [];
+    return genericNodes(
+      '[data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"]',
+    ).filter((node) => composerNodes.some((composer) =>
+      composer !== node && composer.contains?.(node)));
+  };
   const addPart = (desired, part, nodes) => {
     for (const node of nodes) {
       if (node && typeof node.setAttribute === "function" && !desired.has(node)) {
         desired.set(node, part);
       }
+    }
+  };
+  const restoreComposerBorders = (node) => {
+    const saved = composerBorderRestores.get(node);
+    if (!saved) return;
+    for (const [property, { value, priority }] of saved) {
+      if (value) node.style.setProperty(property, value, priority);
+      else node.style.removeProperty(property);
+      metrics.styleWrites += 1;
+    }
+    composerBorderRestores.delete(node);
+  };
+  const refreshComposerBorders = (composerNodes) => {
+    const desired = new Set(COMPOSER_BORDER_BRIDGES.length ? composerNodes : []);
+    for (const node of composerBorderRestores.keys()) {
+      if (!desired.has(node)) restoreComposerBorders(node);
+    }
+    for (const node of desired) {
+      if (!node?.style || composerBorderRestores.has(node)) continue;
+      const saved = new Map();
+      for (const { property, variable } of COMPOSER_BORDER_BRIDGES) {
+        saved.set(property, {
+          value: node.style.getPropertyValue(property),
+          priority: node.style.getPropertyPriority(property),
+        });
+        node.style.setProperty(property, `var(${variable})`, "important");
+        metrics.styleWrites += 1;
+      }
+      composerBorderRestores.set(node, saved);
     }
   };
   const refreshParts = () => {
@@ -698,8 +770,11 @@
     addPart(desired, "project-list", selectorNodes("project-selector"));
     addPart(desired, "thread", selectorNodes("thread-surface"));
     addPart(desired, "message", selectorNodes("message"));
-    addPart(desired, "composer", [...selectorNodes("composer-chrome"), ...fallbackComposerNodes()]);
-    addPart(desired, "composer-toolbar", selectorNodes("composer-toolbar"));
+    const composerNodes = [...selectorNodes("composer-chrome"), ...fallbackComposerNodes()];
+    addPart(desired, "composer", composerNodes);
+    addPart(desired, "composer-toolbar", [
+      ...selectorNodes("composer-toolbar"), ...fallbackComposerToolbarNodes(composerNodes),
+    ]);
     addPart(desired, "dialog", selectorNodes("overlay-dialog"));
     const homeHero = selectorNodes("game-source")[0] ??
       selectorNodes("home-icon")[0]?.parentElement;
@@ -719,9 +794,11 @@
       }
       partNodes.add(node);
     }
+    refreshComposerBorders(composerNodes);
   };
 
   const removeParts = () => {
+    for (const node of [...composerBorderRestores.keys()]) restoreComposerBorders(node);
     for (const node of partNodes) node.removeAttribute?.(PART_ATTR);
     partNodes.clear();
     for (const node of queryAll(`[${PART_ATTR}]`)) node.removeAttribute?.(PART_ATTR);

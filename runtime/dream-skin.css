@@ -248,7 +248,9 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [class*="text-token
   color: rgb(var(--ds-muted-rgb) / .92) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ svg {
+/* Preserve native inline color declarations for sidebar indicators without
+   mistaking background-color or custom properties for a foreground color. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: rgb(var(--ds-muted-rgb) / .96) !important;
 }
 
@@ -259,8 +261,8 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ a:hover {
   transform: none !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ button:hover svg,
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ a:hover svg {
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ button:hover svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]),
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ a:hover svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: var(--ds-accent) !important;
 }
 
@@ -287,7 +289,7 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [aria-current="page
   color: var(--ds-text) !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [aria-current="page"] svg {
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ [aria-current="page"] svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: var(--ds-accent) !important;
 }
 
@@ -901,6 +903,30 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__::before { content: none !important; }
 
+/* Codex 26.803+ moves the Home surface paint onto its body child. Keep one
+   public visual surface: the renderer exposes the outer root as
+   data-ds-part="composer", while this internal native layer stays
+   transparent so base and Community Safe CSS paint the same node. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__[data-composer-utility-bar-variant="home"]
+  > [class*="_ComposerLayoutBody_"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* The current Home utility bar is a separate opaque cap above the Composer.
+   Match its surface to the public composer without affecting task routes. */
+html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placement="home"]
+  [data-composer-home-utility-bar-position="above"] {
+  background: rgb(var(--ds-panel-rgb) / .94) !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
+  border-bottom: 0 !important;
+  border-radius: 22px 22px 0 0 !important;
+  box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
+  backdrop-filter: blur(16px) saturate(108%) !important;
+}
+
 /* Newer app shells may no longer expose the selector contract above. The
    renderer assigns these parts only from one coherent main/composer/sidebar
    structure; keep the minimum background and transparency contract functional
@@ -1058,6 +1084,13 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
   > __DREAM_SELECTOR_HEADER_TINT__ svg {
   color: rgb(var(--ds-muted-rgb) / .96) !important;
   filter: drop-shadow(0 1px 2px rgb(var(--ds-bg-rgb) / .72));
+}
+
+/* Codex moves focus to this non-interactive route wrapper after Shift. Its
+   native outline can span the full content pane and an embedded webview. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_SHELL_MAIN__
+  [data-vscode-context][tabindex="0"]:focus-visible {
+  outline: none !important;
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)

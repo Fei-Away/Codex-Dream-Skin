@@ -248,7 +248,9 @@ html[data-dream-skin="active"] aside.app-shell-left-panel [class*="text-token-in
   color: rgb(var(--ds-muted-rgb) / .92) !important;
 }
 
-html[data-dream-skin="active"] aside.app-shell-left-panel svg {
+/* Preserve native inline color declarations for sidebar indicators without
+   mistaking background-color or custom properties for a foreground color. */
+html[data-dream-skin="active"] aside.app-shell-left-panel svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: rgb(var(--ds-muted-rgb) / .96) !important;
 }
 
@@ -259,8 +261,8 @@ html[data-dream-skin="active"] aside.app-shell-left-panel a:hover {
   transform: none !important;
 }
 
-html[data-dream-skin="active"] aside.app-shell-left-panel button:hover svg,
-html[data-dream-skin="active"] aside.app-shell-left-panel a:hover svg {
+html[data-dream-skin="active"] aside.app-shell-left-panel button:hover svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]),
+html[data-dream-skin="active"] aside.app-shell-left-panel a:hover svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: var(--ds-accent) !important;
 }
 
@@ -287,7 +289,7 @@ html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] 
   color: var(--ds-text) !important;
 }
 
-html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] svg {
+html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] svg:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]) {
   color: var(--ds-accent) !important;
 }
 
@@ -428,7 +430,7 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-
 }
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])):not(:has(main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [role="main"]))
-  .composer-surface-chrome {
+  :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) {
   background: var(--ds-immersive-composer-solid) !important;
   border: 0 !important;
   box-shadow:
@@ -890,7 +892,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .gro
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:first-child { justify-content: center !important; }
 html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) .group\/home-suggestions button > span:last-child { align-items: center !important; text-align: center !important; }
 
-html[data-dream-skin="active"] .composer-surface-chrome {
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) {
   overflow: visible !important;
   border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
   border-radius: 22px !important;
@@ -899,7 +901,31 @@ html[data-dream-skin="active"] .composer-surface-chrome {
   backdrop-filter: blur(16px) saturate(108%) !important;
 }
 
-html[data-dream-skin="active"] .composer-surface-chrome::before { content: none !important; }
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])::before { content: none !important; }
+
+/* Codex 26.803+ moves the Home surface paint onto its body child. Keep one
+   public visual surface: the renderer exposes the outer root as
+   data-ds-part="composer", while this internal native layer stays
+   transparent so base and Community Safe CSS paint the same node. */
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])[data-composer-utility-bar-variant="home"]
+  > [class*="_ComposerLayoutBody_"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* The current Home utility bar is a separate opaque cap above the Composer.
+   Match its surface to the public composer without affecting task routes. */
+html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placement="home"]
+  [data-composer-home-utility-bar-position="above"] {
+  background: rgb(var(--ds-panel-rgb) / .94) !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
+  border-bottom: 0 !important;
+  border-radius: 22px 22px 0 0 !important;
+  box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
+  backdrop-filter: blur(16px) saturate(108%) !important;
+}
 
 /* Newer app shells may no longer expose the selector contract above. The
    renderer assigns these parts only from one coherent main/composer/sidebar
@@ -1060,6 +1086,13 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   filter: drop-shadow(0 1px 2px rgb(var(--ds-bg-rgb) / .72));
 }
 
+/* Codex moves focus to this non-interactive route wrapper after Shift. Its
+   native outline can span the full content pane and an embedded webview. */
+html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+  [data-vscode-context][tabindex="0"]:focus-visible {
+  outline: none !important;
+}
+
 html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])
   [role="main"]:has([data-testid="home-icon"]) > div:first-child > div:first-child > div:first-child {
   border: 0 !important;
@@ -1082,7 +1115,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   backdrop-filter: blur(8px) saturate(104%) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] .composer-surface-chrome {
+html[data-dream-skin="active"][data-dream-art-wide="true"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) {
   background: var(--ds-immersive-composer-solid) !important;
   border: 0 !important;
   box-shadow:
@@ -1093,7 +1126,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] .composer-surface-chr
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
-  .composer-surface-chrome {
+  :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) {
   box-shadow:
     0 10px 28px rgb(var(--ds-bg-rgb) / .14),
     inset 0 0 0 1px var(--ds-immersive-line),
@@ -1102,7 +1135,7 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"]
-  .composer-surface-chrome p.placeholder::after {
+  :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) p.placeholder::after {
   color: rgb(var(--ds-muted-rgb) / .78) !important;
   opacity: 1 !important;
 }
@@ -1110,7 +1143,7 @@ html[data-dream-skin="active"][data-dream-shell="light"]
 /* Current Codex builds render the home project picker as a separate opaque
    cap above the composer. Join both native controls into one continuous
    surface while leaving task and utility-route inputs untouched. */
-html[data-dream-skin="active"] [class*="_homeUtilityBar_"] {
+html[data-dream-skin="active"] :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) {
   top: 0 !important;
   width: 100% !important;
   margin-inline: 0 !important;
@@ -1124,8 +1157,8 @@ html[data-dream-skin="active"] [class*="_homeUtilityBar_"] {
   backdrop-filter: blur(16px) saturate(108%) !important;
 }
 
-html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]):has([class*="_homeUtilityBar_"])
-  .composer-surface-chrome {
+html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]):has(:is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]))
+  :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) {
   border: 0 !important;
   border-radius: 0 0 22px 22px !important;
   box-shadow:
@@ -1135,7 +1168,7 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]):has(
     inset 0 -1px rgb(var(--ds-muted-rgb) / .18) !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"] [class*="_homeUtilityBar_"] {
+html[data-dream-skin="active"][data-dream-art-wide="true"] :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) {
   background: var(--ds-immersive-composer-solid) !important;
   box-shadow:
     inset 1px 0 var(--ds-immersive-line),
@@ -1145,7 +1178,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] [class*="_homeUtility
 }
 
 html[data-dream-skin="active"][data-dream-art-wide="true"]
-  [role="main"]:has([data-testid="home-icon"]):has([class*="_homeUtilityBar_"]) .composer-surface-chrome {
+  [role="main"]:has([data-testid="home-icon"]):has(:is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"])) :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) {
   box-shadow:
     0 10px 30px rgb(var(--ds-bg-rgb) / .20),
     inset 1px 0 var(--ds-immersive-line),
@@ -1154,7 +1187,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]
 }
 
 html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="true"]
-  [class*="_homeUtilityBar_"] {
+  :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) {
   box-shadow:
     inset 1px 0 var(--ds-immersive-line),
     inset -1px 0 var(--ds-immersive-line),
@@ -1162,28 +1195,28 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
   backdrop-filter: blur(8px) saturate(102%) !important;
 }
 
-html[data-dream-skin="active"] [class*="_homeUtilityBar_"] button,
-html[data-dream-skin="active"] .composer-surface-chrome button:not([class~="bg-token-foreground"]) {
+html[data-dream-skin="active"] :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) button,
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) button:not([class~="bg-token-foreground"]) {
   color: var(--ds-muted) !important;
 }
 
-html[data-dream-skin="active"] [class*="_homeUtilityBar_"] button svg,
-html[data-dream-skin="active"] .composer-surface-chrome button svg {
+html[data-dream-skin="active"] :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) button svg,
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) button svg {
   color: currentColor !important;
 }
 
-html[data-dream-skin="active"] [class*="_homeUtilityBar_"] button *,
-html[data-dream-skin="active"] .composer-surface-chrome button:not([class~="bg-token-foreground"]) * {
+html[data-dream-skin="active"] :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) button *,
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) button:not([class~="bg-token-foreground"]) * {
   color: currentColor !important;
 }
 
-html[data-dream-skin="active"] [class*="_homeUtilityBar_"] button:hover,
-html[data-dream-skin="active"] .composer-surface-chrome button:not([class~="bg-token-foreground"]):hover {
+html[data-dream-skin="active"] :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) button:hover,
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) button:not([class~="bg-token-foreground"]):hover {
   color: var(--ds-text) !important;
   background: rgb(var(--ds-accent-rgb) / .10) !important;
 }
 
-html[data-dream-skin="active"] .composer-surface-chrome p.placeholder::after {
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) p.placeholder::after {
   color: rgb(var(--ds-muted-rgb) / .82) !important;
   opacity: 1 !important;
 }
