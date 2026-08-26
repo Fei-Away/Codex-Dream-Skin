@@ -90,11 +90,12 @@
 - Completed: instructions/release contract read, remote refreshed, clean
   isolated branch created, site and client GitHub summaries audited, exact
   #373 contribution acknowledged publicly.
-- In progress: compare current shared runtime/selectors/Windows lifecycle code
-  against #373/#378 source evidence and open PR diffs; map each issue to a
-  bounded fix or truthful non-release disposition.
-- No source change, commit, push, PR merge, issue close, version change, tag, or
-  Release has occurred in this branch yet.
+- Completed: compared current shared runtime/selectors/Windows lifecycle code
+  against #373/#378 source evidence and open PR diffs; each candidate is mapped
+  to a bounded fix or truthful non-release disposition.
+- In progress: stage and commit the compatibility patch plus the v1.5.15
+  version/changelog bump, then push a Ready PR and require exact-head CI before
+  merging. No tag or public Release exists yet.
 
 ### Candidate disposition checkpoint
 
@@ -115,6 +116,27 @@
   surface; #363/#231 touch Windows startup/CDP lifecycle already covered by the
   current release history and lack new 26.818-specific evidence. #370/#369 and
   the large feature PRs are explicitly out of this release scope.
+
+### Implementation checkpoint
+
+- Integrated #372's reviewed ComposerLayoutRoot/Pet surface implementation as
+  local commit `16e85d1`, preserving its dual-platform generated assets and
+  focused regression coverage.
+- Integrated #368's two source commits as local commits `5e9e0b4` and `133b1dc`,
+  preserving contributor attribution. The sidebar CSS now exempts native inline
+  semantic icon colors in base, hover, and selected states.
+- Adapted the safe, complementary portions of #366 on top of #372 instead of
+  importing its stale Body-as-root selector: Composer border declarations are
+  compiled to bounded `--ds-community-composer-*` bridge variables and restored
+  on renderer cleanup; the current Home Body/utility-bar and route-focus rules
+  are covered while the public root remains ComposerLayoutRoot.
+- Focused local gates currently pass: shared renderer runtime, both platform
+  renderer payload tests, Safe CSS validator (14/14), macOS/Windows payload
+  integrity, macOS/Windows bootstrap, selector doctor, dual payload checks,
+  runtime sync check, Node syntax, and `git diff --check`. The full portable
+  suite passes 105/105; all six release version sources and both changelog
+  entries now target `1.5.15`. Native Windows PowerShell 5.1/7 and Setup.exe
+  remain exact-head CI gates before publication.
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 

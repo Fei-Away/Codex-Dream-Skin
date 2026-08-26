@@ -5,11 +5,17 @@ import vm from "node:vm";
 
 function styleDeclaration() {
   const values = new Map();
+  const priorities = new Map();
   return {
-    values,
+    priorities, values,
     getPropertyValue(name) { return values.get(name) || ""; },
-    setProperty(name, value) { values.set(name, String(value)); },
-    removeProperty(name) { values.delete(name); },
+    getPropertyPriority(name) { return priorities.get(name) || ""; },
+    setProperty(name, value, priority = "") {
+      values.set(name, String(value));
+      if (priority) priorities.set(name, String(priority));
+      else priorities.delete(name);
+    },
+    removeProperty(name) { values.delete(name); priorities.delete(name); },
     [Symbol.iterator]() { return values.keys(); },
   };
 }
@@ -52,6 +58,7 @@ function makeFixture({
     const node = {
       name,
       parentElement,
+      style: styleDeclaration(),
       get attributes() { return attributesFor(values); },
       getAttribute(attribute) { return values.get(attribute) ?? null; },
       setAttribute(attribute, value) { values.set(attribute, String(value)); },
@@ -176,8 +183,8 @@ function makeFixture({
       register(messageSelector, partFixtures.userMessage);
       register(messageSelector, partFixtures.assistantMessage);
     }
-    register(':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"])', partFixtures.composer);
-    register(':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutRoot_"] [class*="_ComposerLayoutFooter_"])', partFixtures.composerToolbar);
+    register(':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])', partFixtures.composer);
+    register(':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutRoot_"] [class*="_ComposerLayoutFooter_"], [data-composer-surface-variant][data-composer-radius-variant] :is([data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"]))', partFixtures.composerToolbar);
   }
   const makeStyleNode = () => {
     const node = {
@@ -261,10 +268,10 @@ function makeFixture({
     clearInterval(id) { intervals.delete(id); },
     console,
   };
-  const payloadFor = (theme = {}) => {
+  const payloadFor = (theme = {}, cssText = ".fixture { color: red; }") => {
     const template = fixture.template;
     return template
-      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(".fixture { color: red; }"))
+      .replace("__DREAM_SKIN_CSS_JSON__", JSON.stringify(cssText))
       .replace("__DREAM_SKIN_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
       .replace("__DREAM_SKIN_THEME_JSON__", JSON.stringify({ id: "fixture", appearance: "auto", ...theme }))
       .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify("test"))
@@ -392,8 +399,18 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
-    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome, \[class\*="_ComposerLayoutRoot_"\]\)|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
+    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome,[^)]*\)|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
     "Accent foreground contrast must model the composer panel's 94% RGB surface",
+  );
+  assert.match(
+    css,
+    /data-composer-utility-bar-variant="home"\][\s\S]{0,180}> \[class\*="_ComposerLayoutBody_"\][\s\S]{0,220}background:\s*transparent\s*!important;[\s\S]{0,180}backdrop-filter:\s*none\s*!important;/,
+    "The Home-only native Composer body must stay transparent behind the public root.",
+  );
+  assert.match(
+    css,
+    /(?:__DREAM_SELECTOR_SHELL_MAIN__|main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*="_MainContentSurface_"\]\))[\s\S]{0,180}\[data-vscode-context\]\[tabindex="0"\]:focus-visible[\s\S]{0,120}outline:\s*none\s*!important;/,
+    "The non-interactive Codex route wrapper must not draw a window-sized focus outline.",
   );
   assert.match(
     css,
@@ -472,6 +489,30 @@ export async function runRendererRuntimeTest(assetRoot) {
     assert.equal(home.partFixtures[fixtureKey].getAttribute("data-ds-part"), part,
       `${part} must be exposed through the public Safe CSS bridge`);
   }
+
+  const composerBridgeCss = `@layer dreamskin-community {
+    [data-ds-part="composer"] {
+      --ds-community-composer-border-color: rgba(255, 255, 255, 0.28) !important;
+      --ds-community-composer-border-width: 1px !important;
+      --ds-community-composer-border-style: solid !important;
+    }
+  }`;
+  const bridgedComposer = makeFixture({ nativeAppearance: "dark" });
+  bridgedComposer.partFixtures.composer.style.setProperty("border-color", "red");
+  bridgedComposer.partFixtures.composer.style.setProperty("border-width", "2px", "important");
+  bridgedComposer.partFixtures.composer.style.setProperty("border-style", "dashed");
+  vm.runInNewContext(bridgedComposer.payloadFor({}, composerBridgeCss), bridgedComposer.context);
+  for (const property of ["border-color", "border-width", "border-style"]) {
+    assert.equal(
+      bridgedComposer.partFixtures.composer.style.getPropertyValue(property),
+      `var(--ds-community-composer-${property})`,
+      `${property} must be bridged to the validated community cascade`,
+    );
+    assert.equal(bridgedComposer.partFixtures.composer.style.getPropertyPriority(property), "important");
+  }
+  assert.equal(bridgedComposer.window.__CODEX_DREAM_SKIN_STATE__.cleanup(), true);
+  assert.equal(bridgedComposer.partFixtures.composer.style.getPropertyValue("border-color"), "red");
+  assert.equal(bridgedComposer.partFixtures.composer.style.getPropertyPriority("border-width"), "important");
 
   const petOverlay = makeFixture({ nativeAppearance: "dark", initialRoute: "/avatar-overlay" });
   vm.runInNewContext(petOverlay.payloadFor(), petOverlay.context);
