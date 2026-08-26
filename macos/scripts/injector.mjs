@@ -510,6 +510,13 @@ async function listAppTargets(port) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const initialRoute = new URLSearchParams(String(location.search || ''))
+      .get('initialRoute') || '';
+    const pathname = String(location.pathname || '');
+    const excludedPetSurface = location.protocol === 'app:' && (
+      pathname.endsWith('/avatar-overlay-composition-surface.html') ||
+      initialRoute === '/avatar-overlay' || initialRoute.startsWith('/avatar-overlay/')
+    );
     const genericCodexSurface = () => {
       if (location.protocol !== 'app:') return false;
       const main = document.querySelector('main, [role="main"]');
@@ -531,7 +538,8 @@ async function probeSession(session) {
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       markers,
-      codex: location.protocol === 'app:' &&
+      excludedPetSurface,
+      codex: !excludedPetSurface && location.protocol === 'app:' &&
         ((markers.shell && markers.sidebar) || settings || markers.main || markers.generic),
     };
   })()`);
@@ -565,7 +573,12 @@ async function connectCodexTargets(port, timeoutMs) {
           session = await connectTarget(target, port);
           const probe = await probeSession(session);
           if (probe?.codex) connected.push({ target, session, probe });
-          else session.close();
+          else {
+            if (probe?.excludedPetSurface && !await cleanupExcludedSurface(session)) {
+              throw new Error("Excluded Pet surface cleanup did not verify");
+            }
+            session.close();
+          }
         } catch (error) {
           session?.close();
           lastError = error;
@@ -1080,6 +1093,11 @@ async function verifyRemovedSession(session) {
       !document.getElementById('codex-dream-skin-style') &&
       !window.__CODEX_DREAM_SKIN_STATE__;
   })()`);
+}
+
+export async function cleanupExcludedSurface(session) {
+  if (!await removeFromSession(session)) return false;
+  return verifyRemovedSession(session);
 }
 
 export async function inspectNativeWindow(session) {
@@ -1997,12 +2015,16 @@ async function runWatch(options) {
           const probe = await waitForCodexProbe(session);
           if (!probe?.codex) {
             await removeEarly(record);
+            if (probe?.excludedPetSurface && !await cleanupExcludedSurface(session)) {
+              throw new Error("Excluded Pet surface cleanup did not verify");
+            }
             session.close();
             sessions.delete(target.id);
-            if (!rejected.has(target.id)) {
+            if (!probe?.excludedPetSurface && !rejected.has(target.id)) {
               console.error(`[dream-skin] rejected non-ChatGPT app target ${target.id}`);
               rejected.add(target.id);
             }
+            if (probe?.excludedPetSurface) rejected.delete(target.id);
             continue;
           }
           rejected.delete(target.id);

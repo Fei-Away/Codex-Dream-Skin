@@ -1,5 +1,121 @@
 # Task Progress
 
+## Codex composer and Pet surface compatibility (2026-08-18)
+
+- [goal] Fix current Codex renderer drift where the composer fallback binds to
+  `_ComposerLayoutFooter_` instead of `_ComposerLayoutRoot_`, and prevent Dream
+  Skin from injecting wallpaper/CSS into `/avatar-overlay` and Pet composition
+  surfaces that must remain transparent.
+- [scope] Isolated contributor branch `codex/fix-composer-pet-scope`, based on
+  exact `origin/main@95423d8` (v1.5.14).
+  Shared runtime source, generated dual-platform assets, focused regressions,
+  and this progress record are in scope. User-specific theme colors are not.
+- [field evidence] Live macOS Codex exposed `_ComposerLayoutRoot_*` around the
+  active ProseMirror while the v1.5.14 fallback marked `_ComposerLayoutFooter_*`.
+  The avatar overlay plus Pet composition surfaces carried
+  `data-dream-skin="active"`; three bodies had the theme wallpaper instead of a
+  transparent background. Local runtime guards and explicit cleanup restored
+  all five Pet-related surfaces to transparent without changing Pet assets.
+- [implemented] Canonical selector contract now accepts both legacy
+  `.composer-surface-chrome` and `_ComposerLayoutRoot_`, with the matching
+  toolbar selector. The generic fallback also prefers `_ComposerLayoutRoot_`
+  before broad composer/prompt ownership so `_ComposerLayoutFooter_` cannot
+  capture the public composer part.
+- [implemented] Shared renderer payload self-excludes `/avatar-overlay` and
+  Pet composition-surface routes before installing style/art state, cleaning a
+  previous payload first when present. Both platform injectors classify those
+  targets explicitly, and one-shot plus watcher discovery reuse the existing
+  remove-and-verify path to clean already contaminated Pet renderers.
+- [tests] Shared renderer regressions cover fresh Pet exclusion, cleanup after
+  prior injection, ComposerLayoutRoot selection, and footer non-selection.
+  macOS/Windows bootstrap regressions cover probe exclusion and require both
+  discovery paths to call verified cleanup. Focused dual-platform renderer,
+  bootstrap, selector-doctor, syntax, sync, payload, and diff checks pass.
+- [tests] Portable Node set passes 102/103 in the default sandbox; the sole
+  Swift bounded-HTTP test was blocked by module-cache permission/toolchain
+  setup there and passes when rerun outside the sandbox, yielding 103/103
+  covered tests. The complete macOS wrapper passes outside the sandbox with
+  its documented signed-runtime, full-Xcode, and Doctor branches skipped.
+- [audit] A read-only renderer audit reports the main renderer themed, all five
+  Pet-related targets transparent/unmarked, and no anomalies; the quick
+  validation pass also succeeded.
+- [review] Independent code/spec/security review found no Critical, High,
+  Medium, or Low issues. It confirmed renderer self-exclusion, verified cleanup
+  in one-shot and watcher paths, ComposerLayoutRoot selection, generated asset
+  synchronization, and focused dual-platform coverage.
+- [current] Implementation, generated assets, tests, and review are complete.
+  No commit, push, or PR yet. Fork `hjnnjh/Codex-Dream-Skin` now exists for the
+  contribution branch.
+- [next] Inspect and stage the final diff, create an atomic commit, push the
+  fork branch, and open a Ready PR with exact test/gap evidence. Native Windows
+  PowerShell 5.1/7 remains a CI gate.
+## v1.5.15 current-client compatibility release - 2026-08-27
+
+### Objective, authorization, and boundaries
+
+- Owner authorized end-to-end issue/PR triage, community replies, focused
+  implementation, local verification, push/merge, and a new public client
+  Release without requiring intermediate decisions.
+- Completion target: the smallest coherent release that fixes current
+  Codex/ChatGPT 26.814-26.818 regressions with reproducible evidence and merges
+  only ready, in-scope community work. Do not expand into Linux, pets, broad UX
+  redesign, native-runtime replacement, or speculative maintenance.
+- Supply-chain boundary: do not execute or redistribute community-provided
+  installer binaries. Review source/diffs, rebuild from the exact merged
+  `main` commit through `.github/workflows/release.yml`, and independently
+  verify tag, public Release, DMG, Setup.exe, and `SHA256SUMS.txt`.
+
+### Repository and baseline
+
+- This repository is the macOS/Windows desktop client. Related repository
+  `Fei-Away/dreamskin-cc` owns the website, Gallery/Studio, Go API, public
+  package pipeline, and shared theme contract. Cross-project behavior must
+  preserve platform and package compatibility.
+- Isolated working branch `codex/release-v1.5.15-26.818` starts from exact
+  `origin/main@95423d849f74b9824db2ba0c1121cc7a13b56d10`, the public v1.5.14
+  release commit. The primary checkout's dirty progress file and older local
+  commit are intentionally untouched.
+- Current GitHub baseline: 35 open Issues and 21 open PRs. Relevant recent
+  reports are #371, #373-#376, #378, and #381; likely overlapping PRs are
+  #359, #363, #366, #368, and #372. Each still requires source-level review;
+  no open PR is assumed mergeable from title or attachment alone.
+- Public community thanks completed on #373: maintainer comment
+  `issuecomment-5428504496` thanked `QingYe-05` for the 26.818 findings and
+  locally verified source work, promised attribution, and stated that official
+  assets will be rebuilt from reviewed `main`. The contributor's follow-up
+  comment `5408531731` also received a heart reaction.
+
+### Current status
+
+- Completed: instructions/release contract read, remote refreshed, clean
+  isolated branch created, site and client GitHub summaries audited, exact
+  #373 contribution acknowledged publicly.
+- In progress: compare current shared runtime/selectors/Windows lifecycle code
+  against #373/#378 source evidence and open PR diffs; map each issue to a
+  bounded fix or truthful non-release disposition.
+- No source change, commit, push, PR merge, issue close, version change, tag, or
+  Release has occurred in this branch yet.
+
+### Candidate disposition checkpoint
+
+- #372 is the primary 26.814 compatibility contribution: it prefers the
+  `_ComposerLayoutRoot_` visual root, excludes Pet/avatar overlay renderers, and
+  includes dual-platform injector cleanup plus shared regression coverage. Its
+  latest head is `d2c01e6`, based directly on current `main`, but GitHub has no
+  completed CI result and reports merge state `blocked`; local exact-head gates
+  are required.
+- #366 addresses the related Studio Safe CSS/runtime bridge and Home utility
+  surface, but its original selector contract treats `_ComposerLayoutBody_` as
+  the composer root. It will not be merged wholesale. Only pieces proven
+  compatible with #372's `_ComposerLayoutRoot_` contract may be integrated.
+- #368 is an independent, narrow CSS fix preserving native inline colors on
+  remote-control sidebar icons; it has no completed GitHub CI and will be
+  reviewed and tested separately before inclusion.
+- #359 is stale (based on v1.5.13-era `main`) and overlaps the composer selector
+  surface; #363/#231 touch Windows startup/CDP lifecycle already covered by the
+  current release history and lack new 26.818-specific evidence. #370/#369 and
+  the large feature PRs are explicitly out of this release scope.
+
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
 - [fix merged] PR #360 (`e3787857953998a1916c39b10942ac6c15978a25`) passed exact-head CI run `31558654733`: Static, macOS repository regressions plus universal DMG, Windows PowerShell 7, and Windows PowerShell 5.1 plus Setup.exe. It was squash-merged with the authorized same-owner review bypass at `2026-08-12T03:06:37Z` as `main@69a5a2e4b68174b1c0c70a2fa62adf1aca1eff2a`.
