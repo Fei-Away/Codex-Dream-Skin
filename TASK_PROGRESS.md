@@ -93,26 +93,27 @@
 - Completed: compared current shared runtime/selectors/Windows lifecycle code
   against #373/#378 source evidence and open PR diffs; each candidate is mapped
   to a bounded fix or truthful non-release disposition.
-- In progress: stage and commit the compatibility patch plus the v1.5.15
-  version/changelog bump, then push a Ready PR and require exact-head CI before
-  merging. No tag or public Release exists yet.
+- Completed: compatibility patch and v1.5.15 version/changelog bump were
+  merged by PR #382 as `main@b44e729f123b29e22e8f02ea8644f81f265e1287` after
+  exact-head CI passed for Static, macOS regressions/DMG, Windows PowerShell 7,
+  and Windows PowerShell 5.1/Setup.exe.
 
 ### Candidate disposition checkpoint
 
-- #372 is the primary 26.814 compatibility contribution: it prefers the
+- #372 was the primary 26.814 compatibility contribution: it prefers the
   `_ComposerLayoutRoot_` visual root, excludes Pet/avatar overlay renderers, and
-  includes dual-platform injector cleanup plus shared regression coverage. Its
-  latest head is `d2c01e6`, based directly on current `main`, but GitHub has no
-  completed CI result and reports merge state `blocked`; local exact-head gates
-  are required.
+  includes dual-platform injector cleanup plus shared regression coverage. The
+  reviewed implementation shipped through PR #382; the original PR remains
+  open pending a maintainer attribution/closure note.
 - #366 addresses the related Studio Safe CSS/runtime bridge and Home utility
-  surface, but its original selector contract treats `_ComposerLayoutBody_` as
-  the composer root. It will not be merged wholesale. Only pieces proven
-  compatible with #372's `_ComposerLayoutRoot_` contract may be integrated.
+  surface, but its original selector contract treated `_ComposerLayoutBody_` as
+  the composer root. Only its compatible Safe CSS/Home surface bridge was
+  adapted into #382; the original PR remains open pending an explanation.
 - #368 is an independent, narrow CSS fix preserving native inline colors on
-  remote-control sidebar icons; it has no completed GitHub CI and will be
-  reviewed and tested separately before inclusion.
-- #359 is stale (based on v1.5.13-era `main`) and overlaps the composer selector
+  remote-control sidebar icons. Its two source commits were retained in PR
+  #382 and passed the exact-head client CI gates; the original PR remains open
+  pending a maintainer attribution/closure note.
+  #359 is stale (based on v1.5.13-era `main`) and overlaps the composer selector
   surface; #363/#231 touch Windows startup/CDP lifecycle already covered by the
   current release history and lack new 26.818-specific evidence. #370/#369 and
   the large feature PRs are explicitly out of this release scope.
@@ -136,7 +137,14 @@
   runtime sync check, Node syntax, and `git diff --check`. The full portable
   suite passes 105/105; all six release version sources and both changelog
   entries now target `1.5.15`. Native Windows PowerShell 5.1/7 and Setup.exe
-  remain exact-head CI gates before publication.
+  passed as exact-head CI gates before publication. The sole Release workflow run
+  `32996630333` then passed guard, portable regressions, tag creation, both
+  platform builds, checksum generation, and public release validation. Tag
+  `v1.5.15` points directly to the merge commit and the public Release is
+  `https://github.com/Fei-Away/Codex-Dream-Skin/releases/tag/v1.5.15`.
+  Independently downloaded assets were non-empty: DMG `3428875` bytes, Setup
+  `24487803` bytes, and `SHA256SUMS.txt` `192` bytes; both published hashes
+  matched `sha256sum -c`.
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
