@@ -103,16 +103,16 @@
 - #372 was the primary 26.814 compatibility contribution: it prefers the
   `_ComposerLayoutRoot_` visual root, excludes Pet/avatar overlay renderers, and
   includes dual-platform injector cleanup plus shared regression coverage. The
-  reviewed implementation shipped through PR #382; the original PR remains
-  open pending a maintainer attribution/closure note.
+  reviewed implementation shipped through PR #382; the original PR was closed
+  after an attribution note pointing to the formal release.
 - #366 addresses the related Studio Safe CSS/runtime bridge and Home utility
   surface, but its original selector contract treated `_ComposerLayoutBody_` as
   the composer root. Only its compatible Safe CSS/Home surface bridge was
-  adapted into #382; the original PR remains open pending an explanation.
+  adapted into #382; the original PR was closed with that explanation.
 - #368 is an independent, narrow CSS fix preserving native inline colors on
   remote-control sidebar icons. Its two source commits were retained in PR
-  #382 and passed the exact-head client CI gates; the original PR remains open
-  pending a maintainer attribution/closure note.
+  #382 and passed the exact-head client CI gates; the original PR was closed
+  after an attribution note pointing to the formal release.
   #359 is stale (based on v1.5.13-era `main`) and overlaps the composer selector
   surface; #363/#231 touch Windows startup/CDP lifecycle already covered by the
   current release history and lack new 26.818-specific evidence. #370/#369 and
@@ -145,6 +145,9 @@
   Independently downloaded assets were non-empty: DMG `3428875` bytes, Setup
   `24487803` bytes, and `SHA256SUMS.txt` `192` bytes; both published hashes
   matched `sha256sum -c`.
+- #373 was closed after the official-release reply and attribution. Issues
+  #374, #375, #376, and #381 remain open because they require separate field or
+  API evidence outside this release's bounded scope.
 
 ## Issue #352 fix and v1.5.14 release (2026-08-12)
 
