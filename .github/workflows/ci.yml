@@ -136,15 +136,17 @@ jobs:
           # binds to, and the provenance block silently stayed on 26.727 until
           # 26.818. Changing selectors without restating what they were checked
           # against is what makes doctor output untrustworthy later.
-          base_file=""
+          # An array, not an unquoted variable: the base argument is optional
+          # and a bare $base_file would either vanish or word-split.
+          args=()
           if [[ -n "$BASE_SHA" ]]; then
             git fetch --depth 1 origin "$BASE_SHA"
             base_file="$(mktemp)"
-            if ! git show "$BASE_SHA:tools/selectors.json" > "$base_file" 2>/dev/null; then
-              base_file=""
+            if git show "$BASE_SHA:tools/selectors.json" > "$base_file" 2>/dev/null; then
+              args+=("$base_file")
             fi
           fi
-          node tools/check-selector-provenance.mjs $base_file
+          node tools/check-selector-provenance.mjs "${args[@]}"
 
       - name: Run portable Node.js regressions
         shell: bash
