@@ -34,6 +34,20 @@ Branch `codex/unified-compat`, based on `origin/main@40d1f97` (v1.5.16 + #386).
 - [verified locally] `node tools/sync-runtime-assets.mjs --check`, `node --test`
   across `tools` (10), `windows` (28) and `macos` (76) suites, and
   `git diff --check` all pass.
+- [triaged] Full sweep of all open issues on 2026-08-27. Closed with evidence:
+  #80 (accent contrast — `readableAccentInk` computes from the resolved accent
+  against both backdrop extremes; the legacy Windows `applyProfile`/
+  `--dream-accent-ink` path no longer exists and both platform assets are
+  byte-identical), #354 (fixed by #357 in v1.5.13; reporter was on 1.5.2),
+  #373 (v1.5.16). Every remaining issue got an explicit disposition: accepted,
+  accepted-but-blocked, needs-info, folded into another issue, or declined with
+  a stated reason and a written trigger for revisiting. #388 was split out of
+  #379 for the wallpaper library/rotation request. #189/#346 were linked:
+  `codesign --verify --deep --strict` re-verifies nested binaries, so one bad
+  nested signature in an official build is an unfixable dead end for users;
+  local check on ChatGPT 26.727.51351 passes both modes, so it is
+  version-specific. Proposed fix is to keep the requirement check and demote
+  `--deep` to an optional strictness mode.
 - [not done] No release, no version bump, no macOS Swift change. #374, #376,
   #371 remain open; #378 sections 4-7 were already covered by v1.5.16 while
   sections 1-3 were already in `main`.
