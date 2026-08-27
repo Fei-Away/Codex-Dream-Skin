@@ -61,6 +61,7 @@ function makeFixture({
       style: styleDeclaration(),
       get attributes() { return attributesFor(values); },
       getAttribute(attribute) { return values.get(attribute) ?? null; },
+      hasAttribute(attribute) { return values.has(attribute); },
       setAttribute(attribute, value) { values.set(attribute, String(value)); },
       removeAttribute(attribute) { values.delete(attribute); },
       appendChild(child) { child.parentElement = node; return child; },
@@ -80,6 +81,11 @@ function makeFixture({
           current = current.parentElement;
         }
         return false;
+      },
+      querySelector(selector) {
+        return [...domNodes].find((candidate) =>
+          candidate !== node && node.contains(candidate) && candidate.matches?.(selector),
+        ) || null;
       },
     };
     domNodes.add(node);
@@ -163,8 +169,18 @@ function makeFixture({
     partFixtures.projectList = makeDomNode("project-list", partFixtures.home);
     partFixtures.thread = makeDomNode("thread", partFixtures.main);
     partFixtures.legacyMessage = makeDomNode("legacy-message", partFixtures.thread);
-    partFixtures.userMessage = makeDomNode("user-message", partFixtures.thread);
-    partFixtures.assistantMessage = makeDomNode("assistant-message", partFixtures.thread);
+    partFixtures.userMessage = makeDomNode(
+      "user-message", partFixtures.thread,
+      new Map([["data-local-conversation-user-anchor", "true"]]),
+    );
+    partFixtures.userMessageBubble = makeDomNode(
+      "user-message-bubble", partFixtures.userMessage, new Map(),
+      ['[class*="max-w-"][class*="rounded-2xl"][class*="text-start"]'],
+    );
+    partFixtures.assistantMessage = makeDomNode(
+      "assistant-message", partFixtures.thread,
+      new Map([["data-local-conversation-final-assistant", "true"]]),
+    );
     partFixtures.composer = makeDomNode("composer", partFixtures.main);
     partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
     register("aside.app-shell-left-panel", partFixtures.sidebar);
@@ -391,9 +407,16 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /header:is\(\.app-header-tint, \[data-app-shell-header-edge-scroll\], \[class\*=\"_Header_\"\]\)/);
   assert.match(css, /:is\(\.app-shell-main-content-top-fade, \[data-app-shell-main-content-top-fade\], \[class\*=\"_MainContentTopFade_\"\]\)/);
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
-  assert.match(css, /content:\s*var\(--dream-skin-name[\s\S]{0,180}var\(--dream-skin-brand-subtitle/);
-  assert.match(css, /content:\s*var\(--dream-skin-status/);
-  assert.match(css, /content:\s*var\(--dream-skin-quote/);
+  assert.doesNotMatch(
+    css,
+    /content:\s*var\(--dream-skin-(?:brand-subtitle|status|quote)/,
+    "Core CSS must not inject fixed branding or status labels over native content.",
+  );
+  assert.match(
+    css,
+    /:is\(\[class~="group\/application-menu-top-bar"\], \[class\*="_ApplicationMenuTopBar_"\]\)[\s\S]{0,140}background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.38\)/,
+    "The current Windows application menu bar must use the themed acrylic surface.",
+  );
   assert.match(css, /--ds-task-full-veil/);
   assert.match(css, /data-dream-task-mode="full"/);
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
@@ -406,6 +429,51 @@ export async function runRendererRuntimeTest(assetRoot) {
     css,
     /data-composer-utility-bar-variant="home"\][\s\S]{0,180}> \[class\*="_ComposerLayoutBody_"\][\s\S]{0,220}background:\s*transparent\s*!important;[\s\S]{0,180}backdrop-filter:\s*none\s*!important;/,
     "The Home-only native Composer body must stay transparent behind the public root.",
+  );
+  assert.match(
+    css,
+    /data-composer-placement="thread"\][\s\S]{0,260}> \[class\*="_ComposerLayoutBody_"\][\s\S]{0,220}background:\s*transparent\s*!important;[\s\S]{0,180}backdrop-filter:\s*none\s*!important;/,
+    "The thread Composer body must stay transparent behind the public ComposerLayoutRoot.",
+  );
+  assert.match(
+    css,
+    /(?:__DREAM_SELECTOR_HOME_UTILITY__|:is\(\[class\*="_homeUtilityBar_"\], \[class\*="_ComposerHomeUtilityBar_"\]\))[\s\S]{0,100}position:\s*relative;[\s\S]{0,60}z-index:\s*3;/,
+    "The Home project utility must remain above the composer surface.",
+  );
+  assert.match(
+    css,
+    /\[class~="h-full"\]\[class~="bg-gradient-to-t"\]\[class~="from-surface"\]\[class~="via-surface"\]/,
+    "The current 148px sticky composer fade must be removed by its full utility signature.",
+  );
+  assert.match(
+    css,
+    /\[class~="h-7"\]\[class~="bg-gradient-to-t"\]\[class~="from-surface"\]\[class~="to-transparent"\]/,
+    "The current 28px composer-top fade must be removed by its full utility signature.",
+  );
+  assert.match(
+    css,
+    /\[data-markdown-table="true"\][\s\S]{0,220}margin-inline:\s*0\s*!important/,
+    "Markdown wide tables must remain aligned with the themed message body.",
+  );
+  assert.match(
+    css,
+    /\[data-response-annotation-conversation\]\[data-response-annotation-target\][\s\S]{0,900}backdrop-filter:\s*blur\(20px\)/,
+    "Streaming reasoning needs a readable single themed surface.",
+  );
+  assert.match(
+    css,
+    /\[data-local-conversation-final-assistant\][\s\S]{0,160}\[data-response-annotation-conversation\]\[data-response-annotation-target\][\s\S]{0,260}background:\s*transparent\s*!important/,
+    "Final assistant messages must not retain a nested reasoning surface.",
+  );
+  assert.match(
+    css,
+    /\[data-local-conversation-item-target-ids\][\s\S]{0,900}backdrop-filter:\s*blur\(18px\)/,
+    "Expanded command details need a readable themed surface.",
+  );
+  assert.match(
+    css,
+    /button\[class~="bg-primary-solid"\][\s\S]{0,520}color:\s*var\(--ds-on-accent\)\s*!important/,
+    "Current composer actions must retain computed accent foreground contrast.",
   );
   assert.match(
     css,
@@ -551,8 +619,10 @@ export async function runRendererRuntimeTest(assetRoot) {
   vm.runInNewContext(modernMessages.payloadFor(), modernMessages.context);
   assert.equal(modernMessages.partFixtures.legacyMessage.getAttribute("data-ds-part"), "message",
     "The legacy message role attribute must remain supported.");
-  assert.equal(modernMessages.partFixtures.userMessage.getAttribute("data-ds-part"), "message",
-    "Codex 26.727 user message anchors must expose the public message part.");
+  assert.equal(modernMessages.partFixtures.userMessage.getAttribute("data-ds-part"), null,
+    "Codex 26.818 full-width user anchors must not receive the public message part.");
+  assert.equal(modernMessages.partFixtures.userMessageBubble.getAttribute("data-ds-part"), "message",
+    "Codex 26.818 user bubbles must expose the public message part at their adaptive boundary.");
   assert.equal(modernMessages.partFixtures.assistantMessage.getAttribute("data-ds-part"), "message",
     "Codex 26.727 assistant message containers must expose the public message part.");
 
@@ -611,6 +681,13 @@ export async function runRendererRuntimeTest(assetRoot) {
   vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);
   assert.equal(full.attrs.get("data-dream-task-mode"), "full");
   assert.equal(full.attrs.get("data-dream-art-task-mode"), "full");
+
+  const landscape = makeFixture({ nativeAppearance: "dark" });
+  vm.runInNewContext(landscape.payloadFor({
+    artMetadata: { wide: false, aspect: "wide", focusX: 0.5, focusY: 0.5, taskMode: "ambient" },
+  }), landscape.context);
+  assert.equal(landscape.attrs.get("data-dream-art-wide"), "true",
+    "Landscape artwork classified as wide must use the immersive layout without requiring 16:9.");
 
   const explicitColors = {
     background: "#abc",

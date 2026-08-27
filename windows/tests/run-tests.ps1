@@ -1105,10 +1105,48 @@ try {
     -not (Test-DreamSkinThemePathWithin -Path $updatedTheme.ImagePath -Root $themePaths.Active)) {
     throw 'Imported image did not reset to the generic adaptive contract inside the managed directory.'
   }
+
+  $safeCssFixture = Join-Path $temporaryRoot 'preserved-theme.css'
+  $safeCssText = '[data-ds-part="composer"] { background-color: var(--ds-theme-color-panel); }'
+  [System.IO.File]::WriteAllText($safeCssFixture, $safeCssText, $utf8NoBom)
+  $preservedContract = [pscustomobject]@{
+    schemaVersion = 1
+    id = 'preserved-theme'
+    name = '保留主题配置'
+    tagline = 'Keep the active contract'
+    appearance = 'dark'
+    art = [pscustomobject]@{ focusX = 0.25; focusY = 0.75; safeArea = 'none'; taskMode = 'ambient' }
+    colors = [pscustomobject]@{
+      background = '#11171b'; panel = '#20292e'; panelAlt = '#2b363c'; accent = '#cceeff'
+      accentAlt = '#8ac1da'; secondary = '#d9e3e8'; highlight = '#a9d6e8'
+      text = '#ffffff'; muted = '#eaeef1'; line = '#d2e7f0'
+    }
+  }
+  $beforeBackgroundUpdate = Set-DreamSkinActiveTheme `
+    -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Theme $preservedContract -SafeCssPath $safeCssFixture -StateRoot $themeStateRoot
+  $backgroundOnlyUpdate = Set-DreamSkinActiveThemeImage `
+    -ImagePath (Join-Path $Root 'assets\dream-reference.jpg') -StateRoot $themeStateRoot
+  $preservedCssPath = Join-Path $themePaths.Active 'theme.css'
+  if ($backgroundOnlyUpdate.Theme.id -cne 'preserved-theme' -or
+    $backgroundOnlyUpdate.Theme.name -cne '保留主题配置' -or
+    $backgroundOnlyUpdate.Theme.tagline -cne 'Keep the active contract' -or
+    $backgroundOnlyUpdate.Theme.appearance -cne 'dark' -or
+    $backgroundOnlyUpdate.Theme.art.focusX -ne 0.25 -or
+    $backgroundOnlyUpdate.Theme.art.focusY -ne 0.75 -or
+    $backgroundOnlyUpdate.Theme.art.safeArea -cne 'none' -or
+    $backgroundOnlyUpdate.Theme.art.taskMode -cne 'ambient' -or
+    $backgroundOnlyUpdate.Theme.colors.panel -cne '#20292e' -or
+    $backgroundOnlyUpdate.ImagePath -ieq $beforeBackgroundUpdate.ImagePath -or
+    (Test-Path -LiteralPath $beforeBackgroundUpdate.ImagePath) -or
+    -not (Test-Path -LiteralPath $preservedCssPath -PathType Leaf) -or
+    [System.IO.File]::ReadAllText($preservedCssPath, $utf8NoBom) -cne $safeCssText) {
+    throw 'Background-only replacement did not preserve the active theme JSON and Safe CSS.'
+  }
   $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
   $idempotentTheme = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
   $afterReinitCount = @(Get-DreamSkinSavedThemes -StateRoot $themeStateRoot).Count
-  if ($idempotentTheme.Theme.id -cne 'custom' -or $afterReinitCount -ne 2) {
+  if ($idempotentTheme.Theme.id -cne 'preserved-theme' -or $afterReinitCount -ne 2) {
     throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled presets.'
   }
 

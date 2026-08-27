@@ -239,7 +239,7 @@ try {
       try {
         if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
           $null = Invoke-DreamSkinTrayThemeOperation -Action {
-            $null = Set-DreamSkinActiveTheme -ImagePath $dialog.FileName -Theme $null `
+            $null = Set-DreamSkinActiveThemeImage -ImagePath $dialog.FileName `
               -StateRoot $StateRoot
             Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
           }
