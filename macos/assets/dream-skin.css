@@ -545,8 +545,7 @@ html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surfa
 /* Decorative chrome lives on the native shell; no injected positioning host is needed. */
 html[data-dream-skin="active"]
   main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"])) > header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*="_Header_"])::before {
-  content: var(--dream-skin-name, "Codex Dream Skin") " · "
-    var(--dream-skin-brand-subtitle, "CODEX DREAM SKIN");
+  content: none;
   position: absolute;
   left: 22px;
   top: 4px;
@@ -564,7 +563,7 @@ html[data-dream-skin="active"]
 
 html[data-dream-skin="active"]
   main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"])) > header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*="_Header_"])::after {
-  content: var(--dream-skin-status, "DREAM SKIN ONLINE");
+  content: none;
   position: absolute;
   right: 84px;
   top: 13px;
@@ -582,7 +581,7 @@ html[data-dream-skin="active"]
 
 html[data-dream-skin="active"]
   main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):has([role="main"])::after {
-  content: var(--dream-skin-quote, "MAKE SOMETHING WONDERFUL");
+  content: none;
   position: absolute;
   right: 28px;
   bottom: 72px;
@@ -604,16 +603,18 @@ html[data-dream-skin="active"][data-dream-shell="light"]
 
 /* Windows keeps this native bar outside main; macOS simply has no match. */
 html[data-dream-skin="active"][data-dream-shell="dark"]
-  [class~="group/application-menu-top-bar"] {
+  :is([class~="group/application-menu-top-bar"], [class*="_ApplicationMenuTopBar_"]) {
   color: var(--ds-text) !important;
-  background: rgb(var(--ds-panel-rgb) / .90) !important;
+  background: rgb(var(--ds-panel-rgb) / .38) !important;
   border-bottom: 1px solid var(--ds-line) !important;
-  box-shadow: 0 1px 12px rgb(var(--ds-bg-rgb) / .72) !important;
-  backdrop-filter: blur(16px) saturate(90%) !important;
+  box-shadow:
+    0 1px 14px rgb(var(--ds-bg-rgb) / .28),
+    inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
+  backdrop-filter: blur(24px) saturate(130%) brightness(108%) !important;
 }
 
 html[data-dream-skin="active"][data-dream-shell="dark"]
-  [class~="group/application-menu-top-bar"] :is(button, svg) {
+  :is([class~="group/application-menu-top-bar"], [class*="_ApplicationMenuTopBar_"]) :is(button, svg) {
   color: var(--ds-text) !important;
   text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .82) !important;
 }
@@ -915,6 +916,16 @@ html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerL
   backdrop-filter: none !important;
 }
 
+/* Keep the public ComposerLayoutRoot as the single thread surface too. The
+   canonical 26.814+ contract maps that Root, so clear only nested paint. */
+html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placement="thread"]
+  :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) > [class*="_ComposerLayoutBody_"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
 /* The current Home utility bar is a separate opaque cap above the Composer.
    Match its surface to the public composer without affecting task routes. */
 html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placement="home"]
@@ -1144,6 +1155,8 @@ html[data-dream-skin="active"][data-dream-shell="light"]
    cap above the composer. Join both native controls into one continuous
    surface while leaving task and utility-route inputs untouched. */
 html[data-dream-skin="active"] :is([class*="_homeUtilityBar_"], [class*="_ComposerHomeUtilityBar_"]) {
+  position: relative;
+  z-index: 3;
   top: 0 !important;
   width: 100% !important;
   margin-inline: 0 !important;
@@ -1218,6 +1231,88 @@ html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerL
 
 html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) p.placeholder::after {
   color: rgb(var(--ds-muted-rgb) / .82) !important;
+  opacity: 1 !important;
+}
+
+/* Codex 26.818 places two opaque fades around the sticky thread composer.
+   Match their complete utility signatures inside non-Home main surfaces so
+   unrelated application gradients keep their native paint. */
+html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))
+  [class~="pointer-events-none"][class~="bottom-0"][class~="h-full"][class~="bg-gradient-to-t"][class~="from-surface"][class~="via-surface"],
+html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))
+  [class~="pointer-events-none"][class~="-bottom-1"][class~="h-7"][class~="bg-gradient-to-t"][class~="from-surface"][class~="to-transparent"] {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* Native wide blocks escape the prose column with negative inline margins.
+   Keep tables inside the themed message and delegate width overflow to the
+   existing horizontal scroller. */
+html[data-dream-skin="active"] [data-markdown-text-style] [data-markdown-table="true"] {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-inline: 0 !important;
+}
+
+html[data-dream-skin="active"] [data-markdown-text-style]
+  [data-markdown-table="true"] > [class~="horizontal-scroll-fade-mask"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+/* Streaming reasoning is not yet inside the final assistant message. Give it
+   one readable surface, then remove the nested decoration after finalization. */
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-response-annotation-conversation][data-response-annotation-target] {
+  box-sizing: border-box;
+  margin-block: 4px 10px !important;
+  padding: 14px 16px !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(135deg, rgb(var(--ds-text-rgb) / .08), transparent 42%),
+    rgb(var(--ds-panel-rgb) / .46) !important;
+  color: var(--ds-text) !important;
+  box-shadow:
+    0 10px 28px rgb(var(--ds-bg-rgb) / .18),
+    inset 0 1px rgb(var(--ds-text-rgb) / .14) !important;
+  backdrop-filter: blur(20px) saturate(125%) brightness(104%) !important;
+}
+
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-local-conversation-final-assistant]
+  [data-response-annotation-conversation][data-response-annotation-target] {
+  margin: 0 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Expanded command details are tool-result nodes rather than messages. */
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-local-conversation-item-target-ids] {
+  box-sizing: border-box;
+  padding: 10px 12px !important;
+  border: 1px solid rgb(var(--ds-muted-rgb) / .16) !important;
+  border-radius: 14px !important;
+  background:
+    linear-gradient(135deg, rgb(var(--ds-text-rgb) / .06), transparent 46%),
+    rgb(var(--ds-panel-rgb) / .52) !important;
+  color: rgb(var(--ds-text-rgb) / .94) !important;
+  box-shadow:
+    0 8px 22px rgb(var(--ds-bg-rgb) / .16),
+    inset 0 1px rgb(var(--ds-text-rgb) / .12) !important;
+  backdrop-filter: blur(18px) saturate(120%) brightness(102%) !important;
+}
+
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-local-conversation-item-target-ids] :is(p, pre, code, samp, kbd, span) {
   opacity: 1 !important;
 }
 
@@ -1307,6 +1402,24 @@ html[data-dream-skin="active"] button[class~="bg-token-foreground"] {
   background: var(--ds-accent) !important;
   color: var(--ds-on-accent) !important;
   box-shadow: 0 5px 14px rgb(var(--ds-accent-rgb) / .20) !important;
+}
+
+/* Current send, stop, and voice actions do not consistently retain the old
+   foreground utility. Keep their icons on the computed accent foreground. */
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])
+  :is(button[class~="bg-primary-solid"], button[aria-label="发送"], button[aria-label="停止"], button[aria-label*="语音"], button[aria-label*="对话"], button[aria-label*="send" i], button[aria-label*="stop" i], button[aria-label*="voice" i]) {
+  border-color: rgb(var(--ds-text-rgb) / .46) !important;
+  background: var(--ds-accent) !important;
+  color: var(--ds-on-accent) !important;
+  box-shadow:
+    0 5px 16px rgb(var(--ds-bg-rgb) / .24),
+    inset 0 1px rgb(var(--ds-text-rgb) / .42) !important;
+}
+
+html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])
+  :is(button[class~="bg-primary-solid"], button[aria-label="发送"], button[aria-label="停止"], button[aria-label*="语音"], button[aria-label*="对话"], button[aria-label*="send" i], button[aria-label*="stop" i], button[aria-label*="voice" i]) * {
+  color: currentColor !important;
+  opacity: 1 !important;
 }
 
 html[data-dream-skin="active"] article,

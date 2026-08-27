@@ -414,7 +414,7 @@
     const focusY = typeof ART.focusY === "number" ? ART.focusY : profile?.focusY ?? 0.5;
     const taskMode = ART.taskMode && ART.taskMode !== "auto"
       ? ART.taskMode : profile?.taskMode || "ambient";
-    const wide = profile?.wide || false;
+    const wide = profile?.wide || profile?.aspect === "wide" || profile?.aspect === "ultrawide";
     const aspect = profile?.aspect || "unknown";
     const focusXValue = `${(clamp(focusX, 0, 1) * 100).toFixed(2)}%`;
     const focusYValue = `${(clamp(focusY, 0, 1) * 100).toFixed(2)}%`;
@@ -757,6 +757,14 @@
       composerBorderRestores.set(node, saved);
     }
   };
+  const resolvedMessageNodes = () => selectorNodes("message").map((node) => {
+    if (!node?.hasAttribute?.("data-local-conversation-user-anchor")) return node;
+    // Current Codex user anchors span the conversation column. Prefer the
+    // adaptive native bubble, while retaining the older anchor as a fallback.
+    return node.querySelector?.(
+      '[class*="max-w-"][class*="rounded-2xl"][class*="text-start"]',
+    ) ?? node;
+  });
   const refreshParts = () => {
     metrics.partPasses += 1;
     const desired = new Map();
@@ -769,7 +777,7 @@
     addPart(desired, "main", [...selectorNodes("shell-main"), ...fallbackMainNodes()]);
     addPart(desired, "project-list", selectorNodes("project-selector"));
     addPart(desired, "thread", selectorNodes("thread-surface"));
-    addPart(desired, "message", selectorNodes("message"));
+    addPart(desired, "message", resolvedMessageNodes());
     const composerNodes = [...selectorNodes("composer-chrome"), ...fallbackComposerNodes()];
     addPart(desired, "composer", composerNodes);
     addPart(desired, "composer-toolbar", [

@@ -652,6 +652,28 @@ function Set-DreamSkinActiveTheme {
   return Read-DreamSkinTheme -ThemeDirectory $paths.Active
 }
 
+function Set-DreamSkinActiveThemeImage {
+  param(
+    [Parameter(Mandatory = $true)][string]$ImagePath,
+    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+  )
+  $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+  $current = Read-DreamSkinTheme -ThemeDirectory $paths.Active
+
+  # Changing the artwork is an update to the active theme, not a request to
+  # replace its validated contract with the generic custom-theme defaults.
+  $theme = $current.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+  $safeCssPath = Join-Path $paths.Active 'theme.css'
+  if (Test-Path -LiteralPath $safeCssPath -PathType Leaf) {
+    Assert-DreamSkinSafeCssFile -Path $safeCssPath
+  } else {
+    $safeCssPath = $null
+  }
+
+  return Set-DreamSkinActiveTheme -ImagePath $ImagePath -Theme $theme `
+    -SafeCssPath $safeCssPath -StateRoot $StateRoot
+}
+
 function Save-DreamSkinCurrentTheme {
   param(
     [Parameter(Mandatory = $true)][string]$Name,

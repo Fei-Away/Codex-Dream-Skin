@@ -1,5 +1,70 @@
 # Task Progress
 
+## Issue #373 complete Codex 26.818 hotfix and v1.5.16 (2026-08-27)
+
+- [objective] Complete the portions of #373 that v1.5.15 did not ship, validate
+  them from the current upstream source, and publish a formal v1.5.16 through
+  the repository Release workflow. Do not post another Issue reply until the
+  release assets and checksums have been independently verified.
+- [baseline] Clean isolated branch `codex/fix-373-complete-26-818` starts from
+  exact `origin/main@900b85e`. The primary checkout and its local progress
+  edits remain untouched.
+- [issue truth] #373 is reopened. The maintainer acknowledged in
+  `issuecomment-5433226862` that v1.5.15 only shipped the Composer Root/Pet
+  subset and was closed too early. Contributor follow-up
+  `issuecomment-5433121124` supplies later source evidence for the missing
+  Windows background replacement and renderer compatibility work.
+- [confirmed gaps] Current main still calls `Set-DreamSkinActiveTheme` with a
+  null theme from the Windows Change Background action, discarding the active
+  theme JSON and Safe CSS. It also lacks bounded rules for the two current
+  sticky composer fades and Markdown table overflow. Additional contributor
+  mappings for user message bubbles, thinking/command details, action-button
+  contrast, and wide-art classification require source-level review against
+  the v1.5.15 selector contract.
+- [supply-chain boundary] The contributor Markdown and patch are untrusted text
+  references only; the ZIP was listed but not extracted or executed. Required
+  changes will be manually adapted to current canonical sources. Published
+  DMG/Setup assets must be rebuilt from the exact merged main commit.
+- [implemented] Windows Change Background now deep-copies the active theme
+  contract and revalidates/preserves its Safe CSS before delegating to the
+  existing managed image transaction. The tray calls this background-only
+  helper instead of rebuilding with a null theme. Executable PowerShell
+  coverage preserves colors, art metadata, extra theme fields, and CSS bytes;
+  a portable static contract also guards the tray/helper wiring.
+- [implemented] Canonical renderer/CSS sources preserve the v1.5.15
+  ComposerLayoutRoot and Pet exclusions while adding the missing 26.818
+  behavior: real user-bubble part resolution, landscape wide classification,
+  exact sticky fade removal, in-message Markdown table bounds, single
+  reasoning/final surfaces, readable command details, current action-button
+  contrast, Home utility stacking, current Windows top-bar matching, and
+  removal of fixed engine branding/status pseudo-labels. Thread Body paint is
+  cleared beneath the public Root rather than importing the stale contributor
+  Body-as-composer selector.
+- [tests] Canonical assets are synchronized byte-for-byte. Portable Node passes
+  106/106: macOS 76, Windows 28 (including the new background replacement
+  contract), and tools 2. The complete macOS wrapper exits 0; only native
+  SwiftPM/XCTest is skipped because this host lacks a matching full Xcode
+  platform, and Doctor was explicitly skipped. Runtime sync, Node/Bash syntax,
+  BOM preservation, six-version consistency, and `git diff --check` pass. This
+  host has no `pwsh`/Windows PowerShell, so native PS 5.1/7 and Setup remain
+  exact-head CI gates.
+- [live macOS] With ChatGPT initially stopped, the current branch launched the
+  signed app without restarting an active window and installed v1.5.16 on
+  loopback port 9341. Independent verification passed at L1 for exact theme and
+  payload revision with visible Home, Sidebar, Main, Composer, four cards,
+  project control, no business-class pollution, and no document overflow. The
+  screenshot is nonblank and shows no fixed engine branding/status labels.
+  Local Codex is 26.727, so this is a regression smoke, not Windows 26.818
+  field evidence.
+- [release prep] All six version sources and the bound macOS assertions equal
+  `1.5.16`; both changelogs describe the complete #373 hotfix and credit
+  `@QingYe-05` for the Windows field/source evidence.
+- [current] Implementation is local and uncommitted. No push, PR, merge, tag,
+  or v1.5.16 Release exists yet. Next: final diff/staging review, commit, push,
+  open the Ready PR, and require exact-head CI before merge. Live Windows
+  Codex 26.818 rendering remains a contributor/field evidence boundary and
+  must not be represented as local macOS testing.
+
 ## Codex composer and Pet surface compatibility (2026-08-18)
 
 - [goal] Fix current Codex renderer drift where the composer fallback binds to
