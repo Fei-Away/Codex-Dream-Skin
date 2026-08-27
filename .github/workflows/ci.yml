@@ -124,6 +124,25 @@ jobs:
           test "$macos_injector" = "$expected"
           test "$windows_injector" = "$expected"
 
+      - name: Check selector contract provenance
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Every Codex release since 26.715 moved DOM that the shared contract
+          # binds to, and the provenance block silently stayed on 26.727 until
+          # 26.818. Changing selectors without restating what they were checked
+          # against is what makes doctor output untrustworthy later.
+          base_file=""
+          if [[ -n "$BASE_SHA" ]]; then
+            git fetch --depth 1 origin "$BASE_SHA"
+            base_file="$(mktemp)"
+            if ! git show "$BASE_SHA:tools/selectors.json" > "$base_file" 2>/dev/null; then
+              base_file=""
+            fi
+          fi
+          node tools/check-selector-provenance.mjs $base_file
+
       - name: Run portable Node.js regressions
         shell: bash
         run: |

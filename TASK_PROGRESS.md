@@ -1,5 +1,43 @@
 # Task Progress
 
+## Unified compatibility pass (2026-08-27)
+
+Branch `codex/unified-compat`, based on `origin/main@40d1f97` (v1.5.16 + #386).
+
+- [merged] PR #386 (horizontal overflow) squashed to `main` as `40d1f97` after
+  full CI green and a local `node --test windows/tests/injector-window-readiness.test.mjs`
+  run at 11/11. It closed a real cross-platform drift: macOS already gated
+  `pass` on `!result.documentOverflow?.x`; Windows computed `documentOverflow`
+  and ignored it. #287 is superseded by it; #298 is closed by it.
+- [implemented, unverified on Windows] Adopted PR #363's managed CDP profile.
+  Nothing ever passed `-ProfilePath`, so `--user-data-dir` was never sent, and
+  Chromium 136+ ignores `--remote-debugging-port` for the default data
+  directory. The launcher now defaults to `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile`
+  and an explicit `-ProfilePath` remains an override. The regression asserts
+  exactly one managed `--user-data-dir` argument and that the directory exists
+  before launch. **This host has no `pwsh`; the PowerShell suites have not been
+  run locally — CI's PowerShell 5.1/7 jobs are the first real execution.**
+  Known behavior change: the managed profile requires a one-time Codex sign-in
+  inside it; recorded in `windows/CHANGELOG.md`.
+- [implemented] `tools/check-selector-provenance.mjs` plus a CI step: changing
+  `tools/selectors.json` selectors now requires moving `verifiedAgainst` in the
+  same commit. The base file is compared but not shape-validated, so the
+  introducing commit can pass its own gate.
+- [corrected] `verifiedAgainst` claimed 26.727 while the contract already
+  covered 26.818. It now lists every Codex build per platform with explicit
+  evidence strength (`maintainer` / `reporter` / `fixture`) and a `gaps` list.
+  **Everything after 26.803 is reporter evidence; there is no maintainer
+  re-verify on Windows since 26.727.**
+- [design only] `docs/compat-profile-design.md` specifies a signed, hot-updatable
+  selector/Safe-CSS profile served from `api.dreamskin.cc`, so a Codex DOM change
+  stops requiring a full client release. Not implemented.
+- [verified locally] `node tools/sync-runtime-assets.mjs --check`, `node --test`
+  across `tools` (10), `windows` (28) and `macos` (76) suites, and
+  `git diff --check` all pass.
+- [not done] No release, no version bump, no macOS Swift change. #374, #376,
+  #371 remain open; #378 sections 4-7 were already covered by v1.5.16 while
+  sections 1-3 were already in `main`.
+
 ## Issue #373 complete Codex 26.818 hotfix and v1.5.16 (2026-08-27)
 
 - [objective] Complete the portions of #373 that v1.5.15 did not ship, validate
