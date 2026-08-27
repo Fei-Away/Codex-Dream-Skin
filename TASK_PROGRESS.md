@@ -9,7 +9,11 @@ Branch `codex/unified-compat`, based on `origin/main@40d1f97` (v1.5.16 + #386).
   run at 11/11. It closed a real cross-platform drift: macOS already gated
   `pass` on `!result.documentOverflow?.x`; Windows computed `documentOverflow`
   and ignored it. #287 is superseded by it; #298 is closed by it.
-- [implemented, unverified on Windows] Adopted PR #363's managed CDP profile.
+- [split out] The managed CDP profile change moved to its own branch
+  `codex/windows-cdp-profile` so it stops blocking the verified work here. It is
+  the only change in this pass that cannot be verified without a Windows host.
+  Original note kept below for context:
+- [moved to codex/windows-cdp-profile] Adopted PR #363's managed CDP profile.
   Nothing ever passed `-ProfilePath`, so `--user-data-dir` was never sent, and
   Chromium 136+ ignores `--remote-debugging-port` for the default data
   directory. The launcher now defaults to `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile`

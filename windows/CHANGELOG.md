@@ -10,7 +10,6 @@
 
 - 完整补齐 Codex 26.818 主题兼容（#373，感谢 @QingYe-05 的 Windows 实机源码证据）：托盘“更换背景图”现在保留当前 `theme.json`、颜色、构图参数和已验证的 `theme.css`；共享 renderer 同时清除 sticky composer 的两层原生渐变、约束 Markdown 宽表、映射真实用户气泡，并改善流式思考、命令详情、新版动作按钮、横向壁纸和顶部栏的可读性；固定品牌/状态伪文案不再覆盖原生界面。
 - 修复新版 Codex 把输入框壳迁移到 `_ComposerLayoutRoot_` 后，Dream Skin 误把 `_ComposerLayoutFooter_` 标记为 composer、导致主题输入框样式只落在底部工具栏的问题；同时排除 `/avatar-overlay` 与 Pet composition surface，并在发现旧注入时执行移除与验证，避免主题壁纸污染透明 Pet 窗口形成矩形背景。
-- 修复 Chromium 136 及更高版本上 Dream Skin 完全打不开 CDP、主题一点都不生效的问题（#235、#363）：Chromium 会忽略指向默认数据目录的 `--remote-debugging-port`，而 Windows 启动器此前只在显式传入 `-ProfilePath` 时才追加 `--user-data-dir`。现在默认创建并复用 `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile`，与官方 Codex profile 隔离，不修改 WindowsApps；显式 `-ProfilePath` 仍可覆盖。注意首次使用受管 profile 需要在该 profile 内重新登录一次 Codex，之后会持久保留。
 - 修复 Windows 首次或冷启动状态下从 DreamSkin.cc 一键换肤被错误拒绝的问题。客户端现在会在下载主题包前安全启动并验证当前主题；如果官方 Codex 未提供可用 CDP 端点，则在任何主题库或活动主题写入前返回明确失败。
 - 修复透明或极端显式强调色下按钮文字对比度不稳定的问题：共享渲染器现在按真实 composer 面板表面和最坏背景计算前景色，并正确处理 alpha 与 RGB 夹取（#351）。
 - 修复 Windows 启动失败后只留下颜色、背景等部分外观状态的问题（#354、#357）：新增有界持久 journal 和三方恢复，保留较新的用户编辑；一键换肤在慢启动、超时或渲染未确认时不强杀仍运行的子进程，也不留下混合的活动主题文件，并提供可区分的有界失败原因。该修复处理本地失败启动的状态一致性，不改变官方 Codex 的 CDP 能力。
