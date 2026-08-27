@@ -1,5 +1,61 @@
 # Task Progress
 
+## Unified compatibility pass (2026-08-27)
+
+Branch `codex/unified-compat`, based on `origin/main@40d1f97` (v1.5.16 + #386).
+
+- [merged] PR #386 (horizontal overflow) squashed to `main` as `40d1f97` after
+  full CI green and a local `node --test windows/tests/injector-window-readiness.test.mjs`
+  run at 11/11. It closed a real cross-platform drift: macOS already gated
+  `pass` on `!result.documentOverflow?.x`; Windows computed `documentOverflow`
+  and ignored it. #287 is superseded by it; #298 is closed by it.
+- [split out] The managed CDP profile change moved to its own branch
+  `codex/windows-cdp-profile` so it stops blocking the verified work here. It is
+  the only change in this pass that cannot be verified without a Windows host.
+  Original note kept below for context:
+- [moved to codex/windows-cdp-profile] Adopted PR #363's managed CDP profile.
+  Nothing ever passed `-ProfilePath`, so `--user-data-dir` was never sent, and
+  Chromium 136+ ignores `--remote-debugging-port` for the default data
+  directory. The launcher now defaults to `%LOCALAPPDATA%\CodexDreamSkin\cdp-profile`
+  and an explicit `-ProfilePath` remains an override. The regression asserts
+  exactly one managed `--user-data-dir` argument and that the directory exists
+  before launch. **This host has no `pwsh`; the PowerShell suites have not been
+  run locally — CI's PowerShell 5.1/7 jobs are the first real execution.**
+  Known behavior change: the managed profile requires a one-time Codex sign-in
+  inside it; recorded in `windows/CHANGELOG.md`.
+- [implemented] `tools/check-selector-provenance.mjs` plus a CI step: changing
+  `tools/selectors.json` selectors now requires moving `verifiedAgainst` in the
+  same commit. The base file is compared but not shape-validated, so the
+  introducing commit can pass its own gate.
+- [corrected] `verifiedAgainst` claimed 26.727 while the contract already
+  covered 26.818. It now lists every Codex build per platform with explicit
+  evidence strength (`maintainer` / `reporter` / `fixture`) and a `gaps` list.
+  **Everything after 26.803 is reporter evidence; there is no maintainer
+  re-verify on Windows since 26.727.**
+- [design only] `docs/compat-profile-design.md` specifies a signed, hot-updatable
+  selector/Safe-CSS profile served from `api.dreamskin.cc`, so a Codex DOM change
+  stops requiring a full client release. Not implemented.
+- [verified locally] `node tools/sync-runtime-assets.mjs --check`, `node --test`
+  across `tools` (10), `windows` (28) and `macos` (76) suites, and
+  `git diff --check` all pass.
+- [triaged] Full sweep of all open issues on 2026-08-27. Closed with evidence:
+  #80 (accent contrast — `readableAccentInk` computes from the resolved accent
+  against both backdrop extremes; the legacy Windows `applyProfile`/
+  `--dream-accent-ink` path no longer exists and both platform assets are
+  byte-identical), #354 (fixed by #357 in v1.5.13; reporter was on 1.5.2),
+  #373 (v1.5.16). Every remaining issue got an explicit disposition: accepted,
+  accepted-but-blocked, needs-info, folded into another issue, or declined with
+  a stated reason and a written trigger for revisiting. #388 was split out of
+  #379 for the wallpaper library/rotation request. #189/#346 were linked:
+  `codesign --verify --deep --strict` re-verifies nested binaries, so one bad
+  nested signature in an official build is an unfixable dead end for users;
+  local check on ChatGPT 26.727.51351 passes both modes, so it is
+  version-specific. Proposed fix is to keep the requirement check and demote
+  `--deep` to an optional strictness mode.
+- [not done] No release, no version bump, no macOS Swift change. #374, #376,
+  #371 remain open; #378 sections 4-7 were already covered by v1.5.16 while
+  sections 1-3 were already in `main`.
+
 ## Issue #373 complete Codex 26.818 hotfix and v1.5.16 (2026-08-27)
 
 - [objective] Complete the portions of #373 that v1.5.15 did not ship, validate

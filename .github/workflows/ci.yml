@@ -3,8 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
+  # Deliberately unfiltered by base branch. With `branches: [main]` a pull
+  # request stacked on another branch ran no checks at all, so a change split
+  # out for separate review also lost its tests and its installer artifact —
+  # which is the one thing a reporter needs in order to verify it.
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
@@ -124,6 +127,27 @@ jobs:
           test "$macos_injector" = "$expected"
           test "$windows_injector" = "$expected"
 
+      - name: Check selector contract provenance
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Every Codex release since 26.715 moved DOM that the shared contract
+          # binds to, and the provenance block silently stayed on 26.727 until
+          # 26.818. Changing selectors without restating what they were checked
+          # against is what makes doctor output untrustworthy later.
+          # An array, not an unquoted variable: the base argument is optional
+          # and a bare $base_file would either vanish or word-split.
+          args=()
+          if [[ -n "$BASE_SHA" ]]; then
+            git fetch --depth 1 origin "$BASE_SHA"
+            base_file="$(mktemp)"
+            if git show "$BASE_SHA:tools/selectors.json" > "$base_file" 2>/dev/null; then
+              args+=("$base_file")
+            fi
+          fi
+          node tools/check-selector-provenance.mjs "${args[@]}"
+
       - name: Run portable Node.js regressions
         shell: bash
         run: |
@@ -184,6 +208,21 @@ jobs:
             (Get-Item -LiteralPath $artifact).Length -le 0) {
             throw 'Windows installer artifact is missing or empty.'
           }
+          "INSTALLER_PATH=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # The macOS job has always published its DMG, so a macOS fix can be handed
+      # to a reporter straight from the pull request. Windows compiled the
+      # installer purely as a build check and then discarded it, which left every
+      # Windows-only fix unverifiable: the maintainer has no Windows host, and a
+      # reporter cannot test a branch without an installer. Publish it too.
+      - name: Upload Setup.exe artifact
+        if: matrix.executable == 'powershell.exe'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CodexDreamSkin-setup
+          path: ${{ env.INSTALLER_PATH }}
+          retention-days: 7
+          if-no-files-found: error
 
   macos-tests:
     name: macOS repository regressions

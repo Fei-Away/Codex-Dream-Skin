@@ -2,16 +2,55 @@
   "schema": "codex-dream-skin-selectors/1",
   "description": "双端统一选择器契约。scope 与 required 来自双端 DOM 快照实测；shell-main 与 header-tint 另由 2026-07-31 Codex 26.727.40816 真实 macOS renderer 复核。doctor / CI 应逐条 querySelector 并按 tier 判级：L1 缺失=皮肤主行为受损，L2 缺失=精修静默降级。",
   "verifiedAgainst": {
-    "date": "2026-07-31",
-    "chromium": "150.0.7871.124（双端快照）；150.0.7871.182（macOS 真实 renderer 复核）",
-    "codexVersionMac": "26.715.61943（历史快照）；26.727.40816（真实 renderer 复核）",
-    "codexVersionWindows": "版本号未记录；bundle hash 与 mac 不同（ModelPickerTrigger mac=1fm6a win=1w4ob），确认存在版本错位",
-    "fixtures": [
-      "runtime/dom-fixtures/codex-dom-fixture-darwin-watch.json (15 状态)",
-      "runtime/dom-fixtures/codex-dom-fixture-win32-watch.json (7 状态)",
-      "Codex 26.727.40816 signed macOS app, live app:// renderer"
+    "date": "2026-08-27",
+    "codexVersions": [
+      {
+        "version": "26.818",
+        "platform": "windows",
+        "evidence": "reporter: #378 本机已验证补丁与 #373 @QingYe-05 的实机源码证据；v1.5.16 据此扩展 composer / Markdown / message 绑定，维护者未做本机 renderer 复核"
+      },
+      {
+        "version": "26.814.41407",
+        "platform": "macos",
+        "evidence": "reporter: #373 @GreenLv 的 loopback CDP 只读 DOM 与样式读数，确认 _ComposerLayoutRoot_ 是真实输入框壳、_ComposerLayoutFooter_ 只是其内层 footer"
+      },
+      {
+        "version": "26.814.5517.0",
+        "platform": "windows",
+        "evidence": "reporter: #376 复现环境；该版本设置页外观切换后的混色问题仍未修复，settings/appearance 路径未验证"
+      },
+      {
+        "version": "26.803.10989.0",
+        "platform": "windows",
+        "evidence": "reporter: #363 实机探测（Chromium 151.0.7922.76）；受管 --user-data-dir 下 CDP、app://-/index.html renderer 与真实主题注入验证全部通过"
+      },
+      {
+        "version": "26.803",
+        "platform": "both",
+        "evidence": "reporter: #359 Owl composer 布局报告；_ComposerLayoutBody_ / _ComposerLayoutFooter_ / _ComposerHomeUtilityBar_ 前缀别名已并入合同"
+      },
+      {
+        "version": "26.727.40816",
+        "platform": "macos",
+        "evidence": "maintainer: 已签名 macOS app 的 live app:// renderer 实测复核（Chromium 150.0.7871.182），shell-main 与 header-tint 逐条 querySelector"
+      },
+      {
+        "version": "26.715.61943",
+        "platform": "macos",
+        "evidence": "fixture: runtime/dom-fixtures/codex-dom-fixture-darwin-watch.json（15 状态，Chromium 150.0.7871.124）"
+      },
+      {
+        "version": "unrecorded",
+        "platform": "windows",
+        "evidence": "fixture: runtime/dom-fixtures/codex-dom-fixture-win32-watch.json（7 状态）；bundle hash 与 mac 不同（ModelPickerTrigger mac=1fm6a win=1w4ob），确认双端存在版本错位"
+      }
     ],
-    "verdict": "双端运行时继续共用一份 selector/CSS 合同。26.727.40816 将主表面和顶栏的旧语义类改为 CSS Modules，同时提供稳定 app-shell data 属性；合同保留旧类并优先增加稳定属性。Windows 26.727 仍需真实 renderer 验收。"
+    "verdict": "双端运行时继续共用一份 selector/CSS 合同。26.727.40816 起主表面与顶栏的旧语义类改为 CSS Modules，26.803~26.818 又把输入框壳迁到 _ComposerLayoutRoot_；合同的做法始终是保留旧锚点、追加稳定属性或模块名前缀，绝不匹配完整 hash。注意 26.803 之后每一条证据都来自报告者，维护者没有对应平台的本机 renderer 复核——不要把它们当成与 26.727 同等强度的验收。",
+    "gaps": [
+      "Windows 26.727 之后至今没有维护者本机 renderer 复核",
+      "#376：26.814.5517.0 上 Codex 设置→外观切换深浅色后主题混色，settings/appearance 路径的锚点行为未验证",
+      "#371：Windows 顶部与底部区域配色与主区不一致，尚未确认是 header-tint 未命中还是原生层未被覆盖"
+    ]
   },
   "appearanceSignal": {
     "dark": "html.electron-dark",
