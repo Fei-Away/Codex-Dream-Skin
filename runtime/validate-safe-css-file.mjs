@@ -10,6 +10,9 @@ const [fileArg] = process.argv.slice(2);
 if (!fileArg) throw new Error("Usage: validate-safe-css-file.mjs <theme.css>");
 
 const filePath = path.resolve(fileArg);
+if (path.extname(filePath).toLowerCase() !== ".css") {
+  throw new Error("Theme Safe CSS file must have a .css extension");
+}
 let handle;
 try {
   handle = await fs.open(filePath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
