@@ -203,6 +203,21 @@ jobs:
             (Get-Item -LiteralPath $artifact).Length -le 0) {
             throw 'Windows installer artifact is missing or empty.'
           }
+          "INSTALLER_PATH=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      # The macOS job has always published its DMG, so a macOS fix can be handed
+      # to a reporter straight from the pull request. Windows compiled the
+      # installer purely as a build check and then discarded it, which left every
+      # Windows-only fix unverifiable: the maintainer has no Windows host, and a
+      # reporter cannot test a branch without an installer. Publish it too.
+      - name: Upload Setup.exe artifact
+        if: matrix.executable == 'powershell.exe'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CodexDreamSkin-setup
+          path: ${{ env.INSTALLER_PATH }}
+          retention-days: 7
+          if-no-files-found: error
 
   macos-tests:
     name: macOS repository regressions
