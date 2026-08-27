@@ -3,8 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
+  # Deliberately unfiltered by base branch. With `branches: [main]` a pull
+  # request stacked on another branch ran no checks at all, so a change split
+  # out for separate review also lost its tests and its installer artifact —
+  # which is the one thing a reporter needs in order to verify it.
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
