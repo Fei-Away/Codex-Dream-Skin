@@ -42,9 +42,15 @@
   v1.5.16 DMG SHA-256 `1e45f04948f0155cb93284b4a1a9d1ddbaf7916936dce3d2e9a3cc06203e2488`
   without opening or installing it. Full-Xcode SwiftPM/XCTest, signed-runtime
   integrations, Doctor, and native Windows remain documented CI/host gaps.
-- [pending] Update the fork branch with `--force-with-lease`, refresh the Draft
-  PR description, reply to the maintainer with the #387 preservation and test
-  evidence, then require exact-head upstream CI and maintainer rereview.
+- [pushed 2026-08-28] The fork branch was updated with an exact-old-SHA
+  `--force-with-lease`; Draft PR #355 is conflict-free and mergeable. Its body
+  and maintainer reply now record the #387 preservation, current test evidence,
+  and real v1.5.16 download verification. Exact-head CI run `33138255714` is
+  `action_required` with no jobs, so it has not passed and requires upstream
+  maintainer approval.
+- [pending] Require all exact-head CI jobs and maintainer rereview before making
+  the PR Ready or merging. No release, tag, or installed-client delivery is
+  authorized or complete.
 
 ## Unified compatibility pass (2026-08-27)
 
