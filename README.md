@@ -174,8 +174,10 @@ macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studi
 | macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
 | Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
 
-安装后从菜单栏（macOS）或系统托盘（Windows）使用。更新时下载新安装包覆盖安装，主题和图片会保留；
-未签名的新下载文件在个别系统上仍可能再次出现一次安全提示，文档列出了放行方法。
+安装后从菜单栏（macOS）或系统托盘（Windows）使用。macOS 发现新版本后可由用户确认下载：客户端会
+核对 GitHub Release 资产、双重 SHA-256 摘要和 DMG 内应用身份，再打开镜像供用户拖拽覆盖；Windows
+仍从 Release 页面手动下载安装包。两种方式都会保留主题和图片。客户端不会静默替换应用；未签名的
+新下载文件在个别系统上仍可能再次出现一次安全提示，文档列出了放行方法。
 
 ### 导入下载的主题
 

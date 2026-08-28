@@ -1,4 +1,29 @@
 {
   "tag_name": "v9.8.7",
-  "html_url": "https://example.invalid/ignored"
+  "draft": false,
+  "prerelease": false,
+  "html_url": "https://github.com/Fei-Away/Codex-Dream-Skin/releases/tag/v9.8.7",
+  "assets": [
+    {
+      "name": "SHA256SUMS.txt",
+      "url": "https://api.github.com/repos/Fei-Away/Codex-Dream-Skin/releases/assets/980001",
+      "browser_download_url": "https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v9.8.7/SHA256SUMS.txt",
+      "size": 128,
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "CodexDreamSkin-v9.8.7.dmg",
+      "url": "https://api.github.com/repos/Fei-Away/Codex-Dream-Skin/releases/assets/980002",
+      "browser_download_url": "https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v9.8.7/CodexDreamSkin-v9.8.7.dmg",
+      "size": 1024,
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "name": "CodexDreamSkin-Setup-v9.8.7.exe",
+      "url": "https://api.github.com/repos/Fei-Away/Codex-Dream-Skin/releases/assets/980003",
+      "browser_download_url": "https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v9.8.7/CodexDreamSkin-Setup-v9.8.7.exe",
+      "size": 2048,
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ]
 }

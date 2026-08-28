@@ -101,7 +101,7 @@ UPDATE_JSON="$({
   const value = JSON.parse(process.argv[1]);
   if (value.currentVersion !== "v1.5.16" || value.latestVersion !== "v9.8.7") process.exit(1);
   if (!value.updateAvailable) process.exit(1);
-  if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
+  if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/tag/v9.8.7") process.exit(1);
 ' "$UPDATE_JSON"
 if /usr/bin/grep -R -n -E --exclude-dir='.build' \
   --exclude-dir='.build-*' \
@@ -268,6 +268,188 @@ cleanup_tests() {
   /bin/rm -rf "$TMP"
 }
 trap cleanup_tests EXIT
+
+# Guided updates never replace the running app. The hermetic fixture path only
+# substitutes local bytes for curl inside the source tree; exact release
+# metadata, both SHA-256 layers, DMG integrity, mounted app identity/version,
+# and code-signature validation all run through the production validators.
+UPDATE_ROOT="$TMP/guided-update"
+UPDATE_STAGE="$UPDATE_ROOT/stage"
+UPDATE_APP="$UPDATE_STAGE/Codex Dream Skin.app"
+UPDATE_CONTENTS="$UPDATE_APP/Contents"
+UPDATE_EXECUTABLE="$UPDATE_CONTENTS/MacOS/CodexDreamSkinMenuBar"
+UPDATE_INFO="$UPDATE_CONTENTS/Info.plist"
+UPDATE_ENGINE_VERSION="$UPDATE_CONTENTS/Resources/engine/VERSION"
+/bin/mkdir -p "$(/usr/bin/dirname "$UPDATE_EXECUTABLE")" \
+  "$(/usr/bin/dirname "$UPDATE_ENGINE_VERSION")"
+/usr/bin/printf '%s\n' '#!/bin/bash' 'exit 0' > "$UPDATE_EXECUTABLE"
+/bin/chmod 755 "$UPDATE_EXECUTABLE"
+/usr/bin/printf '%s\n' '9.8.7' > "$UPDATE_ENGINE_VERSION"
+/usr/bin/plutil -create xml1 "$UPDATE_INFO"
+/usr/bin/plutil -insert CFBundleIdentifier -string cc.dreamskin.menubar "$UPDATE_INFO"
+/usr/bin/plutil -insert CFBundleExecutable -string CodexDreamSkinMenuBar "$UPDATE_INFO"
+/usr/bin/plutil -insert CFBundlePackageType -string APPL "$UPDATE_INFO"
+/usr/bin/plutil -insert CFBundleShortVersionString -string 9.8.7 "$UPDATE_INFO"
+/usr/bin/plutil -insert CFBundleVersion -string 9.8.7 "$UPDATE_INFO"
+/usr/bin/codesign --force --deep --sign - --timestamp=none "$UPDATE_APP"
+GOOD_DMG="$UPDATE_ROOT/CodexDreamSkin-v9.8.7.dmg"
+/usr/bin/hdiutil create -quiet -ov -format UDZO -volname 'Dream Skin Update Test' \
+  -srcfolder "$UPDATE_STAGE" "$GOOD_DMG"
+/usr/bin/hdiutil verify "$GOOD_DMG" >/dev/null
+
+make_update_response() {
+  local dmg="$1"
+  local sums="$2"
+  local response="$3"
+  local dmg_size sums_size dmg_sha sums_sha
+  dmg_size="$(/usr/bin/stat -f '%z' "$dmg")"
+  sums_size="$(/usr/bin/stat -f '%z' "$sums")"
+  dmg_sha="$(/usr/bin/shasum -a 256 "$dmg" | /usr/bin/awk '{print $1}')"
+  sums_sha="$(/usr/bin/shasum -a 256 "$sums" | /usr/bin/awk '{print $1}')"
+  /bin/cp "$ROOT/tests/fixtures/latest-release.json" "$response"
+  /usr/bin/plutil -replace assets.0.size -integer "$sums_size" "$response"
+  /usr/bin/plutil -replace assets.0.digest -string "sha256:$sums_sha" "$response"
+  /usr/bin/plutil -replace assets.1.size -integer "$dmg_size" "$response"
+  /usr/bin/plutil -replace assets.1.digest -string "sha256:$dmg_sha" "$response"
+}
+
+GOOD_SUMS="$UPDATE_ROOT/SHA256SUMS.txt"
+/usr/bin/printf '%s  %s\n' \
+  "$(/usr/bin/shasum -a 256 "$GOOD_DMG" | /usr/bin/awk '{print $1}')" \
+  'CodexDreamSkin-v9.8.7.dmg' > "$GOOD_SUMS"
+GOOD_RESPONSE="$UPDATE_ROOT/release-good.json"
+make_update_response "$GOOD_DMG" "$GOOD_SUMS" "$GOOD_RESPONSE"
+GUIDED_JSON="$({
+  HOME="$UPDATE_ROOT/home" \
+  CODEX_DREAM_SKIN_TEST_MODE=1 \
+  CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$GOOD_RESPONSE" \
+  CODEX_DREAM_SKIN_TEST_CHECKSUM_FILE="$GOOD_SUMS" \
+  CODEX_DREAM_SKIN_TEST_DMG_FILE="$GOOD_DMG" \
+  CODEX_DREAM_SKIN_TEST_CACHE_ROOT="$UPDATE_ROOT/cache-good" \
+    "$ROOT/scripts/check-update-macos.sh" --json --download v9.8.7
+})"
+GUIDED_PATH="$($NODE -e '
+  const value = JSON.parse(process.argv[1]);
+  if (value.latestVersion !== "v9.8.7" || value.updateAvailable !== true) process.exit(1);
+  if (!/^[0-9a-f]{64}$/.test(value.downloadSha256)) process.exit(1);
+  process.stdout.write(value.downloadPath);
+' "$GUIDED_JSON")"
+[ "$GUIDED_PATH" = "$UPDATE_ROOT/cache-good/CodexDreamSkin-v9.8.7.dmg" ]
+/usr/bin/cmp -s "$GUIDED_PATH" "$GOOD_DMG"
+/usr/bin/hdiutil verify "$GUIDED_PATH" >/dev/null
+
+BAD_SUMS="$UPDATE_ROOT/SHA256SUMS-bad.txt"
+/usr/bin/printf '%064d  %s\n' 0 'CodexDreamSkin-v9.8.7.dmg' > "$BAD_SUMS"
+BAD_SUMS_RESPONSE="$UPDATE_ROOT/release-bad-sums.json"
+make_update_response "$GOOD_DMG" "$BAD_SUMS" "$BAD_SUMS_RESPONSE"
+if HOME="$UPDATE_ROOT/home" CODEX_DREAM_SKIN_TEST_MODE=1 \
+  CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$BAD_SUMS_RESPONSE" \
+  CODEX_DREAM_SKIN_TEST_CHECKSUM_FILE="$BAD_SUMS" \
+  CODEX_DREAM_SKIN_TEST_DMG_FILE="$GOOD_DMG" \
+  CODEX_DREAM_SKIN_TEST_CACHE_ROOT="$UPDATE_ROOT/cache-bad-sums" \
+    "$ROOT/scripts/check-update-macos.sh" --json --download v9.8.7 \
+    >"$UPDATE_ROOT/bad-sums.out" 2>&1; then
+  printf 'Guided update accepted a DMG that did not match SHA256SUMS.txt.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'does not match SHA256SUMS.txt' "$UPDATE_ROOT/bad-sums.out"
+
+BAD_ID_STAGE="$UPDATE_ROOT/bad-id-stage"
+/usr/bin/ditto "$UPDATE_STAGE" "$BAD_ID_STAGE"
+BAD_ID_APP="$BAD_ID_STAGE/Codex Dream Skin.app"
+/usr/bin/plutil -replace CFBundleIdentifier -string cc.dreamskin.impostor \
+  "$BAD_ID_APP/Contents/Info.plist"
+/usr/bin/codesign --force --deep --sign - --timestamp=none "$BAD_ID_APP"
+BAD_ID_DMG="$UPDATE_ROOT/CodexDreamSkin-bad-identity.dmg"
+/usr/bin/hdiutil create -quiet -ov -format UDZO -volname 'Dream Skin Bad Identity' \
+  -srcfolder "$BAD_ID_STAGE" "$BAD_ID_DMG"
+BAD_ID_SUMS="$UPDATE_ROOT/SHA256SUMS-bad-identity.txt"
+/usr/bin/printf '%s  %s\n' \
+  "$(/usr/bin/shasum -a 256 "$BAD_ID_DMG" | /usr/bin/awk '{print $1}')" \
+  'CodexDreamSkin-v9.8.7.dmg' > "$BAD_ID_SUMS"
+BAD_ID_RESPONSE="$UPDATE_ROOT/release-bad-identity.json"
+make_update_response "$BAD_ID_DMG" "$BAD_ID_SUMS" "$BAD_ID_RESPONSE"
+if HOME="$UPDATE_ROOT/home" CODEX_DREAM_SKIN_TEST_MODE=1 \
+  CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$BAD_ID_RESPONSE" \
+  CODEX_DREAM_SKIN_TEST_CHECKSUM_FILE="$BAD_ID_SUMS" \
+  CODEX_DREAM_SKIN_TEST_DMG_FILE="$BAD_ID_DMG" \
+  CODEX_DREAM_SKIN_TEST_CACHE_ROOT="$UPDATE_ROOT/cache-bad-identity" \
+    "$ROOT/scripts/check-update-macos.sh" --json --download v9.8.7 \
+    >"$UPDATE_ROOT/bad-identity.out" 2>&1; then
+  printf 'Guided update accepted a DMG with the wrong bundle identity.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'bundle identifier is invalid' "$UPDATE_ROOT/bad-identity.out"
+
+BAD_URL_RESPONSE="$UPDATE_ROOT/release-bad-url.json"
+/bin/cp "$GOOD_RESPONSE" "$BAD_URL_RESPONSE"
+/usr/bin/plutil -replace assets.1.browser_download_url -string \
+  'https://example.invalid/CodexDreamSkin-v9.8.7.dmg' "$BAD_URL_RESPONSE"
+if CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$BAD_URL_RESPONSE" \
+    "$ROOT/scripts/check-update-macos.sh" --json >"$UPDATE_ROOT/bad-url.out" 2>&1; then
+  printf 'Guided update accepted an asset URL outside the exact release tag.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'DMG download URL does not match the exact tag' "$UPDATE_ROOT/bad-url.out"
+
+DUPLICATE_RESPONSE="$UPDATE_ROOT/release-duplicate-dmg.json"
+/bin/cp "$GOOD_RESPONSE" "$DUPLICATE_RESPONSE"
+/usr/bin/plutil -replace assets.2.name -string 'CodexDreamSkin-v9.8.7.dmg' "$DUPLICATE_RESPONSE"
+/usr/bin/plutil -replace assets.2.browser_download_url -string \
+  'https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v9.8.7/CodexDreamSkin-v9.8.7.dmg' \
+  "$DUPLICATE_RESPONSE"
+/usr/bin/plutil -replace assets.2.size -integer \
+  "$(/usr/bin/stat -f '%z' "$GOOD_DMG")" "$DUPLICATE_RESPONSE"
+/usr/bin/plutil -replace assets.2.digest -string \
+  "sha256:$(/usr/bin/shasum -a 256 "$GOOD_DMG" | /usr/bin/awk '{print $1}')" \
+  "$DUPLICATE_RESPONSE"
+if CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$DUPLICATE_RESPONSE" \
+    "$ROOT/scripts/check-update-macos.sh" --json >"$UPDATE_ROOT/duplicate.out" 2>&1; then
+  printf 'Guided update accepted duplicate exact-name DMG assets.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'exactly one CodexDreamSkin-v9.8.7.dmg' "$UPDATE_ROOT/duplicate.out"
+
+DRAFT_RESPONSE="$UPDATE_ROOT/release-draft.json"
+/bin/cp "$GOOD_RESPONSE" "$DRAFT_RESPONSE"
+/usr/bin/plutil -replace draft -bool true "$DRAFT_RESPONSE"
+if CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$DRAFT_RESPONSE" \
+    "$ROOT/scripts/check-update-macos.sh" --json >"$UPDATE_ROOT/draft.out" 2>&1; then
+  printf 'Guided update accepted a draft release.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'release is still a draft' "$UPDATE_ROOT/draft.out"
+
+/bin/mkdir "$UPDATE_ROOT/cache-target"
+/bin/ln -s "$UPDATE_ROOT/cache-target" "$UPDATE_ROOT/cache-link"
+if HOME="$UPDATE_ROOT/home" CODEX_DREAM_SKIN_TEST_MODE=1 \
+  CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$GOOD_RESPONSE" \
+  CODEX_DREAM_SKIN_TEST_CHECKSUM_FILE="$GOOD_SUMS" \
+  CODEX_DREAM_SKIN_TEST_DMG_FILE="$GOOD_DMG" \
+  CODEX_DREAM_SKIN_TEST_CACHE_ROOT="$UPDATE_ROOT/cache-link" \
+    "$ROOT/scripts/check-update-macos.sh" --json --download v9.8.7 \
+    >"$UPDATE_ROOT/cache-link.out" 2>&1; then
+  printf 'Guided update followed a symbolic-link cache root.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'test cache root is invalid' "$UPDATE_ROOT/cache-link.out"
+
+HUGE_VERSION_RESPONSE="$UPDATE_ROOT/release-huge-version.json"
+/bin/cp "$GOOD_RESPONSE" "$HUGE_VERSION_RESPONSE"
+/usr/bin/plutil -replace tag_name -string 'v999999999999999999.8.7' "$HUGE_VERSION_RESPONSE"
+if CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$HUGE_VERSION_RESPONSE" \
+    "$ROOT/scripts/check-update-macos.sh" --json >"$UPDATE_ROOT/huge-version.out" 2>&1; then
+  printf 'Guided update accepted an integer-overflow version component.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'unsupported release tag' "$UPDATE_ROOT/huge-version.out"
+
+if "$ROOT/scripts/check-update-macos.sh" --interactive --download v9.8.7 \
+    >"$UPDATE_ROOT/mixed-mode.out" 2>&1; then
+  printf 'Guided update accepted interactive and download modes together.\n' >&2
+  exit 1
+fi
+/usr/bin/grep -F -q 'cannot be used together' "$UPDATE_ROOT/mixed-mode.out"
 
 # Standalone archives flatten macos/ to their root. Prompt guides and NOTICE
 # must describe that layout and must not claim that Windows assets are bundled.

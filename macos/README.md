@@ -19,7 +19,9 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 普通用户请从 [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载
 `CodexDreamSkin-vX.Y.Z.dmg`，按 [`docs/install-macos.md`](../docs/install-macos.md) 的图形界面步骤
 拖入 Applications。首次运行可能需要在“系统设置 → 隐私与安全性 → 仍要打开”确认一次；不需要
-运行 `xattr` 或安装源码。后续更新下载新的 DMG 覆盖安装即可，用户主题和图片会保留。
+运行 `xattr` 或安装源码。菜单栏发现新版本后可下载精确 tag 的 DMG，核对 GitHub API digest、
+`SHA256SUMS.txt`、DMG 和其内 App 身份后打开；用户仍需亲自拖入 Applications 并确认替换，客户端不会
+静默自覆盖。更新后用户主题和图片会保留。
 
 ## Advanced: run from source
 
