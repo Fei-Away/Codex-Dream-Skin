@@ -32,12 +32,13 @@ sudo apt install codex-desktop
 2. 安装（推荐，apt 会自动解析依赖）：
    `sudo apt install ./codex-dream-skin_<version>_amd64.deb`。
    备选：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`，若提示依赖缺失再运行
-   `sudo apt install -f` 补齐。依赖（`bash`、`coreutils`、`curl`、`libnotify-bin`、
-   `nodejs`（>= 18）、`unzip`、`xdg-utils`、`iproute2`）会由包管理器自动安装。
+   `sudo apt install -f` 补齐。依赖（`bash`、`coreutils`、`curl`、`file`、`iproute2`、
+   `libnotify-bin`、`nodejs`（>= 18）、`procps`、`unzip`、`xdg-utils`）会由包管理器自动安装。
 3. 在终端运行 `dreamskin`，出现交互菜单。
 
-包会安装到 `/opt/codex-dream-skin`，提供 `/usr/bin/dreamskin` 命令，并自动注册
-`x-scheme-handler/dreamskin` 协议（网站一键换肤用）。`ffmpeg` 是可选推荐依赖
+包会安装到 `/opt/codex-dream-skin`，并提供 `/usr/bin/dreamskin` 命令。首次以桌面用户运行
+`dreamskin` 时会注册 `x-scheme-handler/dreamskin` 协议（网站一键换肤用）；deb 维护脚本
+不会以 root 身份改写用户的 MIME 默认项。`ffmpeg` 是可选推荐依赖
 （Recommends）：只有更换背景图时源图不是 JPEG 才需要它做转换，JPEG 直通不受影响；
 缺少它时换背景图会明确报错，`sudo apt install ffmpeg` 即可补齐。
 
@@ -128,7 +129,7 @@ SHA-256。`theme.css` 会在本机导入和应用时复验，通过后只作用�
 
 安装客户端后，DreamSkin.cc 上已通过审核并支持一键换肤的主题会显示“一键应用到客户端”。
 点击后，Linux 会把 `dreamskin://apply?version=...` 请求通过 `x-scheme-handler/dreamskin`
-交给 Dream Skin（deb 安装自动注册；tar.gz 由 `install.sh` 注册）。浏览器确认后不会弹出
+交给 Dream Skin（deb 在用户首次运行 `dreamskin` 时注册；tar.gz 由 `install.sh` 注册）。浏览器确认后不会弹出
 终端：换肤在后台完成，结果以桌面通知呈现（成功显示主题名；失败提示并给出日志路径
 `~/.local/state/codex-dream-skin/community-apply.log`）。在终端里跑 `dreamskin community
 <链接>` 则照常在终端里显示过程输出。

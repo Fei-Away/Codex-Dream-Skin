@@ -1,5 +1,14 @@
 # Task Progress
 
+## PR #1 pre-merge hardening (2026-08-29)
+
+- [scope] Local-only review fixes on `feat/linux-support`; do not push until the owner reviews the diff.
+- [root cause] Exact-head CI run `31957982419` failed on both Windows jobs because generated Linux runtime files were not pinned to LF in the root `.gitattributes`; Windows checkout changed their bytes and `sync-runtime-assets.mjs --check` reported all eight Linux outputs stale.
+- [implemented] Added LF contracts, portable Release-note URLs, idempotent `workflow_dispatch` resume from an existing unpublished tag commit, Linux Node 18/20/22 CI coverage, user-context protocol registration, correct desktop database refresh, missing `file`/`procps` dependencies, coreutils `sha256sum`, caller-provided Node version validation, and safe dpkg-owned path cleanup.
+- [tests] Added release workflow/LF/retry URL assertions and Linux packaging/registration/Node-floor/dependency regressions. Focused red failures were observed before implementation. Full Linux suite and dual-package release build pass; portable macOS tests pass 72/74 with two platform-only skips; tools tests pass 2/2; workflow YAML, shell/Node syntax, sync check, and diff check pass.
+- [remaining gate] Node 18/20/22 matrix structure is locally validated, but actual Node 18 and native Windows reruns require GitHub CI after owner approval and push.
+- [next] Present the unpushed diff and verification evidence to the owner; push only after explicit approval.
+
 ## feat/linux-support Linux 移植 (2026-08-16)
 
 - 分支 `feat/linux-support`，依据 `docs/superpowers/plans/2026-08-16-linux-support.md` 逐任务移植 macOS 引擎到 `linux/`。

@@ -707,10 +707,9 @@ launch_injector_daemon() {
 
 # Resolve Node from the system installation and require version 18 or newer.
 ensure_node_runtime() {
-  if [ -n "${NODE:-}" ] && [ -x "$NODE" ]; then
-    return 0
+  if [ -z "${NODE:-}" ] || [ ! -x "$NODE" ]; then
+    NODE="$(command -v node || true)"
   fi
-  NODE="$(command -v node || true)"
   [ -n "$NODE" ] && [ -x "$NODE" ] || fail "Node.js was not found. Install nodejs (>= 18) first."
   local node_major=""
   node_major="$("$NODE" --version)"

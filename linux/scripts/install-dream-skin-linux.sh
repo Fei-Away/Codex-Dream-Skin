@@ -132,6 +132,8 @@ if [ "$CREATE_LAUNCHERS" = "true" ]; then
   if command -v xdg-mime >/dev/null 2>&1; then
     xdg-mime default codex-dream-skin.desktop x-scheme-handler/dreamskin >/dev/null 2>&1 || true
   fi
+  command -v update-desktop-database >/dev/null 2>&1 \
+    && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 fi
 
 printf 'Codex Dream Skin Studio %s installed at %s for Codex %s using its signed Node.js %s.\n' \

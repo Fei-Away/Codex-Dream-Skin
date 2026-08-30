@@ -62,7 +62,7 @@ if [ -n "$EXPECTED_SHA256" ]; then
   snapshot_bytes="$(/usr/bin/stat -c '%s' "$ARCHIVE_SNAPSHOT")"
   [ "$snapshot_bytes" = "$EXPECTED_BYTES" ] \
     || fail "The private import snapshot no longer matches the approved package byte count."
-  snapshot_sha256="$(LC_ALL=C /usr/bin/shasum -a 256 "$ARCHIVE_SNAPSHOT" | /usr/bin/awk '{print $1}')"
+  snapshot_sha256="$(LC_ALL=C /usr/bin/sha256sum "$ARCHIVE_SNAPSHOT" | /usr/bin/awk '{print $1}')"
   [ "$snapshot_sha256" = "$EXPECTED_SHA256" ] \
     || fail "The private import snapshot no longer matches the approved package SHA-256."
 fi

@@ -1,7 +1,5 @@
 #!/bin/bash
 set -e
-rm -f /usr/bin/dreamskin
-if [ "$1" = "purge" ]; then
-  rm -rf /opt/codex-dream-skin
-fi
+command -v update-desktop-database >/dev/null 2>&1 \
+  && update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
 exit 0

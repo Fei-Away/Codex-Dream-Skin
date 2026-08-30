@@ -3,7 +3,7 @@ Version: 1.5.14
 Section: utils
 Priority: optional
 Architecture: amd64
-Depends: bash, coreutils, curl, libnotify-bin, nodejs (>= 18.0), unzip, xdg-utils, iproute2
+Depends: bash, coreutils, curl, file, iproute2, libnotify-bin, nodejs (>= 18.0), procps, unzip, xdg-utils
 Recommends: ffmpeg
 Maintainer: Codex Dream Skin <noreply@dreamskin.cc>
 Description: External themes for the official Codex desktop app

@@ -22,7 +22,7 @@ fi
 /usr/bin/grep -F -q 'private import snapshot no longer matches the approved package SHA-256' \
   "$TMP/hash-output"
 
-ACTUAL_SHA="$(LC_ALL=C /usr/bin/shasum -a 256 "$ARCHIVE" | /usr/bin/awk '{print $1}')"
+ACTUAL_SHA="$(LC_ALL=C /usr/bin/sha256sum "$ARCHIVE" | /usr/bin/awk '{print $1}')"
 if /usr/bin/env HOME="$TMP/home" NODE="$NODE" \
   "$ROOT/scripts/import-theme-zip-linux.sh" --file "$ARCHIVE" \
   --expected-sha256 "$ACTUAL_SHA" --expected-bytes "$((BYTES + 1))" \

@@ -155,7 +155,10 @@ jobs:
             fi
             should_release="false"
           elif [[ -n "$tag_sha" ]]; then
-            if [[ "$version_unchanged" == "true" ]]; then
+            if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+              release_sha="$tag_commit"
+              echo "Resuming incomplete $tag from its existing tagged commit."
+            elif [[ "$version_unchanged" == "true" ]]; then
               release_sha="$tag_commit"
               echo "Resuming incomplete $tag from its existing tagged commit."
             else
@@ -494,6 +497,7 @@ jobs:
           RELEASE_SHA: ${{ needs.guard.outputs.release_sha }}
         run: |
           set -euo pipefail
+          REPOSITORY_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           test -s "dist/CodexDreamSkin-v${VERSION}.dmg"
           test -s "dist/CodexDreamSkin-Setup-v${VERSION}.exe"
           test -s "dist/codex-dream-skin_${VERSION}_amd64.deb"
@@ -510,15 +514,15 @@ jobs:
 
           ### Downloads
 
-          - **macOS:** [CodexDreamSkin-v${VERSION}.dmg](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg)
-          - **Windows:** [CodexDreamSkin-Setup-v${VERSION}.exe](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe)
-          - **Linux:** [codex-dream-skin_${VERSION}_amd64.deb](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/codex-dream-skin_${VERSION}_amd64.deb), [CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz) — see [Linux installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-linux.md)
-          - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
+          - **macOS:** [CodexDreamSkin-v${VERSION}.dmg](${REPOSITORY_URL}/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg)
+          - **Windows:** [CodexDreamSkin-Setup-v${VERSION}.exe](${REPOSITORY_URL}/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe)
+          - **Linux:** [codex-dream-skin_${VERSION}_amd64.deb](${REPOSITORY_URL}/releases/download/v${VERSION}/codex-dream-skin_${VERSION}_amd64.deb), [CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz](${REPOSITORY_URL}/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}-linux-amd64.tar.gz) — see [Linux installation](${REPOSITORY_URL}/blob/v${VERSION}/docs/install-linux.md)
+          - [SHA256SUMS.txt](${REPOSITORY_URL}/releases/download/v${VERSION}/SHA256SUMS.txt)
 
           The packages are currently unsigned. Follow the graphical first-run steps in
-          [macOS installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-macos.md),
-          [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md),
-          or [Linux installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-linux.md).
+          [macOS installation](${REPOSITORY_URL}/blob/v${VERSION}/docs/install-macos.md),
+          [Windows installation](${REPOSITORY_URL}/blob/v${VERSION}/docs/install-windows.md),
+          or [Linux installation](${REPOSITORY_URL}/blob/v${VERSION}/docs/install-linux.md).
           No terminal trust command is required for ordinary users, except Linux AppImage users:
           approve the official download once with \`dreamskin start --allow-unsigned\`.
 

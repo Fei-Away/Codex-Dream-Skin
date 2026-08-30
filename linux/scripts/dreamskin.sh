@@ -9,6 +9,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$(/usr/bin/readlink -f "${BASH_SOURCE[0]}")")" && pwd -P)"
 . "$SCRIPT_DIR/common-linux.sh"
 
+ensure_user_scheme_handler() {
+  command -v xdg-mime >/dev/null 2>&1 || return 0
+  local current=""
+  current="$(xdg-mime query default x-scheme-handler/dreamskin 2>/dev/null || true)"
+  [ "$current" = "codex-dream-skin.desktop" ] && return 0
+  xdg-mime default codex-dream-skin.desktop x-scheme-handler/dreamskin >/dev/null 2>&1 || true
+}
+
 resolve_command() {
   local input="${1:-}"
   case "$input" in
@@ -160,6 +168,9 @@ main() {
   if [ "${1:-}" = "--self-test-source" ]; then
     return 0
   fi
+  # Debian maintainer scripts run as root and cannot set a desktop user's
+  # MIME defaults. Register idempotently when the real user invokes Dream Skin.
+  ensure_user_scheme_handler
   if [ "$#" -gt 0 ]; then
     local key=""
     # One-click dreamskin:// links bypass resolve_command so dispatch keeps

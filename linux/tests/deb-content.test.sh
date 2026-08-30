@@ -60,4 +60,12 @@ case "$INFO" in
   *"nodejs (>= 18.0)"*) ;;
   *) printf 'nodejs >= 18.0 dependency missing\n' >&2; exit 1 ;;
 esac
+case "$INFO" in
+  *"file"*) ;;
+  *) printf 'file runtime dependency missing\n' >&2; exit 1 ;;
+esac
+case "$INFO" in
+  *"procps"*) ;;
+  *) printf 'procps runtime dependency missing\n' >&2; exit 1 ;;
+esac
 printf 'deb content tests passed\n'
