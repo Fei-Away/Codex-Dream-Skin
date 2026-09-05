@@ -16,6 +16,7 @@ while IFS= read -r file; do "$NODE" --check "$file" >/dev/null; done < <(
 # same source aborts at runtime under a UTF-8 locale with `set -u` and masks
 # the real failure behind a bogus "unbound variable" (#251).
 "$NODE" "$ROOT/tests/shell-braced-vars-before-cjk.test.mjs"
+"$NODE" --test "$ROOT/tests/restart-cancellation.test.mjs"
 
 ZH_COPY="$(DREAMSKIN_LANG=zh-CN /bin/bash -c '
   . "$1/scripts/localization-macos.sh"
@@ -712,15 +713,19 @@ STATUS_JSON="$(/usr/bin/env HOME="$STATUS_HOME" "$ROOT/scripts/status-dream-skin
 wait "$STATUS_PID" 2>/dev/null || true
 STATUS_PID=""
 
-# The common stop path must reject a real watcher running on 19341 when the
-# saved state claims 1934, even though nodePath/injectorPath/start-time all
-# match. This exercises the signal gate directly (status has its own matcher).
-"$NODE" "$ROOT/scripts/injector.mjs" --watch --port 19341 --theme-dir "$ROOT/presets/preset-gothic-void-crusade" \
+# The common stop path must reject a watcher on 19341 when state claims 1934.
+# Use the inert fixture: a real injector could reach a working client on that
+# loopback port even with an isolated HOME.
+"$NODE" "$STATUS_FAKE_INJECTOR" --watch --port 19341 --theme-dir "$TMP" \
   >"$TMP/near-prefix-injector.out" 2>&1 &
 WATCH_PID="$!"
 /bin/sleep 0.2
 WATCH_START="$(/bin/ps -p "$WATCH_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
 [ -n "$WATCH_START" ] || { printf 'Could not record near-prefix watcher start time.\n' >&2; exit 1; }
+/usr/bin/env HOME="$STOP_HOME" NODE="$NODE" /bin/bash -c '
+  . "$1/scripts/common-macos.sh"
+  recorded_injector_process_matches "$2" "$3" "$NODE" "$4" 19341
+' _ "$ROOT" "$WATCH_PID" "$WATCH_START" "$STATUS_FAKE_INJECTOR"
 "$NODE" -e '
   const fs = require("node:fs");
   const [file, pid, node, injector, startedAt] = process.argv.slice(1);
@@ -733,9 +738,11 @@ WATCH_START="$(/bin/ps -p "$WATCH_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$
     injectorPath: injector,
     nodePath: node,
   })}\n`);
-' "$STOP_STATE_ROOT/state.json" "$WATCH_PID" "$NODE" "$ROOT/scripts/injector.mjs" "$WATCH_START"
+' "$STOP_STATE_ROOT/state.json" "$WATCH_PID" "$NODE" "$STATUS_FAKE_INJECTOR" "$WATCH_START"
 if /usr/bin/env HOME="$STOP_HOME" NODE="$NODE" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
+  # This fixture tests PID identity, not discovery of the installed signed app.
+  ensure_node_runtime() { [ -x "$NODE" ]; }
   INJECTOR_JOB_LABEL="$2"
   stop_recorded_injector 2>/dev/null
 ' _ "$ROOT" "$TEST_INJECTOR_JOB_LABEL"; then
@@ -771,7 +778,7 @@ APPLY_SCRIPT="$ROOT/scripts/apply-from-menubar-macos.sh"
 /usr/bin/grep -F -q 'if hot_reapply_theme "$PORT" 8000; then' "$APPLY_SCRIPT"
 /usr/bin/grep -F -q 'SESSION="off"' "$APPLY_SCRIPT"
 /usr/bin/grep -F -q 'if ! confirm "$PROMPT" "$OK_LABEL"; then' "$APPLY_SCRIPT"
-/usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" --prompt-restart' "$APPLY_SCRIPT"
 if /usr/bin/grep -F -q 'CODEX_RUNNING=' "$APPLY_SCRIPT" ||
    /usr/bin/grep -F -q 'MENU_ACTION=' "$APPLY_SCRIPT" ||
    /usr/bin/grep -F -q 'OPEN_PROMPT=' "$APPLY_SCRIPT"; then
@@ -780,7 +787,7 @@ if /usr/bin/grep -F -q 'CODEX_RUNNING=' "$APPLY_SCRIPT" ||
 fi
 HOT_LINE="$(/usr/bin/grep -n 'hot_reapply_theme "$PORT" 8000' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
 CONFIRM_LINE="$(/usr/bin/grep -n 'if ! confirm "$PROMPT" "$OK_LABEL"; then' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
-START_LINE="$(/usr/bin/grep -n 'start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+START_LINE="$(/usr/bin/grep -n 'start-dream-skin-macos.sh" --prompt-restart' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
 if [ -z "$HOT_LINE" ] || [ -z "$CONFIRM_LINE" ] || [ -z "$START_LINE" ] ||
    [ "$CONFIRM_LINE" -ge "$HOT_LINE" ] ||
    [ "$HOT_LINE" -ge "$START_LINE" ]; then

@@ -408,6 +408,50 @@ recorded_injector_process_matches() {
   return 0
 }
 
+quit_codex_for_restart() {
+  local outcome
+  local deadline
+  codex_is_running || return 0
+
+  # Restart consent does not authorize overriding the official app's quit dialog.
+  # Keep launchd and injector ownership intact until the app has actually exited.
+  if ! outcome="$(/usr/bin/osascript <<'APPLESCRIPT'
+try
+  with timeout of 15 seconds
+    tell application id "com.openai.codex" to quit
+  end timeout
+  return "requested"
+on error errorMessage number errorNumber
+  if errorNumber is -128 then return "cancelled"
+  if errorNumber is -1712 then return "timed-out"
+  error errorMessage number errorNumber
+end try
+APPLESCRIPT
+)"; then
+    printf 'ChatGPT quit could not be confirmed; restart was stopped.\n' >&2
+    return 1
+  fi
+  case "$outcome" in
+    cancelled) return 20 ;;
+    timed-out)
+      printf 'ChatGPT quit timed out; restart was stopped without forcing it to close.\n' >&2
+      return 124
+      ;;
+    requested) ;;
+    *)
+      printf 'ChatGPT quit returned an unexpected result; restart was stopped.\n' >&2
+      return 1
+      ;;
+  esac
+  deadline=$((SECONDS + 15))
+  while codex_is_running && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.25; done
+  if codex_is_running; then
+    printf 'ChatGPT is still running; restart was stopped without forcing it to close.\n' >&2
+    return 124
+  fi
+  release_codex_launchd_job
+}
+
 stop_codex() {
   local allow_force="${1:-false}"
   local deadline
