@@ -41,17 +41,27 @@ for (const modulePath of modules) {
         parseCalls += 1;
         return JSON.parse(...args);
       };
+      const signal = AbortSignal.timeout(fixture.timeoutMs);
+      const startedAt = performance.now();
       try {
-        const value = await discovery.fetchBoundedCdpJson(port, testCase.resource, { parseJson });
+        const value = await discovery.fetchBoundedCdpJson(port, testCase.resource, { parseJson, signal });
         assert.equal(testCase.expect, "ok", `${modulePath}: ${testCase.name} unexpectedly passed`);
         if (testCase.resource === "/json/list") assert.ok(Array.isArray(value));
         else assert.equal(typeof value, "object");
         if (testCase.name === "list-count-128") assert.equal(value.length, 128);
         if (testCase.name === "list-exact-byte-limit") assert.equal(value.length, 1);
+        if (testCase.count !== undefined) assert.equal(value.length, testCase.count);
       } catch (error) {
         assert.notEqual(testCase.expect, "ok", `${modulePath}: ${testCase.name} failed: ${error.message}`);
-        assert.equal(error.code, expectedCode(testCase.expect), `${modulePath}: ${testCase.name}`);
+        if (testCase.expect === "timeout") {
+          assert.ok(signal.aborted, `${modulePath}: ${testCase.name} did not exhaust its deadline`);
+          assert.ok(["AbortError", "TimeoutError"].includes(error.name));
+          assert.ok(performance.now() - startedAt < fixture.timeoutMs + 3000, "response exceeded deadline tolerance");
+        } else {
+          assert.equal(error.code, expectedCode(testCase.expect), `${modulePath}: ${testCase.name}`);
+        }
       }
+      if (testCase.expect === "timeout") assert.equal(parseCalls, 0, "incomplete response must not be parsed");
       if (isPreParseCase) assert.equal(parseCalls, 0, `${modulePath}: ${testCase.name} parsed before rejecting the size limit`);
       if (testCase.expect === "redirect") {
         assert.equal(running.stats[testCase.name].followedRedirect, 0, `${modulePath}: redirect was followed`);

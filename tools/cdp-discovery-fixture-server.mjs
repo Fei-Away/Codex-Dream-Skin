@@ -100,6 +100,23 @@ export async function startFixtureServers(fixture) {
         response.end();
         return;
       }
+      if (testCase.body === "slow-body" || testCase.body === "stalled-body") {
+        let interval;
+        let finish;
+        const start = setTimeout(() => {
+          response.write("[");
+          if (testCase.body === "slow-body") {
+            interval = setInterval(() => response.write(" "), 100);
+          }
+          finish = setTimeout(() => response.end("]"), fixture.timeoutMs * 2);
+        }, testCase.headerDelayMs ?? 0);
+        response.once("close", () => {
+          clearTimeout(start);
+          clearInterval(interval);
+          clearTimeout(finish);
+        });
+        return;
+      }
       const body = bodyForCase(testCase, port);
       response.setHeader("Content-Length", String(body.length));
       response.end(body);
@@ -118,6 +135,7 @@ export async function startFixtureServers(fixture) {
     ports,
     stats: Object.fromEntries([...servers].map(([name, value]) => [name, value.stats])),
     async close() {
+      for (const { server } of servers.values()) server.closeAllConnections();
       await Promise.all([...servers.values()].map(({ server }) => new Promise((resolve) => server.close(resolve))));
     },
   };

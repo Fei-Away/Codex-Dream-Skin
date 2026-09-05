@@ -4,8 +4,10 @@
   "maxTargets": 128,
   "maxTargetIdLength": 200,
   "maxUrlLength": 2048,
+  "timeoutMs": 2000,
   "cases": [
-    { "name": "list-valid", "resource": "/json/list", "body": "valid-list", "expect": "ok" },
+    { "name": "list-empty", "resource": "/json/list", "body": "list-count", "count": 0, "expect": "ok" },
+    { "name": "list-valid", "resource": "/json/list", "body": "valid-list", "count": 1, "expect": "ok" },
     { "name": "list-count-128", "resource": "/json/list", "body": "list-count", "count": 128, "expect": "ok" },
     { "name": "list-count-129", "resource": "/json/list", "body": "list-count", "count": 129, "expect": "too-many-targets" },
     { "name": "list-id-200", "resource": "/json/list", "body": "list-boundary", "idLength": 200, "expect": "ok" },
@@ -33,6 +35,9 @@
     { "name": "redirect", "resource": "/json/list", "body": "valid-list", "status": 302, "expect": "redirect" },
     { "name": "non-2xx", "resource": "/json/list", "body": "malformed", "status": 503, "expect": "http-status" },
     { "name": "invalid-utf8", "resource": "/json/list", "body": "invalid-utf8", "expect": "invalid-utf8" },
-    { "name": "malformed-json", "resource": "/json/list", "body": "malformed", "expect": "malformed-json" }
+    { "name": "malformed-json", "resource": "/json/list", "body": "malformed", "expect": "malformed-json" },
+    { "name": "trickle-body", "resource": "/json/list", "body": "slow-body", "expect": "timeout" },
+    { "name": "stalled-body", "resource": "/json/list", "body": "stalled-body", "expect": "timeout" },
+    { "name": "delayed-headers-body", "resource": "/json/list", "body": "slow-body", "headerDelayMs": 1500, "expect": "timeout" }
   ]
 }

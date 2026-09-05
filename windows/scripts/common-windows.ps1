@@ -179,6 +179,7 @@ $script:DREAM_SKIN_MAX_CDP_TARGETS = 128
 $script:DREAM_SKIN_MAX_CDP_TARGET_ID_LENGTH = 200
 $script:DREAM_SKIN_MAX_CDP_URL_LENGTH = 2048
 $script:DREAM_SKIN_MAX_CDP_TEXT_LENGTH = 200
+$script:DREAM_SKIN_CDP_TIMEOUT_MS = 2000
 
 function Enter-DreamSkinOperationLock {
   param(
@@ -1104,7 +1105,7 @@ function Assert-DreamSkinCdpString {
 }
 
 function Assert-DreamSkinCdpListShape {
-  param([Parameter(Mandatory = $true)][object]$Value)
+  param([Parameter(Mandatory = $true)][AllowEmptyCollection()][object]$Value)
   if ($Value -isnot [array]) { throw 'CDP_DISCOVERY_ROOT_TYPE: target list must be an array' }
   if ($Value.Count -gt $script:DREAM_SKIN_MAX_CDP_TARGETS) {
     throw "CDP_DISCOVERY_TOO_MANY_TARGETS: target list exceeds $script:DREAM_SKIN_MAX_CDP_TARGETS items"
@@ -1127,7 +1128,7 @@ function Assert-DreamSkinCdpListShape {
       -Value $target -Name 'webSocketDebuggerUrl' -Field "target[$index].webSocketDebuggerUrl") `
       -Field "target[$index].webSocketDebuggerUrl" -MaximumLength $script:DREAM_SKIN_MAX_CDP_URL_LENGTH)
   }
-  return $Value
+  return ,$Value
 }
 
 function Assert-DreamSkinCdpVersionShape {
@@ -1172,16 +1173,21 @@ function ConvertFrom-DreamSkinCdpJsonBytes {
       throw "CDP_DISCOVERY_MALFORMED_JSON: $Resource comments are not allowed"
     }
   }
-  $arrayRoot = $text.TrimStart().StartsWith('[')
   try {
-    $value = ConvertFrom-Json -InputObject $text -ErrorAction Stop
+    if ($PSVersionTable.PSVersion.Major -ge 7) {
+      $value = ConvertFrom-Json -InputObject $text -NoEnumerate -ErrorAction Stop
+    } else {
+      $value = ConvertFrom-Json -InputObject $text -ErrorAction Stop
+    }
   } catch {
     throw "CDP_DISCOVERY_MALFORMED_JSON: $Resource is not valid JSON"
   }
-  # PowerShell 7 可能在赋值时枚举单元素 JSON 数组，而 PowerShell 5.1 会保留数组。
-  # 在校验前恢复 JSON 根类型，确保两个受支持版本使用同一份合同。
-  if ($arrayRoot) { $value = @($value) }
-  if ($Resource -eq '/json/list') { return Assert-DreamSkinCdpListShape -Value $value }
+  # PS 5.1 retains the root array; PS 7 needs NoEnumerate. Preserve it through
+  # each function boundary too, including [] and a single target.
+  if ($Resource -eq '/json/list') {
+    [void](Assert-DreamSkinCdpListShape -Value $value)
+    return ,$value
+  }
   return Assert-DreamSkinCdpVersionShape -Value $value
 }
 
@@ -1192,9 +1198,10 @@ function Invoke-DreamSkinCdpJsonRequest {
   )
   $request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$Port$Resource")
   $request.AllowAutoRedirect = $false
-  $request.Timeout = 2000
-  $request.ReadWriteTimeout = 2000
+  $request.Timeout = $script:DREAM_SKIN_CDP_TIMEOUT_MS
+  $request.ReadWriteTimeout = $script:DREAM_SKIN_CDP_TIMEOUT_MS
   $request.Proxy = $null
+  $deadline = [System.Diagnostics.Stopwatch]::StartNew()
   $response = $null
   $stream = $null
   $memory = $null
@@ -1202,6 +1209,9 @@ function Invoke-DreamSkinCdpJsonRequest {
     try {
       $response = $request.GetResponse()
     } catch [System.Net.WebException] {
+      if ($_.Exception.Status -eq [System.Net.WebExceptionStatus]::Timeout) {
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
       $response = $_.Exception.Response
       if ($null -eq $response) { throw }
     }
@@ -1218,14 +1228,36 @@ function Invoke-DreamSkinCdpJsonRequest {
     $stream = $response.GetResponseStream()
     $memory = [System.IO.MemoryStream]::new()
     $buffer = [byte[]]::new(8192)
-    while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+    while ($true) {
+      $remaining = $script:DREAM_SKIN_CDP_TIMEOUT_MS - [int]$deadline.ElapsedMilliseconds
+      if ($remaining -le 0) {
+        $request.Abort()
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
+      # ReadWriteTimeout restarts for each read. Wait only for the remaining
+      # whole-response budget, including time already spent receiving headers.
+      $pendingRead = $stream.ReadAsync($buffer, 0, $buffer.Length)
+      $remaining = [Math]::Max(0, $script:DREAM_SKIN_CDP_TIMEOUT_MS - [int]$deadline.ElapsedMilliseconds)
+      if (-not $pendingRead.Wait($remaining)) {
+        $request.Abort()
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
+      $read = $pendingRead.GetAwaiter().GetResult()
+      if ($deadline.ElapsedMilliseconds -ge $script:DREAM_SKIN_CDP_TIMEOUT_MS) {
+        $request.Abort()
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
+      if ($read -eq 0) { break }
       if ($memory.Length + $read -gt $script:DREAM_SKIN_MAX_CDP_JSON_BYTES) {
         throw "CDP_DISCOVERY_RESPONSE_TOO_LARGE: $Resource streamed more than $script:DREAM_SKIN_MAX_CDP_JSON_BYTES bytes"
       }
       $memory.Write($buffer, 0, $read)
     }
-    return ConvertFrom-DreamSkinCdpJsonBytes -Bytes $memory.ToArray() -Resource $Resource
+    $value = ConvertFrom-DreamSkinCdpJsonBytes -Bytes $memory.ToArray() -Resource $Resource
+    if ($Resource -eq '/json/list') { return ,$value }
+    return $value
   } finally {
+    $deadline.Stop()
     if ($null -ne $memory) { $memory.Dispose() }
     if ($null -ne $stream) { $stream.Dispose() }
     if ($null -ne $response) { $response.Dispose() }
