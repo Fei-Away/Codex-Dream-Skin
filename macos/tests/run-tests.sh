@@ -113,6 +113,7 @@ UPDATE_REDIRECT_JSON="$({
   if (!value.updateAvailable) process.exit(1);
   if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
 ' "$UPDATE_REDIRECT_JSON"
+"$NODE" --test "$ROOT/tests/update-fallback.test.mjs"
 if /usr/bin/grep -R -n -E --exclude-dir='.build' \
   --exclude-dir='.build-*' \
   'xattr|spctl[[:space:]]+--master-disable' \

@@ -56,7 +56,6 @@ TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-update.XXXXXX)"
 trap '/bin/rm -rf "$TMP"' EXIT
 RESPONSE="$TMP/release.json"
 REDIRECT_HEADERS="$TMP/release.headers"
-LATEST_TAG=""
 if [ -n "${CODEX_DREAM_SKIN_TEST_REDIRECT_HEADERS_FILE:-}" ]; then
   [ -f "$CODEX_DREAM_SKIN_TEST_REDIRECT_HEADERS_FILE" ] \
     || fail "Test redirect response does not exist."
@@ -67,7 +66,7 @@ elif [ -n "${CODEX_DREAM_SKIN_TEST_RESPONSE_FILE:-}" ]; then
   /bin/cp "$CODEX_DREAM_SKIN_TEST_RESPONSE_FILE" "$RESPONSE"
 else
   if ! /usr/bin/curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
-    --connect-timeout 5 --max-time 12 \
+    --connect-timeout 5 --max-time 12 --max-filesize 1048576 \
     --header 'Accept: application/vnd.github+json' \
     --header 'X-GitHub-Api-Version: 2022-11-28' \
     --user-agent 'CodexDreamSkin-UpdateCheck' \
@@ -82,14 +81,20 @@ else
 fi
 
 if [ -f "$REDIRECT_HEADERS" ]; then
+  HEADER_BYTES="$(/usr/bin/stat -f '%z' "$REDIRECT_HEADERS")"
+  [ "$HEADER_BYTES" -gt 0 ] && [ "$HEADER_BYTES" -le 65536 ] \
+    || fail "GitHub returned invalid release headers."
+  # BSD awk does not implement IGNORECASE. Only inspect the final response
+  # block, excluding a proxy's CONNECT response or an informational header.
   LATEST_LOCATION="$(/usr/bin/awk '
-    BEGIN { IGNORECASE = 1 }
-    /^location:/ {
+    /^HTTP\/[0-9.]+[[:space:]]/ { status = $2; count = 0; value = ""; next }
+    tolower($0) ~ /^location:/ {
       sub(/^[^:]+:[[:space:]]*/, "")
       sub(/\r$/, "")
+      count++
       value = $0
     }
-    END { print value }
+    END { if (status >= 300 && status < 400 && count == 1) print value }
   ' "$REDIRECT_HEADERS")"
   TAG_PREFIX="https://github.com/$REPOSITORY/releases/tag/"
   case "$LATEST_LOCATION" in
