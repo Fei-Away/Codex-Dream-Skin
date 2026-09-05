@@ -104,6 +104,17 @@ UPDATE_JSON="$({
   if (!value.updateAvailable) process.exit(1);
   if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
 ' "$UPDATE_JSON"
+UPDATE_REDIRECT_JSON="$({
+  CODEX_DREAM_SKIN_TEST_REDIRECT_HEADERS_FILE="$ROOT/tests/fixtures/latest-release.headers" \
+    "$ROOT/scripts/check-update-macos.sh" --json
+})"
+"$NODE" -e '
+  const value = JSON.parse(process.argv[1]);
+  if (value.currentVersion !== "v1.5.16" || value.latestVersion !== "v9.8.7") process.exit(1);
+  if (!value.updateAvailable) process.exit(1);
+  if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
+' "$UPDATE_REDIRECT_JSON"
+"$NODE" --test "$ROOT/tests/update-fallback.test.mjs"
 if /usr/bin/grep -R -n -E --exclude-dir='.build' \
   --exclude-dir='.build-*' \
   'xattr|spctl[[:space:]]+--master-disable' \

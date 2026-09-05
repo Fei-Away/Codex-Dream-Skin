@@ -442,6 +442,11 @@ export async function runRendererRuntimeTest(assetRoot) {
   );
   assert.match(
     css,
+    /\[role="main"\]:has\(\[data-testid="home-icon"\]\):has\(:is\(\[class\*="_homeUtilityBar_"\], \[class\*="_ComposerHomeUtilityBar_"\]\)\)\s*:is\(\.composer-surface-chrome,[^)]*\)\s*\{[^}]*border-radius:\s*22px\s*!important;/,
+    "The Home Composer must keep rounded corners below the utility bar.",
+  );
+  assert.match(
+    css,
     /\[class~="h-full"\]\[class~="bg-gradient-to-t"\]\[class~="from-surface"\]\[class~="via-surface"\]/,
     "The current 148px sticky composer fade must be removed by its full utility signature.",
   );
