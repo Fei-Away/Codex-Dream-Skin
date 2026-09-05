@@ -9,6 +9,7 @@ import {
   normalizeThemeText,
 } from "../assets/theme-package-validator.mjs";
 import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
+import { fetchBoundedCdpJson } from "./cdp-discovery.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
@@ -412,12 +413,7 @@ async function fetchCdpJson(port, resource) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2000);
   try {
-    const response = await fetch(`http://127.0.0.1:${port}${resource}`, {
-      redirect: "error",
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
+    return await fetchBoundedCdpJson(port, resource, { signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }

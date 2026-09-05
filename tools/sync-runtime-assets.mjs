@@ -130,6 +130,10 @@ const sourceImageMetadata = await fs.readFile(
   path.join(projectRoot, "runtime", "image-metadata.mjs"),
   "utf8",
 );
+const sourceCdpDiscovery = await fs.readFile(
+  path.join(projectRoot, "runtime", "cdp-discovery.mjs"),
+  "utf8",
+);
 const outputs = [
   {
     // The injector runs from a packaged platform tree, so stage the same
@@ -181,6 +185,10 @@ const outputs = [
   {
     content: compileWindowsImageMetadata(sourceImageMetadata),
     paths: ["windows/scripts/image-metadata.mjs"],
+  },
+  {
+    content: sourceCdpDiscovery,
+    paths: ["macos/scripts/cdp-discovery.mjs", "windows/scripts/cdp-discovery.mjs"],
   },
 ];
 

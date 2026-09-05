@@ -1,4 +1,4 @@
-. (Join-Path $PSScriptRoot 'config-utf8.ps1')
+﻿. (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
 $script:DreamSkinStartResultCategories = @(
   'none',
@@ -174,6 +174,12 @@ function Read-DreamSkinStartResult {
   }
   return $result
 }
+$script:DREAM_SKIN_MAX_CDP_JSON_BYTES = 256 * 1024
+$script:DREAM_SKIN_MAX_CDP_TARGETS = 128
+$script:DREAM_SKIN_MAX_CDP_TARGET_ID_LENGTH = 200
+$script:DREAM_SKIN_MAX_CDP_URL_LENGTH = 2048
+$script:DREAM_SKIN_MAX_CDP_TEXT_LENGTH = 200
+$script:DREAM_SKIN_CDP_TIMEOUT_MS = 2000
 
 function Enter-DreamSkinOperationLock {
   param(
@@ -371,6 +377,7 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\apply-community-theme.ps1',
     'scripts\common-windows.ps1',
     'scripts\check-update.ps1',
+    'scripts\cdp-discovery.mjs',
     'scripts\config-utf8.ps1',
     'scripts\image-metadata.mjs',
     'scripts\injector.mjs',
@@ -1072,11 +1079,195 @@ function Test-DreamSkinCdpPageTarget {
   }
 }
 
+function Get-DreamSkinCdpJsonProperty {
+  param(
+    [Parameter(Mandatory = $true)][object]$Value,
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$Field
+  )
+  $property = $Value.PSObject.Properties[$Name]
+  if ($null -eq $property) { throw "CDP_DISCOVERY_FIELD: $Field is missing" }
+  return $property.Value
+}
+
+function Assert-DreamSkinCdpString {
+  param(
+    [AllowNull()][object]$Value,
+    [Parameter(Mandatory = $true)][string]$Field,
+    [Parameter(Mandatory = $true)][int]$MaximumLength,
+    [switch]$AllowEmpty
+  )
+  if ($Value -isnot [string] -or (-not $AllowEmpty -and $Value.Length -eq 0) -or
+    $Value.Length -gt $MaximumLength) {
+    throw "CDP_DISCOVERY_FIELD: $Field must be a string of at most $MaximumLength characters"
+  }
+  return $Value
+}
+
+function Assert-DreamSkinCdpListShape {
+  param([Parameter(Mandatory = $true)][AllowEmptyCollection()][object]$Value)
+  if ($Value -isnot [array]) { throw 'CDP_DISCOVERY_ROOT_TYPE: target list must be an array' }
+  if ($Value.Count -gt $script:DREAM_SKIN_MAX_CDP_TARGETS) {
+    throw "CDP_DISCOVERY_TOO_MANY_TARGETS: target list exceeds $script:DREAM_SKIN_MAX_CDP_TARGETS items"
+  }
+  for ($index = 0; $index -lt $Value.Count; $index++) {
+    $target = $Value[$index]
+    if ($null -eq $target -or $target -is [string] -or $target -is [array]) {
+      throw "CDP_DISCOVERY_FIELD: target[$index] must be an object"
+    }
+    [void](Assert-DreamSkinCdpString -Value (Get-DreamSkinCdpJsonProperty `
+      -Value $target -Name 'id' -Field "target[$index].id") `
+      -Field "target[$index].id" -MaximumLength $script:DREAM_SKIN_MAX_CDP_TARGET_ID_LENGTH)
+    [void](Assert-DreamSkinCdpString -Value (Get-DreamSkinCdpJsonProperty `
+      -Value $target -Name 'type' -Field "target[$index].type") `
+      -Field "target[$index].type" -MaximumLength $script:DREAM_SKIN_MAX_CDP_TEXT_LENGTH)
+    [void](Assert-DreamSkinCdpString -Value (Get-DreamSkinCdpJsonProperty `
+      -Value $target -Name 'url' -Field "target[$index].url") `
+      -Field "target[$index].url" -MaximumLength $script:DREAM_SKIN_MAX_CDP_URL_LENGTH -AllowEmpty)
+    [void](Assert-DreamSkinCdpString -Value (Get-DreamSkinCdpJsonProperty `
+      -Value $target -Name 'webSocketDebuggerUrl' -Field "target[$index].webSocketDebuggerUrl") `
+      -Field "target[$index].webSocketDebuggerUrl" -MaximumLength $script:DREAM_SKIN_MAX_CDP_URL_LENGTH)
+  }
+  return ,$Value
+}
+
+function Assert-DreamSkinCdpVersionShape {
+  param([Parameter(Mandatory = $true)][object]$Value)
+  if ($Value -is [array] -or $null -eq $Value -or $Value -is [string]) {
+    throw 'CDP_DISCOVERY_ROOT_TYPE: version response must be an object'
+  }
+  [void](Assert-DreamSkinCdpString -Value (Get-DreamSkinCdpJsonProperty `
+    -Value $Value -Name 'webSocketDebuggerUrl' -Field 'version.webSocketDebuggerUrl') `
+    -Field 'version.webSocketDebuggerUrl' -MaximumLength $script:DREAM_SKIN_MAX_CDP_URL_LENGTH)
+  $browserProperty = $Value.PSObject.Properties['Browser']
+  if ($null -ne $browserProperty) {
+    [void](Assert-DreamSkinCdpString -Value $browserProperty.Value -Field 'version.Browser' `
+      -MaximumLength $script:DREAM_SKIN_MAX_CDP_URL_LENGTH -AllowEmpty)
+  }
+  return $Value
+}
+
+function ConvertFrom-DreamSkinCdpJsonBytes {
+  param(
+    [Parameter(Mandatory = $true)][byte[]]$Bytes,
+    [Parameter(Mandatory = $true)][ValidateSet('/json/list', '/json/version')][string]$Resource
+  )
+  try {
+    $text = [System.Text.UTF8Encoding]::new($false, $true).GetString($Bytes)
+  } catch {
+    throw "CDP_DISCOVERY_INVALID_UTF8: $Resource is not valid UTF-8"
+  }
+  $inString = $false
+  $escaped = $false
+  for ($index = 0; $index -lt $text.Length; $index++) {
+    $character = $text[$index]
+    if ($inString) {
+      if ($escaped) { $escaped = $false; continue }
+      if ($character -eq '\') { $escaped = $true; continue }
+      if ($character -eq '"') { $inString = $false }
+      continue
+    }
+    if ($character -eq '"') { $inString = $true; continue }
+    if ($character -eq '/' -and $index + 1 -lt $text.Length -and
+      ($text[$index + 1] -eq '/' -or $text[$index + 1] -eq '*')) {
+      throw "CDP_DISCOVERY_MALFORMED_JSON: $Resource comments are not allowed"
+    }
+  }
+  try {
+    if ($PSVersionTable.PSVersion.Major -ge 7) {
+      $value = ConvertFrom-Json -InputObject $text -NoEnumerate -ErrorAction Stop
+    } else {
+      $value = ConvertFrom-Json -InputObject $text -ErrorAction Stop
+    }
+  } catch {
+    throw "CDP_DISCOVERY_MALFORMED_JSON: $Resource is not valid JSON"
+  }
+  # PS 5.1 retains the root array; PS 7 needs NoEnumerate. Preserve it through
+  # each function boundary too, including [] and a single target.
+  if ($Resource -eq '/json/list') {
+    [void](Assert-DreamSkinCdpListShape -Value $value)
+    return ,$value
+  }
+  return Assert-DreamSkinCdpVersionShape -Value $value
+}
+
+function Invoke-DreamSkinCdpJsonRequest {
+  param(
+    [Parameter(Mandatory = $true)][ValidateRange(1024, 65535)][int]$Port,
+    [Parameter(Mandatory = $true)][ValidateSet('/json/list', '/json/version')][string]$Resource
+  )
+  $request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$Port$Resource")
+  $request.AllowAutoRedirect = $false
+  $request.Timeout = $script:DREAM_SKIN_CDP_TIMEOUT_MS
+  $request.ReadWriteTimeout = $script:DREAM_SKIN_CDP_TIMEOUT_MS
+  $request.Proxy = $null
+  $deadline = [System.Diagnostics.Stopwatch]::StartNew()
+  $response = $null
+  $stream = $null
+  $memory = $null
+  try {
+    try {
+      $response = $request.GetResponse()
+    } catch [System.Net.WebException] {
+      if ($_.Exception.Status -eq [System.Net.WebExceptionStatus]::Timeout) {
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
+      $response = $_.Exception.Response
+      if ($null -eq $response) { throw }
+    }
+    $status = [int]$response.StatusCode
+    if ($status -ge 300 -and $status -lt 400) {
+      throw "CDP_DISCOVERY_REDIRECT: $Resource redirected"
+    }
+    if ($status -lt 200 -or $status -ge 300) {
+      throw "CDP_DISCOVERY_HTTP_STATUS: $Resource returned HTTP $status"
+    }
+    if ($response.ContentLength -gt $script:DREAM_SKIN_MAX_CDP_JSON_BYTES) {
+      throw "CDP_DISCOVERY_RESPONSE_TOO_LARGE: $Resource declares more than $script:DREAM_SKIN_MAX_CDP_JSON_BYTES bytes"
+    }
+    $stream = $response.GetResponseStream()
+    $memory = [System.IO.MemoryStream]::new()
+    $buffer = [byte[]]::new(8192)
+    while ($true) {
+      $remaining = $script:DREAM_SKIN_CDP_TIMEOUT_MS - [int]$deadline.ElapsedMilliseconds
+      if ($remaining -le 0) {
+        $request.Abort()
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
+      # ReadWriteTimeout restarts for each read. Wait only for the remaining
+      # whole-response budget, including time already spent receiving headers.
+      $pendingRead = $stream.ReadAsync($buffer, 0, $buffer.Length)
+      $remaining = [Math]::Max(0, $script:DREAM_SKIN_CDP_TIMEOUT_MS - [int]$deadline.ElapsedMilliseconds)
+      if (-not $pendingRead.Wait($remaining)) {
+        $request.Abort()
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
+      $read = $pendingRead.GetAwaiter().GetResult()
+      if ($deadline.ElapsedMilliseconds -ge $script:DREAM_SKIN_CDP_TIMEOUT_MS) {
+        $request.Abort()
+        throw "CDP_DISCOVERY_TIMEOUT: $Resource exceeded the response deadline"
+      }
+      if ($read -eq 0) { break }
+      if ($memory.Length + $read -gt $script:DREAM_SKIN_MAX_CDP_JSON_BYTES) {
+        throw "CDP_DISCOVERY_RESPONSE_TOO_LARGE: $Resource streamed more than $script:DREAM_SKIN_MAX_CDP_JSON_BYTES bytes"
+      }
+      $memory.Write($buffer, 0, $read)
+    }
+    $value = ConvertFrom-DreamSkinCdpJsonBytes -Bytes $memory.ToArray() -Resource $Resource
+    if ($Resource -eq '/json/list') { return ,$value }
+    return $value
+  } finally {
+    $deadline.Stop()
+    if ($null -ne $memory) { $memory.Dispose() }
+    if ($null -ne $stream) { $stream.Dispose() }
+    if ($null -ne $response) { $response.Dispose() }
+  }
+}
+
 function Get-DreamSkinCdpTargets {
   param([int]$Port)
   try {
-    $targets = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/list" -TimeoutSec 2 `
-      -MaximumRedirection 0 -ErrorAction Stop
+    $targets = Invoke-DreamSkinCdpJsonRequest -Port $Port -Resource '/json/list'
     return @($targets | Where-Object { Test-DreamSkinCdpPageTarget -Target $_ -Port $Port })
   } catch {
     return @()
@@ -1091,8 +1282,7 @@ function Test-DreamSkinBrowserId {
 function Get-DreamSkinCdpBrowserIdentity {
   param([int]$Port)
   try {
-    $version = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/version" -TimeoutSec 2 `
-      -MaximumRedirection 0 -ErrorAction Stop
+    $version = Invoke-DreamSkinCdpJsonRequest -Port $Port -Resource '/json/version'
     $webSocketUrl = "$($version.webSocketDebuggerUrl)"
     if (-not (Test-DreamSkinWebSocketUrl -Value $webSocketUrl -Port $Port)) { return $null }
     $uri = [Uri]$webSocketUrl

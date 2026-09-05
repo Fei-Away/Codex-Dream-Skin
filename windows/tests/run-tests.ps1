@@ -33,6 +33,7 @@ try {
   $env:DREAMSKIN_LANG = $originalLanguageOverride
   Remove-Item -LiteralPath $languageState -Recurse -Force -ErrorAction SilentlyContinue
 }
+. (Join-Path $PSScriptRoot 'cdp-discovery.tests.ps1')
 
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-tests-$PID-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
@@ -1170,6 +1171,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\common-windows.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\apply-community-theme.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\check-update.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\cdp-discovery.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\config-utf8.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\image-metadata.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\injector.mjs') -Destination $releaseFixtureScripts -Force
@@ -1619,6 +1621,7 @@ try {
   $selfTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--self-test')
   if ($selfTest.ExitCode -ne 0) { throw 'Injector CDP self-test failed.' }
+  Invoke-DreamSkinCdpDiscoveryContractTest -NodePath $node.Path
   $payloadTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $Root 'scripts\injector.mjs'), '--check-payload')
   if ($payloadTest.ExitCode -ne 0) { throw 'Injector self-test failed.' }

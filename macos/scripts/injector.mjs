@@ -12,6 +12,7 @@ import {
   normalizeThemeText,
 } from "../assets/theme-package-validator.mjs";
 import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
+import { fetchBoundedCdpJson } from "./cdp-discovery.mjs";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
@@ -495,13 +496,7 @@ async function listAppTargets(port) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2000);
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
-      redirect: "error",
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const targets = await response.json();
-    if (!Array.isArray(targets)) throw new Error("CDP target list was not an array");
+    const targets = await fetchBoundedCdpJson(port, "/json/list", { signal: controller.signal });
     return targets.filter((item) => isValidCdpPageTarget(item, port));
   } finally {
     clearTimeout(timeout);
