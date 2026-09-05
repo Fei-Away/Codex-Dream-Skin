@@ -71,6 +71,7 @@ assert.equal(
     scope: { level: "L1", baseState: "home", missingL1: [] },
     homeRoute: true,
     homePresent: true,
+    homeSurface: { visible: true, width: 900, height: 640 },
     hero: { visible: true, width: 800, height: 520 },
   }, readyNativeWindow, exactPayload).pass,
   true,

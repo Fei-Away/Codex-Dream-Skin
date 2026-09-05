@@ -17,6 +17,7 @@ require_macos_runtime
 for required in \
   "$PROJECT_ROOT/assets/dream-skin.css" \
   "$PROJECT_ROOT/assets/renderer-inject.js" \
+  "$PROJECT_ROOT/assets/renderer-readiness.mjs" \
   "$PROJECT_ROOT/assets/safe-css-policy.json" \
   "$PROJECT_ROOT/assets/safe-css-validator.mjs" \
   "$PROJECT_ROOT/assets/selectors.json" \

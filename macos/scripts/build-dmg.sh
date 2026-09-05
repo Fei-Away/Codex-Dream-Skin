@@ -80,6 +80,8 @@ MOUNTED_ICON="$MOUNTED_APP/Contents/Resources/${MOUNTED_ICON_NAME%.icns}.icns"
 MOUNTED_ENGINE="$MOUNTED_APP/Contents/Resources/engine"
 [ -f "$MOUNTED_ENGINE/assets/selectors.json" ] \
   || { printf 'Mounted app is missing the selector contract.\n' >&2; exit 1; }
+[ -s "$MOUNTED_ENGINE/assets/renderer-readiness.mjs" ] \
+  || { printf 'Mounted app is missing renderer readiness.\n' >&2; exit 1; }
 for runtime_script in apply-community-theme-macos.sh snapshot-active-theme-macos.sh \
   theme-switch-lock-macos.sh localization-macos.sh; do
   [ -x "$MOUNTED_ENGINE/scripts/$runtime_script" ] \

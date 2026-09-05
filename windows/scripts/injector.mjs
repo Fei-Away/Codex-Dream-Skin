@@ -9,6 +9,11 @@ import {
   normalizeThemeText,
 } from "../assets/theme-package-validator.mjs";
 import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
+import {
+  assessRendererReadiness,
+  MIN_RENDERER_WIDTH as MIN_RENDERER_VIEWPORT_WIDTH,
+  MIN_RENDERER_HEIGHT as MIN_RENDERER_VIEWPORT_HEIGHT,
+} from "../assets/renderer-readiness.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const here = path.dirname(scriptPath);
@@ -47,8 +52,6 @@ export { SKIN_VERSION };
 const MAX_ART_BYTES = 10 * 1024 * 1024;
 const MAX_SAFE_CSS_BYTES = 256 * 1024;
 const STRONG_THEME_AUDIT_MS = 30000;
-const MIN_RENDERER_VIEWPORT_WIDTH = 320;
-const MIN_RENDERER_VIEWPORT_HEIGHT = 240;
 const VISIBLE_WINDOW_STATES = new Set(["normal", "maximized", "fullscreen"]);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
@@ -1154,6 +1157,30 @@ export async function cleanupExcludedSurface(session) {
   return verifyRemovedSession(session);
 }
 
+export function assessRendererVerification(renderer, nativeWindow, expected) {
+  const result = renderer && typeof renderer === "object" ? { ...renderer } : {};
+  const verdict = assessRendererReadiness({ ...result, settings: result.settingsAnchor }, {
+    status: nativeWindow?.pass === true ? "ready"
+      : nativeWindow?.unsupported === true ? "unsupported" : "not-ready",
+  }, expected);
+  const checks = verdict.checks;
+  result.nativeWindow = nativeWindow;
+  result.expectedVersion = expected.skinVersion;
+  result.expectedThemeId = expected.expectedThemeId;
+  result.expectedRevision = expected.expectedRevision;
+  // Retain the existing Windows diagnostics while sharing the actual verdict.
+  result.readiness = {
+    windowPass: checks.nativeBindingPass,
+    documentPass: checks.documentVisible,
+    viewportPass: checks.viewportPass,
+    structurePass: checks.structurePass,
+    nativeWindowPass: checks.nativeWindowPass,
+    fallbackWindowPass: checks.fallbackWindowPass,
+  };
+  result.pass = verdict.pass;
+  return result;
+}
+
 export async function verifySession(
   session,
   targetId,
@@ -1161,7 +1188,7 @@ export async function verifySession(
   expectedRevision = null,
 ) {
   const nativeWindow = await inspectTargetWindow(session, targetId);
-  return session.evaluate(`(() => {
+  const renderer = await session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
@@ -1243,7 +1270,6 @@ export async function verifySession(
     const result = {
       installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
       version: runtime?.version ?? null,
-      expectedVersion: ${JSON.stringify(SKIN_VERSION)},
       themeId: runtime?.themeId ?? null,
       revision: runtime?.revision ?? null,
       styleMode: runtime?.styleMode ?? null,
@@ -1266,7 +1292,6 @@ export async function verifySession(
       sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
       genericMain: box(document.querySelector('[data-ds-part="main"], [data-ds-part="home"]')),
       genericInput: box(document.querySelector('[data-ds-part="composer"]')),
-      nativeWindow: ${JSON.stringify(nativeWindow)},
       documentVisibility: document.visibilityState ?? null,
       documentHidden: document.hidden === true,
       viewport: { width: innerWidth, height: innerHeight },
@@ -1275,54 +1300,13 @@ export async function verifySession(
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
-    const homeScope = result.scope?.baseState === 'home' || result.homePresent;
-    const l1ScopePass = result.scope?.level === 'L1' &&
-      Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 0;
-    const genericStructurePass = l1ScopePass && Boolean(result.genericMain?.visible) &&
-      Boolean(result.genericInput?.visible || (homeScope && result.homeSurface?.visible));
-    const l0StructurePass = result.scope?.level === 'L0' &&
-      result.scope?.baseState === 'settings' && Boolean(result.settingsAnchor?.visible);
-    const structurePass = l0StructurePass || (l1ScopePass &&
-      (Boolean(result.shell?.visible && result.sidebar?.visible) || genericStructurePass));
-    const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;
-    const viewportPass = result.viewport.width >= ${MIN_RENDERER_VIEWPORT_WIDTH} &&
-      result.viewport.height >= ${MIN_RENDERER_VIEWPORT_HEIGHT};
-    const nativeWindowPass = result.nativeWindow?.pass === true;
-    // Codex 26.721.x (Chrome/150) cannot resolve a native window for our target
-    // even when that window is real, focused and on-screen (-32000), and older
-    // builds omit the Browser domain outright (-32601). The injector classifies
-    // both as unsupported; in that case fall back to the renderer's own
-    // visibility evidence instead of failing every install. documentPass and
-    // viewportPass below stay hard requirements, so a genuinely hidden or
-    // collapsed window still fails closed. Mirrors the macOS
-    // assessRendererVerification fallbackWindowPass. See #256.
-    const fallbackWindowPass = result.nativeWindow?.unsupported === true;
-    const windowPass = nativeWindowPass || fallbackWindowPass;
-    const expectedThemeId = ${JSON.stringify(expectedThemeId)};
-    const expectedRevision = ${JSON.stringify(expectedRevision)};
-    const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
-      (!expectedRevision || result.revision === expectedRevision);
-    result.expectedThemeId = expectedThemeId;
-    result.expectedRevision = expectedRevision;
-    result.readiness = {
-      windowPass, documentPass, viewportPass, structurePass,
-      nativeWindowPass, fallbackWindowPass,
-    };
-    const homePass = !homeScope || (
-      result.homePresent && Boolean(result.homeSurface?.visible) &&
-      ((result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120) ||
-        Boolean(result.genericMain?.visible)) &&
-      (!result.suggestionsPresent || result.visibleCardCount === 0 || (
-        result.suggestionLabels.filter((item) => item?.visible).length >= result.visibleCardCount &&
-        result.suggestionLabelColorsMatch
-      ))
-    );
-    result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.businessClassPollution === 0 && !result.documentOverflow.x &&
-      windowPass && documentPass && viewportPass && structurePass &&
-      payloadPass && homePass;
     return result;
   })()`);
+  return assessRendererVerification(renderer, nativeWindow, {
+    skinVersion: SKIN_VERSION,
+    expectedThemeId,
+    expectedRevision,
+  });
 }
 
 async function waitForVerifiedSession(

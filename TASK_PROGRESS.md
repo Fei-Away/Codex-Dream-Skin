@@ -1,5 +1,77 @@
 # Task Progress
 
+## Controller B1 implementation - 2026-09-05
+
+- Owner delegated continuation of the documented Controller migration without
+  routine intervention. Execution follows the existing
+  `Codex-Dream-Skin-controller/docs/controller-implementation-plan.md`.
+- Active worktree: `/private/tmp/dreamskin-controller-readiness`, branch
+  `codex/shared-renderer-readiness`, base main
+  `548959075d3c6b1faab340596d374b6457e1966f`. Existing dirty client and
+  website worktrees remain preserved.
+- B1 scope: shared pure renderer signals-to-verdict function, both injector
+  consumers, packaged generated copies, common behavior fixtures and focused
+  documentation. Platform probes and CDP error classification stay in adapters;
+  default Controller entry points and platform launch/state flows stay as-is.
+- Ownership: root owns `runtime/renderer-readiness.mjs`, both
+  `scripts/injector.mjs`, shared behavior fixtures, documentation/progress and
+  combined verification; the originally planned separate tests handoff was
+  handled locally. readiness_packaging owns sync and the explicit
+  installation/resource inclusion files it discovers, plus focused packaging
+  tests. Reviewers must coordinate before expanding ownership. No agent may
+  commit, push, merge or touch live client processes; root handles delivery.
+- Verification planned: shared fixture matrix through canonical and both
+  platform copies/adapters, existing dual-platform renderer/window regressions,
+  runtime sync, both payloads, portable suite, installer inclusion, syntax and
+  diff checks; remote platform CI after an appropriate scoped PR.
+- Release/native gaps remain from stage A. No current-host quit, restart,
+  restore, installation, Doctor, live CDP mutation or broad process cleanup is
+  permitted. No B1 commit, PR, merge or release is complete yet.
+- Implementation checkpoint: canonical pure verdict and both injector
+  consumers are implemented; Windows evaluates the final verdict host-side.
+  Existing diagnostics retain their names. Both probes now include explicit
+  Home/document evidence; differences and common rules are documented in
+  `docs/renderer-readiness.md`. Original platform renderer/window tests pass
+  16/16 (session 17866); common fixtures and full verification are next.
+- Packaging agent completed the sync and ten resource/test files, including
+  DMG presence and Windows missing-module preflight preservation. Root reviewed
+  the diff. Agent's sync/syntax/byte checks passed; Windows execution awaits CI.
+- Common behavior matrix passed 38/38 (session 91526). First full portable run
+  (session 84385, `/private/tmp/dreamskin-b1-portable.log`) finished 181/186:
+  a moved-predicate source assertion needs migration to the new behavioral
+  coverage; the other failures were Swift cache denial, bundled runtime
+  signature validation under sandbox, loopback bind denial, and a fixture
+  subprocess timeout during parallel compilation. No application lifecycle
+  command was authorized or invoked. Next: remove the superseded source-string
+  assertions already replaced by shared behavior cases, rerun isolated tests
+  with bounded test concurrency and required local fixture permissions.
+- Inserted owner steering: preserve the active Codex/conversation; the already
+  stronger protected-host rule remains in force. Separately, owner supplied
+  server AI provider credentials and authorized retaining those profiles for
+  community moderation and later production configuration. Secret handling is
+  in the website workstream; no credential values are recorded here.
+- Resumed verification checkpoint: second full portable run (session 78857,
+  `/private/tmp/dreamskin-b1-portable-verified.log`) finished 185/186. Its only
+  failure is the unchanged bounded HTTP fixture's 180s Swift compilation
+  timeout; all runtime and renderer tests passed. Root will rerun that fixture
+  alone before classifying it. Source-string assertions superseded by the
+  common behavior matrix have been removed without skipping behavior cases.
+- Review handoff: final_pr_review owns a read-only review of the canonical
+  readiness function, both adapters, fixtures and packaging diff; root owns
+  fixes and verification. release_gate_review owns read-only website production
+  configuration/runbook discovery for the inserted AI request. Neither may
+  change GitHub, production state, secrets or the running client.
+- Verified checkpoint: the bounded Swift HTTP test passed unchanged in an
+  isolated rerun (session 68029, 1/1, 8.5s test / 9.1s total). Combined with
+  the second full run's 185 passing cases, all 186 portable cases have passed;
+  the full invocation itself remains recorded as 185/186, not a false green.
+  Shared asset sync, both injector `--check-payload` commands and diff checks
+  passed. final_pr_review found no actionable regression or blocking coverage
+  gap in the canonical module, adapters, tests and packaging changes.
+  Windows PowerShell 5.1/7 and DMG/Setup execution still require platform CI.
+
+## Previous Baseline History
+
 > **接手先读 `docs/handoff-2026-08-27.md`。** 那份文档汇总了 2026-08-27 兼容性专项的背景、
 > 已落地内容（含未发布提交）、按优先级排好的待办、本机环境限制与关键决策记录。
 > 本文件其余部分是逐次任务的流水记录，作为证据保留。

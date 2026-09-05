@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     "assets/dream-skin.css",
     "assets/portal-hero.png",
     "assets/renderer-inject.js",
+    "assets/renderer-readiness.mjs",
     "assets/safe-css-policy.json",
     "assets/safe-css-validator.mjs",
     "assets/selectors.json",
