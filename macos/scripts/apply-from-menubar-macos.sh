@@ -144,8 +144,13 @@ fi
 
 progress "$(dreamskin_text connecting_debug)"
 
-"$SCRIPT_DIR/start-dream-skin-macos.sh" --restart-existing >>"$LOG_OUT" 2>&1
+"$SCRIPT_DIR/start-dream-skin-macos.sh" --prompt-restart >>"$LOG_OUT" 2>&1
 code=$?
+
+if [ "$code" -eq 20 ]; then
+  progress "$(dreamskin_text cancelled_progress)"
+  exit 0
+fi
 
 if [ "$code" -eq 0 ]; then
   progress "$(dreamskin_text apply_complete)"
