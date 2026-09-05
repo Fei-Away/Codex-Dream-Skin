@@ -210,7 +210,6 @@ html[data-dream-skin="active"][data-dream-shell="light"]:is([data-dream-art-safe
 html[data-dream-skin="active"] body {
   background: var(--ds-bg) !important;
   color: var(--ds-text) !important;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif !important;
 }
 
 html[data-dream-skin="active"] body::before {
