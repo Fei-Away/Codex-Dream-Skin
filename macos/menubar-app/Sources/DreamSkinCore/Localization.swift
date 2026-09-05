@@ -138,10 +138,22 @@ public struct DreamSkinCopy: Sendable {
     case updateMissingMessage
     case updateFailedTitle
     case updateFailedMessage
+    case updateInvalidTitle
+    case updateInvalidMessage
     case newVersionTitle
     case newVersionMessage
     case downloadNow
     case later
+    case updateNotificationTitle
+    case updateNotificationMessage
+    case updateDownloadMissingTitle
+    case updateDownloadMissingMessage
+    case updateDownloadFailedTitle
+    case updateDownloadFailedMessage
+    case updateOpenFailedTitle
+    case updateOpenFailedMessage
+    case updateOpenedTitle
+    case updateOpenedMessage
     case upToDateTitle
     case upToDateMessage
     case loginApprovalTitle
@@ -283,10 +295,22 @@ public struct DreamSkinCopy: Sendable {
     case .updateMissingMessage: return chinese ? "更新检查脚本缺失，请重新安装应用。" : "The update checker is missing. Reinstall the app."
     case .updateFailedTitle: return chinese ? "检查更新失败" : "Update check failed"
     case .updateFailedMessage: return chinese ? "无法连接 GitHub，请稍后重试。" : "Could not connect to GitHub. Try again later."
+    case .updateInvalidTitle: return chinese ? "更新信息无效" : "Invalid update information"
+    case .updateInvalidMessage: return chinese ? "GitHub 返回了无法识别的版本号。" : "GitHub returned an unrecognized version number."
     case .newVersionTitle: return chinese ? "发现新版本 %@" : "New version %@ available"
-    case .newVersionMessage: return chinese ? "当前版本为 %@。是否前往 GitHub Releases 下载？" : "You are running %@. Open GitHub Releases to download the update?"
-    case .downloadNow: return chinese ? "前往下载" : "Download"
+    case .newVersionMessage: return chinese ? "当前版本为 %@。客户端将从精确版本的 GitHub Release 下载 DMG，核对资产信息、GitHub SHA-256、SHA256SUMS.txt 和磁盘映像完整性，并验证其中 App 的身份、版本、内嵌引擎与代码签名完整性；全部通过后只打开 DMG，不会自动替换应用。" : "You are running %@. The app will download the DMG from the exact GitHub Release, verify its asset metadata, GitHub SHA-256, SHA256SUMS.txt, and disk image integrity, then check the mounted app identity, version, embedded engine, and code-signature integrity. It opens the DMG only after every check passes and never replaces the app automatically."
+    case .downloadNow: return chinese ? "下载并验证" : "Download and verify"
     case .later: return chinese ? "稍后" : "Later"
+    case .updateNotificationTitle: return chinese ? "Codex Dream Skin 有新版本" : "Codex Dream Skin update available"
+    case .updateNotificationMessage: return chinese ? "%@ 已发布，点按下载并验证 DMG。" : "%@ is available. Click to download and verify the DMG."
+    case .updateDownloadMissingTitle: return chinese ? "无法下载更新" : "Could not download the update"
+    case .updateDownloadMissingMessage: return chinese ? "更新组件缺失，请重新安装应用。" : "The update component is missing. Reinstall the app."
+    case .updateDownloadFailedTitle: return chinese ? "更新下载或验证失败" : "Update download or verification failed"
+    case .updateDownloadFailedMessage: return chinese ? "未打开任何 DMG。请重试；如果问题持续，请前往 GitHub Releases 手动下载。" : "No DMG was opened. Try again; if the problem continues, download it manually from GitHub Releases."
+    case .updateOpenFailedTitle: return chinese ? "无法打开已验证的 DMG" : "Could not open the verified DMG"
+    case .updateOpenFailedMessage: return chinese ? "DMG 保存在：\n%@\n请稍后从 Finder 手动打开。" : "The DMG is saved at:\n%@\nOpen it from Finder later."
+    case .updateOpenedTitle: return chinese ? "已验证并打开 DMG" : "DMG verified and opened"
+    case .updateOpenedMessage: return chinese ? "请退出当前 Dream Skin App，再把新 App 拖入 Applications 并选择替换。客户端不会自行覆盖应用；主题和图片会继续保留。" : "Quit the current Dream Skin app, drag the new app into Applications, and choose Replace. The client will not overwrite itself; your themes and images are preserved."
     case .upToDateTitle: return chinese ? "已是最新版本" : "You are up to date"
     case .upToDateMessage: return chinese ? "当前安装的是 %@。" : "You are running %@."
     case .loginApprovalTitle: return chinese ? "需要系统确认" : "System confirmation required"

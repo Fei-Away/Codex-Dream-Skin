@@ -196,11 +196,13 @@ follow the graphical first-run guide:
 | macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
 | Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
 
-After installation, use the menu bar (macOS) or system tray (Windows). Updates
-are manual: download the new package and install over the existing one; themes
-and images are preserved. Because the public packages are unsigned, a new
-download may show a one-time OS security warning; the guides explain the safe
-GUI approval path.
+After installation, use the menu bar (macOS) or system tray (Windows). On macOS,
+the user can confirm a guided update download; the client verifies the exact
+GitHub Release assets, two SHA-256 sources, and the app identity inside the DMG
+before opening it for drag-and-drop replacement. Windows updates still use the
+Release page. Neither path silently replaces the app, and themes and images are
+preserved. Because the public packages are unsigned, a new download may show a
+one-time OS security warning; the guides explain the safe GUI approval path.
 
 ### Import a downloaded theme
 

@@ -4,6 +4,54 @@
 > 已落地内容（含未发布提交）、按优先级排好的待办、本机环境限制与关键决策记录。
 > 本文件其余部分是逐次任务的流水记录，作为证据保留。
 
+## Verified in-app update handoff PR #355 (2026-08-11 to 2026-08-28)
+
+- [goal] Replace the macOS release-page-only update action with an explicit,
+  user-confirmed DMG handoff. Bind the download to the canonical repository and
+  exact stable tag; enforce bounded metadata and payload sizes; verify GitHub
+  asset digests, `SHA256SUMS.txt`, DMG integrity, mounted App identity/version,
+  embedded engine version, and code-signature integrity before opening it.
+  Never replace `/Applications`, remove quarantine, or silently install.
+- [submitted] Original feature `e98b12c` and handoff record `5da5ff2` were
+  published through Draft PR #355. A regular merge `5242d74` synchronized the
+  branch with v1.5.14 and carried the final bilingual UI, stable localized
+  errors, and regression coverage. The fork CI runs remained
+  `action_required`, so no remote job result was represented as passing.
+- [maintainer review 2026-08-27] The owner accepts the verified guided handoff
+  and manual replacement boundary, but requires a rebase after #387. Current
+  main fixes stale update detection by always preferring the App bundle's
+  updater script over a potentially stale deployed-engine copy. Windows stays
+  out of scope behind #276; signing/provenance remains tracked by #279.
+- [rebase baseline 2026-08-28] Current upstream is `main@e0341de`, eight commits
+  ahead of the PR merge base and four commits beyond public v1.5.16. Local
+  recovery branch `codex/verified-auto-update-pre-v1.5.16-rebase` preserves the
+  published `5242d74` head. The earlier no-history-rewrite preference is
+  superseded by the explicit maintainer request; the remote update must use
+  `--force-with-lease`, never an unconditional force.
+- [rebased implementation] Linear feature commit `13b85d5` rebuilds the complete
+  `5242d74` product delta on current `upstream/main@e0341de`. This avoids losing
+  localization and security-error adaptations that existed only in the old
+  merge commit. Manual checks, background checks, and verified downloads all
+  retain #387's App-bundled-script-first behavior; notifications and menu
+  actions carry the exact version into the verified handoff.
+- [verified 2026-08-28] Portable Node passes 125/125; runtime asset sync, both
+  payload checks, six-version consistency, Bash/Swift parsing, and direct Swift
+  typecheck pass. The complete macOS wrapper exits 0 and exercises the guided
+  DMG success and fail-closed negative cases. A production Release smoke from
+  isolated v1.5.14 source and HOME successfully downloaded and verified public
+  v1.5.16 DMG SHA-256 `1e45f04948f0155cb93284b4a1a9d1ddbaf7916936dce3d2e9a3cc06203e2488`
+  without opening or installing it. Full-Xcode SwiftPM/XCTest, signed-runtime
+  integrations, Doctor, and native Windows remain documented CI/host gaps.
+- [pushed 2026-08-28] The fork branch was updated with an exact-old-SHA
+  `--force-with-lease`; Draft PR #355 is conflict-free and mergeable. Its body
+  and maintainer reply now record the #387 preservation, current test evidence,
+  and real v1.5.16 download verification. Exact-head CI run `33138255714` is
+  `action_required` with no jobs, so it has not passed and requires upstream
+  maintainer approval.
+- [pending] Require all exact-head CI jobs and maintainer rereview before making
+  the PR Ready or merging. No release, tag, or installed-client delivery is
+  authorized or complete.
+
 ## Unified compatibility pass (2026-08-27)
 
 Branch `codex/unified-compat`, based on `origin/main@40d1f97` (v1.5.16 + #386).

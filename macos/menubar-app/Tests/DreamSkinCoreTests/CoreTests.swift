@@ -39,6 +39,24 @@ final class CoreTests: XCTestCase {
     XCTAssertEqual(chinese.format(.selectedThemePending, "纸面"), "已选主题：纸面（待应用）")
     XCTAssertEqual(english.operationFailed("Apply skin"), "Apply skin failed")
     XCTAssertEqual(chinese.operationFailed("应用皮肤"), "应用皮肤失败")
+    XCTAssertEqual(english.text(.downloadNow), "Download and verify")
+    XCTAssertEqual(chinese.text(.downloadNow), "下载并验证")
+    XCTAssertEqual(
+      english.format(.updateNotificationMessage, "v2.0.0"),
+      "v2.0.0 is available. Click to download and verify the DMG."
+    )
+    XCTAssertEqual(
+      chinese.format(.updateOpenFailedMessage, "/tmp/update.dmg"),
+      "DMG 保存在：\n/tmp/update.dmg\n请稍后从 Finder 手动打开。"
+    )
+    XCTAssertTrue(english.format(.newVersionMessage, "v1.5.14").contains("never replaces the app automatically"))
+    XCTAssertTrue(chinese.format(.newVersionMessage, "v1.5.14").contains("代码签名完整性"))
+    XCTAssertEqual(
+      english.text(.updateDownloadFailedMessage),
+      "No DMG was opened. Try again; if the problem continues, download it manually from GitHub Releases."
+    )
+    XCTAssertTrue(chinese.text(.updateOpenedMessage).contains("不会自行覆盖应用"))
+    XCTAssertTrue(english.text(.updateOpenedMessage).contains("Quit the current Dream Skin app"))
   }
 
   func testSemanticVersionParsingAndComparison() throws {

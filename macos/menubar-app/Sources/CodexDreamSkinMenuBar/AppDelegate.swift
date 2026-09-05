@@ -296,7 +296,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     if let availableUpdate {
       addActionItem(
         copy.format(.newVersion, availableUpdate.version),
-        action: #selector(openAvailableUpdate)
+        action: #selector(openAvailableUpdate),
+        enabled: !operationInFlight && !updateCheckInFlight
       )
       menu.addItem(.separator())
     }
@@ -1176,16 +1177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         return
       }
       if available {
-        let alert = NSAlert()
-        alert.messageText = self.copy.format(.newVersionTitle, latest)
-        alert.informativeText = self.copy.format(.newVersionMessage, current)
-        alert.addButton(withTitle: self.copy.text(.downloadNow))
-        alert.addButton(withTitle: self.copy.text(.later))
-        self.activateForUserInteraction()
-        if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") {
-          NSWorkspace.shared.open(url)
-        }
+        self.confirmVerifiedUpdateDownload(current: current, latest: latest)
       } else {
         self.showInfo(
           title: self.copy.text(.upToDateTitle),
@@ -1237,15 +1229,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   private func postUpdateAvailableNotification(version: String, releaseURL: String) {
     let content = UNMutableNotificationContent()
-    if copy.resolvedLanguage == .chinese {
-      content.title = "Codex Dream Skin 有新版本"
-      content.body = "\(version) 已发布，点按前往下载页面。"
-    } else {
-      content.title = "Codex Dream Skin update available"
-      content.body = "\(version) is available. Click to open the download page."
-    }
+    content.title = copy.text(.updateNotificationTitle)
+    content.body = copy.format(.updateNotificationMessage, version)
     content.sound = .default
-    content.userInfo = ["releaseURL": releaseURL]
+    content.userInfo = ["version": version, "releaseURL": releaseURL]
     let request = UNNotificationRequest(
       identifier: "dreamskin-update-\(version)",
       content: content,
@@ -1255,9 +1242,107 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   @objc private func openAvailableUpdate() {
-    guard let url = URL(string: availableUpdate?.releaseURL
-      ?? "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") else { return }
-    NSWorkspace.shared.open(url)
+    guard let version = availableUpdate?.version else { return }
+    confirmVerifiedUpdateDownload(current: "v\(appVersion)", latest: version)
+  }
+
+  private func confirmVerifiedUpdateDownload(current: String, latest: String) {
+    guard latest.range(
+      of: #"^v[0-9]+\.[0-9]+\.[0-9]+$"#,
+      options: .regularExpression
+    ) != nil else {
+      showError(title: copy.text(.updateInvalidTitle), message: copy.text(.updateInvalidMessage))
+      return
+    }
+    let alert = NSAlert()
+    alert.messageText = copy.format(.newVersionTitle, latest)
+    alert.informativeText = copy.format(.newVersionMessage, current)
+    alert.addButton(withTitle: copy.text(.downloadNow))
+    alert.addButton(withTitle: copy.text(.later))
+    activateForUserInteraction()
+    guard alert.runModal() == .alertFirstButtonReturn else { return }
+    beginVerifiedUpdateDownload(version: latest)
+  }
+
+  private func beginVerifiedUpdateDownload(version: String) {
+    guard !operationInFlight, !updateCheckInFlight else { return }
+    guard let script = bundledScript(named: "check-update-macos.sh")
+      ?? installedScript(named: "check-update-macos.sh") else {
+      showError(
+        title: copy.text(.updateDownloadMissingTitle),
+        message: copy.text(.updateDownloadMissingMessage)
+      )
+      return
+    }
+    operationInFlight = true
+    updateCheckInFlight = true
+    rebuildMenu()
+    ScriptRunner.run(script: script, arguments: ["--json", "--download", version]) { [weak self] result in
+      guard let self else { return }
+      self.operationInFlight = false
+      self.updateCheckInFlight = false
+      self.rebuildMenu()
+      guard result.succeeded,
+            let data = result.output.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let value = object as? [String: Any],
+            value["latestVersion"] as? String == version,
+            value["updateAvailable"] as? Bool == true,
+            let path = value["downloadPath"] as? String,
+            let expectedDigest = value["downloadSha256"] as? String,
+            expectedDigest.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+            let dmgURL = self.validatedDownloadedDMG(path: path, version: version),
+            self.sha256Hex(of: dmgURL) == expectedDigest else {
+        NSLog("[DreamSkin] verified update failed with exit code %d", result.exitCode)
+        self.showError(
+          title: self.copy.text(.updateDownloadFailedTitle),
+          message: self.copy.text(.updateDownloadFailedMessage)
+        )
+        return
+      }
+      guard NSWorkspace.shared.open(dmgURL) else {
+        self.showError(
+          title: self.copy.text(.updateOpenFailedTitle),
+          message: self.copy.format(.updateOpenFailedMessage, dmgURL.path)
+        )
+        return
+      }
+      self.showInfo(
+        title: self.copy.text(.updateOpenedTitle),
+        message: self.copy.text(.updateOpenedMessage)
+      )
+    }
+  }
+
+  private func validatedDownloadedDMG(path: String, version: String) -> URL? {
+    let expectedName = "CodexDreamSkin-\(version).dmg"
+    let expectedRoot = homeURL.appendingPathComponent(
+      "Library/Caches/CodexDreamSkin/Updates",
+      isDirectory: true
+    ).standardizedFileURL
+    let url = URL(fileURLWithPath: path).standardizedFileURL
+    guard url.lastPathComponent == expectedName,
+          url.deletingLastPathComponent() == expectedRoot,
+          let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+          values.isRegularFile == true,
+          values.isSymbolicLink != true else {
+      return nil
+    }
+    return url
+  }
+
+  private func sha256Hex(of url: URL) -> String? {
+    do {
+      let handle = try FileHandle(forReadingFrom: url)
+      defer { try? handle.close() }
+      var hasher = SHA256()
+      while let chunk = try handle.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+        hasher.update(data: chunk)
+      }
+      return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    } catch {
+      return nil
+    }
   }
 
   func userNotificationCenter(
@@ -1273,9 +1358,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
-    if let urlString = response.notification.request.content.userInfo["releaseURL"] as? String,
-       let url = URL(string: urlString) {
-      NSWorkspace.shared.open(url)
+    if let version = response.notification.request.content.userInfo["version"] as? String {
+      DispatchQueue.main.async { [weak self] in
+        guard let self else { return }
+        self.confirmVerifiedUpdateDownload(current: "v\(self.appVersion)", latest: version)
+      }
     }
     completionHandler()
   }

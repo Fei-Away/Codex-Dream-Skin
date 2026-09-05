@@ -64,6 +64,28 @@ test("macOS native language selection persists and reaches child scripts", () =>
   assert.match(buildScript, /\n\s*localization-macos\.sh\n/);
 });
 
+test("macOS verified update handoff uses the native localized catalog", () => {
+  for (const key of [
+    "updateNotificationTitle",
+    "updateNotificationMessage",
+    "updateInvalidTitle",
+    "updateInvalidMessage",
+    "newVersionMessage",
+    "downloadNow",
+    "updateDownloadMissingTitle",
+    "updateDownloadMissingMessage",
+    "updateDownloadFailedTitle",
+    "updateDownloadFailedMessage",
+    "updateOpenFailedTitle",
+    "updateOpenFailedMessage",
+    "updateOpenedTitle",
+    "updateOpenedMessage"
+  ]) {
+    assert.match(appDelegate, new RegExp(`(?:self\\.)?copy\\.(?:text|format)\\(\\.${key}\\b`));
+  }
+  assert.doesNotMatch(appDelegate, /"(?:下载并验证|更新下载或验证失败|已验证并打开 DMG)"/);
+});
+
 test("macOS localized status keeps the machine-readable JSON contract stable", () => {
   assert.match(status, /\. "\$SCRIPT_DIR\/localization-macos\.sh"/);
   assert.match(
