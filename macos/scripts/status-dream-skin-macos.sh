@@ -36,6 +36,7 @@ APPLIED_THEME_ID=""
 CODEX_RUNNING="false"
 OPERATION_STATUS=""
 OPERATION_MESSAGE=""
+SAVED_CODEX_EXE=""
 
 read_json_text_field() {
   # Parse machine-written JSON (one key per line) without python3, which macOS
@@ -90,12 +91,6 @@ injector_identity_matches() {
   [ -n "$actual_start" ] && [ "$actual_start" = "$expected_start" ]
 }
 
-# Codex process: cheap name match only.  26.707 renamed Codex.app to
-# ChatGPT.app, while older installs still expose the former process name.
-if /usr/bin/pgrep -x ChatGPT >/dev/null 2>&1 || /usr/bin/pgrep -x Codex >/dev/null 2>&1; then
-  CODEX_RUNNING="true"
-fi
-
 if [ -f "$STATE_PATH" ]; then
   STATE_SNAPSHOT="$(/bin/cat "$STATE_PATH" 2>/dev/null)"
   saved_port="$(read_json_text_field "$STATE_SNAPSHOT" port)"
@@ -105,6 +100,7 @@ if [ -f "$STATE_PATH" ]; then
   saved_start="$(read_json_text_field "$STATE_SNAPSHOT" injectorStartedAt)"
   saved_node="$(read_json_text_field "$STATE_SNAPSHOT" nodePath)"
   saved_injector="$(read_json_text_field "$STATE_SNAPSHOT" injectorPath)"
+  SAVED_CODEX_EXE="$(read_json_text_field "$STATE_SNAPSHOT" codexExe)"
   APPLIED_THEME_ID="$(read_json_text_field "$STATE_SNAPSHOT" appliedThemeId)"
   APPLIED_THEME_NAME="$(read_json_text_field "$STATE_SNAPSHOT" appliedThemeName)"
   if injector_identity_matches "${pid:-}" "$saved_start" "$saved_node" "$saved_injector" "$PORT"; then
@@ -128,6 +124,21 @@ if [ -f "$STATE_PATH" ]; then
     esac
   fi
 fi
+
+# macOS may truncate the process name exposed to pgrep (for example,
+# /Applications/Ch). Match the complete main command path and ignore helpers.
+while IFS= read -r command_line; do
+  for candidate in "$SAVED_CODEX_EXE" \
+    "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT" \
+    "$HOME/Applications/ChatGPT.app/Contents/MacOS/ChatGPT" \
+    "/Applications/Codex.app/Contents/MacOS/Codex" \
+    "$HOME/Applications/Codex.app/Contents/MacOS/Codex"; do
+    [ -n "$candidate" ] || continue
+    case "$command_line" in
+      "$candidate"|"$candidate "*) CODEX_RUNNING="true"; break 2 ;;
+    esac
+  done
+done < <(/bin/ps -axo command= 2>/dev/null)
 
 if [ -f "$THEME_DIR/theme.json" ]; then
   THEME_SNAPSHOT="$(/bin/cat "$THEME_DIR/theme.json" 2>/dev/null)"
