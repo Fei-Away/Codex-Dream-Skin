@@ -14,6 +14,7 @@ runtime/*
 !runtime/dream-skin.css
 !runtime/image-metadata.mjs
 !runtime/renderer-inject.js
+!runtime/renderer-readiness.mjs
 !runtime/safe-css-policy.json
 !runtime/safe-css-validator.mjs
 !runtime/theme-package-validator.mjs

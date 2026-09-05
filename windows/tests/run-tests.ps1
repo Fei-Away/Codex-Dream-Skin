@@ -195,6 +195,23 @@ try {
     throw 'An incomplete bundled Node runtime replaced the previously valid managed engine.'
   }
 
+  $missingReadinessRoot = Join-Path $temporaryRoot 'missing-readiness-source'
+  Copy-Item -LiteralPath $runtimeSourceRoot -Destination $missingReadinessRoot -Recurse -Force
+  Remove-Item -LiteralPath (Join-Path $missingReadinessRoot 'assets\renderer-readiness.mjs') -Force
+  $missingReadinessRejected = $false
+  try {
+    $null = Install-DreamSkinRuntimeEngine -SkillRoot $missingReadinessRoot -StateRoot $runtimeStateRoot
+  } catch {
+    if ($_.Exception.Message -cne 'Dream Skin runtime source is incomplete: assets\renderer-readiness.mjs') { throw }
+    $missingReadinessRejected = $true
+  }
+  if (-not $missingReadinessRejected -or
+    (Get-FileHash -Algorithm SHA256 `
+      -LiteralPath (Join-Path $engine.Root 'scripts\runtime-update.test')).Hash -cne $engineSentinelHash -or
+    -not (Test-Path -LiteralPath (Join-Path $engine.Root 'assets\renderer-readiness.mjs') -PathType Leaf)) {
+    throw 'A runtime without shared renderer readiness replaced the previously valid managed engine.'
+  }
+
   $invalidRuntimeRoot = Join-Path $temporaryRoot 'invalid-runtime-source'
   New-Item -ItemType Directory -Path $invalidRuntimeRoot | Out-Null
   foreach ($directoryName in @('assets', 'scripts')) {
@@ -1162,6 +1179,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'VERSION') -Destination $releaseFixtureRoot -Force
   foreach ($releaseAsset in @(
     'dream-skin.css', 'renderer-inject.js', 'safe-css-policy.json', 'safe-css-validator.mjs', 'selectors.json',
+    'renderer-readiness.mjs',
     'theme-package-validator.mjs'
   )) {
     Copy-Item -LiteralPath (Join-Path $Root "assets\$releaseAsset") `

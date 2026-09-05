@@ -12,6 +12,7 @@ import {
   normalizeThemeText,
 } from "../assets/theme-package-validator.mjs";
 import { decodeAndValidateSafeCss } from "../assets/safe-css-validator.mjs";
+import { assessRendererReadiness, hasReasonableDimensions } from "../assets/renderer-readiness.mjs";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
@@ -56,9 +57,6 @@ const OPERATION_UI_HOST_ID = "chatgpt-dream-skin-operation";
 const OPERATION_UI_REGISTRY_KEY = "__CHATGPT_DREAM_SKIN_OPERATION_UI__";
 const OPERATION_KINDS = new Set(["apply", "pause", "switch"]);
 const OPERATION_UI_STATES = new Set(["success", "error", "cancelled"]);
-const MIN_RENDERER_WIDTH = 320;
-const MIN_RENDERER_HEIGHT = 240;
-const MAX_RENDERER_DIMENSION = 65536;
 const OPERATION_UI_CSS = `
   :host {
     all: initial;
@@ -169,12 +167,6 @@ const OPERATION_UI_CSS = `
 let staticPayloadAssets = null;
 let operationSequence = 0;
 
-function hasReasonableDimensions(width, height) {
-  return Number.isFinite(width) && Number.isFinite(height)
-    && width >= MIN_RENDERER_WIDTH && height >= MIN_RENDERER_HEIGHT
-    && width <= MAX_RENDERER_DIMENSION && height <= MAX_RENDERER_DIMENSION;
-}
-
 export function classifyNativeWindowResponse(response) {
   const windowId = Number(response?.windowId);
   const bounds = response?.bounds && typeof response.bounds === "object"
@@ -229,42 +221,9 @@ export function classifyNativeWindowError(error) {
 
 export function assessRendererVerification(renderer, nativeWindow, expected) {
   const result = renderer && typeof renderer === "object" ? { ...renderer } : {};
-  const viewportWidth = Number(result.viewport?.width);
-  const viewportHeight = Number(result.viewport?.height);
-  const viewportPass = hasReasonableDimensions(viewportWidth, viewportHeight);
-  const documentVisible = result.documentVisibility === "visible";
-  const settingsRoute = result.scope?.baseState === "settings";
-  const homeRoute = result.scope?.baseState === "home" || result.homeRoute || result.homePresent;
-  const l1ScopePass = result.scope?.level === "L1" &&
-    Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 0;
-  const genericStructurePass = l1ScopePass && Boolean(result.genericMain?.visible) &&
-    (Boolean(result.genericInput?.visible) || Boolean(homeRoute && result.homePresent));
-  const l0StructurePass = result.scope?.level === "L0" &&
-    settingsRoute && Boolean(result.settings?.visible);
-  const structurePass = l0StructurePass || (l1ScopePass && (
-    (Boolean(result.shell?.visible) && Boolean(result.sidebar?.visible)) || genericStructurePass
-  ));
-  const nativeWindowPass = nativeWindow?.status === "ready";
-  const fallbackWindowPass = nativeWindow?.status === "unsupported";
-  const windowPass = documentVisible && viewportPass
-    && (nativeWindowPass || fallbackWindowPass);
-  const basePass = result.installed && result.version === expected.skinVersion
-    && result.stylePresent && result.businessClassPollution === 0
-    && structurePass && windowPass && !result.documentOverflow?.x;
-  const payloadPass = (!expected.expectedThemeId || result.themeId === expected.expectedThemeId)
-    && (!expected.expectedRevision || result.revision === expected.expectedRevision);
-  const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
-    ? result.suggestionLabels.filter((item) => item?.visible) : [];
-  const homeFallbackVisible = Boolean(homeRoute && result.homePresent && result.genericMain?.visible);
-  const homePass = !homeRoute || (
-    result.homePresent && ((result.hero?.visible && result.hero.width >= 280
-      && result.hero.height >= 120) || homeFallbackVisible)
-    && (result.visibleCardCount === 0 || (
-      visibleSuggestionLabels.length >= result.visibleCardCount
-      && result.suggestionLabelColorsMatch
-    ))
-  );
-
+  const verdict = assessRendererReadiness(result, nativeWindow, expected);
+  const { documentVisible, fallbackWindowPass, nativeWindowPass, payloadPass,
+    structurePass, viewportPass, windowPass } = verdict.checks;
   result.nativeWindow = nativeWindow;
   result.checks = {
     documentVisible,
@@ -275,14 +234,10 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     viewportPass,
     windowPass,
   };
-  result.pass = Boolean(basePass && homePass && payloadPass);
+  result.pass = verdict.pass;
   result.expectedThemeId = expected.expectedThemeId;
   result.expectedRevision = expected.expectedRevision;
-  result.softNotes = {
-    projectButtonOptional: !result.projectButton?.visible,
-    composerOptionalOnNonTaskRoutes: !result.composer?.visible,
-    suggestionCardsOptional: homeRoute && result.visibleCardCount === 0,
-  };
+  result.softNotes = verdict.softNotes;
   return result;
 }
 
@@ -1206,6 +1161,7 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
     const result = {
       installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
       documentVisibility: document.visibilityState,
+      documentHidden: document.hidden === true,
       version: runtime?.version ?? null,
       themeId: runtime?.themeId ?? null,
       revision: runtime?.revision ?? null,
@@ -1217,6 +1173,7 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
       ).length,
       homeRoute: Boolean(homeRoute),
       homePresent: Boolean(home),
+      homeSurface: box(home),
       hero,
       cards: cardBoxes,
       visibleCardCount: visibleCards.length,

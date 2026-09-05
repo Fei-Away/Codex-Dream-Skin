@@ -225,7 +225,5 @@ assert.match(
   /const suggestionLabelColorsMatch = visibleSuggestionLabels\.every\(/,
   "Live verification must reject visible home suggestion labels that diverge from the themed card color.",
 );
-assert.match(source, /visibleSuggestionLabels\.length >= result\.visibleCardCount/);
-assert.match(source, /result\.suggestionLabelColorsMatch/);
 
 console.log("PASS: early injection is L0-ready, generation-safe, and removed on shutdown.");
