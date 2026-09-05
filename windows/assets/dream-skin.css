@@ -1463,3 +1463,452 @@ html[data-dream-skin="active"] [data-ds-part="message"] { border-radius: 16px; }
     }
   }
 }
+
+/* Codex 26.x gives the composer submit button a literal foreground fill.
+   That becomes a white disk when the button loses focus, so keep the action
+   on the same themed glass/accent scale in every interaction state. */
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ) {
+  background: rgb(var(--ds-accent-rgb) / .72) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .72) !important;
+  border: 1px solid rgb(var(--ds-text-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  box-shadow: 0 3px 10px rgb(var(--ds-bg-rgb) / .30) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ):hover,
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ):focus-visible {
+  background: rgb(var(--ds-accent-rgb) / .94) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .94) !important;
+  color: var(--ds-text) !important;
+  box-shadow: 0 3px 12px rgb(var(--ds-accent-rgb) / .42) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    .composer-surface-chrome,
+    [class*="_ComposerLayoutRoot_"],
+    [data-ds-part="composer"]
+  )
+  :is(
+    button[type="submit"],
+    button[class~="bg-token-foreground"],
+    button[class*="bg-primary-solid"],
+    button[aria-label="发送"],
+    button[aria-label="停止"],
+    button[aria-label*="Send" i],
+    button[aria-label*="Stop" i]
+  ):disabled {
+  background: rgb(var(--ds-panel-2-rgb) / .72) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .72) !important;
+  border-color: rgb(var(--ds-line-rgb) / .68) !important;
+  color: rgb(var(--ds-muted-rgb) / .92) !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+
+/* Keep native text selection and selected dialog controls from reintroducing
+   a pale/white slab over the wallpaper. */
+html[data-dream-skin="active"] ::selection {
+  background: rgb(var(--ds-accent-rgb) / .52) !important;
+  color: var(--ds-text) !important;
+  text-shadow: none !important;
+}
+html[data-dream-skin="active"]
+  :is([aria-selected="true"], [data-state="selected"], [data-selected="true"]) {
+  background: rgb(var(--ds-accent-rgb) / .30) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .30) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .56) !important;
+  color: var(--ds-text) !important;
+  text-shadow: 0 1px 3px rgb(var(--ds-bg-rgb) / .42) !important;
+}
+
+/* Dialog actions must keep their fill when the modal loses focus. Newer
+   builds use literal white foreground utilities for the confirm action. */
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]) {
+  background: rgb(var(--ds-panel-2-rgb) / .78) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .78) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .52) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .38) !important;
+}
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]):hover,
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]):focus-visible {
+  background: rgb(var(--ds-accent-rgb) / .88) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .88) !important;
+  color: var(--ds-text) !important;
+}
+html[data-dream-skin="active"]
+  :is([role="dialog"], [data-radix-dialog-content], [class*="DialogContent"], [class*="_Dialog_"])
+  :is(button, [role="button"]):disabled {
+  background: rgb(var(--ds-panel-2-rgb) / .54) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .54) !important;
+  border-color: rgb(var(--ds-line-rgb) / .52) !important;
+  color: rgb(var(--ds-muted-rgb) / .88) !important;
+}
+
+/* The message-edit dialog uses the same foreground token as the composer, but
+   it lives outside the composer shell. Keep its send action themed too. */
+html[data-dream-skin="active"]
+  :is([data-dream-skin-dialog-send="true"], [role="dialog"], [aria-modal="true"], [class*="Dialog"], [class*="dialog"])
+  :is(button[type="submit"], button[class~="bg-token-foreground"], button[class*="bg-primary-solid"], button[aria-label="发送"], button[aria-label*="Send" i]) {
+  background: rgb(var(--ds-accent-rgb) / .72) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .72) !important;
+  border: 1px solid rgb(var(--ds-text-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  box-shadow: 0 3px 10px rgb(var(--ds-bg-rgb) / .30) !important;
+}
+html[data-dream-skin="active"]
+  [data-dream-skin-dialog-send="true"] {
+  background: rgb(var(--ds-accent-rgb) / .72) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .72) !important;
+  border: 1px solid rgb(var(--ds-text-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+}
+
+/* Toasts used for archive/delete/undo feedback are separate from dialogs.
+   Keep their surface readable even when Codex resolves its native toast token
+   to a white panel under a translucent Dream Skin. */
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-notification-toast="true"],
+    [data-radix-toast-root],
+    [data-sonner-toast],
+    [role="alert"],
+    [class*="Toast"],
+    [class*="toast"]
+  ) {
+  background: rgb(var(--ds-panel-2-rgb) / .92) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .92) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .58) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 26px rgb(var(--ds-bg-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .42) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-notification-toast="true"],
+    [data-radix-toast-root],
+    [data-sonner-toast],
+    [role="alert"],
+    [class*="Toast"],
+    [class*="toast"]
+  )
+  :is(button, [role="button"]) {
+  background: rgb(var(--ds-panel-rgb) / .54) !important;
+  background-color: rgb(var(--ds-panel-rgb) / .54) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .52) !important;
+  border-radius: 10px !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .42) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-notification-toast="true"],
+    [data-radix-toast-root],
+    [data-sonner-toast],
+    [role="alert"],
+    [class*="Toast"],
+    [class*="toast"]
+  )
+  :is(button, [role="button"]):hover,
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-notification-toast="true"],
+    [data-radix-toast-root],
+    [data-sonner-toast],
+    [role="alert"],
+    [class*="Toast"],
+    [class*="toast"]
+  )
+  :is(button, [role="button"]):focus-visible {
+  background: rgb(var(--ds-accent-rgb) / .82) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .82) !important;
+  color: var(--ds-text) !important;
+}
+
+/* Codex's text-selection action bar is a transient portal. Cover the stable
+   toolbar semantics and generated class families used by current builds. */
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-selection-toolbar="true"],
+    [role="toolbar"],
+    [class*="SelectionToolbar"],
+    [class*="selection-toolbar"],
+    [class*="ContextualToolbar"],
+    [class*="contextual-toolbar"]
+  ) {
+  background: rgb(var(--ds-panel-2-rgb) / .88) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .88) !important;
+  border: 1px solid rgb(var(--ds-accent-rgb) / .58) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 26px rgb(var(--ds-bg-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-selection-toolbar="true"],
+    [role="toolbar"],
+    [class*="SelectionToolbar"],
+    [class*="selection-toolbar"],
+    [class*="ContextualToolbar"],
+    [class*="contextual-toolbar"]
+  )
+  :is(button, [role="button"]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: rgb(var(--ds-line-rgb) / .34) !important;
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .46) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [data-dream-skin-selection-toolbar="true"],
+    [role="toolbar"],
+    [class*="SelectionToolbar"],
+    [class*="selection-toolbar"],
+    [class*="ContextualToolbar"],
+    [class*="contextual-toolbar"]
+  )
+  :is(button, [role="button"]):hover {
+  background: rgb(var(--ds-accent-rgb) / .22) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .22) !important;
+  color: var(--ds-text) !important;
+}
+
+/* Codex 26.803 file-change cards use utility tokens such as
+   bg-surface-elevated-secondary/50. Those tokens can resolve to a pale,
+   half-transparent surface, which washes out the path and +/- counts over
+   the wallpaper. Keep the card and its hover header on the same readable
+   glass material as the rest of the themed conversation. */
+html[data-dream-skin="active"]
+  :is(
+    [class~="bg-surface-elevated-secondary/50"],
+    [class~="extension:bg-background-primary-soft/50"]
+  ) {
+  background: rgb(var(--ds-panel-2-rgb) / .88) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .88) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .48) !important;
+  box-shadow: 0 8px 22px rgb(var(--ds-bg-rgb) / .22) !important;
+  color: var(--ds-text) !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [class~="bg-surface-elevated-secondary/50"],
+    [class~="extension:bg-background-primary-soft/50"]
+  )
+  :is([class*="turn-diff-header"], [class*="turn-diff"] [class*="header"]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--ds-text) !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [class~="bg-surface-elevated-secondary/50"],
+    [class~="extension:bg-background-primary-soft/50"]
+  )
+  :is(p, span, button, [role="button"], a, svg, svg *, [class*="text-"]) {
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgb(var(--ds-bg-rgb) / .34) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [class~="bg-surface-elevated-secondary/50"],
+    [class~="extension:bg-background-primary-soft/50"]
+  )
+  :is(button, [role="button"]) {
+  background: rgb(var(--ds-panel-rgb) / .56) !important;
+  background-color: rgb(var(--ds-panel-rgb) / .56) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .52) !important;
+  color: var(--ds-text) !important;
+  box-shadow: 0 2px 8px rgb(var(--ds-bg-rgb) / .16) !important;
+}
+html[data-dream-skin="active"]
+  :is(
+    [class~="bg-surface-elevated-secondary/50"],
+    [class~="extension:bg-background-primary-soft/50"]
+  )
+  :is(button, [role="button"]):hover,
+html[data-dream-skin="active"]
+  :is(
+    [class~="bg-surface-elevated-secondary/50"],
+    [class~="extension:bg-background-primary-soft/50"]
+  )
+  :is(button, [role="button"]):focus-visible {
+  background: rgb(var(--ds-accent-rgb) / .78) !important;
+  background-color: rgb(var(--ds-accent-rgb) / .78) !important;
+  color: var(--ds-text) !important;
+}
+
+/* The expanded file preview is a shadow-root-backed diffs-container. Feed it
+   both the surface and editor tokens, and explicitly disable inherited fade
+   or blur so code remains sharp while the file row is hovered. */
+html[data-dream-skin="active"] diffs-container {
+  --color-token-main-surface-primary: #ffffff !important;
+  --color-token-main-surface-secondary: #ffffff !important;
+  --color-token-text-primary: var(--ds-text) !important;
+  --color-token-text-secondary: var(--ds-muted) !important;
+  --color-token-text-link-foreground: var(--ds-accent) !important;
+  --color-token-editor-foreground: var(--ds-text) !important;
+  --codex-base-surface: #ffffff !important;
+  --codex-base-ink: #1f2937 !important;
+  --vscode-editor-background: #ffffff !important;
+  --vscode-editor-foreground: #1f2937 !important;
+  --diffs-light-bg: #ffffff !important;
+  --diffs-dark-bg: #ffffff !important;
+  --diffs-addition-base: #65d6ad !important;
+  --diffs-deletion-base: #ff8e9e !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d7dee7 !important;
+  box-shadow: 0 8px 22px rgb(var(--ds-bg-rgb) / .22) !important;
+  color: #1f2937 !important;
+  filter: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-dream-skin="active"] diffs-container
+  :is(pre, code, [class*="code"], [class*="Code"], [class*="editor"], [class*="Editor"]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #1f2937 !important;
+  filter: none !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+/* The hover preview is a Radix tooltip surface, not only a diffs-container.
+   Its current Codex markup uses group/diff-preview plus the un-suffixed
+   bg-surface-elevated-secondary token; cover those concrete surfaces so the
+   editor cannot fall back to a white panel. */
+html[data-dream-skin="active"] [class*="diff-preview"] {
+  --color-token-main-surface-primary: var(--ds-panel-2) !important;
+  --color-token-main-surface-secondary: var(--ds-panel) !important;
+  --color-token-text-primary: var(--ds-text) !important;
+  --color-token-text-secondary: var(--ds-muted) !important;
+  --color-token-text-tertiary: var(--ds-secondary) !important;
+  --color-token-foreground: var(--ds-text) !important;
+  --color-token-description-foreground: var(--ds-muted) !important;
+  --vscode-editor-background: var(--ds-panel-2) !important;
+  --vscode-editor-foreground: var(--ds-text) !important;
+  background: rgb(var(--ds-bg-rgb) / .92) !important;
+  background-color: rgb(var(--ds-bg-rgb) / .92) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .62) !important;
+  color: var(--ds-text) !important;
+  filter: none !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+html[data-dream-skin="active"] [class*="diff-preview"]
+  :is([class~="bg-surface-elevated-secondary"], [class~="extension:bg-primary-soft"]) {
+  background: rgb(var(--ds-panel-2-rgb) / .96) !important;
+  background-color: rgb(var(--ds-panel-2-rgb) / .96) !important;
+  border-color: rgb(var(--ds-accent-rgb) / .54) !important;
+  color: var(--ds-text) !important;
+}
+html[data-dream-skin="active"] [class*="diff-preview"]
+  :is(p, span, div, button, [role="button"], svg, svg *):not(pre *):not(code *) {
+  color: var(--ds-text) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+html[data-dream-skin="active"] [class*="diff-preview"]
+  :is(pre, code, [class*="code"], [class*="Code"], [class*="editor"], [class*="Editor"]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--ds-text) !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+html[data-dream-skin="active"] [class*="diff-preview"]
+  :is([class~="max-h-96"], [class*="composer-diff-simple-line"]) {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border-color: #d7dee7 !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+html[data-dream-skin="active"] [class*="diff-preview"] :is(pre, code) {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #1f2937 !important;
+  text-shadow: none !important;
+}
+html[data-dream-skin="active"] [class*="diff-preview"] [class~="max-h-96"] :is(pre, code) {
+  color: #1f2937 !important;
+  text-shadow: none !important;
+}
+html[data-dream-skin="active"] [class*="diff-preview"][class*="diff-preview"] [class~="max-h-96"] {
+  color: #1f2937 !important;
+  text-shadow: none !important;
+}
+
+/* Keep file-change preview surfaces sharp while hovering the edited file. */
+html[data-dream-skin="active"]
+  :is(diffs-container, [class*="diff"], [class*="Diff"], [class*="preview"], [class*="Preview"]) {
+  filter: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
