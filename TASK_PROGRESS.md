@@ -1,9 +1,5 @@
 # Task Progress
 
-> **接手先读 `docs/handoff-2026-08-27.md`。** 那份文档汇总了 2026-08-27 兼容性专项的背景、
-> 已落地内容（含未发布提交）、按优先级排好的待办、本机环境限制与关键决策记录。
-> 本文件其余部分是逐次任务的流水记录，作为证据保留。
-
 ## Unified compatibility pass (2026-08-27)
 
 Branch `codex/unified-compat`, based on `origin/main@40d1f97` (v1.5.16 + #386).
