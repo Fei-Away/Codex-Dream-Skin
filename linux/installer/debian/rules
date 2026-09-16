@@ -1,0 +1,50 @@
+#!/bin/make -f dh
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# No compilation needed for this all-arch package
+
+override_dh_auto_install:
+	# Install scripts
+	install -d $(CURDIR)/debian/codex-dream-skin/usr/share/codex-dream-skin
+	cp -r $(CURDIR)/scripts $(CURDIR)/assets $(CURDIR)/presets \
+	  $(CURDIR)/runtime $(CURDIR)/debian/codex-dream-skin/usr/share/codex-dream-skin/
+	# Install tray app
+	install -d $(CURDIR)/debian/codex-dream-skin/usr/share/codex-dream-skin/tray-app
+	cp $(CURDIR)/tray-app/tray.py $(CURDIR)/tray-app/*.png \
+	  $(CURDIR)/debian/codex-dream-skin/usr/share/codex-dream-skin/tray-app/
+	# Make scripts executable
+	chmod +x $(CURDIR)/debian/codex-dream-skin/usr/share/codex-dream-skin/scripts/*.sh
+	# Install symlinks
+	install -d $(CURDIR)/debian/codex-dream-skin/usr/local/bin
+	ln -sf /usr/share/codex-dream-skin/scripts/dream-skin.sh \
+	  $(CURDIR)/debian/codex-dream-skin/usr/local/bin/dream-skin
+	ln -sf /usr/share/codex-dream-skin/tray-app/tray.py \
+	  $(CURDIR)/debian/codex-dream-skin/usr/local/bin/dream-skin-tray
+	ln -sf /usr/share/codex-dream-skin/tray-app/tray.py \
+	  $(CURDIR)/debian/codex-dream-skin/usr/local/bin/dream-skin-launcher
+	# Install desktop file
+	install -d $(CURDIR)/debian/codex-dream-skin/usr/share/applications
+	install -d $(CURDIR)/debian/codex-dream-skin/usr/share/icons/hicolor/48x48/apps
+	cp $(CURDIR)/installer/codex-dream-skin.desktop \
+	  $(CURDIR)/debian/codex-dream-skin/usr/share/applications/
+	# Copy icons
+	cp $(CURDIR)/scripts/icon-status-active.png \
+	  $(CURDIR)/debian/codex-dream-skin/usr/share/icons/hicolor/48x48/apps/codex-dream-skin-active.png
+	cp $(CURDIR)/scripts/icon-status-paused.png \
+	  $(CURDIR)/debian/codex-dream-skin/usr/share/icons/hicolor/48x48/apps/codex-dream-skin-paused.png
+	cp $(CURDIR)/scripts/icon-status-inactive.png \
+	  $(CURDIR)/debian/codex-dream-skin/usr/share/icons/hicolor/48x48/apps/codex-dream-skin-inactive.png
+	# Install autostart
+	install -d $(CURDIR)/debian/codex-dream-skin/etc/xdg/autostart
+	cp $(CURDIR)/installer/codex-dream-skin-autostart.desktop \
+	  $(CURDIR)/debian/codex-dream-skin/etc/xdg/autostart/
+	# Install systemd user service
+	install -d $(CURDIR)/debian/codex-dream-skin/usr/share/systemd/user
+	cp $(CURDIR)/installer/codex-dream-skin-injector.service \
+	  $(CURDIR)/debian/codex-dream-skin/usr/share/systemd/user/
+
+override_dh_installsystemd:
+	dh_installsystemd --no-restart-daemon --name=codex-dream-skin-injector

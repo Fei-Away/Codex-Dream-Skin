@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Codex Dream Skin
+Name[zh]=Codex 主题皮肤
+Comment=Adaptive theme injector for Codex/ChatGPT Desktop
+Comment[zh]=为 Codex/ChatGPT 桌面客户端注入自适应主题
+Exec=/usr/local/bin/dream-skin-tray
+Icon=codex-dream-skin-inactive
+Type=Application
+Categories=Development;Utility;
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Codex Dream Skin (Auto)
+Comment=Start Codex Dream Skin tray on login
+Exec=/usr/local/bin/dream-skin-tray
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel
