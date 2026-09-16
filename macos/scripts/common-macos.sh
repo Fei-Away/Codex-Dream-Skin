@@ -30,7 +30,7 @@ CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
 EXPECTED_CODEX_TEAM_ID="2DC432GLL2"
 EXPECTED_CODEX_REQUIREMENT="anchor apple generic and certificate leaf[subject.OU] = \"$EXPECTED_CODEX_TEAM_ID\""
-SKIN_VERSION="1.5.14"
+SKIN_VERSION="1.5.18"
 DREAM_SKIN_VALIDATED_RUNTIME_PID=""
 DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE=""
 DREAM_SKIN_VALIDATED_RUNTIME_EXE=""
@@ -406,6 +406,50 @@ recorded_injector_process_matches() {
   actual_start="$(process_started_at "$pid")"
   [ -n "$actual_start" ] && [ "$actual_start" = "$expected_start" ] || return 1
   return 0
+}
+
+quit_codex_for_restart() {
+  local outcome
+  local deadline
+  codex_is_running || return 0
+
+  # Restart consent does not authorize overriding the official app's quit dialog.
+  # Keep launchd and injector ownership intact until the app has actually exited.
+  if ! outcome="$(/usr/bin/osascript <<'APPLESCRIPT'
+try
+  with timeout of 15 seconds
+    tell application id "com.openai.codex" to quit
+  end timeout
+  return "requested"
+on error errorMessage number errorNumber
+  if errorNumber is -128 then return "cancelled"
+  if errorNumber is -1712 then return "timed-out"
+  error errorMessage number errorNumber
+end try
+APPLESCRIPT
+)"; then
+    printf 'ChatGPT quit could not be confirmed; restart was stopped.\n' >&2
+    return 1
+  fi
+  case "$outcome" in
+    cancelled) return 20 ;;
+    timed-out)
+      printf 'ChatGPT quit timed out; restart was stopped without forcing it to close.\n' >&2
+      return 124
+      ;;
+    requested) ;;
+    *)
+      printf 'ChatGPT quit returned an unexpected result; restart was stopped.\n' >&2
+      return 1
+      ;;
+  esac
+  deadline=$((SECONDS + 15))
+  while codex_is_running && [ "$SECONDS" -lt "$deadline" ]; do /bin/sleep 0.25; done
+  if codex_is_running; then
+    printf 'ChatGPT is still running; restart was stopped without forcing it to close.\n' >&2
+    return 124
+  fi
+  release_codex_launchd_job
 }
 
 stop_codex() {

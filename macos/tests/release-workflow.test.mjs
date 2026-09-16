@@ -63,5 +63,14 @@ assert.match(
   /if \[\[ "\$EVENT_NAME" == "workflow_dispatch" \]\]; then\s+release_sha="\$tag_commit"/,
   "A manual retry must resume the existing unpublished tag commit even after main advances.",
 );
+assert.match(
+  workflow,
+  /Public \$tag predates the current release payload; skipping legacy tag parity checks\./,
+  "A published pre-Linux tag must remain a no-op when the version is unchanged.",
+);
+assert.match(
+  workflow,
+  /cat "docs\/releases\/v\$\{VERSION\}\.md" >> release-notes\.md/,
+  "Version-specific changes and contributor credits must reach the public release notes.");
 
 console.log("PASS: Release workflow binds assets and tag to the exact event commit.");

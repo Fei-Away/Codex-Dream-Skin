@@ -9,7 +9,7 @@ import process from "node:process";
 export const COMMUNITY_API_ORIGIN = "https://api.dreamskin.cc";
 const MAX_HEADER_BYTES = 8 * 1024;
 const MAXIMUM_PACKAGE_BYTES = 32 * 1024 * 1024;
-const USER_AGENT = `DreamSkinLinux/${process.env.SKIN_VERSION || "1.5.14"}`;
+const USER_AGENT = `DreamSkinLinux/${process.env.SKIN_VERSION || "1.5.18"}`;
 const VERSION_ID_PATTERN = /^ver_[a-z0-9]{8,64}$/;
 const LINK_PATTERN = /^dreamskin:\/\/apply\?version=(ver_[a-z0-9]{8,64})$/;
 const UNSAFE_CODEPOINTS = new Set([

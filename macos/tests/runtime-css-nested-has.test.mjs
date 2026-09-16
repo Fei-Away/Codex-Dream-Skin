@@ -40,6 +40,30 @@ const findNestedHas = (css) => {
 };
 
 for (const file of files) {
+  test(`Home suggestion text supports old and current native classes in ${file}`, () => {
+    const css = readFileSync(join(root, file), "utf8");
+    const home = file.startsWith("runtime/")
+      ? "__DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__"
+      : '[role="main"]:has([data-testid="home-icon"]) .group\\/home-suggestions';
+    const labels = ':is([class~="text-token-text-primary"], [class~="text-default"])';
+    const selector = `html[data-dream-skin="active"] ${home} button ${labels}`;
+    assert.ok(css.includes(`${selector} {\n  color: var(--ds-text) !important;\n}`),
+      "Both observed label classes must receive theme text color only inside Home suggestion buttons.");
+    const iconSelector = `html[data-dream-skin="active"] ${home} button svg`;
+    const iconRule = css.slice(css.indexOf(`${iconSelector} {`)).split("}")[0];
+    assert.ok(css.includes(`${iconSelector} {`));
+    assert.match(iconRule, /color:\s*var\(--ds-accent\)\s*!important;/,
+      "Suggestion icons must retain their distinct theme accent color.");
+  });
+
+  test(`base skin preserves native body fonts in ${file}`, () => {
+    const css = readFileSync(join(root, file), "utf8");
+    const bodyRule = css.match(/html\[data-dream-skin="active"\] body\s*\{([^}]*)\}/);
+    assert.ok(bodyRule, "The base body rule must remain present.");
+    assert.doesNotMatch(bodyRule[1], /\bfont(?:-family)?\s*:/i,
+      "The base skin must not override native UI or inherited code fonts (#399).");
+  });
+
   test(`no nested :has() in ${file}`, () => {
     const css = readFileSync(join(root, file), "utf8");
     const findings = findNestedHas(css);

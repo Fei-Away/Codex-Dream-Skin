@@ -28,7 +28,7 @@ INJECTOR_ERROR_LOG="$STATE_ROOT/injector-error.log"
 APP_LOG="$STATE_ROOT/codex-launch.log"
 APP_ERROR_LOG="$STATE_ROOT/codex-launch-error.log"
 START_ERROR_LOG="$STATE_ROOT/start-error.log"
-SKIN_VERSION="1.5.14"
+SKIN_VERSION="1.5.18"
 
 fail() {
   local message="$*"
@@ -479,6 +479,7 @@ cdp_http_ready() {
 verified_cdp_endpoint() {
   local port="$1"
   port_belongs_to_codex "$port" || return 1
+  cdp_listener_is_loopback "$port" || return 1
   cdp_http_ready "$port"
 }
 
@@ -705,18 +706,20 @@ launch_injector_daemon() {
   fail "The injector did not start. See $INJECTOR_ERROR_LOG and $INJECTOR_LOG"
 }
 
-# Resolve Node from the system installation and require version 18 or newer.
+# Resolve Node from the system installation and require version 22 or newer.
+# The injector uses Node's built-in WebSocket API for CDP; Node 18/20 do not
+# provide it as a stable default global.
 ensure_node_runtime() {
   if [ -z "${NODE:-}" ] || [ ! -x "$NODE" ]; then
     NODE="$(command -v node || true)"
   fi
-  [ -n "$NODE" ] && [ -x "$NODE" ] || fail "Node.js was not found. Install nodejs (>= 18) first."
+  [ -n "$NODE" ] && [ -x "$NODE" ] || fail "Node.js was not found. Install nodejs (>= 22) first."
   local node_major=""
   node_major="$("$NODE" --version)"
   node_major="${node_major#v}"
   node_major="${node_major%%.*}"
   case "$node_major" in ''|*[!0-9]*) fail "Could not parse Node.js version." ;; esac
-  [ "$node_major" -ge 18 ] || fail "Node.js $("$NODE" --version) is too old; version 18 or newer is required."
+  [ "$node_major" -ge 22 ] || fail "Node.js $("$NODE" --version) is too old; version 22 or newer is required."
   NODE_VERSION="$("$NODE" --version)"
   export NODE NODE_VERSION
 }

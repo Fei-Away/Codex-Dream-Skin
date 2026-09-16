@@ -39,7 +39,7 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.14";
+const SKIN_VERSION = "1.5.18";
 // .github/workflows/ci.yml's version-consistency check greps this file for a
 // literal `const SKIN_VERSION = "...";` line, so the export stays a separate
 // statement rather than an inline `export const`.
@@ -707,6 +707,13 @@ async function readThemeSourceStamp(loadedTheme) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const initialRoute = new URLSearchParams(String(location.search || ''))
+      .get('initialRoute') || '';
+    const pathname = String(location.pathname || '');
+    const excludedPetSurface = location.protocol === 'app:' && (
+      pathname.endsWith('/avatar-overlay-composition-surface.html') ||
+      initialRoute === '/avatar-overlay' || initialRoute.startsWith('/avatar-overlay/')
+    );
     const genericCodexSurface = () => {
       if (location.protocol !== 'app:') return false;
       const main = document.querySelector('main, [role="main"]');
@@ -728,7 +735,8 @@ async function probeSession(session) {
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       markers,
-      codex: location.protocol === 'app:' &&
+      excludedPetSurface,
+      codex: !excludedPetSurface && location.protocol === 'app:' &&
         ((markers.shell && markers.sidebar) || settings || markers.main || markers.generic),
     };
   })()`);
@@ -835,7 +843,12 @@ async function connectCodexTargets(port, timeoutMs, expectedBrowserId) {
           session = await connectTarget(target, port);
           const probe = await probeSession(session);
           if (probe?.codex) connected.push({ target, session, probe });
-          else session.close();
+          else {
+            if (probe?.excludedPetSurface && !await cleanupExcludedSurface(session)) {
+              throw new Error("Excluded Pet surface cleanup did not verify");
+            }
+            session.close();
+          }
         } catch (error) {
           session?.close();
           lastError = error;
@@ -1136,6 +1149,11 @@ async function verifyRemovedSession(session) {
   })()`);
 }
 
+export async function cleanupExcludedSurface(session) {
+  if (!await removeFromSession(session)) return false;
+  return verifyRemovedSession(session);
+}
+
 export async function verifySession(
   session,
   targetId,
@@ -1300,8 +1318,8 @@ export async function verifySession(
       ))
     );
     result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.businessClassPollution === 0 && windowPass &&
-      documentPass && viewportPass && structurePass &&
+      result.stylePresent && result.businessClassPollution === 0 && !result.documentOverflow.x &&
+      windowPass && documentPass && viewportPass && structurePass &&
       payloadPass && homePass;
     return result;
   })()`);
@@ -1689,6 +1707,9 @@ async function runWatch(options) {
           const probe = await waitForCodexProbe(session);
           if (!probe?.codex) {
             await removeEarlyPayload(session, earlyScriptId);
+            if (probe?.excludedPetSurface && !await cleanupExcludedSurface(session)) {
+              throw new Error("Excluded Pet surface cleanup did not verify");
+            }
             rejectTarget(target, 5000);
             session.close();
             continue;

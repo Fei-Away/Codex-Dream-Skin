@@ -3,12 +3,23 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { earlyPayloadFor } from "../scripts/injector.mjs";
+import {
+  cleanupExcludedSurface,
+  createCdpWebSocket,
+  earlyPayloadFor,
+} from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const injectorPath = path.resolve(here, "../scripts/injector.mjs");
 const source = await fs.readFile(injectorPath, "utf8");
 const shellSelector = 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])';
+
+assert.throws(
+  () => createCdpWebSocket("ws://127.0.0.1:1", null),
+  /Node\.js 22 or newer with the built-in WebSocket API is required/,
+  "CDP must fail clearly before constructing a missing WebSocket implementation.",
+);
+assert.match(source, /this\.ws = createCdpWebSocket\(validatedDebuggerUrl\(target, port\)\)/);
 
 function createFixture() {
   const domReady = [];
@@ -28,7 +39,7 @@ function createFixture() {
   let root = {};
   const context = {
     window: { installs: [] },
-    location: { protocol: "app:" },
+    location: { protocol: "app:", pathname: "/index.html", search: "" },
     document: {
       get documentElement() { return root; },
       addEventListener(type, callback) { if (type === "DOMContentLoaded") domReady.push(callback); },
@@ -149,8 +160,14 @@ const liveProbePayload = vm.runInNewContext(`\`${probeTemplate}\``, {
 const runLiveProbe = ({
   protocol = "app:", settingsPanel: hasSettingsPanel = false,
   genericMain = false, genericInput = false, branding = false,
+  pathname = "/index.html", initialRoute = "",
 } = {}) => vm.runInNewContext(liveProbePayload, {
-  location: { protocol },
+  location: {
+    protocol,
+    pathname,
+    search: initialRoute ? `?initialRoute=${encodeURIComponent(initialRoute)}` : "",
+  },
+  URLSearchParams,
   document: {
     querySelector(selector) {
       if (selector === "[selector-settings-panel]") return hasSettingsPanel ? {} : null;
@@ -173,6 +190,25 @@ assert.equal(runLiveProbe({ genericMain: true, genericInput: true }).codex, fals
   "The live probe must reject an unbranded generic app target.");
 assert.equal(runLiveProbe({ genericMain: true, genericInput: true, branding: true }).codex, true,
   "The live probe may accept generic anchors only with the stable Codex branding marker.");
+const avatarOverlayProbe = runLiveProbe({ settingsPanel: true, initialRoute: "/avatar-overlay" });
+assert.equal(avatarOverlayProbe.excludedPetSurface, true);
+assert.equal(avatarOverlayProbe.codex, false,
+  "The avatar overlay must never be treated as the primary Codex renderer.");
+const petCompositionProbe = runLiveProbe({
+  settingsPanel: true, pathname: "/avatar-overlay-composition-surface.html",
+});
+assert.equal(petCompositionProbe.excludedPetSurface, true);
+assert.equal(petCompositionProbe.codex, false,
+  "Pet composition surfaces must stay outside the Dream Skin target set.");
+const cleanupEvaluations = [];
+assert.equal(await cleanupExcludedSurface({
+  async evaluate(expression) { cleanupEvaluations.push(expression); return true; },
+}), true, "Excluded Pet cleanup must remove and verify stale renderer state.");
+assert.equal(cleanupEvaluations.length, 2);
+assert.match(cleanupEvaluations[0], /__CODEX_DREAM_SKIN_DISABLED__/);
+assert.match(cleanupEvaluations[1], /hasAttributes/);
+assert.ok((source.match(/probe\?\.excludedPetSurface && !await cleanupExcludedSurface/g) || []).length >= 2,
+  "One-shot and watcher discovery must both clean excluded Pet targets.");
 assert.match(identityProbeSource, /selectorLiteral\("settings-panel"\)/,
   "The live probe must retain the current Settings structural marker.");
 assert.match(identityProbeSource, /return Boolean\(main && input && branded\)/,

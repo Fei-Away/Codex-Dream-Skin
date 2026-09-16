@@ -13,8 +13,8 @@ ensure_user_scheme_handler() {
   command -v xdg-mime >/dev/null 2>&1 || return 0
   local current=""
   current="$(xdg-mime query default x-scheme-handler/dreamskin 2>/dev/null || true)"
-  [ "$current" = "codex-dream-skin.desktop" ] && return 0
-  xdg-mime default codex-dream-skin.desktop x-scheme-handler/dreamskin >/dev/null 2>&1 || true
+  [ "$current" = "codex-dream-skin-url.desktop" ] && return 0
+  xdg-mime default codex-dream-skin-url.desktop x-scheme-handler/dreamskin >/dev/null 2>&1 || true
 }
 
 resolve_command() {
@@ -174,7 +174,7 @@ main() {
   if [ "$#" -gt 0 ]; then
     local key=""
     # One-click dreamskin:// links bypass resolve_command so dispatch keeps
-    # the URL as its argument (the desktop entry runs "dreamskin community %u",
+    # the URL as its argument (the URL-handler desktop entry runs "dreamskin community %u",
     # but a bare "dreamskin dreamskin://apply?..." must work too).
     case "${1:-}" in
       dreamskin://*) dispatch community "$@" || exit 1; return 0 ;;

@@ -51,7 +51,11 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
 - Windows：双击 `CodexDreamSkin-Setup-vX.Y.Z.exe`，按安装向导完成。
 - Linux：`sudo apt install ./codex-dream-skin_<version>_amd64.deb`，或解压
   `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` 后运行 `./install.sh`（不需要 root），
-  然后终端运行 `dreamskin`。
+  然后从桌面应用菜单打开 Dream Skin，或终端运行 `dreamskin`。
+
+Linux 支持为本分支新增。正式 Release 尚未包含 Linux 资产时，请使用 Linux CI 构建产物，
+或运行 `bash linux/scripts/build-release-linux.sh` 构建。Linux 桌面入口打开终端交互菜单，
+目前不是常驻图形托盘应用。
 
 不需要 clone 源码或手动运行仓库脚本。macOS / Windows 的首次未签名放行、更新和卸载步骤见
 [macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md)；

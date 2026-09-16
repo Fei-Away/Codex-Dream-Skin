@@ -94,12 +94,14 @@ function makeDomFixture({
   hidden = false,
   viewportWidth = 1280,
   viewportHeight = 800,
+  scrollWidth = viewportWidth,
+  scrollHeight = viewportHeight,
 } = {}) {
   const styleNode = {};
   const documentElement = {
-    scrollWidth: viewportWidth,
+    scrollWidth,
     clientWidth: viewportWidth,
-    scrollHeight: viewportHeight,
+    scrollHeight,
     clientHeight: viewportHeight,
     getAttribute: (name) => name === "data-dream-skin" ? "active" : null,
   };
@@ -455,6 +457,27 @@ test("hidden documents and unreasonable viewports cannot pass", async () => {
   });
   assert.equal(tiny.result.pass, false);
   assert.equal(tiny.result.readiness.viewportPass, false);
+});
+
+test("horizontal document overflow cannot be reported as a verified skin", async () => {
+  const boundary = await verify({
+    dom: makeDomFixture({ scrollWidth: 1280 }),
+  });
+  assert.equal(boundary.result.documentOverflow.x, false);
+  assert.equal(boundary.result.pass, true, "Equal document and viewport widths are not overflow.");
+
+  const horizontal = await verify({
+    dom: makeDomFixture({ scrollWidth: 1281 }),
+  });
+  assert.equal(horizontal.result.documentOverflow.x, true);
+  assert.equal(horizontal.result.pass, false);
+
+  const verticalOnly = await verify({
+    dom: makeDomFixture({ scrollHeight: 1600 }),
+  });
+  assert.equal(verticalOnly.result.documentOverflow.y, true);
+  assert.equal(verticalOnly.result.documentOverflow.x, false);
+  assert.equal(verticalOnly.result.pass, true, "Vertical scrolling is expected for long conversations.");
 });
 
 test("zero-size and CSS-hidden shell anchors cannot satisfy L1", async () => {

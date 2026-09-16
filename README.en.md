@@ -51,7 +51,11 @@ then download from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Ski
 - Windows: run `CodexDreamSkin-Setup-vX.Y.Z.exe` and follow the wizard.
 - Linux: run `sudo apt install ./codex-dream-skin_<version>_amd64.deb`, or extract
   `CodexDreamSkin-vX.Y.Z-linux-amd64.tar.gz` and run `./install.sh` (no root
-  needed), then run `dreamskin` in a terminal.
+  needed), then open Dream Skin from the applications menu or run `dreamskin`.
+
+Linux support is new in this branch. Until a release includes Linux assets,
+use the Linux CI artifact or build with `bash linux/scripts/build-release-linux.sh`.
+The Linux desktop launcher opens a terminal menu; it is not a graphical tray app.
 
 No source checkout is required. See the [macOS guide](./docs/install-macos.md)
 or [Windows guide](./docs/install-windows.md) for unsigned first-run approval,

@@ -3,23 +3,18 @@
 本页面向只想使用主题的普通用户。Release 安装包只包含换肤引擎，不修改官方 Codex 的安装
 目录或签名；不需要 clone 仓库，也不需要手动运行仓库脚本。
 
+Linux 包为新增构建目标；正式 Release 尚未发布 Linux 资产时，请使用该分支 Linux CI 的
+构建产物，或由开发者运行 `bash linux/scripts/build-release-linux.sh` 生成安装包。
+
 ## 前置：官方 Codex 桌面应用
 
 Dream Skin 在 Linux 上直接启动官方 Codex / ChatGPT 桌面应用并通过本机回环 CDP 注入主题。
 请先安装官方应用，至少启动一次并退出，让它生成 `~/.codex/config.toml` 与登录信息。
 
-首选官方 apt 源安装（Dream Skin 会在每次启动换肤前校验包的仓库来源与完整性）：
+请沿用 Codex 桌面应用提供的安装说明；Dream Skin 安装包不包含 Codex，也不会新增或修改
+系统的软件源。对于 apt 安装，Dream Skin 会在每次启动换肤前校验包的仓库来源与完整性。
 
-```bash
-curl -fsSL https://platform.openai.com/codex/gpg.key \
-  | sudo gpg --dearmor -o /usr/share/keyrings/openai-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/openai-archive-keyring.gpg] https://platform.openai.com/codex/debian stable main" \
-  | sudo tee /etc/apt/sources.list.d/openai.list
-sudo apt update
-sudo apt install codex-desktop
-```
-
-也可以用官方 AppImage：从官方下载页下载后 `chmod +x` 加上执行权限，放到 `~/Applications/`
+如果已有可信来源的 AppImage，`chmod +x` 加上执行权限后放到 `~/Applications/`
 （或设置环境变量 `CODEX_APP_IMAGE` 指向该文件）。AppImage 的额外要求见下方
 「AppImage 与二进制安装」。
 
@@ -33,14 +28,17 @@ sudo apt install codex-desktop
    `sudo apt install ./codex-dream-skin_<version>_amd64.deb`。
    备选：`sudo dpkg -i codex-dream-skin_<version>_amd64.deb`，若提示依赖缺失再运行
    `sudo apt install -f` 补齐。依赖（`bash`、`coreutils`、`curl`、`file`、`iproute2`、
-   `libnotify-bin`、`nodejs`（>= 18）、`procps`、`unzip`、`xdg-utils`）会由包管理器自动安装。
-3. 在终端运行 `dreamskin`，出现交互菜单。
+   `libnotify-bin`、`nodejs`（>= 22）、`procps`、`unzip`、`xdg-utils`）会由包管理器解析。
+   若发行版软件源不提供 Node.js 22 或更新版本，需先按 Node.js 官方安装说明安装受支持版本。
+3. 从桌面应用菜单打开 Dream Skin，或在终端运行 `dreamskin`，出现交互菜单。
 
 包会安装到 `/opt/codex-dream-skin`，并提供 `/usr/bin/dreamskin` 命令。首次以桌面用户运行
 `dreamskin` 时会注册 `x-scheme-handler/dreamskin` 协议（网站一键换肤用）；deb 维护脚本
 不会以 root 身份改写用户的 MIME 默认项。`ffmpeg` 是可选推荐依赖
 （Recommends）：只有更换背景图时源图不是 JPEG 才需要它做转换，JPEG 直通不受影响；
 缺少它时换背景图会明确报错，`sudo apt install ffmpeg` 即可补齐。
+网站一键换肤还需要 `zenity` 显示本地确认对话框（同样列为推荐依赖）；缺少图形确认程序
+且没有交互终端时会取消应用，不会静默切换主题。
 
 deb 安装时不预置主题库。第一次启动 `dreamskin` 时会自动播种内置预设主题并预选
 Gothic Void Crusade，无需手动准备；想要其他主题时再手动导入（菜单 4）。之后日常用
@@ -65,9 +63,10 @@ Gothic Void Crusade，无需手动准备；想要其他主题时再手动导入�
    `export PATH="$HOME/.local/bin:$PATH"` 加入 `~/.profile`、`~/.bashrc` 或 `~/.zshrc`
    （或重新登录一次）。
 
-tar.gz 用户需要自装依赖：`nodejs`（>= 18）与 `curl`（启动探测与检查更新需要）；`unzip`
+tar.gz 用户需要自装依赖：`nodejs`（>= 22）与 `curl`（启动探测与检查更新需要）；`unzip`
 （导入主题 ZIP 需要）；`libnotify-bin`（网站一键换肤的结果桌面通知需要）；`rsync`
 （安装脚本用）一般已随系统预装。
+从浏览器一键换肤还需要 `zenity`，用于确认具体主题后才应用。
 
 ## 日常使用
 
@@ -106,8 +105,8 @@ tar.gz 用户需要自装依赖：`nodejs`（>= 18）与 `curl`（启动探测�
 
 主题、图片和运行状态保存在 `~/.local/state/codex-dream-skin`；更新或重装引擎不会删除它们。
 
-应用菜单里的“Dream Skin”入口是 `dreamskin://` 一键换肤协议处理器；日常打开菜单请直接
-在终端运行 `dreamskin`。
+应用菜单里的“Dream Skin”入口会打开终端交互菜单；网站的一键换肤使用单独隐藏的
+`dreamskin://` 协议处理器。当前 Linux 版未提供常驻图形托盘或原生文件选择器。
 
 ### 主题导入与手动目录
 
@@ -127,10 +126,12 @@ SHA-256。`theme.css` 会在本机导入和应用时复验，通过后只作用�
 
 ### 从网站一键换肤
 
+网站主题包必须在 manifest 的 `platforms` 中明确声明 `linux`，否则客户端会拒绝导入。
+仅有 macOS/Windows 声明的现有包不能自动视为 Linux 兼容，需由主题发布方重新导出。
 安装客户端后，DreamSkin.cc 上已通过审核并支持一键换肤的主题会显示“一键应用到客户端”。
 点击后，Linux 会把 `dreamskin://apply?version=...` 请求通过 `x-scheme-handler/dreamskin`
-交给 Dream Skin（deb 在用户首次运行 `dreamskin` 时注册；tar.gz 由 `install.sh` 注册）。浏览器确认后不会弹出
-终端：换肤在后台完成，结果以桌面通知呈现（成功显示主题名；失败提示并给出日志路径
+交给 Dream Skin（deb 在用户首次运行 `dreamskin` 时注册；tar.gz 由 `install.sh` 注册）。浏览器确认后会显示
+本地主题确认对话框；同意后换肤在后台完成，结果以桌面通知呈现（成功显示主题名；失败提示并给出日志路径
 `~/.local/state/codex-dream-skin/community-apply.log`）。在终端里跑 `dreamskin community
 <链接>` 则照常在终端里显示过程输出。
 
@@ -172,11 +173,13 @@ Dream Skin 优先使用官方 apt 源安装的 Codex：启动前会校验包的�
 2. 运行 `dreamskin restore`（菜单 7），恢复 Codex 官方外观并以普通方式重启 Codex。
 3. deb：`sudo dpkg -r codex-dream-skin` 卸载；`sudo dpkg -P codex-dream-skin`（purge）
    会一并删除 `/opt/codex-dream-skin`。
-4. tar.gz：先运行
-   `xdg-mime uninstall ~/.local/share/applications/codex-dream-skin.desktop`
-   清理 `x-scheme-handler/dreamskin` 协议关联（若存在），再删除
-   `~/.local/share/codex-dream-skin`（引擎）、`~/.local/bin/dreamskin` 以及
-   `~/.local/share/applications/codex-dream-skin.desktop`。
+4. tar.gz：删除 `~/.local/share/codex-dream-skin`（引擎）、`~/.local/bin/dreamskin`、
+   `~/.local/share/applications/codex-dream-skin.desktop` 和
+   `~/.local/share/applications/codex-dream-skin-url.desktop`。
+   如安装了 `update-desktop-database`，运行
+   `update-desktop-database ~/.local/share/applications` 更新桌面注册缓存。
+   若用户的 `mimeapps.list` 仍将 `x-scheme-handler/dreamskin` 指向已删除的处理器，
+   仅移除该协议对应的 Dream Skin 条目，保留其他默认程序设置。
 5. `~/.local/state/codex-dream-skin` 中的主题、图片与状态默认保留，方便重装；确认不再
    需要时手动删除该目录。
 
@@ -184,9 +187,9 @@ Dream Skin 优先使用官方 apt 源安装的 Codex：启动前会校验包的�
 
 ### 白屏 / 卡在 logo
 
-通常是官方 Codex 应用的本地配置或缓存损坏：先退出 Codex，备份并清空 `~/.config/Codex/`
-（社区反馈的缓存目录，不存在可跳过）；仍不行时备份并重置 `~/.codex`（注意其中含登录
-凭据 `auth.json`，重置后需要重新登录），然后重新运行 `dreamskin`。
+先运行 `dreamskin pause`，退出 Codex 后从其原始桌面入口重新打开，判断是否仅在换肤
+时发生。保留 `dreamskin doctor` 的诊断结果并检查日志；报告问题前移除私密路径和会话
+信息。不要为排查换肤问题直接清空 Codex 的配置、登录凭据或会话目录。
 
 ### Wayland 下界面模糊
 
@@ -213,9 +216,10 @@ Wayland 会话下工具会自动附加 `--enable-wayland-ime`。如果候选框�
 
 ### 提示找不到 Node.js
 
-deb 会通过依赖自动安装 `nodejs`（>= 18）。tar.gz 用户请自行安装
-（`sudo apt install nodejs`；发行版默认源版本低于 18 时按 NodeSource 官方文档升级），
-并确认已安装 `curl`。
+需要 `nodejs` >= 22，并启用内建 `WebSocket`。Node.js 18/20 即使能通过部分离线测试，
+也不能直接运行这里的 CDP 连接代码。deb 声明相同的版本依赖；若发行版默认源版本过低，
+请按 [Node.js 官方说明](https://nodejs.org/en/download) 安装受支持版本。
+tar.gz 用户也请确认已安装 `curl`。
 
 ### Codex 更新后主题失效
 

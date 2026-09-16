@@ -6,6 +6,7 @@
 
 set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-linux.sh"
+. "$SCRIPT_DIR/confirm-community-linux.sh"
 
 URL="${1:-}"
 case "$URL" in
@@ -50,6 +51,12 @@ read_package_field() {
     process.stdout.write(String(JSON.parse(fs.readFileSync(process.argv[1], "utf8"))[process.argv[2]] || ""));
   ' "$TRANSACTION_ROOT/community-package.json" "$1"
 }
+
+if ! confirm_community_theme "$(read_package_field name)" "$(read_package_field version)"; then
+  notify_outcome "已取消，未应用主题。"
+  NOTIFICATION_MODE="false"
+  exit 0
+fi
 
 # Read one JSON field from stdin, accumulating chunks before parsing so a
 # multi-chunk write cannot yield an empty value.

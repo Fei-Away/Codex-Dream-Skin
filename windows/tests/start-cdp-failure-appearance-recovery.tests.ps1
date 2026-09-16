@@ -25,6 +25,7 @@ $script:lockExited = $false
 $script:installCalls = 0
 $script:pendingAppearance = $false
 $script:pendingResolveCalls = 0
+$script:debugArguments = @()
 
 function Enter-DreamSkinOperationLock { param([int]$TimeoutMilliseconds); return 'mock-lock' }
 function Exit-DreamSkinOperationLock {
@@ -52,7 +53,10 @@ function Get-DreamSkinThemePaths {
     PauseFile = (Join-Path $StateRoot 'paused')
   }
 }
-function Ensure-DreamSkinManagedDirectory { param([string]$Path, [string]$Root) }
+function Ensure-DreamSkinManagedDirectory {
+  param([string]$Path, [string]$Root)
+  New-Item -ItemType Directory -Force -Path $Path | Out-Null
+}
 function Initialize-DreamSkinThemeStore {
   param([string]$SkillRoot, [string]$StateRoot)
   return Get-DreamSkinThemePaths -StateRoot $StateRoot
@@ -87,6 +91,7 @@ function Install-DreamSkinBaseTheme {
 }
 function Start-DreamSkinCodexForDebugging {
   param([object]$Codex, [string[]]$Arguments, [int]$Port, [int[]]$PreserveProcessIds)
+  $script:debugArguments = @($Arguments)
   if ($script:forcedCategory) {
     throw (New-DreamSkinStartException -Category $script:forcedCategory `
       -Message 'forced categorized CDP launch failure' -InnerException $null)
@@ -119,9 +124,16 @@ $failure = $null
 try {
   $startBlock = [scriptblock]::Create($source)
   try { & $startBlock -Port 9335 } catch { $failure = $_ }
+  # Chromium 136+ only honors --remote-debugging-port next to a non-default
+  # data directory, so the managed profile must be passed exactly once and
+  # must already exist when the launcher runs (#235).
+  $expectedProfile = [System.IO.Path]::GetFullPath((Join-Path $childStateRoot 'cdp-profile'))
+  $profileArguments = @($script:debugArguments | Where-Object { $_ -like '--user-data-dir=*' })
   if ($null -eq $failure -or $failure.Exception.Message -cne 'forced CDP launch failure' -or
     $script:installCalls -ne 1 -or ($script:events -join ',') -cne 'stop,restore,start' -or
-    -not $script:lockExited) {
+    -not $script:lockExited -or $profileArguments.Count -ne 1 -or
+    $profileArguments[0] -cne "--user-data-dir=$expectedProfile" -or
+    -not (Test-Path -LiteralPath $expectedProfile -PathType Container)) {
     throw 'A failed CDP launch did not close Codex, restore appearance, then reopen normally.'
   }
 
@@ -171,6 +183,7 @@ try {
   }
 } finally {
   Remove-Variable -Name forcedCategory -Scope Script -ErrorAction SilentlyContinue
+  Remove-Variable -Name debugArguments -Scope Script -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $fixtureStateRoot -Recurse -Force -ErrorAction SilentlyContinue
   $env:LOCALAPPDATA = $originalLocalAppData
 }

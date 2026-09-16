@@ -2,9 +2,9 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 NODE="${NODE:-$(command -v node)}"
-[ -x "$NODE" ] || { printf 'node was not found. Install nodejs (>= 18) first.\n' >&2; exit 1; }
+[ -x "$NODE" ] || { printf 'node was not found. Install nodejs (>= 22) first.\n' >&2; exit 1; }
 NODE_MAJOR="$("$NODE" -p 'process.versions.node.split(".")[0]' || printf 0)"
-[ "$NODE_MAJOR" -ge 18 ] || { printf 'node >= 18 is required (deb Depends: nodejs >= 18), found: %s\n' "$("$NODE" --version)" >&2; exit 1; }
+[ "$NODE_MAJOR" -ge 22 ] || { printf 'node >= 22 is required (deb Depends: nodejs >= 22), found: %s\n' "$("$NODE" --version)" >&2; exit 1; }
 
 while IFS= read -r file; do /bin/bash -n "$file"; done < <(
   find "$ROOT" -type f -name '*.sh' ! -path '*/release/*' -print

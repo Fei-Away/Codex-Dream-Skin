@@ -26,11 +26,37 @@ for required in \
   'opt/codex-dream-skin/assets/safe-css-validator.mjs' \
   'opt/codex-dream-skin/assets/safe-css-policy.json' \
   'usr/bin/dreamskin' \
-  'usr/share/applications/codex-dream-skin.desktop'; do
+  'usr/share/applications/codex-dream-skin.desktop' \
+  'usr/share/applications/codex-dream-skin-url.desktop'; do
   case "$CONTENTS" in
     *"./$required"*) ;;
     *) printf 'missing from deb: %s\n' "$required" >&2; exit 1 ;;
   esac
+done
+
+APP_DESKTOP="$(dpkg-deb --fsys-tarfile "$DEB" | tar -xO ./usr/share/applications/codex-dream-skin.desktop)"
+case "$APP_DESKTOP" in
+  *$'Exec=dreamskin\n'*) ;;
+  *) printf 'app desktop entry must launch the interactive dreamskin menu\n' >&2; exit 1 ;;
+esac
+case "$APP_DESKTOP" in
+  *$'Terminal=true\n'*) ;;
+  *) printf 'app desktop entry must open a terminal for the menu\n' >&2; exit 1 ;;
+esac
+case "$APP_DESKTOP" in
+  *'MimeType=x-scheme-handler/dreamskin;'*)
+    printf 'app desktop entry must not own the Dream Skin URL scheme\n' >&2
+    exit 1
+    ;;
+esac
+URL_DESKTOP="$(dpkg-deb --fsys-tarfile "$DEB" | tar -xO ./usr/share/applications/codex-dream-skin-url.desktop)"
+for required_line in \
+  'Exec=dreamskin community %u' \
+  'Terminal=false' \
+  'NoDisplay=true' \
+  'MimeType=x-scheme-handler/dreamskin;'; do
+  printf '%s\n' "$URL_DESKTOP" | grep -Fqx "$required_line" \
+    || { printf 'URL desktop entry is missing: %s\n' "$required_line" >&2; exit 1; }
 done
 
 # Type check: usr/bin/dreamskin must be a symlink to the real launcher. The
@@ -52,13 +78,14 @@ case "$CONTENTS" in
 esac
 
 INFO="$(dpkg-deb -f "$DEB" Package Depends Architecture)"
+RECOMMENDS="$(dpkg-deb -f "$DEB" Recommends)"
 case "$INFO" in
   *"codex-dream-skin"*) ;;
   *) printf 'bad package name\n' >&2; exit 1 ;;
 esac
 case "$INFO" in
-  *"nodejs (>= 18.0)"*) ;;
-  *) printf 'nodejs >= 18.0 dependency missing\n' >&2; exit 1 ;;
+  *"nodejs (>= 22.0)"*) ;;
+  *) printf 'nodejs >= 22.0 dependency missing\n' >&2; exit 1 ;;
 esac
 case "$INFO" in
   *"file"*) ;;
@@ -67,5 +94,9 @@ esac
 case "$INFO" in
   *"procps"*) ;;
   *) printf 'procps runtime dependency missing\n' >&2; exit 1 ;;
+esac
+case "$RECOMMENDS" in
+  *"ffmpeg"*"zenity"*) ;;
+  *) printf 'ffmpeg and zenity recommended dependencies missing\n' >&2; exit 1 ;;
 esac
 printf 'deb content tests passed\n'

@@ -74,7 +74,7 @@ RESPONSE_BYTES="$(/usr/bin/stat -c '%s' "$RESPONSE")"
 [ "$RESPONSE_BYTES" -gt 0 ] && [ "$RESPONSE_BYTES" -le 1048576 ] \
   || fail "GitHub returned an invalid response size."
 [ -n "${NODE:-}" ] && [ -x "$NODE" ] || NODE="$(command -v node 2>/dev/null || true)"
-[ -n "$NODE" ] && [ -x "$NODE" ] || fail "Node.js was not found. Install nodejs (>= 18) first."
+[ -n "$NODE" ] && [ -x "$NODE" ] || fail "Node.js was not found. Install nodejs (>= 22) first."
 LATEST_TAG="$("$NODE" -e '
 const fs = require("node:fs");
 let tag = "";

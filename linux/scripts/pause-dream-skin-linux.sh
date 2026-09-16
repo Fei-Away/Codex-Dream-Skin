@@ -106,7 +106,7 @@ ensure_state_root
 write_operation_state pausing "$(dreamskin_text pausing_skin)" "$OPERATION_TOKEN" \
   || fail "Could not publish the pause operation state."
 discover_codex_app
-# Linux uses the system Node (>= 18); there is no bundled signed runtime.
+# Linux uses the system Node (>= 22); there is no bundled signed runtime.
 ensure_node_runtime
 
 if [ "$PORT_EXPLICIT" = "false" ] && [ -f "$STATE_PATH" ]; then

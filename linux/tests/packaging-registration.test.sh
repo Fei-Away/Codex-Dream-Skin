@@ -3,6 +3,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 TMP="$(/usr/bin/mktemp -d /tmp/dreamskin-registration.XXXXXX)"
 trap '/bin/rm -rf "$TMP"' EXIT
+. "$ROOT/scripts/desktop-entry-linux.sh"
+
+# Desktop Entry Exec quoting must survive user homes with spaces, non-ASCII
+# names, and literal percent signs (which otherwise introduce field codes).
+DESKTOP_PATH='/home/用户/Dream Skin 100%/dreamskin.sh'
+[ "$(desktop_exec_arg "$DESKTOP_PATH")" = '"/home/用户/Dream Skin 100%%/dreamskin.sh"' ] \
+  || { printf 'desktop executable path was not encoded for Desktop Entry Exec syntax\n' >&2; exit 1; }
+SPECIAL_DESKTOP_PATH='/tmp/a$b`c"d\e'
+[ "$(desktop_exec_arg "$SPECIAL_DESKTOP_PATH")" = '"/tmp/a\\$b\\`c\"d\\\\e"' ] \
+  || { printf 'desktop executable path did not preserve Exec special characters\n' >&2; exit 1; }
 
 # Debian maintainer scripts run as root and must not write a desktop user's
 # MIME defaults. Registration belongs in the user-invoked launcher instead.
@@ -44,27 +54,27 @@ PATH="$TMP/bin:$PATH" /bin/bash -c '
 ' _ "$ROOT"
 
 /usr/bin/grep -Fxq 'query default x-scheme-handler/dreamskin' "$DREAMSKIN_XDG_MIME_LOG"
-/usr/bin/grep -Fxq 'default codex-dream-skin.desktop x-scheme-handler/dreamskin' "$DREAMSKIN_XDG_MIME_LOG"
+/usr/bin/grep -Fxq 'default codex-dream-skin-url.desktop x-scheme-handler/dreamskin' "$DREAMSKIN_XDG_MIME_LOG"
 /usr/bin/grep -q 'ensure_user_scheme_handler' "$ROOT/scripts/dreamskin.sh"
 
 # A caller-provided NODE must still pass the declared major-version floor.
-/usr/bin/cat > "$TMP/bin/node16" <<'FAKE'
+/usr/bin/cat > "$TMP/bin/node21" <<'FAKE'
 #!/bin/bash
-if [ "${1:-}" = "--version" ]; then printf 'v16.20.2\n'; exit 0; fi
+if [ "${1:-}" = "--version" ]; then printf 'v21.20.2\n'; exit 0; fi
 exit 0
 FAKE
-/bin/chmod 755 "$TMP/bin/node16"
-if NODE="$TMP/bin/node16" /bin/bash -c '
+/bin/chmod 755 "$TMP/bin/node21"
+if NODE="$TMP/bin/node21" /bin/bash -c '
   set -euo pipefail
   . "$1/scripts/common-linux.sh"
   ensure_node_runtime
 ' _ "$ROOT" >/dev/null 2>&1; then
-  printf 'ensure_node_runtime accepted a caller-provided Node 16 binary\n' >&2
+  printf 'ensure_node_runtime accepted a caller-provided Node 21 binary\n' >&2
   exit 1
 fi
 
 CI_WORKFLOW="$ROOT/../.github/workflows/ci.yml"
-/usr/bin/grep -Eq 'node: \[18, 20, 22\]' "$CI_WORKFLOW" \
-  || { printf 'Linux CI matrix must exercise Node 18, 20, and 22\n' >&2; exit 1; }
+/usr/bin/grep -Eq 'node: \[22, 24\]' "$CI_WORKFLOW" \
+  || { printf 'Linux CI matrix must exercise Node 22 and 24\n' >&2; exit 1; }
 
 printf 'packaging registration tests passed\n'

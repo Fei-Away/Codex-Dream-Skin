@@ -1140,8 +1140,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
   @objc private func checkForUpdates() {
     guard !operationInFlight, !updateCheckInFlight else { return }
-    guard let script = installedScript(named: "check-update-macos.sh")
-      ?? bundledScript(named: "check-update-macos.sh") else {
+    // Bundled first, unlike every other script. check-update reads its own
+    // $ROOT/VERSION to report "the version you are running", and the deployed
+    // engine's VERSION is not that: the engine is installed asynchronously
+    // after launch and the install refuses outright while Codex is open
+    // ("Close Codex before installation so config.toml cannot be rewritten").
+    // Whenever that refusal sticks, the app is already the new version while
+    // the engine is still the old one, so the installed script reports the old
+    // number as current and the client announces an update to the very version
+    // it is running. The app bundle is the only source that cannot be stale.
+    guard let script = bundledScript(named: "check-update-macos.sh")
+      ?? installedScript(named: "check-update-macos.sh") else {
       showError(title: copy.text(.updateMissingTitle), message: copy.text(.updateMissingMessage))
       return
     }
@@ -1191,8 +1200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   /// version is seen so a user who dismisses it isn't renotified every day.
   private func performBackgroundUpdateCheck() {
     guard !operationInFlight, !updateCheckInFlight,
-          let script = installedScript(named: "check-update-macos.sh")
-            ?? bundledScript(named: "check-update-macos.sh") else { return }
+          // Bundled first for the same reason as the manual check above: a
+          // stale deployed engine must not make the app notify about itself.
+          let script = bundledScript(named: "check-update-macos.sh")
+            ?? installedScript(named: "check-update-macos.sh") else { return }
     updateCheckInFlight = true
     ScriptRunner.run(script: script, arguments: ["--json"]) { [weak self] result in
       guard let self else { return }

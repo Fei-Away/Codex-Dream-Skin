@@ -3,6 +3,7 @@ param(
   [string]$OutputDirectory,
   [string]$IsccPath,
   [string]$NodeArchivePath,
+  [int]$DownloadTimeoutSeconds = 120,
   [string]$WorkingDirectory,
   [switch]$KeepWorkingDirectory
 )
@@ -332,7 +333,7 @@ try {
     try {
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
       Write-Host "Downloading pinned Node.js v$($manifest.version) runtime..."
-      Invoke-WebRequest -UseBasicParsing -Uri "$($manifest.url)" -OutFile $archivePath
+      Invoke-WebRequest -UseBasicParsing -Uri "$($manifest.url)" -OutFile $archivePath -TimeoutSec $DownloadTimeoutSeconds
     } finally {
       [Net.ServicePointManager]::SecurityProtocol = $previousProtocol
     }

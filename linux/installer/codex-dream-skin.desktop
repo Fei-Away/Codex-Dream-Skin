@@ -2,7 +2,6 @@
 Type=Application
 Name=Dream Skin
 Comment=External themes for Codex desktop
-Exec=dreamskin community %u
-Terminal=false
+Exec=dreamskin
+Terminal=true
 Categories=Utility;Development;
-MimeType=x-scheme-handler/dreamskin;

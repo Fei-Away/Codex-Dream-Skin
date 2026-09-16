@@ -21,6 +21,7 @@ runtime/*
 
 # local agent context
 TASK_PROGRESS.md
+.local-evidence/
 修复记录*.md
 docs/architecture-cdp-and-cross-platform-grok45.md
 docs/unified-skin-runtime-plan.md

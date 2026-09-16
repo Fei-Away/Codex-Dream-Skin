@@ -2,6 +2,7 @@
 
 set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd -P)/common-linux.sh"
+. "$(cd "$(dirname "$0")" && pwd -P)/desktop-entry-linux.sh"
 
 PORT=9341
 CREATE_LAUNCHERS="true"
@@ -119,18 +120,28 @@ if [ "$CREATE_LAUNCHERS" = "true" ]; then
   else
     /bin/ln -sf "$SCRIPT_DIR/dreamskin.sh" "$HOME/.local/bin/dreamskin"
   fi
+  DESKTOP_EXEC="$(desktop_exec_arg "$SCRIPT_DIR/dreamskin.sh")"
   /usr/bin/printf '%s\n' \
     '[Desktop Entry]' \
     'Type=Application' \
     'Name=Dream Skin' \
     'Comment=External themes for Codex desktop' \
-    "Exec=$SCRIPT_DIR/dreamskin.sh community %u" \
-    'Terminal=false' \
+    "Exec=$DESKTOP_EXEC" \
+    'Terminal=true' \
     'Categories=Utility;Development;' \
-    'MimeType=x-scheme-handler/dreamskin;' \
     > "$HOME/.local/share/applications/codex-dream-skin.desktop"
+  /usr/bin/printf '%s\n' \
+    '[Desktop Entry]' \
+    'Type=Application' \
+    'Name=Dream Skin URL Handler' \
+    'Comment=Apply Dream Skin themes from DreamSkin.cc' \
+    'NoDisplay=true' \
+    "Exec=$DESKTOP_EXEC community %u" \
+    'Terminal=false' \
+    'MimeType=x-scheme-handler/dreamskin;' \
+    > "$HOME/.local/share/applications/codex-dream-skin-url.desktop"
   if command -v xdg-mime >/dev/null 2>&1; then
-    xdg-mime default codex-dream-skin.desktop x-scheme-handler/dreamskin >/dev/null 2>&1 || true
+    xdg-mime default codex-dream-skin-url.desktop x-scheme-handler/dreamskin >/dev/null 2>&1 || true
   fi
   command -v update-desktop-database >/dev/null 2>&1 \
     && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true

@@ -1,10 +1,10 @@
 Package: codex-dream-skin
-Version: 1.5.14
+Version: 1.5.18
 Section: utils
 Priority: optional
 Architecture: amd64
-Depends: bash, coreutils, curl, file, iproute2, libnotify-bin, nodejs (>= 18.0), procps, unzip, xdg-utils
-Recommends: ffmpeg
+Depends: bash, coreutils, curl, file, iproute2, libnotify-bin, nodejs (>= 22.0), procps, unzip, xdg-utils
+Recommends: ffmpeg, zenity
 Maintainer: Codex Dream Skin <noreply@dreamskin.cc>
 Description: External themes for the official Codex desktop app
  Dream Skin applies local CSS themes to the official Codex desktop app

@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 NODE="${NODE:-$(command -v node)}"
-[ -x "$NODE" ] || { printf 'node was not found. Install nodejs (>= 18) first.\n' >&2; exit 1; }
+[ -x "$NODE" ] || { printf 'node was not found. Install nodejs (>= 22) first.\n' >&2; exit 1; }
 TMP="$(/usr/bin/mktemp -d /tmp/dreamskin-import-identity.XXXXXX)"
 trap '/bin/rm -rf "$TMP"' EXIT
 

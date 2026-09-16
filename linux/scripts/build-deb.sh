@@ -39,7 +39,9 @@ trap '/bin/rm -rf "$STAGE"' EXIT
 /usr/bin/cp "$ROOT/installer/postinst" "$ROOT/installer/prerm" "$ROOT/installer/postrm" \
   "$STAGE/DEBIAN/"
 /bin/chmod 755 "$STAGE/DEBIAN/postinst" "$STAGE/DEBIAN/prerm" "$STAGE/DEBIAN/postrm"
-/usr/bin/cp "$ROOT/installer/codex-dream-skin.desktop" "$STAGE/usr/share/applications/"
+/usr/bin/cp "$ROOT/installer/codex-dream-skin.desktop" \
+  "$ROOT/installer/codex-dream-skin-url.desktop" \
+  "$STAGE/usr/share/applications/"
 
 /usr/bin/find "$STAGE/opt" -type f -exec /bin/chmod 644 {} \;
 /usr/bin/find "$STAGE/opt" -type f -name '*.sh' -exec /bin/chmod 755 {} \;

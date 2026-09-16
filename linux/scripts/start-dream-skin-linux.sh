@@ -66,7 +66,7 @@ if [ "$FOREGROUND_INJECTOR" != "true" ]; then
     || fail "Could not publish the apply operation state."
 fi
 discover_codex_app
-# Linux has no bundled signed Node inside the app; the system Node (>= 18)
+# Linux has no bundled signed Node inside the app; the system Node (>= 22)
 # resolved here is the runtime used for the injector and state helpers.
 ensure_node_runtime
 

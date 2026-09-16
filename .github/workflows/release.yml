@@ -110,6 +110,10 @@ jobs:
             fi
           fi
 
+          release_state=""
+          if release_json="$(gh release view "$tag" --json isDraft 2>/dev/null)"; then
+            release_state="$(jq -r '.isDraft | if . then "draft" else "published" end' <<<"$release_json")"
+          fi
           tag_sha="$(git ls-remote origin "refs/tags/$tag" | awk 'NR == 1 { print $1 }')"
           if [[ -n "$tag_sha" ]]; then
             tag_commit="$(git rev-parse "$tag_sha^{commit}" 2>/dev/null || true)"
@@ -117,6 +121,13 @@ jobs:
               echo "Existing $tag is not a commit-backed tag." >&2
               exit 1
             }
+            if [[ "$release_state" == "published" &&
+                  ( "$EVENT_NAME" == "workflow_dispatch" || "$version_unchanged" == "true" ) ]]; then
+              # v1.5.18 predates Linux packaging and is already public. A
+              # normal unchanged push is a no-op; do not require files that
+              # did not exist in that historical tag.
+              echo "Public $tag predates the current release payload; skipping legacy tag parity checks."
+            else
             tagged_macos="$(git show "$tag_commit:macos/VERSION" | tr -d '[:space:]')"
             tagged_windows="$(git show "$tag_commit:windows/VERSION" | tr -d '[:space:]')"
             tagged_linux="$(git show "$tag_commit:linux/VERSION" | tr -d '[:space:]')"
@@ -134,10 +145,7 @@ jobs:
               echo "Existing $tag does not contain a consistent $version payload." >&2
               exit 1
             }
-          fi
-          release_state=""
-          if release_json="$(gh release view "$tag" --json isDraft 2>/dev/null)"; then
-            release_state="$(jq -r '.isDraft | if . then "draft" else "published" end' <<<"$release_json")"
+            fi
           fi
           if [[ "$release_state" == "published" ]]; then
             if [[ "$EVENT_NAME" == "workflow_dispatch" || "$version_unchanged" == "true" ]]; then
@@ -367,6 +375,7 @@ jobs:
     needs: [guard, create-tag]
     if: needs.guard.outputs.should_release == 'true'
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -393,22 +402,31 @@ jobs:
           if (-not $resolved) { throw 'Inno Setup 6 (ISCC.exe) is not available on the runner.' }
           "ISCC_PATH=$resolved" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Run Windows PowerShell 5.1 regressions
+        shell: pwsh
+        run: |
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\tests\run-tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 regressions failed with exit code $LASTEXITCODE." }
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\tests\installer-static.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 installer checks failed with exit code $LASTEXITCODE." }
+
+      - name: Run PowerShell 7 regressions
+        shell: pwsh
+        run: |
+          & pwsh.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\tests\run-tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell 7 regressions failed with exit code $LASTEXITCODE." }
+          & pwsh.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
+            -File .\windows\tests\installer-static.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell 7 installer checks failed with exit code $LASTEXITCODE." }
+
       - name: Build Setup.exe with pinned Node runtime
         shell: pwsh
         env:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
-          # Users run the shipped scripts under whichever shell their machine
-          # has, so both hosts must pass before the artifact is built.  Only
-          # Windows PowerShell 5.1 was exercised here previously.
-          foreach ($shell in @('powershell.exe', 'pwsh.exe')) {
-            & $shell -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
-              -File .\windows\tests\run-tests.ps1
-            if ($LASTEXITCODE -ne 0) { throw "Windows regressions failed under $shell with exit code $LASTEXITCODE." }
-            & $shell -NoLogo -NoProfile -ExecutionPolicy RemoteSigned `
-              -File .\windows\tests\installer-static.tests.ps1
-            if ($LASTEXITCODE -ne 0) { throw "Installer static checks failed under $shell with exit code $LASTEXITCODE." }
-          }
           $output = Join-Path $env:RUNNER_TEMP 'codex-dream-skin-release'
           New-Item -ItemType Directory -Path $output -Force | Out-Null
           & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned `
@@ -444,7 +462,7 @@ jobs:
       - name: Set up Node.js for Linux regressions
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Build deb and tarball
         shell: bash
@@ -528,6 +546,10 @@ jobs:
 
           This release was built automatically from ${RELEASE_SHA} after the version bump reached main.
           EOF
+          if [[ -f "docs/releases/v${VERSION}.md" ]]; then
+            printf '\n' >> release-notes.md
+            cat "docs/releases/v${VERSION}.md" >> release-notes.md
+          fi
 
       - name: Stage, verify, and publish release
         env:

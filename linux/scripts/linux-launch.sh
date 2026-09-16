@@ -78,6 +78,31 @@ codex_origin_is_official() {
     | /usr/bin/grep -Eq '(^|[[:space:]])https://platform\.openai\.com/codex/|(^|[[:space:]])https://([a-z0-9.-]+\.)?oaistatic\.com/codex-app-prod/'
 }
 
+installed_codex_origin_is_official() {
+  local policy_output="${1:-}" installed_version="${2:-}"
+  [ -n "$installed_version" ] || return 1
+  local version_policy=""
+  version_policy="$(printf '%s\n' "$policy_output" | /usr/bin/awk -v wanted="$installed_version" '
+    $1 == "***" { active = ($2 == wanted); next }
+    NF == 2 && $2 ~ /^[0-9]+$/ { active = ($1 == wanted); next }
+    active { print }
+  ')"
+  codex_origin_is_official "$version_policy"
+}
+
+listeners_are_loopback() {
+  printf '%s\n' "${1:-}" | /usr/bin/awk '
+    NF { count++; if ($4 !~ /^127\.0\.0\.1:[0-9]+$/ && $4 !~ /^\[::1\]:[0-9]+$/ && $4 !~ /^::1:[0-9]+$/) bad = 1 }
+    END { exit (!count || bad) }
+  '
+}
+
+cdp_listener_is_loopback() {
+  local listeners=""
+  listeners="$(/usr/bin/ss -ltnH "sport = :$1" 2>/dev/null)" || return 1
+  listeners_are_loopback "$listeners"
+}
+
 require_linux_runtime() {
   local verification_mode="${1:-deep}"
   case "$verification_mode" in deep|quick) ;; *) fail "Unknown runtime verification mode: $verification_mode" ;; esac
@@ -172,12 +197,14 @@ discover_codex_app() {
 verify_codex_install() {
   case "${CODEX_LAUNCH_KIND:-}" in
     deb)
-      if command -v apt-cache >/dev/null 2>&1; then
-        codex_origin_is_official "$(apt-cache policy "$CODEX_PACKAGE" 2>/dev/null || true)" \
-          || fail "The installed Codex package does not come from the official OpenAI repository. Restore or reinstall the official app before continuing."
-      fi
+      local policy_output="" installed_version=""
+      [ -x /usr/bin/apt-cache ] || fail "apt-cache is required to verify the installed Codex package."
+      policy_output="$(LC_ALL=C /usr/bin/apt-cache policy "$CODEX_PACKAGE" 2>/dev/null)" || fail "Could not read Codex package origin metadata."
+      installed_version="$(/usr/bin/dpkg-query -W -f='${Version}' "$CODEX_PACKAGE" 2>/dev/null)" || fail "Could not read the installed Codex version."
+      installed_codex_origin_is_official "$policy_output" "$installed_version" \
+        || fail "The installed Codex version is not available from the official OpenAI repository. Restore or reinstall the official app before continuing."
       local integrity_output=""
-      integrity_output="$(/usr/bin/dpkg -V "$CODEX_PACKAGE" 2>/dev/null || true)"
+      integrity_output="$(/usr/bin/dpkg -V "$CODEX_PACKAGE" 2>/dev/null)" || fail "Could not verify Codex package integrity."
       if [ -n "$integrity_output" ]; then
         fail "The installed Codex package files fail the dpkg integrity check. Reinstall the official app before continuing."
       fi
@@ -246,6 +273,10 @@ electron_flags_lines() {
   session="$(session_type_of "${XDG_SESSION_TYPE:-}" "${WAYLAND_DISPLAY:-}")"
   nvidia="$(is_nvidia_present)"
   if [ -f "$ELECTRON_FLAGS_PATH" ]; then
+    if /usr/bin/grep -v -E '^\s*#|^\s*$' "$ELECTRON_FLAGS_PATH" | /usr/bin/grep -q -- '--remote-debugging'; then
+      fail "Custom Electron flags must not override the managed remote-debugging endpoint."
+      return 1
+    fi
     /usr/bin/grep -v -E '^\s*#|^\s*$' "$ELECTRON_FLAGS_PATH" || true
     printf '\n'
   fi
@@ -257,14 +288,14 @@ launch_codex_with_cdp() {
   local flags=""
   : > "$APP_LOG"
   : > "$APP_ERROR_LOG"
-  flags="$(electron_flags_lines)"
+  flags="$(electron_flags_lines)" || return 1
   # Disable pathname expansion for the flag list (word splitting only), so a
   # user flag can never be interpreted as a glob pattern.
   ( set -f
     /usr/bin/nohup "$CODEX_EXE" \
+      $flags \
       --remote-debugging-address=127.0.0.1 \
       --remote-debugging-port="$port" \
-      $flags \
       >>"$APP_LOG" 2>>"$APP_ERROR_LOG" &
   )
 }

@@ -43,7 +43,7 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.14";
+const SKIN_VERSION = "1.5.18";
 // .github/workflows/ci.yml's version-consistency check greps this file for a
 // literal `const SKIN_VERSION = "...";` line, so the export stays a separate
 // statement rather than an inline `export const`.
@@ -510,6 +510,13 @@ async function listAppTargets(port) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const initialRoute = new URLSearchParams(String(location.search || ''))
+      .get('initialRoute') || '';
+    const pathname = String(location.pathname || '');
+    const excludedPetSurface = location.protocol === 'app:' && (
+      pathname.endsWith('/avatar-overlay-composition-surface.html') ||
+      initialRoute === '/avatar-overlay' || initialRoute.startsWith('/avatar-overlay/')
+    );
     const genericCodexSurface = () => {
       if (location.protocol !== 'app:') return false;
       const main = document.querySelector('main, [role="main"]');
@@ -531,7 +538,8 @@ async function probeSession(session) {
       Boolean(document.querySelector(${stableTestidLiteral("theme-preview")}));
     return {
       markers,
-      codex: location.protocol === 'app:' &&
+      excludedPetSurface,
+      codex: !excludedPetSurface && location.protocol === 'app:' &&
         ((markers.shell && markers.sidebar) || settings || markers.main || markers.generic),
     };
   })()`);
@@ -565,7 +573,12 @@ async function connectCodexTargets(port, timeoutMs) {
           session = await connectTarget(target, port);
           const probe = await probeSession(session);
           if (probe?.codex) connected.push({ target, session, probe });
-          else session.close();
+          else {
+            if (probe?.excludedPetSurface && !await cleanupExcludedSurface(session)) {
+              throw new Error("Excluded Pet surface cleanup did not verify");
+            }
+            session.close();
+          }
         } catch (error) {
           session?.close();
           lastError = error;
@@ -1082,6 +1095,11 @@ async function verifyRemovedSession(session) {
   })()`);
 }
 
+export async function cleanupExcludedSurface(session) {
+  if (!await removeFromSession(session)) return false;
+  return verifyRemovedSession(session);
+}
+
 export async function inspectNativeWindow(session) {
   try {
     const response = await session.send(
@@ -1425,6 +1443,54 @@ async function runOneShot(options) {
   if (failed) process.exitCode = 2;
 }
 
+/**
+ * Backoff for the watcher's CDP target-discovery loop.
+ *
+ * The ceiling used to be a flat 500ms, so once Codex exited the watcher kept
+ * polling a dead endpoint about twice a second for as long as it stayed
+ * loaded, writing `fetch failed` to the error log every 2s. Users reported the
+ * machine becoming noticeably sluggish with no Codex running at all (#218).
+ *
+ * Simply stopping the watcher would be worse: a brief navigation, reload, or
+ * renderer restart also fails discovery, and the watcher is what repaints the
+ * skin afterwards — killing it is how live theme switching breaks (#200). So
+ * the fast ramp is preserved for short outages and the ceiling escalates only
+ * once the endpoint has been continuously unreachable, which is the shape of a
+ * closed Codex rather than a reloading one.
+ */
+export const DISCOVERY_BACKOFF = {
+  initialMs: 100,
+  factor: 1.6,
+  /** Ceiling while an outage still looks like a reload. */
+  ceilingMs: 500,
+  /** After this much continuous failure, treat Codex as gone. */
+  idleAfterMs: 10_000,
+  idleCeilingMs: 5_000,
+  /** And after this much, stop paying for polling almost entirely. */
+  dormantAfterMs: 60_000,
+  dormantCeilingMs: 30_000,
+};
+
+export function nextDiscoveryDelayMs(currentDelayMs, outageMs, config = DISCOVERY_BACKOFF) {
+  const ceiling = outageMs >= config.dormantAfterMs
+    ? config.dormantCeilingMs
+    : outageMs >= config.idleAfterMs
+      ? config.idleCeilingMs
+      : config.ceilingMs;
+  const base = Number.isFinite(currentDelayMs) && currentDelayMs > 0
+    ? currentDelayMs
+    : config.initialMs;
+  return Math.min(ceiling, Math.round(base * config.factor));
+}
+
+/**
+ * Log cadence follows the backoff instead of a fixed 2s, so a watcher left
+ * running overnight against a closed Codex cannot fill `injector-error.log`.
+ */
+export function discoveryLogIntervalMs(delayMs, config = DISCOVERY_BACKOFF) {
+  return Math.max(2000, Math.min(delayMs * 4, config.dormantCeilingMs * 2));
+}
+
 export function earlyPayloadFor(payload, revision) {
   return `(() => {
     const generationKey = "__CODEX_DREAM_SKIN_EARLY_GENERATION__";
@@ -1600,8 +1666,9 @@ async function runWatch(options) {
   let stopping = false;
   let reloadTimer = null;
   let reloadChain = Promise.resolve();
-  let discoveryDelayMs = 100;
+  let discoveryDelayMs = DISCOVERY_BACKOFF.initialMs;
   let lastListErrorAt = 0;
+  let discoveryOutageSince = 0;
   let operationSignalChain = Promise.resolve();
   let activeOperation = null;
   let pauseRecovery = null;
@@ -1917,14 +1984,18 @@ async function runWatch(options) {
       let targets = [];
       try {
         targets = await listAppTargets(options.port);
-        discoveryDelayMs = 100;
+        discoveryDelayMs = DISCOVERY_BACKOFF.initialMs;
+        discoveryOutageSince = 0;
       } catch (error) {
-        if (Date.now() - lastListErrorAt >= 2000) {
+        const now = Date.now();
+        if (!discoveryOutageSince) discoveryOutageSince = now;
+        const outageMs = now - discoveryOutageSince;
+        if (now - lastListErrorAt >= discoveryLogIntervalMs(discoveryDelayMs)) {
           console.error(`[dream-skin] ${new Date().toISOString()} ${error.message}`);
-          lastListErrorAt = Date.now();
+          lastListErrorAt = now;
         }
         await new Promise((resolve) => setTimeout(resolve, discoveryDelayMs));
-        discoveryDelayMs = Math.min(500, Math.round(discoveryDelayMs * 1.6));
+        discoveryDelayMs = nextDiscoveryDelayMs(discoveryDelayMs, outageMs);
         continue;
       }
 
@@ -1997,12 +2068,16 @@ async function runWatch(options) {
           const probe = await waitForCodexProbe(session);
           if (!probe?.codex) {
             await removeEarly(record);
+            if (probe?.excludedPetSurface && !await cleanupExcludedSurface(session)) {
+              throw new Error("Excluded Pet surface cleanup did not verify");
+            }
             session.close();
             sessions.delete(target.id);
-            if (!rejected.has(target.id)) {
+            if (!probe?.excludedPetSurface && !rejected.has(target.id)) {
               console.error(`[dream-skin] rejected non-ChatGPT app target ${target.id}`);
               rejected.add(target.id);
             }
+            if (probe?.excludedPetSurface) rejected.delete(target.id);
             continue;
           }
           rejected.delete(target.id);
