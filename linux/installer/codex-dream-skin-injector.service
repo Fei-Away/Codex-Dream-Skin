@@ -1,0 +1,17 @@
+[Unit]
+Description=Codex Dream Skin CDP Injector
+After=network.target
+WantedBy=default.target
+
+[Service]
+Type=simple
+Environment=HOME=%h
+Environment=DREAMSKIN_LANG=en
+ExecStart=/usr/lib/chatgpt/resources/cua_node/bin/node /usr/share/codex-dream-skin/scripts/injector.mjs --watch --port 9335 --theme-dir %h/.local/share/codex-dream-skin/theme
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

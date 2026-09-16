@@ -1,0 +1,6 @@
+codex-dream-skin (1.5.19-1ubuntu1) noble; urgency=medium
+
+  * Fix CONFIG_PATH to ~/.codex/config.toml (was ~/.config/Codex/).
+  * Add missing theme-config.mjs for theme switching on Linux.
+  * Replace GTK FileChooser with zenity in tray app for Wayland compatibility.
+  * Add "linux" to theme-package-validator allowed platforms.

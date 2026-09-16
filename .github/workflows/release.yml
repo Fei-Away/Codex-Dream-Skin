@@ -425,9 +425,73 @@ jobs:
           path: ${{ runner.temp }}/codex-dream-skin-release/CodexDreamSkin-Setup-v${{ needs.guard.outputs.version }}.exe
           retention-days: 14
 
+  build-linux:
+    name: Build Linux .deb
+    needs: [guard, create-tag]
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Run Linux tests and syntax checks
+        shell: bash
+        run: bash linux/tests/run-tests.sh
+
+      - name: Build Linux .deb package
+        shell: bash
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="linux/release"
+          mkdir -p "$RELEASE_DIR"
+          PKG_ROOT="$(mktemp -d)"
+          trap "rm -rf $PKG_ROOT" EXIT
+          PKG="codex-dream-skin"
+          install -d "$PKG_ROOT/usr/share/$PKG/tray-app"
+          install -d "$PKG_ROOT/usr/local/bin"
+          install -d "$PKG_ROOT/usr/share/applications"
+          install -d "$PKG_ROOT/usr/share/icons/hicolor/48x48/apps"
+          install -d "$PKG_ROOT/etc/xdg/autostart"
+          install -d "$PKG_ROOT/usr/share/systemd/user"
+          install -d "$PKG_ROOT/DEBIAN"
+          cp -r linux/scripts linux/assets linux/presets runtime             "$PKG_ROOT/usr/share/$PKG/"
+          cp linux/tray-app/tray.py "$PKG_ROOT/usr/share/$PKG/tray-app/"
+          cp linux/scripts/icon-status-*.png "$PKG_ROOT/usr/share/$PKG/tray-app/"
+          chmod +x "$PKG_ROOT/usr/share/$PKG/scripts/"*.sh
+          chmod +x "$PKG_ROOT/usr/share/$PKG/tray-app/"*.py
+          ln -sf /usr/share/$PKG/scripts/dream-skin.sh "$PKG_ROOT/usr/local/bin/dream-skin"
+          ln -sf /usr/share/$PKG/tray-app/tray.py "$PKG_ROOT/usr/local/bin/dream-skin-tray"
+          cp linux/installer/codex-dream-skin.desktop "$PKG_ROOT/usr/share/applications/"
+          cp linux/installer/codex-dream-skin-autostart.desktop "$PKG_ROOT/etc/xdg/autostart/"
+          for icon in active paused inactive; do
+            cp "$PKG_ROOT/usr/share/$PKG/scripts/icon-status-${icon}.png" \
+               "$PKG_ROOT/usr/share/icons/hicolor/48x48/apps/codex-dream-skin-${icon}.png"
+          done
+          cp linux/installer/codex-dream-skin-injector.service "$PKG_ROOT/usr/share/systemd/user/"
+          printf 'Package: codex-dream-skin\nVersion: ${VERSION}-1ubuntu1\nSection: misc\nPriority: optional\nArchitecture: all\nMaintainer: Fei-Away <fei-away@example.com>\nDepends: chatgpt (>= 26.700), python3 (>= 3.8), python3-gi, libgtk-3-0,\n libayatana-appindicator3-1, libnotify4, xdg-utils, ca-certificates\nDescription: Adaptive theme injector for Codex Desktop on Linux\n Codex Dream Skin injects adaptive CSS themes into the official\n ChatGPT/Codex Linux desktop application via the Chromium DevTools\n Protocol. It does not modify the official binary or app.asar.\n .\n Features:\n   - Full system tray integration with GTK3 + libayatana-appindicator\n   - Theme import from ZIP packages\n   - Automatic theme switching and appearance sync\n   - Safe CSS policy enforcement\n   - One-click restore to original appearance\n' > "$PKG_ROOT/DEBIAN/control"
+          dpkg-deb --build --root-owner-group "$PKG_ROOT" "$RELEASE_DIR/codex-dream-skin-v${VERSION}-linux.deb"
+          test -s "$RELEASE_DIR/codex-dream-skin-v${VERSION}-linux.deb"
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-linux
+          if-no-files-found: error
+          path: linux/release/codex-dream-skin-v${{ needs.guard.outputs.version }}-linux.deb
+          retention-days: 14
+
   publish-release:
     name: Validate and publish GitHub Release
-    needs: [guard, create-tag, build-macos, build-windows]
+    needs: [guard, create-tag, build-macos, build-windows, build-linux]
     if: needs.guard.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -455,6 +519,7 @@ jobs:
           set -euo pipefail
           test -s "dist/CodexDreamSkin-v${VERSION}.dmg"
           test -s "dist/CodexDreamSkin-Setup-v${VERSION}.exe"
+          test -s "dist/codex-dream-skin-v${VERSION}-linux.deb"
           (
             cd dist
             sha256sum "CodexDreamSkin-v${VERSION}.dmg" \
@@ -467,6 +532,7 @@ jobs:
 
           - **macOS:** [CodexDreamSkin-v${VERSION}.dmg](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg)
           - **Windows:** [CodexDreamSkin-Setup-v${VERSION}.exe](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe)
+          - **Linux:** [codex-dream-skin-v${VERSION}-linux.deb](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/codex-dream-skin-v${VERSION}-linux.deb)
           - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
 
           The packages are currently unsigned. Follow the graphical first-run steps in
@@ -503,6 +569,7 @@ jobs:
             gh release upload "$TAG" --clobber \
               dist/CodexDreamSkin-v${VERSION}.dmg \
               dist/CodexDreamSkin-Setup-v${VERSION}.exe \
+              dist/codex-dream-skin-v${VERSION}-linux.deb \
               dist/SHA256SUMS.txt
             gh release edit "$TAG" --draft \
               --title "Codex Dream Skin v${VERSION}" \
@@ -529,6 +596,7 @@ jobs:
           const expected = [
             "CodexDreamSkin-v" + process.env.VERSION + ".dmg",
             "CodexDreamSkin-Setup-v" + process.env.VERSION + ".exe",
+            "codex-dream-skin-v" + process.env.VERSION + "-linux.deb",
             "SHA256SUMS.txt",
           ];
           if (release.assets.length !== expected.length || !expected.every((name) => release.assets.some((asset) => asset.name === name))) {
@@ -549,6 +617,7 @@ jobs:
           const expected = [
             "CodexDreamSkin-v" + process.env.VERSION + ".dmg",
             "CodexDreamSkin-Setup-v" + process.env.VERSION + ".exe",
+            "codex-dream-skin-v" + process.env.VERSION + "-linux.deb",
             "SHA256SUMS.txt",
           ];
           if (release.isDraft || release.isPrerelease || release.tagName !== "v" + process.env.VERSION ||

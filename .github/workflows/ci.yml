@@ -32,7 +32,7 @@ jobs:
           while IFS= read -r file; do
             bash -n "$file"
           done < <(
-            find macos -type f \( -name '*.sh' -o -name '*.command' \) \
+            find macos linux -type f \( -name '*.sh' -o -name '*.command' \) \
               ! -path '*/release/*' -print
           )
 
@@ -98,7 +98,15 @@ jobs:
             exit 1
           fi
           if grep -n -E '(document\.title|location\.href)' \
-            macos/scripts/injector.mjs windows/scripts/injector.mjs >/dev/null; then
+            macos/scripts/injector.mjs windows/scripts/injector.mjs
+          printf 'Injector logs and results must not record page titles or URLs; keep only target IDs and structural markers.\n' >&2
+            exit 1
+          fi
+          if grep -n -E '/usr/bin/python3|(^|[[:space:]])eval([[:space:]]|$)' \
+            linux/scripts/common-linux.sh >/dev/null; then
+            printf 'The Linux runtime must parse state without python3 or eval in launch paths.\n' >&2
+            exit 1
+          fi >/dev/null; then
             printf 'Injector renderer probes must not read the page title or URL back to the host.\n' >&2
             exit 1
           fi
@@ -156,6 +164,19 @@ jobs:
           node --test tools/*.test.mjs
           node macos/scripts/injector.mjs --check-payload >/dev/null
           node windows/scripts/injector.mjs --check-payload >/dev/null
+
+      - name: Check Linux shell syntax
+        shell: bash
+        run: |
+          while IFS= read -r file; do
+            bash -n "$file"
+          done < <(find linux -type f -name '*.sh' ! -path '*/release/*' -print)
+
+      - name: Run Linux regression suite
+        shell: bash
+        env:
+          NODE: ${{ steps.node.outputs.path }}
+        run: bash linux/tests/run-tests.sh
 
   windows-tests:
     name: Windows (${{ matrix.name }})

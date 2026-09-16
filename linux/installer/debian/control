@@ -1,0 +1,25 @@
+Source: codex-dream-skin
+Section: misc
+Priority: optional
+Maintainer: Fei-Away <fei-away@example.com>
+Build-Depends: debhelper-compat (= 13), dh-python, python3-all, python3-gi,
+ debhelper (>= 13)
+Standards-Version: 4.6.0
+Rules-Requires-Root: no
+
+Package: codex-dream-skin
+Architecture: all
+Depends: chatgpt (>= 26.700), python3, python3-gi, libgtk-3-0,
+ libayatana-appindicator3-1, libnotify4, xdg-utils, ca-certificates,
+ zenity, ${misc:Depends}, ${python3:Depends}
+Description: Adaptive theme injector for Codex Desktop on Linux
+ Codex Dream Skin injects adaptive CSS themes into the official
+ ChatGPT/Codex Linux desktop application via the Chromium DevTools
+ Protocol. It does not modify the official .app bundle or app.asar.
+ .
+ Features:
+  * Full system tray integration with GTK3 + libayatana-appindicator
+  * Theme import from ZIP packages
+  * Automatic theme switching and appearance sync
+  * Safe CSS policy enforcement
+  * One-click restore to original appearance
