@@ -20,7 +20,13 @@ assert.doesNotMatch(selectorFor("shell-main"), /_[A-Za-z]+_[a-z0-9]{4,}/);
 assert.doesNotMatch(selectorFor("header-tint"), /_[A-Za-z]+_[a-z0-9]{4,}/);
 assert.equal(
   selectorFor("main-content-top-fade"),
-  ':is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*="_MainContentTopFade_"])',
+  ':is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade]:not(:has(*)), [class*="_MainContentTopFade_"])',
+  "The fade contract must not match the route container Codex 26.924 tags with the same attribute (#415).",
+);
+assert.match(
+  selectorFor("main-content-top-fade"),
+  /\[data-app-shell-main-content-top-fade\]:not\(:has\(\*\)\)/,
+  "The bare attribute would also match the route wrapper that now carries it, hiding the thread and composer.",
 );
 assert.equal(
   selectorFor("message"),
