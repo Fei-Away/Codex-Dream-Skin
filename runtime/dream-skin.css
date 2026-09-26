@@ -1350,6 +1350,12 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHEL
   border-top: 0 !important;
 }
 
+/* Codex 26.924 moved data-app-shell-main-content-top-fade from the fade
+   overlay onto the container that wraps the whole route. Matching the bare
+   attribute therefore hid the thread scroll container and the composer along
+   with it, so every conversation rendered as an empty pane (#415, #414). The
+   attribute form is limited to the childless native overlay; the class forms
+   keep covering builds that still tag the overlay itself. */
 html[data-dream-skin="active"][data-dream-art-wide="true"] __DREAM_SELECTOR_SHELL_MAIN__
   __DREAM_SELECTOR_MAIN_CONTENT_TOP_FADE__ {
   display: none !important;
