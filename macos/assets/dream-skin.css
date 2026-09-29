@@ -1152,6 +1152,24 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
   backdrop-filter: blur(8px) saturate(102%) !important;
 }
 
+/* Keep the wide task artwork continuous through the idle composer. When the
+   user enters the composer, use a solid panel so text and controls stay clear. */
+html[data-dream-skin="active"][data-dream-art-wide="true"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))
+  :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]):not(:focus-within) {
+  --ds-theme-color-panel-alt: transparent !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="true"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))
+  :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]):focus-within {
+  --ds-theme-color-panel-alt: rgb(var(--ds-panel-rgb) / 1) !important;
+  background: rgb(var(--ds-panel-rgb) / 1) !important;
+  backdrop-filter: none !important;
+}
+
 html[data-dream-skin="active"][data-dream-shell="light"]
   :is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant]) p.placeholder::after {
   color: rgb(var(--ds-muted-rgb) / .78) !important;
@@ -1246,6 +1264,8 @@ html[data-dream-skin="active"] :is(.composer-surface-chrome, [class*="_ComposerL
    unrelated application gradients keep their native paint. */
 html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))
   [class~="pointer-events-none"][class~="bottom-0"][class~="h-full"][class~="bg-gradient-to-t"][class~="from-surface"][class~="via-surface"],
+html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))
+  [class~="pointer-events-none"][class~="inset-x-0"][class~="-top-8"][class~="bottom-0"][class~="z-0"][class~="bg-gradient-to-t"][class~="from-surface"][class~="via-surface"],
 html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))
   [class~="pointer-events-none"][class~="-bottom-1"][class~="h-7"][class~="bg-gradient-to-t"][class~="from-surface"][class~="to-transparent"] {
   background: transparent !important;
