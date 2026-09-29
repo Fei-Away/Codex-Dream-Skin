@@ -367,6 +367,32 @@ export async function runRendererRuntimeTest(assetRoot) {
   // and the measured fossil selector must be absent from the canonical CSS.
   assert.doesNotMatch(css, /(?:^|[.#\s])(?:codex-dream-skin|dream-skin-home|dream-home|dream-task)(?:[\s.#:{>]|$)|home-suggestion-list-item/);
   assert.match(css, /html\[data-dream-skin="active"\]/);
+
+  // Codex 26.924 gave Projects, Pull Requests and Customize their own
+  // full-window opaque surfaces, and each one hides a different layer than
+  // the other two. Every anchor below was counted on the live 26.924
+  // renderer; each rule stays route-scoped on purpose, because an unscoped
+  // `.bg-surface` reset would also strip dialogs, menus and form cards.
+  assert.match(
+    css,
+    /html\[data-dream-skin="active"\] \[data-app-shell-focus-area\] > \.bg-surface \{\s*background: transparent !important;\s*\}/,
+    "Projects route focus area must drop its opaque surface.",
+  );
+  assert.match(
+    css,
+    /html\[data-dream-skin="active"\] \[data-app-shell-pane-frame\],\s*html\[data-dream-skin="active"\] \[data-app-shell-pane-frame\] \.bg-surface \{\s*background: transparent !important;\s*\}/,
+    "Pull Requests detail pane stacks frame, section and container; clearing the frame alone leaves two nested opaque layers.",
+  );
+  assert.match(
+    css,
+    /html\[data-dream-skin="active"\] \[data-app-shell-focus-area\] \[data-sticky\]:not\(:has\(\[data-codex-composer-root\]\)\)::before \{\s*background: transparent !important;\s*backdrop-filter: blur\(16px\) saturate\(108%\) !important;\s*\}/,
+    "Customize pins its header with a sticky shell whose ::before paints an opaque backdrop; clear the paint but keep the blur.",
+  );
+  assert.doesNotMatch(
+    css,
+    /html\[data-dream-skin="active"\] \.bg-surface\s*\{/,
+    "Utility route surfaces must stay route-scoped; an unscoped .bg-surface reset would also strip dialogs, menus and form cards.",
+  );
   const sidebar = "(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\\.app-shell-left-panel)";
   const noInlineColor = "svg:not\\(\\[style\\^=[\"']color:[\"']\\]\\):not\\(\\[style\\*=[\"'];color:[\"']\\]\\):not\\(\\[style\\*=[\"']; color:[\"']\\]\\)";
   assert.match(
