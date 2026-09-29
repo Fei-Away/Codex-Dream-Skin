@@ -405,7 +405,16 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\):has\(\[role="main"\]\)/);
   assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\):not\(:has\(\[role="main"\]\)\)/);
   assert.match(css, /header:is\(\.app-header-tint, \[data-app-shell-header-edge-scroll\], \[class\*=\"_Header_\"\]\)/);
-  assert.match(css, /:is\(\.app-shell-main-content-top-fade, \[data-app-shell-main-content-top-fade\], \[class\*=\"_MainContentTopFade_\"\]\)/);
+  assert.match(css, /:is\(\.app-shell-main-content-top-fade, \[class\*=\"_MainContentTopFade_\"\]\)/);
+  assert.doesNotMatch(css, /\[data-app-shell-main-content-top-fade\]/,
+    "The 26.924 content wrapper must never be hidden as a decorative fade.");
+  assert.match(css, /body > div > \[class\*="_PageSurfaceLayout_"\] \{\s*background: transparent !important;/,
+    "The 26.924 outer page surface must not wash out the selected artwork.");
+  assert.match(css,
+    /> div:first-child:not\(\[class~="group\/home-composer-layout"\]\) > div:first-child \{\s*flex: 0 0 440px !important;/,
+    "Legacy Home sizing must exclude the 26.924 composer layout.");
+  assert.doesNotMatch(css, /:has\(\[data-testid="home-icon"\]\) > div:first-child(?:\s|>)/,
+    "Unguarded positional Home selectors can target the live 26.924 composer layout.");
   assert.doesNotMatch(css, /:has\([^()]*:has\(/);
   assert.doesNotMatch(
     css,

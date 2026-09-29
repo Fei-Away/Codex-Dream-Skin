@@ -20,7 +20,8 @@ assert.doesNotMatch(selectorFor("shell-main"), /_[A-Za-z]+_[a-z0-9]{4,}/);
 assert.doesNotMatch(selectorFor("header-tint"), /_[A-Za-z]+_[a-z0-9]{4,}/);
 assert.equal(
   selectorFor("main-content-top-fade"),
-  ':is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*="_MainContentTopFade_"])',
+  ':is(.app-shell-main-content-top-fade, [class*="_MainContentTopFade_"])',
+  "The fade selector must not match the 26.924 content wrapper carrying data-app-shell-main-content-top-fade.",
 );
 assert.equal(
   selectorFor("message"),
