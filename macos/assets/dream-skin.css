@@ -1350,8 +1350,14 @@ html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface
   border-top: 0 !important;
 }
 
+/* Remove the native white top fade. Since Codex 26.924 the top-fade state
+   attribute sits on the scroll container that also owns the conversation
+   column and the composer, so hiding the attribute holder collapses the whole
+   thread and leaves the native input box invisible. Hide the fade layer only:
+   the attribute holder is excluded, while [class*="_MainContentTopFade_"]
+   still matches the painted layer. */
 html[data-dream-skin="active"][data-dream-art-wide="true"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
-  :is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*="_MainContentTopFade_"]) {
+  :is(.app-shell-main-content-top-fade, [data-app-shell-main-content-top-fade], [class*="_MainContentTopFade_"]):not([data-app-shell-main-content-top-fade]) {
   display: none !important;
   background: transparent !important;
 }

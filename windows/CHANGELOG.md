@@ -13,6 +13,7 @@
 
 ### 修复
 
+- 修复 Codex 26.924 及以上版本中，移除原生顶部渐变的规则误伤滚动容器、导致主区对话列与原生输入框整体消失的问题（#415）：自 26.924 起 `data-app-shell-main-content-top-fade` 落在承载对话列与 composer 的滚动容器上，原来的 `display: none` 会连带折叠整列，管理端自检因此报「原生输入框不可见」。规则现在排除该属性宿主，只隐藏真正的渐变层（`[class*="_MainContentTopFade_"]`）。
 - 保留 Codex 自定义界面字体和代码字体，基础皮肤不再强制覆盖 body 字体（#399）。
 - 完整补齐 Codex 26.818 主题兼容（#373，感谢 @QingYe-05 的 Windows 实机源码证据）：托盘“更换背景图”现在保留当前 `theme.json`、颜色、构图参数和已验证的 `theme.css`；共享 renderer 同时清除 sticky composer 的两层原生渐变、约束 Markdown 宽表、映射真实用户气泡，并改善流式思考、命令详情、新版动作按钮、横向壁纸和顶部栏的可读性；固定品牌/状态伪文案不再覆盖原生界面。
 - 修复新版 Codex 把输入框壳迁移到 `_ComposerLayoutRoot_` 后，Dream Skin 误把 `_ComposerLayoutFooter_` 标记为 composer、导致主题输入框样式只落在底部工具栏的问题；同时排除 `/avatar-overlay` 与 Pet composition surface，并在发现旧注入时执行移除与验证，避免主题壁纸污染透明 Pet 窗口形成矩形背景。
