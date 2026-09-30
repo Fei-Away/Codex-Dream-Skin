@@ -1152,9 +1152,17 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
   backdrop-filter: blur(8px) saturate(102%) !important;
 }
 
-/* Keep the wide task artwork continuous through the idle composer. When the
-   user enters the composer, use a solid panel so text and controls stay clear. */
+/* Keep task input readable by default, including themes whose Safe CSS sets
+   panelAlt to a translucent value. Transparent idle chrome is opt-in. */
 html[data-dream-skin="active"][data-dream-art-wide="true"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_COMPOSER_CHROME__ {
+  --ds-theme-color-panel-alt: rgb(var(--ds-panel-rgb) / 1) !important;
+  background: rgb(var(--ds-panel-rgb) / 1) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-idle-composer="transparent"][data-dream-art-wide="true"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
   __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_COMPOSER_CHROME__:not(:focus-within) {
   --ds-theme-color-panel-alt: transparent !important;
@@ -1162,7 +1170,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:is([data-dream-task-m
   backdrop-filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-art-wide="true"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
+html[data-dream-skin="active"][data-dream-idle-composer="transparent"][data-dream-art-wide="true"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
   __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_COMPOSER_CHROME__:focus-within {
   --ds-theme-color-panel-alt: rgb(var(--ds-panel-rgb) / 1) !important;

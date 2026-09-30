@@ -49,3 +49,17 @@ test("Windows runtime rejects missing and future theme schema versions", async (
     await assert.rejects(loadTheme(root), /must use schemaVersion 1/);
   });
 });
+
+test("Windows runtime defaults idle composer to opaque and validates overrides", async () => {
+  await withTheme(1, true, async (root) => {
+    const themePath = path.join(root, "theme.json");
+    const theme = JSON.parse(await fs.readFile(themePath, "utf8"));
+    assert.equal((await loadTheme(root)).theme.art.idleComposer, "opaque");
+    theme.art = { idleComposer: "transparent" };
+    await fs.writeFile(themePath, `${JSON.stringify(theme)}\n`);
+    assert.equal((await loadTheme(root)).theme.art.idleComposer, "transparent");
+    theme.art.idleComposer = "glass";
+    await fs.writeFile(themePath, `${JSON.stringify(theme)}\n`);
+    await assert.rejects(loadTheme(root), /art\.idleComposer/);
+  });
+});

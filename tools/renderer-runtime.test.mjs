@@ -695,6 +695,15 @@ export async function runRendererRuntimeTest(assetRoot) {
   vm.runInNewContext(full.payloadFor({ art: { taskMode: "full" } }), full.context);
   assert.equal(full.attrs.get("data-dream-task-mode"), "full");
   assert.equal(full.attrs.get("data-dream-art-task-mode"), "full");
+  assert.equal(full.attrs.get("data-dream-idle-composer"), "opaque",
+    "Themes without an idleComposer setting must keep the composer opaque.");
+
+  const transparentComposer = makeFixture({ nativeAppearance: "light" });
+  vm.runInNewContext(transparentComposer.payloadFor({ art: { idleComposer: "transparent" } }),
+    transparentComposer.context);
+  assert.equal(transparentComposer.attrs.get("data-dream-idle-composer"), "transparent");
+  assert.match(css, /data-dream-idle-composer="transparent"[^{}]*:not\(:focus-within\)\s*\{\s*--ds-theme-color-panel-alt:\s*transparent !important;/,
+    "Only an opted-in idle composer may become transparent.");
 
   const landscape = makeFixture({ nativeAppearance: "dark" });
   vm.runInNewContext(landscape.payloadFor({

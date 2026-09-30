@@ -453,6 +453,7 @@ const THEME_CHOICES = {
   appearance: new Set(["auto", "light", "dark"]),
   safeArea: new Set(["auto", "left", "right", "center", "none"]),
   taskMode: new Set(["auto", "ambient", "banner", "full", "off"]),
+  idleComposer: new Set(["opaque", "transparent"]),
 };
 
 function normalizedUnit(value, name) {
@@ -584,6 +585,7 @@ export async function loadTheme(themeDir) {
       focusY: normalizedUnit(art.focusY, "art.focusY"),
       safeArea: normalizedChoice(art.safeArea, "art.safeArea", THEME_CHOICES.safeArea, "auto"),
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
+      idleComposer: normalizedChoice(art.idleComposer, "art.idleComposer", THEME_CHOICES.idleComposer, "opaque"),
     },
     colorMode: rawColors ? "explicit" : "auto",
     explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],

@@ -180,7 +180,8 @@ Theme metadata is optional. The defaults are deliberately adaptive:
     "focusX": 0.72,
     "focusY": 0.45,
     "safeArea": "auto",
-    "taskMode": "auto"
+    "taskMode": "auto",
+    "idleComposer": "opaque"
   }
 }
 ```
@@ -198,9 +199,12 @@ Theme metadata is optional. The defaults are deliberately adaptive:
   art uses a quieter ambient layer. `full` keeps the artwork at normal strength
   with only the baseline readability veil; `off` removes the task-page artwork
   while leaving the rest of the theme active.
+- `art.idleComposer`: `opaque` (default) or `transparent`. On wide-image task
+  pages, `transparent` shows the artwork through an unfocused composer; it
+  becomes opaque while focused. The home composer is unaffected.
 
 The image-derived palette is used unless a theme explicitly supplies color
-fields. Explicit art metadata (`focusX`, `focusY`, `safeArea`, `taskMode`) has
+fields. Explicit art metadata (`focusX`, `focusY`, `safeArea`, `taskMode`, `idleComposer`) has
 the same priority over automatic inference. The home route remains expressive;
 task routes keep native content, cards, composer, and code readable above the
 image layer.

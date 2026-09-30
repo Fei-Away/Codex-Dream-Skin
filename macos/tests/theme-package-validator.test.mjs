@@ -172,6 +172,21 @@ try {
     "theme.json",
   ]);
 
+  const transparentComposer = await makeOfficial("official-transparent-composer", {
+    mutateTheme: (theme) => { theme.art.idleComposer = "transparent"; },
+  });
+  const [transparentMac, transparentWindows] = await Promise.all([
+    validate(transparentComposer.source, "macos", "transparent-composer-macos"),
+    validate(transparentComposer.source, "windows", "transparent-composer-windows"),
+  ]);
+  assert.equal((await loadMacTheme(transparentMac.stage)).theme.art.idleComposer, "transparent");
+  assert.equal((await loadWindowsTheme(transparentWindows.stage)).theme.art.idleComposer, "transparent");
+
+  const invalidComposer = await makeOfficial("official-invalid-composer", {
+    mutateTheme: (theme) => { theme.art.idleComposer = "glass"; },
+  });
+  await expectRejected(invalidComposer.source, "macos", /art\.idleComposer is unsupported/, "invalid-composer");
+
   const impossibleTimestamp = await makeOfficial("official-impossible-timestamp", {
     mutateManifest: (manifest) => { manifest.createdAt = "2026-02-30T00:00:00Z"; },
   });
