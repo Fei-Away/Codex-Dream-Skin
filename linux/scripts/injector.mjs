@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { readAnimationSettings, DEFAULT_ANIMATION_SETTINGS } from "./animation-settings.mjs";
 import { constants as fsConstants, watch as watchFs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -291,6 +292,7 @@ function parseArgs(argv) {
     screenshot: null,
     reload: false,
     themeDir: null,
+    animationSettings: null,
     operationState: null,
     operationAck: null,
     operationKind: null,
@@ -311,6 +313,7 @@ function parseArgs(argv) {
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
     else if (arg === "--theme-dir") options.themeDir = path.resolve(argv[++i]);
+    else if (arg === "--animation-settings") options.animationSettings = path.resolve(argv[++i]);
     else if (arg === "--operation-state") options.operationState = path.resolve(argv[++i]);
     else if (arg === "--operation-ack") options.operationAck = path.resolve(argv[++i]);
     else if (arg === "--operation-kind") options.operationKind = argv[++i];
@@ -811,7 +814,7 @@ function invalidateStaticPayloadAssets() {
   staticPayloadAssets = null;
 }
 
-export async function loadPayload(themeDir) {
+export async function loadPayload(themeDir, animationSettingsPath = null) {
   const startedAt = performance.now();
   const [staticAssets, loaded] = await Promise.all([
     loadStaticPayloadAssets(),
@@ -819,6 +822,16 @@ export async function loadPayload(themeDir) {
   ]);
   const { css, template } = staticAssets;
   const { art, extension, safeCssRuntime, safeCssStatus, theme } = loaded;
+  if (animationSettingsPath) {
+    try {
+      theme.animation = await readAnimationSettings(animationSettingsPath);
+    } catch {
+      // A damaged local preference must never prevent static wallpaper from
+      // loading, or leave arbitrary data in an executable renderer payload.
+      theme.animation = { ...DEFAULT_ANIMATION_SETTINGS };
+      console.error("[dream-skin] Invalid animation settings; using static wallpaper. Run dreamskin animation reset to reset them.");
+    }
+  }
   const combinedCss = safeCssRuntime ? `${css}\n${safeCssRuntime}\n` : css;
   const styleRevision = createHash("sha256").update(combinedCss).digest("hex").slice(0, 20);
   const artMetadata = readImageMetadata(art, extension);
@@ -1347,7 +1360,7 @@ async function runOneShot(options) {
   let loaded = null;
   try {
     loaded = (options.mode === "once" || options.mode === "verify" || options.reload)
-      ? await loadPayload(options.themeDir)
+      ? await loadPayload(options.themeDir, options.animationSettings)
       : null;
   } catch (error) {
     if (operationToken) {
@@ -1540,7 +1553,7 @@ export function earlyPayloadFor(payload, revision) {
   })()`;
 }
 
-function watchPayloadSources(themeDir, onDirty) {
+export function watchPayloadSources(themeDir, onDirty, animationSettingsPath = null) {
   const assetsRoot = path.join(root, "assets");
   const themeRoot = themeDir ?? assetsRoot;
   const watchers = [];
@@ -1552,7 +1565,8 @@ function watchPayloadSources(themeDir, onDirty) {
         const staticChanged = directory === assetsRoot &&
           (!name || name === "dream-skin.css" || name === "renderer-inject.js");
         if (kind === "static" && !staticChanged) return;
-        onDirty({ staticChanged });
+        if (kind === "animation" && name && name !== path.basename(animationSettingsPath)) return;
+        onDirty({ staticChanged, animationChanged: kind === "animation" });
       });
       watcher.on("error", (error) => {
         console.error(`[dream-skin] file watch unavailable for ${directory}: ${error.message}`);
@@ -1564,7 +1578,20 @@ function watchPayloadSources(themeDir, onDirty) {
   };
   add(themeRoot, "theme");
   if (themeRoot !== assetsRoot) add(assetsRoot, "static");
+  if (animationSettingsPath) add(path.dirname(animationSettingsPath), "animation");
   return () => watchers.forEach((watcher) => watcher.close());
+}
+
+export async function verifyAnimationRefresh(session, revision, settings) {
+  const preset = settings?.enabled ? settings.preset : "off";
+  return await session.evaluate(`(() => {
+    const root = document.documentElement;
+    const state = window.__CODEX_DREAM_SKIN_STATE__;
+    return !window.__CODEX_DREAM_SKIN_DISABLED__ &&
+      root?.getAttribute("data-dream-skin") === "active" &&
+      root?.getAttribute("data-dream-animation") === ${JSON.stringify(preset)} &&
+      state?.revision === ${JSON.stringify(revision)};
+  })()`) === true;
 }
 
 async function readOperationState(statePath) {
@@ -1660,7 +1687,7 @@ async function watchOperationState(statePath, onState) {
 }
 
 async function runWatch(options) {
-  let current = await loadPayload(options.themeDir);
+  let current = await loadPayload(options.themeDir, options.animationSettings);
   const sessions = new Map();
   const rejected = new Set();
   let stopping = false;
@@ -1803,11 +1830,11 @@ async function runWatch(options) {
     wakeControlLoop();
   };
 
-  const refreshPayload = async () => {
+  const refreshPayload = async ({ animationOnly = false } = {}) => {
     const refreshEpoch = mutationEpoch;
     let next;
     try {
-      next = await loadPayload(options.themeDir);
+      next = await loadPayload(options.themeDir, options.animationSettings);
     } catch (error) {
       await Promise.all([...sessions.values()].map(async (record) => {
         if (record.session.closed) return;
@@ -1834,13 +1861,16 @@ async function runWatch(options) {
       const { session } = record;
       if (session.closed) continue;
       const externalOperation = activeOperation;
+      const quietAnimationRefresh = animationOnly && !externalOperation;
       const operationToken = externalOperation?.token ?? nextOperationToken();
       record.operationToken = operationToken;
       record.operationExternal = Boolean(externalOperation);
       try {
-        await presentOperationUi(
-          session, operationToken, "loading", `正在应用「${current.theme.name}」…`,
-        );
+        if (!quietAnimationRefresh) {
+          await presentOperationUi(
+            session, operationToken, "loading", `正在应用「${current.theme.name}」…`,
+          );
+        }
         if (controlOnly || mutationEpoch !== refreshEpoch) continue;
         const nextIdentifier = await registerEarlyForRecord(
           record, current.payload, current.revision,
@@ -1856,6 +1886,15 @@ async function runWatch(options) {
         record.needsLoadFallback = !nextIdentifier;
         await applyToSession(session, current.payload);
         if (controlOnly || mutationEpoch !== refreshEpoch) continue;
+        if (quietAnimationRefresh) {
+          // Preferences can be changed while Codex is minimized. Check the
+          // exact installed state without focusing the window or showing a
+          // theme-switch overlay; its own visibility handler keeps motion off.
+          if (!await verifyAnimationRefresh(session, current.revision, current.theme.animation)) {
+            throw new Error("Animated background refresh verification failed");
+          }
+          continue;
+        }
         // The macOS flow activates the app window before verifying; on Linux
         // a minimized or background window reports visibilityState hidden, so
         // the home-route visibility checks would fail closed. Raise the page
@@ -1873,7 +1912,7 @@ async function runWatch(options) {
         }
       } catch (error) {
         record.needsLoadFallback = true;
-        if (!externalOperation) {
+        if (!externalOperation && !quietAnimationRefresh) {
           await presentOperationUi(session, operationToken, "error", "主题切换失败，未确认应用");
         }
         console.error(`[dream-skin] theme refresh failed: ${error.message}`);
@@ -1882,17 +1921,21 @@ async function runWatch(options) {
     console.log(`[dream-skin] refreshed theme ${current.theme.id} (${current.timings.buildMs}ms)`);
   };
 
-  const queuePayloadRefresh = ({ staticChanged = false } = {}) => {
+  let animationOnlyDirty = true;
+  const queuePayloadRefresh = ({ staticChanged = false, animationChanged = false } = {}) => {
+    animationOnlyDirty &&= animationChanged && !staticChanged;
     if (staticChanged) invalidateStaticPayloadAssets();
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       reloadTimer = null;
-      reloadChain = reloadChain.then(refreshPayload).catch((error) => {
+      const animationOnly = animationOnlyDirty;
+      animationOnlyDirty = true;
+      reloadChain = reloadChain.then(() => refreshPayload({ animationOnly })).catch((error) => {
         console.error(`[dream-skin] theme reload failed: ${error.message}`);
       });
     }, 45);
   };
-  const closePayloadWatchers = watchPayloadSources(options.themeDir, queuePayloadRefresh);
+  const closePayloadWatchers = watchPayloadSources(options.themeDir, queuePayloadRefresh, options.animationSettings);
   const closeOperationWatcher = await watchOperationState(options.operationState, (operation) => {
     operationSignalChain = operationSignalChain.then(async () => {
       const previousOperation = activeOperation?.token === operation.token ? activeOperation : null;
@@ -2216,7 +2259,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
   try {
     const options = parseArgs(process.argv.slice(2));
     if (options.mode === "check") {
-      const loaded = await loadPayload(options.themeDir);
+      const loaded = await loadPayload(options.themeDir, options.animationSettings);
       // loadPayload already fails closed, but every installer, importer and
       // theme switch gates on this command, so the guard is re-asserted at the
       // CLI boundary rather than being an internal implementation detail.
@@ -2230,6 +2273,7 @@ if (path.resolve(process.argv[1] || "") === path.resolve(scriptPath)) {
         imageBytes: loaded.imageBytes,
         payloadBytes: Buffer.byteLength(loaded.payload),
         safeCssStatus: loaded.safeCssStatus,
+        animation: loaded.theme.animation ?? DEFAULT_ANIMATION_SETTINGS,
         artMetadata: loaded.theme.artMetadata ?? null,
         timings: loaded.timings,
       }, null, 2));

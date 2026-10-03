@@ -158,6 +158,7 @@ activate_codex_window
 
 if [ "$FOREGROUND_INJECTOR" = "true" ]; then
   exec "$NODE" "$INJECTOR" --watch --port "$PORT" --theme-dir "$THEME_DIR" \
+    --animation-settings "$ANIMATION_SETTINGS_PATH" \
     --operation-state "$OPERATION_STATE_PATH" --operation-ack "$OPERATION_ACK_PATH"
 fi
 
@@ -178,7 +179,7 @@ cleanup_verify_output() {
   [ -z "${VERIFY_OUTPUT:-}" ] || /bin/rm -f "$VERIFY_OUTPUT"
   VERIFY_OUTPUT=""
 }
-if "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 20000 >"$VERIFY_OUTPUT" 2>/dev/null; then
+if "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --animation-settings "$ANIMATION_SETTINGS_PATH" --timeout-ms 20000 >"$VERIFY_OUTPUT" 2>/dev/null; then
   verify_code=0
 else
   verify_code=$?
@@ -188,12 +189,12 @@ if [ "$verify_code" -ne 0 ]; then
   # exact bundle once more before the final force-inject and verification pass.
   activate_codex_window
   if [ -n "$OPERATION_TOKEN" ]; then
-    "$NODE" "$INJECTOR" --once --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 15000 \
+    "$NODE" "$INJECTOR" --once --port "$PORT" --theme-dir "$THEME_DIR" --animation-settings "$ANIMATION_SETTINGS_PATH" --timeout-ms 15000 \
       --operation-token "$OPERATION_TOKEN" >/dev/null 2>&1 || true
   else
-    "$NODE" "$INJECTOR" --once --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 15000 >/dev/null 2>&1 || true
+    "$NODE" "$INJECTOR" --once --port "$PORT" --theme-dir "$THEME_DIR" --animation-settings "$ANIMATION_SETTINGS_PATH" --timeout-ms 15000 >/dev/null 2>&1 || true
   fi
-  if "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 12000 >"$VERIFY_OUTPUT" 2>/dev/null; then
+  if "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --animation-settings "$ANIMATION_SETTINGS_PATH" --timeout-ms 12000 >"$VERIFY_OUTPUT" 2>/dev/null; then
     verify_code=0
   else
     verify_code=$?

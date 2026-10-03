@@ -30,6 +30,7 @@ resolve_command() {
     gallery|8) printf 'gallery' ;;
     studio|9) printf 'studio' ;;
     autostart|a|A) printf 'autostart' ;;
+    animation|motion|m|M) printf 'animation' ;;
     doctor|d|D) printf 'doctor' ;;
     update|u|U) printf 'update' ;;
     status) printf 'status' ;;
@@ -59,6 +60,7 @@ menu_loop() {
     printf ' 7  一键恢复官方外观\n'
     printf ' 8  主题库 Gallery\n'
     printf ' 9  在线 Studio\n'
+    printf ' M  动画背景（极光 / 星空 / 开关 / 节能）\n'
     printf ' A  开机自启（开/关）\n'
     printf ' D  诊断信息\n'
     printf ' U  检查更新\n'
@@ -137,6 +139,27 @@ dispatch() {
     restore) exec "$SCRIPT_DIR/restore-dream-skin-linux.sh" --restore-base-theme --restart-codex ;;
     gallery) xdg-open "https://dreamskin.cc/gallery" >/dev/null 2>&1 || true ;;
     studio) xdg-open "https://dreamskin.cc/studio" >/dev/null 2>&1 || true ;;
+    animation)
+      if [ "$#" -gt 0 ]; then
+        /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" "$@"
+        return
+      fi
+      local animation_choice=""
+      printf ' 动画背景设置（当前设置）\n'
+      /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" status || return 1
+      printf ' 1 极光  2 星空  3 开启  4 关闭  5 节能静止  6 自动节能  0 返回\n 选择 > '
+      read -r animation_choice || return 0
+      case "$animation_choice" in
+        1) /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" preset aurora ;;
+        2) /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" preset starfield ;;
+        3) /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" on ;;
+        4) /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" off ;;
+        5) /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" power low ;;
+        6) /bin/bash "$SCRIPT_DIR/animated-background-linux.sh" power auto ;;
+        ''|0) return 0 ;;
+        *) printf ' 无效选择：%s\n' "$animation_choice"; return 1 ;;
+      esac
+      ;;
     autostart)
       local target="$HOME/.config/autostart/codex-dream-skin.desktop"
       if [ -f "$target" ]; then
