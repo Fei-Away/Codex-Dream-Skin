@@ -21,6 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
   private let menu = NSMenu()
   private var snapshot = StatusSnapshot()
+  private var menuTracking = false
+  private var transparencyThemeID = ""
+  private var transparencySlider: NSSlider?
+  private var transparencyLabel: NSTextField?
+  private var transparencyResetItem: NSMenuItem?
   private var statusRefreshRunning = false
   private var operationInFlight = false
   private var engineInstallInFlight = false
@@ -44,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     "assets/safe-css-validator.mjs",
     "assets/selectors.json",
     "assets/theme-package-validator.mjs",
+    "assets/theme-preferences.mjs",
     "assets/theme.json",
     "presets/preset-gothic-void-crusade/background.jpg",
     "presets/preset-gothic-void-crusade/theme.json",
@@ -185,6 +191,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     refreshStatus()
   }
 
+  func menuWillOpen(_ menu: NSMenu) {
+    menuTracking = true
+  }
+
+  func menuDidClose(_ menu: NSMenu) {
+    menuTracking = false
+    DispatchQueue.main.async { [weak self] in self?.rebuildMenu() }
+  }
+
   private func configureStatusItem() {
     menu.delegate = self
     menu.autoenablesItems = false
@@ -273,6 +288,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   private func rebuildMenu() {
+    // Status polling must not replace an NSMenu custom view during slider tracking.
+    guard !menuTracking else { return }
     menu.removeAllItems()
     addDisabledItem(copy.statusTitle(session: snapshot.session, operation: snapshot.operation))
     if !snapshot.appliedThemeName.isEmpty && snapshot.session == "active" {
@@ -337,10 +354,92 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     addActionItem(copy.text(.importZip), action: #selector(chooseThemeArchive), enabled: enabled, to: submenu)
     addSavedThemesMenu(enabled: enabled, to: submenu)
     submenu.addItem(.separator())
+    addTransparencyControl(enabled: enabled, to: submenu)
+    submenu.addItem(.separator())
     addActionItem(copy.text(.openThemes), action: #selector(openThemesFolder), to: submenu)
     addActionItem(copy.text(.openImages), action: #selector(openImagesFolder), to: submenu)
     root.submenu = submenu
     menu.addItem(root)
+  }
+
+  private var transparencyPreferencesURL: URL {
+    stateRootURL.appendingPathComponent("theme-preferences.json")
+  }
+
+  private func activeTransparencyTheme() -> (id: String, authored: Int)? {
+    let url = stateRootURL.appendingPathComponent("theme/theme.json")
+    guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+    defer { try? handle.close() }
+    guard let data = try? handle.read(upToCount: 1_048_577), data.count <= 1_048_576,
+          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let id = object["id"] as? String, !id.isEmpty else { return nil }
+    let colors = object["colors"] as? [String: Any]
+    return (id, authoredThemeTransparency(panel: colors?["panel"] as? String))
+  }
+
+  private func transparencyTitle(_ value: Int, following: Bool) -> String {
+    let chinese = copy.resolvedLanguage == .chinese
+    let title = chinese ? "背景透明度：\(value)%" : "Background transparency: \(value)%"
+    return following ? title + (chinese ? " · 跟随主题" : " · Theme default") : title
+  }
+
+  private func addTransparencyControl(enabled: Bool, to submenu: NSMenu) {
+    guard let theme = activeTransparencyTheme() else { return }
+    let preferences = try? ThemeTransparencyPreferences.read(from: transparencyPreferencesURL)
+    let override = preferences?.themes[theme.id]?.transparency
+    let value = override.map { Int($0.rounded()) } ?? theme.authored
+    transparencyThemeID = theme.id
+    let chinese = copy.resolvedLanguage == .chinese
+    let view = NSView(frame: NSRect(x: 0, y: 0, width: 310, height: 82))
+    let label = NSTextField(labelWithString: transparencyTitle(value, following: override == nil))
+    label.frame = NSRect(x: 18, y: 55, width: 280, height: 20)
+    label.font = .menuFont(ofSize: 12)
+    view.addSubview(label)
+    let slider = NSSlider(value: Double(value), minValue: 0, maxValue: 100,
+                          target: self, action: #selector(changeTransparency(_:)))
+    slider.frame = NSRect(x: 18, y: 27, width: 274, height: 24)
+    slider.isContinuous = false // AppKit sends the action on release (and keyboard adjustment).
+    slider.isEnabled = enabled
+    slider.setAccessibilityLabel(chinese ? "背景透明度" : "Background transparency")
+    view.addSubview(slider)
+    let limits = NSTextField(labelWithString: chinese ? "0% 不透明                       100% 全透明" : "0% Opaque                          100% Transparent")
+    limits.frame = NSRect(x: 18, y: 6, width: 280, height: 18)
+    limits.font = .systemFont(ofSize: 10)
+    limits.textColor = .secondaryLabelColor
+    view.addSubview(limits)
+    let item = NSMenuItem()
+    item.view = view
+    submenu.addItem(item)
+    let reset = addActionItem(chinese ? "跟随主题" : "Follow theme", action: #selector(resetTransparency), enabled: enabled, to: submenu)
+    reset.state = override == nil ? .on : .off
+    transparencySlider = slider
+    transparencyLabel = label
+    transparencyResetItem = reset
+  }
+
+  private func saveTransparency(_ value: Int?) {
+    guard let theme = activeTransparencyTheme(), theme.id == transparencyThemeID else { return }
+    do {
+      var preferences = try ThemeTransparencyPreferences.read(from: transparencyPreferencesURL)
+      preferences.themes[theme.id] = value.map { .init(transparency: Double($0)) }
+      try preferences.write(to: transparencyPreferencesURL)
+      transparencySlider?.integerValue = value ?? theme.authored
+      transparencyLabel?.stringValue = transparencyTitle(value ?? theme.authored, following: value == nil)
+      transparencyResetItem?.state = value == nil ? .on : .off
+    } catch {
+      let chinese = copy.resolvedLanguage == .chinese
+      showError(title: chinese ? "无法保存透明度" : "Could not save transparency",
+                message: chinese ? "设置未保存，请检查本地设置文件后重试。" : "Settings were not saved. Check the local settings file and try again.")
+    }
+  }
+
+  @objc private func changeTransparency(_ sender: NSSlider) {
+    let value = min(100, max(0, Int(sender.doubleValue.rounded())))
+    saveTransparency(value)
+  }
+
+  @objc private func resetTransparency() {
+    saveTransparency(nil)
   }
 
   private func addLinksMenu() {

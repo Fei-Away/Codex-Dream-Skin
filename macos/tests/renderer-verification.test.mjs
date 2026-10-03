@@ -9,7 +9,7 @@ import { SKIN_VERSION, verifySession, waitForVerifiedSession } from "../scripts/
 const selectors = {
   shell: 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])',
   sidebar: "aside.app-shell-left-panel",
-  composer: ".composer-surface-chrome",
+  composer: ':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])',
   home: '[role="main"]:has([data-testid="home-icon"])',
   homeIcon: '[data-testid="home-icon"]',
   gameSource: '[data-feature="game-source"]',
@@ -80,7 +80,10 @@ function makeDomFixture({
           selector === selectors.gameSource || selector === selectors.suggestions) return null;
       return null;
     },
-    querySelectorAll: () => [],
+    querySelectorAll(selector) {
+      const node = this.querySelector(selector);
+      return node ? [node] : [];
+    },
     getElementById: (id) => id === "codex-dream-skin-style" ? styleNode : null,
   };
   const window = {

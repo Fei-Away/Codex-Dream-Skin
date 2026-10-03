@@ -12,7 +12,7 @@ const startPath = path.resolve(here, "../scripts/start-dream-skin.ps1");
 const selectors = {
   shell: 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])',
   sidebar: "aside.app-shell-left-panel",
-  composer: ".composer-surface-chrome",
+  composer: ':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])',
   homeIcon: '[data-testid="home-icon"]',
   home: '[role="main"]:has([data-testid="home-icon"])',
   gameSource: '[data-feature="game-source"]',
@@ -122,7 +122,10 @@ function makeDomFixture({
       if (selector === selectors.settings || selector === selectors.themePreview) return settings;
       return null;
     },
-    querySelectorAll: () => [],
+    querySelectorAll(selector) {
+      const node = this.querySelector(selector);
+      return node ? [node] : [];
+    },
     getElementById: (id) => id === "codex-dream-skin-style" ? styleNode : null,
   };
   const window = {
