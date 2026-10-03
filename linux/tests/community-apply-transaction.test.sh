@@ -17,6 +17,7 @@ SCRIPTS="$ENGINE/scripts"
   'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"' \
   'STATE_ROOT="$HOME/state"' \
   'STATE_PATH="$STATE_ROOT/state.json"' \
+  'ANIMATION_SETTINGS_PATH="$STATE_ROOT/animation.json"' \
   'NODE="${NODE:?}"' \
   'INJECTOR="$SCRIPT_DIR/injector.mjs"' \
   'fail() { printf "fixture failure: %s\n" "$*" >&2; exit 1; }' \
@@ -59,7 +60,8 @@ SCRIPTS="$ENGINE/scripts"
   'const valueAfter = (flag) => { const index = args.indexOf(flag); return index >= 0 ? args[index + 1] : ""; };' \
   'const expectedSnapshot = path.join(home, `state/.community-apply-${mode}/active-before`);' \
   'if (!args.includes("--verify") || valueAfter("--port") !== "9341"' \
-  '    || valueAfter("--theme-dir") !== expectedSnapshot || valueAfter("--timeout-ms") !== "12000") process.exit(7);' \
+  '    || valueAfter("--theme-dir") !== expectedSnapshot || valueAfter("--timeout-ms") !== "12000"' \
+  '    || valueAfter("--animation-settings") !== path.join(home, "state/animation.json")) process.exit(7);' \
   'if (mode === "verify-fail") process.exit(8);' \
   > "$SCRIPTS/injector.mjs"
 

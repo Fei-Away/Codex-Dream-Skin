@@ -96,6 +96,7 @@ process.stdout.write(value.contentFingerprint);
 "$NODE" "$INJECTOR" --verify \
   --port "$ROLLBACK_PORT" \
   --theme-dir "$ROLLBACK_SNAPSHOT" \
+  --animation-settings "$ANIMATION_SETTINGS_PATH" \
   --timeout-ms 12000 >/dev/null \
   || fail "The rollback snapshot does not exactly match the current visible renderer; community apply was cancelled before switching themes."
 

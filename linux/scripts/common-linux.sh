@@ -21,6 +21,7 @@ OPERATION_STATE_PATH="$STATE_ROOT/operation-state.json"
 OPERATION_ACK_PATH="$STATE_ROOT/operation-control-ack.json"
 THEME_BACKUP_PATH="$STATE_ROOT/theme-backup.json"
 THEME_DIR="$STATE_ROOT/theme"
+ANIMATION_SETTINGS_PATH="$STATE_ROOT/animation.json"
 CONFIG_PATH="$HOME/.codex/config.toml"
 ELECTRON_FLAGS_PATH="$STATE_ROOT/electron-flags.conf"
 INJECTOR_LOG="$STATE_ROOT/injector.log"
@@ -695,6 +696,7 @@ launch_injector_daemon() {
   : > "$INJECTOR_LOG"
   : > "$INJECTOR_ERROR_LOG"
   /usr/bin/nohup "$NODE" "$INJECTOR" --watch --port "$port" --theme-dir "$THEME_DIR" \
+    --animation-settings "$ANIMATION_SETTINGS_PATH" \
     --operation-state "$OPERATION_STATE_PATH" --operation-ack "$OPERATION_ACK_PATH" \
     >>"$INJECTOR_LOG" 2>>"$INJECTOR_ERROR_LOG" &
   pid="$!"
@@ -753,6 +755,7 @@ hot_reapply_theme() {
     ')"
   fi
   if ! "$NODE" "$INJECTOR" --once --port "$port" --theme-dir "$THEME_DIR" \
+    --animation-settings "$ANIMATION_SETTINGS_PATH" \
     --timeout-ms "$timeout_ms" "${operation_args[@]}" >/dev/null 2>&1; then
     return 1
   fi

@@ -38,6 +38,8 @@ function makeFixture({
   generic = false, genericComposer = true, genericHome = false, genericSearch = false,
   modernMessages = false, modernComposerLayout = false,
   pathname = "/index.html", initialRoute = "",
+  reducedMotion = false, hidden = false, visibilityState = hidden ? "hidden" : "visible",
+  hardwareConcurrency = 8, deviceMemory = 8, saveData = false, navigatorAvailable = true,
 } = {}) {
   const attrs = new Map();
   const rootStyle = styleDeclaration();
@@ -49,9 +51,51 @@ function makeFixture({
   const timers = new Map();
   const intervals = new Map();
   const listeners = new Map();
+  const listenerCallbacks = new Map();
+  const mediaQueries = new Map();
+  const frames = new Map();
+  const frameActivity = { requested: 0, cancelled: 0 };
   const revoked = [];
   let nextId = 0;
   let nextBlob = 0;
+  const eventTarget = (prefix) => ({
+    addEventListener(type, callback) {
+      const key = `${prefix}:${type}`;
+      if (!listenerCallbacks.has(key)) listenerCallbacks.set(key, new Set());
+      listenerCallbacks.get(key).add(callback);
+      listeners.set(key, callback);
+    },
+    removeEventListener(type, callback) {
+      const key = `${prefix}:${type}`;
+      const callbacks = listenerCallbacks.get(key);
+      callbacks?.delete(callback);
+      if (!callbacks?.size) {
+        listenerCallbacks.delete(key);
+        listeners.delete(key);
+      } else {
+        listeners.set(key, [...callbacks].at(-1));
+      }
+    },
+    dispatchEvent(event) {
+      for (const callback of [...(listenerCallbacks.get(`${prefix}:${event.type}`) || [])]) {
+        callback(event);
+      }
+      return true;
+    },
+  });
+  const listenerCount = (key) => key
+    ? listenerCallbacks.get(key)?.size || 0
+    : [...listenerCallbacks.values()].reduce((total, callbacks) => total + callbacks.size, 0);
+  const requestAnimationFrame = (callback) => {
+    frameActivity.requested += 1;
+    const id = ++nextId;
+    frames.set(id, callback);
+    return id;
+  };
+  const cancelAnimationFrame = (id) => {
+    frameActivity.cancelled += 1;
+    frames.delete(id);
+  };
   const attributesFor = (values) => [...values].map(([name, value]) => ({ name, value }));
   const makeDomNode = (name, parentElement = null, values = new Map(), matchedSelectors = []) => {
     const selectorMatches = new Set(matchedSelectors);
@@ -213,9 +257,12 @@ function makeFixture({
     return node;
   };
   const document = {
+    ...eventTarget("document"),
     documentElement: root,
     head: root,
     body,
+    hidden,
+    visibilityState,
     adoptedStyleSheets: adopted ? [] : undefined,
     createElement(tag) { return tag === "style" ? makeStyleNode() : { tagName: tag }; },
     getElementById(id) { return nodes.get(id) || null; },
@@ -235,10 +282,7 @@ function makeFixture({
       return [...(selectorNodes.get(selector) || [])];
     },
   };
-  const navigation = {
-    addEventListener(type, callback) { listeners.set(`navigation:${type}`, callback); },
-    removeEventListener(type) { listeners.delete(`navigation:${type}`); },
-  };
+  const navigation = eventTarget("navigation");
   class MockMutationObserver {
     constructor(callback) { this.callback = callback; this.options = null; this.observations = []; observers.push(this); }
     observe(target, options) { this.target = target; this.options = options; this.observations.push({ target, options }); }
@@ -248,16 +292,26 @@ function makeFixture({
     replaceSync(text) { this.text = text; }
   }
   const window = {
+    ...eventTarget("window"),
     navigation,
-    matchMedia() {
-      return {
-        matches: nativeAppearance === "dark",
-        addEventListener(type, callback) { listeners.set(`media:${type}`, callback); },
-        removeEventListener(type) { listeners.delete(`media:${type}`); },
-      };
+    navigator: navigatorAvailable ? {
+      hardwareConcurrency,
+      deviceMemory,
+      connection: { saveData, ...eventTarget("connection") },
+    } : undefined,
+    matchMedia(query) {
+      if (!mediaQueries.has(query)) {
+        mediaQueries.set(query, {
+          ...eventTarget(`media:${query}`),
+          media: query,
+          matches: query === "(prefers-reduced-motion: reduce)" ? reducedMotion
+            : query === "(prefers-color-scheme: dark)" ? nativeAppearance === "dark" : false,
+        });
+      }
+      return mediaQueries.get(query);
     },
-    addEventListener() {},
-    removeEventListener() {},
+    requestAnimationFrame,
+    cancelAnimationFrame,
   };
   const context = {
     window,
@@ -282,6 +336,8 @@ function makeFixture({
     clearTimeout(id) { timers.delete(id); },
     setInterval(callback, delay) { const id = ++nextId; intervals.set(id, { callback, delay }); return id; },
     clearInterval(id) { intervals.delete(id); },
+    requestAnimationFrame,
+    cancelAnimationFrame,
     console,
   };
   const payloadFor = (theme = {}, cssText = ".fixture { color: red; }") => {
@@ -309,6 +365,7 @@ function makeFixture({
   };
   return {
     addDynamicMessage, attrs, context, document, domNodes, flushTimers, intervals, listeners,
+    frameActivity, frames, listenerCount, mediaQueries,
     nodes, observers, partFixtures, payloadFor, revoked, root, rootClasses, rootStyle, timers, window,
   };
 }
@@ -345,6 +402,214 @@ function unscopedCssRules(css) {
     index += 1;
   }
   return rules;
+}
+
+function assertAnimationLifecycle(css) {
+  const motionQuery = "(prefers-reduced-motion: reduce)";
+  const animationListeners = [
+    "document:visibilitychange", "window:pagehide", "window:pageshow",
+    `media:${motionQuery}:change`, "connection:change",
+  ];
+  const install = (options = {}, animation = undefined) => {
+    const view = makeFixture(options);
+    vm.runInNewContext(view.payloadFor({ animation }), view.context);
+    return view;
+  };
+  const changeMotionPreference = (view, matches) => {
+    const query = view.mediaQueries.get(motionQuery);
+    assert.ok(query, "Enabled effects must observe the reduced-motion preference");
+    query.matches = matches;
+    query.dispatchEvent({ type: "change", matches });
+  };
+  const changeVisibility = (view, isHidden, state = isHidden ? "hidden" : "visible") => {
+    view.document.hidden = isHidden;
+    view.document.visibilityState = state;
+    view.document.dispatchEvent({ type: "visibilitychange" });
+  };
+  const assertNoFrameLoop = (view) => {
+    assert.equal(view.frameActivity.requested, 0, "Ambient effects must not request JavaScript frames");
+    assert.equal(view.frames.size, 0);
+    assert.equal(view.intervals.size, 1, "Animation must retain only the existing renderer safety interval");
+    assert.equal([...view.intervals.values()][0].delay, 30000);
+    assert.equal(view.timers.size, 0, "Visibility and motion changes must not start a frame timer");
+  };
+  const assertMotion = (view, expected) => {
+    assert.equal(view.attrs.get("data-dream-motion"), expected);
+    assertNoFrameLoop(view);
+  };
+
+  const staticView = install();
+  assert.equal(staticView.attrs.get("data-dream-animation"), "off");
+  assertMotion(staticView, "off");
+  const staticArt = staticView.rootStyle.getPropertyValue("--dream-skin-art");
+  const staticNodeCount = staticView.domNodes.size;
+  const staticListenerCount = staticView.listenerCount();
+  assert.ok(staticArt.includes("blob:fixture-1"), "Static themes must retain their wallpaper");
+  assert.equal(staticView.mediaQueries.has(motionQuery), false,
+    "Static themes do not need animation preference listeners");
+  for (const key of animationListeners) assert.equal(staticView.listenerCount(key), 0);
+  staticView.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+
+  for (const animation of [
+    { enabled: false, preset: "aurora", power: "auto" },
+    { enabled: "true", preset: "aurora", power: "auto" },
+    { enabled: true, preset: "https://example.com/template.html", power: "auto" },
+    { enabled: true, preset: "Aurora", power: "auto" },
+    { enabled: true, preset: "aurora", power: "high" },
+    { enabled: true, preset: "starfield" },
+    null,
+    "aurora",
+  ]) {
+    const disabled = install({ reducedMotion: true, saveData: true }, animation);
+    assert.equal(disabled.attrs.get("data-dream-animation"), "off",
+      "Disabled or unrecognized effects must leave the static image active");
+    assertMotion(disabled, "off");
+    for (const key of animationListeners) assert.equal(disabled.listenerCount(key), 0);
+    disabled.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+  }
+
+  for (const preset of ["aurora", "starfield"]) {
+    const running = install({}, { enabled: true, preset, power: "auto" });
+    assert.equal(running.attrs.get("data-dream-animation"), preset);
+    assertMotion(running, "running");
+    assert.equal(running.rootStyle.getPropertyValue("--dream-skin-art"), staticArt,
+      "Enabling atmosphere must preserve the selected wallpaper");
+    assert.equal(running.domNodes.size, staticNodeCount,
+      "Built-in atmosphere must not replace or add native content nodes");
+    for (const key of animationListeners) assert.equal(running.listenerCount(key), 1);
+    running.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+  }
+
+  const reduced = install({ reducedMotion: true }, { enabled: true, preset: "aurora", power: "auto" });
+  assertMotion(reduced, "reduced");
+  changeMotionPreference(reduced, false);
+  assertMotion(reduced, "running");
+  changeMotionPreference(reduced, true);
+  assertMotion(reduced, "reduced");
+  changeVisibility(reduced, true);
+  assertMotion(reduced, "hidden");
+  changeMotionPreference(reduced, false);
+  assertMotion(reduced, "hidden");
+  changeVisibility(reduced, false);
+  assertMotion(reduced, "running");
+  // Either visibility signal can indicate a minimized/background renderer.
+  changeVisibility(reduced, false, "hidden");
+  assertMotion(reduced, "hidden");
+  changeVisibility(reduced, true, "visible");
+  assertMotion(reduced, "hidden");
+  changeVisibility(reduced, false);
+  assertMotion(reduced, "running");
+  reduced.window.dispatchEvent({ type: "pagehide" });
+  assertMotion(reduced, "suspended");
+  changeVisibility(reduced, false);
+  changeMotionPreference(reduced, false);
+  reduced.window.navigator.connection.dispatchEvent({ type: "change" });
+  assertMotion(reduced, "suspended");
+  changeVisibility(reduced, true);
+  reduced.window.dispatchEvent({ type: "pageshow" });
+  assertMotion(reduced, "hidden");
+  changeVisibility(reduced, false);
+  assertMotion(reduced, "running");
+  reduced.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+
+  const initiallyHidden = install({ hidden: true }, { enabled: true, preset: "starfield", power: "auto" });
+  assertMotion(initiallyHidden, "hidden");
+  changeVisibility(initiallyHidden, false);
+  assertMotion(initiallyHidden, "running");
+  initiallyHidden.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+
+  for (const [options, expected] of [
+    [{ hardwareConcurrency: 4 }, "low-power"],
+    [{ hardwareConcurrency: 2 }, "low-power"],
+    [{ deviceMemory: 4 }, "low-power"],
+    [{ deviceMemory: 2 }, "low-power"],
+    [{ saveData: true }, "low-power"],
+    [{ hardwareConcurrency: 0, deviceMemory: 0 }, "running"],
+    [{ hardwareConcurrency: 5, deviceMemory: 8 }, "running"],
+    [{ navigatorAvailable: false }, "running"],
+  ]) {
+    const limited = install(options, { enabled: true, preset: "aurora", power: "auto" });
+    assertMotion(limited, expected);
+    limited.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+  }
+  const dataSaver = install({ saveData: true }, { enabled: true, preset: "starfield", power: "auto" });
+  dataSaver.window.navigator.connection.saveData = false;
+  dataSaver.window.navigator.connection.dispatchEvent({ type: "change" });
+  assertMotion(dataSaver, "running");
+  dataSaver.window.navigator.connection.saveData = true;
+  dataSaver.window.navigator.connection.dispatchEvent({ type: "change" });
+  assertMotion(dataSaver, "low-power");
+  dataSaver.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+
+  const userLow = install({}, { enabled: true, preset: "aurora", power: "low" });
+  assertMotion(userLow, "low-power");
+  userLow.window.navigator.connection.dispatchEvent({ type: "change" });
+  assertMotion(userLow, "low-power");
+  changeMotionPreference(userLow, true);
+  assertMotion(userLow, "reduced");
+  changeMotionPreference(userLow, false);
+  assertMotion(userLow, "low-power");
+  userLow.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
+
+  const repeated = install({}, { enabled: true, preset: "aurora", power: "auto" });
+  const oldState = repeated.window.__CODEX_DREAM_SKIN_STATE__;
+  vm.runInNewContext(repeated.payloadFor({
+    animation: { enabled: true, preset: "starfield", power: "auto" },
+  }), repeated.context);
+  assert.equal(oldState.cleanup(), false, "Stale cleanup must not disable a replacement effect");
+  assert.equal(repeated.attrs.get("data-dream-animation"), "starfield");
+  assertMotion(repeated, "running");
+  for (const key of animationListeners) assert.equal(repeated.listenerCount(key), 1,
+    `Repeated injection must retain exactly one ${key} callback`);
+  assert.equal(repeated.listenerCount(), staticListenerCount + animationListeners.length);
+  changeMotionPreference(repeated, true);
+  assertMotion(repeated, "reduced");
+  vm.runInNewContext(repeated.payloadFor(), repeated.context);
+  assert.equal(repeated.attrs.get("data-dream-animation"), "off");
+  assertMotion(repeated, "off");
+  for (const key of animationListeners) assert.equal(repeated.listenerCount(key), 0);
+  assert.equal(repeated.listenerCount(), staticListenerCount);
+  vm.runInNewContext(repeated.payloadFor({
+    animation: { enabled: true, preset: "aurora", power: "auto" },
+  }), repeated.context);
+  const replacement = repeated.window.__CODEX_DREAM_SKIN_STATE__;
+  assert.equal(repeated.document.adoptedStyleSheets.length, 1);
+  assert.equal(replacement.cleanup(), true);
+  assert.equal(repeated.listenerCount(), 0, "Pause/restore must remove all animation and renderer listeners");
+  assert.equal(repeated.intervals.size, 0);
+  assert.equal(repeated.timers.size, 0);
+  assert.equal(repeated.document.adoptedStyleSheets.length, 0);
+  assert.equal(repeated.attrs.size, 0);
+  assert.equal(repeated.rootStyle.values.size, 0);
+  assert.equal(repeated.window.__CODEX_DREAM_SKIN_STATE__, undefined);
+  changeVisibility(repeated, false);
+  repeated.window.dispatchEvent({ type: "pageshow" });
+  repeated.window.navigator.connection.dispatchEvent({ type: "change" });
+  repeated.mediaQueries.get(motionQuery).dispatchEvent({ type: "change", matches: false });
+  assert.equal(repeated.attrs.size, 0, "Events after pause must not recreate motion or skin attributes");
+
+  const layer = css.match(/html\[data-dream-skin="active"\]:is\(\[data-dream-animation="aurora"\], \[data-dream-animation="starfield"\]\) body::before\s*\{([^}]+)\}/)?.[1];
+  assert.ok(layer, "The built-in layer must require an active skin and a recognized preset");
+  assert.match(layer, /position:\s*fixed;/);
+  assert.match(layer, /pointer-events:\s*none;/);
+  assert.match(layer, /animation-play-state:\s*paused;/,
+    "The layer must remain frozen until the renderer explicitly permits motion");
+  assert.match(css, /html\[data-dream-skin="active"\]:is\(\[data-dream-animation="aurora"\], \[data-dream-animation="starfield"\]\):not\(\[data-dream-art-wide="true"\]\)\s*:is\([^}]*\[data-ds-part="main"\][^}]*\[data-ds-part="home"\][^}]*\)\s*\{[^}]*background:\s*rgb\(var\(--ds-bg-rgb\)\s*\/\s*\.66\)\s*!important;/,
+    "Opt-in atmosphere must remain visible behind compact and generic reading surfaces");
+  assert.doesNotMatch(layer, /(?:filter|will-change)\s*:/,
+    "The ambient layer must avoid costly filters and permanent compositor allocation");
+  assert.match(css, /html\[data-dream-skin="active"\]\[data-dream-motion="low-power"\] body::before\s*\{[^}]*animation-name:\s*none;/,
+    "Low-power mode must release the animated compositor layer rather than just pausing it");
+  const drift = css.match(/@keyframes dream-skin-ambient-drift\s*\{\s*from\s*\{([^}]+)\}\s*to\s*\{([^}]+)\}\s*\}/);
+  assert.ok(drift);
+  for (const frame of drift.slice(1)) {
+    assert.deepEqual([...frame.matchAll(/([a-z-]+)\s*:/g)].map((match) => match[1]), ["transform"],
+      "Built-in animation frames must change only a compositable transform");
+  }
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*html\[data-dream-skin="active"\]:is\(\[data-dream-animation="aurora"\], \[data-dream-animation="starfield"\]\) body::before\s*\{[^}]*animation:\s*none\s*!important;/,
+    "CSS must independently stop the effect when reduced motion is requested");
+  assert.doesNotMatch(unscopedCssRules(css).join("\n"), /data-dream-(?:animation|motion)|body::before/,
+    "Animation layer rules must not survive skin pause/restore");
 }
 
 export async function runRendererRuntimeTest(assetRoot) {
@@ -872,6 +1137,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(fallbackState.cleanup(), true);
   assert.equal(fallback.nodes.has("codex-dream-skin-style"), false);
 
+  assertAnimationLifecycle(css);
   console.log(`PASS: unified renderer runtime (${path.basename(assetRoot)})`);
 }
 

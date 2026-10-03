@@ -82,6 +82,7 @@ tar.gz 用户需要自装依赖：`nodejs`（>= 22）与 `curl`（启动探测�
 | `6` | 打开主题文件夹 |
 | `7` | 一键恢复官方外观 |
 | `8` / `9` | 打开主题库 Gallery / 在线 Studio |
+| `M` | 动画背景（极光 / 星空、开关、节能模式） |
 | `A` | 开机自启（开 / 关，再按一次即切换） |
 | `D` | 诊断信息 |
 | `U` | 检查更新 |
@@ -96,6 +97,11 @@ tar.gz 用户需要自装依赖：`nodejs`（>= 22）与 `curl`（启动探测�
 | `dreamskin restore` | 恢复官方外观并正常重启 Codex（同菜单 7） |
 | `dreamskin import` | 导入主题 ZIP（交互式输入路径） |
 | `dreamskin bg` | 更换背景图（交互式输入路径） |
+| `dreamskin animation` | 打开动画背景设置菜单 |
+| `dreamskin animation preset aurora` / `preset starfield` | 选择并开启内置极光 / 星空背景 |
+| `dreamskin animation on` / `off` | 开启 / 关闭动画，保留已选预设和原有壁纸 |
+| `dreamskin animation power low` / `power auto` | 节能静止 / 自动判断资源与动态效果偏好 |
+| `dreamskin animation status` / `reset` | 查看设置 / 恢复默认关闭状态 |
 | `dreamskin theme list` | 列出已保存主题 |
 | `dreamskin theme apply <id>` | 应用某个已保存主题 |
 | `dreamskin autostart` | 切换开机自启（无参数；运行一次开启，再运行一次关闭） |
@@ -107,6 +113,27 @@ tar.gz 用户需要自装依赖：`nodejs`（>= 22）与 `curl`（启动探测�
 
 应用菜单里的“Dream Skin”入口会打开终端交互菜单；网站的一键换肤使用单独隐藏的
 `dreamskin://` 协议处理器。当前 Linux 版未提供常驻图形托盘或原生文件选择器。
+
+### 动画背景
+
+默认仍显示静态壁纸。菜单 `M` 可开启本地内置的极光或星空，营造 Astro 风格网页模板的
+缓慢动态氛围。它们只是一层本地 CSS 渐变，不导入 Astro 页面、HTML、JavaScript、视频
+或远程资源；原有壁纸、主题配色和原生控件继续保留。关闭后恢复原有静态效果。
+
+设置独立保存在状态目录的 `animation.json`，对当前及之后切换的主题生效；更新引擎、
+切换主题、暂停和恢复换肤均保留设置，不修改主题 ZIP 合同或 Safe CSS 策略。正在使用
+本版本注入器时会自动热更新；暂停状态下只保存，下次启动换肤时生效，不会自动启动
+或重启 Codex。旧版已安装的注入器需要更新到包含此功能的版本才会读取这些设置。
+
+动画使用单层缓慢变换，没有逐帧 JavaScript、模糊滤镜、画布或视频。窗口隐藏/最小化
+以及页面挂起时暂停；系统设置“减少动态效果”时显示静止画面。`power low` 强制静止，
+自动模式在浏览器报告不超过 4 个 CPU 线程、不超过 4 GB 内存或启用节省流量时也保持
+静止。网页无法可靠检测所有桌面电源策略，可手动选择节能模式。任务背景设为 `off` 时
+保留任务页的背景关闭行为。减少动态效果和低资源模式仍可显示所选预设的静态氛围。
+
+本机设置损坏或不符合固定 schema 时，注入器回退到静态壁纸；运行
+`dreamskin animation reset` 可恢复默认设置。动画与系统 GPU、Wayland/X11 的配合仍需
+真实 Codex 窗口验证；隔离浏览器预览不能替代桌面实测。
 
 ### 主题导入与手动目录
 

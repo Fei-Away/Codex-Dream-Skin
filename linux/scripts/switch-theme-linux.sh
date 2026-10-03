@@ -173,7 +173,7 @@ fi
 progress "$(dreamskin_text applying_theme_to_chatgpt)"
 if hot_reapply_theme "$PORT" 8000 "$OPERATION_TOKEN"; then
   progress "$(dreamskin_text verifying_rendered_theme)"
-  "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 10000 >/dev/null \
+  "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --animation-settings "$ANIMATION_SETTINGS_PATH" --timeout-ms 10000 >/dev/null \
     || fail "Theme injection completed but the visible renderer did not verify the exact active theme."
   progress "$(dreamskin_text skin_applied): ${THEME_NAME}"
   exit 0

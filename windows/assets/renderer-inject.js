@@ -20,7 +20,7 @@
     "data-dream-skin", SHELL_ATTR,
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
-    "data-dream-art-ready",
+    "data-dream-art-ready", "data-dream-animation", "data-dream-motion",
   ];
   const initialRoute = new URLSearchParams(String(location.search || ""))
     .get("initialRoute") || "";
@@ -39,6 +39,12 @@
   const STYLE_REVISION = __DREAM_SKIN_STYLE_REVISION_JSON__;
   const PAYLOAD_REVISION = __DREAM_SKIN_PAYLOAD_REVISION_JSON__;
   const THEME = themeConfig && typeof themeConfig === "object" ? themeConfig : {};
+  // Local built-in effects only. Unknown settings cannot activate motion or
+  // inject arbitrary style/markup through the renderer.
+  const ANIMATION = THEME.animation || {};
+  const animationEnabled = ANIMATION.enabled === true &&
+    ["aurora", "starfield"].includes(ANIMATION.preset) &&
+    ["auto", "low"].includes(ANIMATION.power);
   const ART = THEME.art && typeof THEME.art === "object" ? THEME.art : {};
   const ART_METADATA = THEME.artMetadata && typeof THEME.artMetadata === "object"
     ? THEME.artMetadata : null;
@@ -852,12 +858,40 @@
     return scope;
   };
 
+  let reducedMotionQuery = null;
+  let pageSuspended = false;
+  const connection = animationEnabled ? window.navigator?.connection : null;
+  if (animationEnabled) {
+    try { reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)"); } catch {}
+  }
+  const refreshMotion = () => {
+    if (window[DISABLED_KEY]) return;
+    const root = document.documentElement;
+    if (!root) return;
+    setAttribute(root, "data-dream-animation", animationEnabled ? ANIMATION.preset : "off");
+    let motion = "off";
+    if (animationEnabled) {
+      const limitedDevice = (window.navigator?.hardwareConcurrency > 0 &&
+        window.navigator.hardwareConcurrency <= 4) ||
+        (window.navigator?.deviceMemory > 0 && window.navigator.deviceMemory <= 4);
+      motion = pageSuspended ? "suspended"
+        : document.hidden || document.visibilityState === "hidden" ? "hidden"
+        : reducedMotionQuery?.matches ? "reduced"
+        : ANIMATION.power === "low" || limitedDevice || connection?.saveData ? "low-power"
+        : "running";
+    }
+    setAttribute(root, "data-dream-motion", motion);
+  };
+  const suspendMotion = () => { pageSuspended = true; refreshMotion(); };
+  const resumeMotion = () => { pageSuspended = false; refreshMotion(); };
+
   const ensure = ({ root: rootPass = true, scope: scopePass = false, parts: partPass = false } = {}) => {
     if (window[DISABLED_KEY]) return;
     const root = document.documentElement;
     if (!root) return;
     metrics.ensureCalls += 1;
     if (rootPass) applyRootState(root);
+    refreshMotion();
     if (partPass) refreshParts();
     if (scopePass) refreshScope();
   };
@@ -888,6 +922,13 @@
     if (analysisTimer) clearTimeout(analysisTimer);
     if (state?.mediaHandler && state?.mediaQuery) {
       try { state.mediaQuery.removeEventListener("change", state.mediaHandler); } catch {}
+    }
+    if (animationEnabled) {
+      document.removeEventListener?.("visibilitychange", refreshMotion);
+      window.removeEventListener?.("pagehide", suspendMotion);
+      window.removeEventListener?.("pageshow", resumeMotion);
+      reducedMotionQuery?.removeEventListener?.("change", refreshMotion);
+      connection?.removeEventListener?.("change", refreshMotion);
     }
     if (state?.navigationHandler && state?.navigation) {
       try { state.navigation.removeEventListener("navigate", state.navigationHandler); } catch {}
@@ -975,6 +1016,13 @@
   };
   const firstEnsureStartedAt = now();
   ensure({ root: true, parts: true });
+  if (animationEnabled) {
+    document.addEventListener?.("visibilitychange", refreshMotion);
+    window.addEventListener?.("pagehide", suspendMotion);
+    window.addEventListener?.("pageshow", resumeMotion);
+    reducedMotionQuery?.addEventListener?.("change", refreshMotion);
+    connection?.addEventListener?.("change", refreshMotion);
+  }
   const initialScope = refreshScope();
   metrics.firstEnsureMs = Number((now() - firstEnsureStartedAt).toFixed(3));
 
