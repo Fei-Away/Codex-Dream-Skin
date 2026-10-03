@@ -136,21 +136,22 @@ const outputs = [
     // contract beside the renderer assets while keeping tools/selectors.json
     // as the only editable source.
     content: selectorSource,
-    paths: ["macos/assets/selectors.json", "windows/assets/selectors.json"],
+    paths: ["macos/assets/selectors.json", "windows/assets/selectors.json", "linux/assets/selectors.json"],
   },
   {
     content: compileSelectorTokens(sourceCss, "runtime/dream-skin.css"),
-    paths: ["macos/assets/dream-skin.css", "windows/assets/dream-skin.css"],
+    paths: ["macos/assets/dream-skin.css", "windows/assets/dream-skin.css", "linux/assets/dream-skin.css"],
   },
   {
     content: compileRuntime(sourceRuntime),
-    paths: ["macos/assets/renderer-inject.js", "windows/assets/renderer-inject.js"],
+    paths: ["macos/assets/renderer-inject.js", "windows/assets/renderer-inject.js", "linux/assets/renderer-inject.js"],
   },
   {
     content: sourceThemePackageValidator,
     paths: [
       "macos/assets/theme-package-validator.mjs",
       "windows/assets/theme-package-validator.mjs",
+      "linux/assets/theme-package-validator.mjs",
     ],
   },
   {
@@ -158,6 +159,7 @@ const outputs = [
     paths: [
       "macos/assets/safe-css-validator.mjs",
       "windows/assets/safe-css-validator.mjs",
+      "linux/assets/safe-css-validator.mjs",
     ],
   },
   {
@@ -165,6 +167,7 @@ const outputs = [
     paths: [
       "macos/assets/safe-css-policy.json",
       "windows/assets/safe-css-policy.json",
+      "linux/assets/safe-css-policy.json",
     ],
   },
   {
@@ -172,11 +175,12 @@ const outputs = [
     paths: [
       "macos/scripts/validate-safe-css-file.mjs",
       "windows/scripts/validate-safe-css-file.mjs",
+      "linux/scripts/validate-safe-css-file.mjs",
     ],
   },
   {
     content: sourceImageMetadata,
-    paths: ["macos/scripts/image-metadata.mjs"],
+    paths: ["macos/scripts/image-metadata.mjs", "linux/scripts/image-metadata.mjs"],
   },
   {
     content: compileWindowsImageMetadata(sourceImageMetadata),

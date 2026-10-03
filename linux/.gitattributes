@@ -1,0 +1,4 @@
+# The one-click contract test embeds control characters as JS escapes; the
+# historical first commit stored a raw NUL fixture, so pin this path to text
+# diffs so future changes always render line-by-line.
+tests/community-http-bounded.test.mjs diff

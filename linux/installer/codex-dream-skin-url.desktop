@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Dream Skin URL Handler
+Comment=Apply Dream Skin themes from DreamSkin.cc
+NoDisplay=true
+Exec=dreamskin community %u
+Terminal=false
+MimeType=x-scheme-handler/dreamskin;

@@ -1450,6 +1450,90 @@ html[data-dream-skin="active"] [data-ds-part="message"] { border-radius: 16px; }
   html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__ __DREAM_SELECTOR_HOME_SUGGESTIONS__ button { min-height: 112px !important; font-size: 12px !important; }
 }
 
+/* Built-in local atmosphere. One gradient layer is rasterized once and moved
+   with a slow compositor transform; no canvas, video, filters, network assets,
+   per-frame JavaScript or permanent will-change allocation. The selected
+   wallpaper and native surface scrims remain beneath/above it respectively. */
+html[data-dream-skin="active"]:is([data-dream-animation="aurora"], [data-dream-animation="starfield"]) body {
+  isolation: isolate;
+}
+
+/* Compact artwork and the generic L0 shell use an opaque base by default.
+   Let atmosphere through only while enabled; keep a substantial reading veil
+   and leave the selected image/hero and all foreground controls in place. */
+html[data-dream-skin="active"]:is([data-dream-animation="aurora"], [data-dream-animation="starfield"]):not([data-dream-art-wide="true"])
+  :is(__DREAM_SELECTOR_SHELL_MAIN__, [data-ds-part="main"], [data-ds-part="home"]) {
+  background: rgb(var(--ds-bg-rgb) / .66) !important;
+}
+
+html[data-dream-skin="active"]:is([data-dream-animation="aurora"], [data-dream-animation="starfield"]):not([data-dream-art-wide="true"])
+  :is(__DREAM_SELECTOR_SHELL_MAIN__, [data-ds-part="main"], [data-ds-part="home"])::before {
+  opacity: .4;
+}
+
+html[data-dream-skin="active"]:is([data-dream-animation="aurora"], [data-dream-animation="starfield"]) body::before {
+  content: "";
+  position: fixed;
+  inset: -3%;
+  z-index: -1;
+  pointer-events: none;
+  contain: strict;
+  opacity: .62;
+  background-repeat: no-repeat;
+  animation: dream-skin-ambient-drift 28s ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+
+html[data-dream-skin="active"][data-dream-animation="aurora"] body::before {
+  background-image:
+    radial-gradient(ellipse at 18% 82%, #2ad4ab80, transparent 54%),
+    radial-gradient(ellipse at 74% 16%, #568bfa80, transparent 56%),
+    radial-gradient(ellipse at 86% 76%, #a773de70, transparent 48%);
+}
+
+html[data-dream-skin="active"][data-dream-animation="starfield"] body::before {
+  background-image:
+    radial-gradient(circle at 9% 18%, #d7ecff 1px, transparent 2px),
+    radial-gradient(circle at 24% 67%, #d7ecff 1px, transparent 2px),
+    radial-gradient(circle at 42% 29%, #d7ecff 1.5px, transparent 2.5px),
+    radial-gradient(circle at 63% 83%, #d7ecff 1px, transparent 2px),
+    radial-gradient(circle at 78% 36%, #d7ecff 1.5px, transparent 2.5px),
+    radial-gradient(circle at 91% 72%, #d7ecff 1px, transparent 2px),
+    radial-gradient(ellipse at 70% 36%, #568bfa50, transparent 55%);
+  background-size: 320px 240px, 430px 340px, 580px 470px,
+    390px 310px, 680px 530px, 510px 410px, 100% 100%;
+  background-repeat: repeat;
+  animation-duration: 40s;
+  opacity: .72;
+}
+
+html[data-dream-skin="active"][data-dream-motion="running"] body::before {
+  animation-play-state: running;
+}
+
+html[data-dream-skin="active"][data-dream-motion="low-power"] body::before {
+  animation-name: none;
+  transform: none;
+}
+
+/* Preserve the task artwork opt-out while keeping home atmosphere available. */
+html[data-dream-skin="active"]:is([data-dream-task-mode="off"], [data-dream-art-task-mode="off"]):not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)):not(:has([data-ds-part="home"])) body::before {
+  content: none;
+  animation: none;
+}
+
+@keyframes dream-skin-ambient-drift {
+  from { transform: translate(-1.5%, 1%) scale(1.02); }
+  to { transform: translate(1.5%, -1%) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-dream-skin="active"]:is([data-dream-animation="aurora"], [data-dream-animation="starfield"]) body::before {
+    animation: none !important;
+    transform: none;
+  }
+}
+
 @layer dreamskin-accessibility {
   @media (prefers-reduced-motion: reduce) {
     html[data-dream-skin="active"] *,

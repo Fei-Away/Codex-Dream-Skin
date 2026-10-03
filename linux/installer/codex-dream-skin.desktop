@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Dream Skin
+Comment=External themes for Codex desktop
+Exec=dreamskin
+Terminal=true
+Categories=Utility;Development;

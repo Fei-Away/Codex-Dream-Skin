@@ -103,7 +103,7 @@ function parseArguments(argv) {
   for (const key of ["source", "stage", "platform", "client-version"]) {
     if (!values[key]) fail(`Missing --${key}`);
   }
-  if (!new Set(["macos", "windows"]).has(values.platform)) {
+  if (!new Set(["macos", "windows", "linux"]).has(values.platform)) {
     fail(`Unsupported platform: ${values.platform}`);
   }
   return values;
@@ -356,8 +356,8 @@ function validateManifest(value, platform, clientVersion) {
   }
   const platforms = assertStringSet(manifest.platforms, "manifest.platforms", {
     min: 1,
-    max: 2,
-    allowed: new Set(["macos", "windows"]),
+    max: 3,
+    allowed: new Set(["macos", "windows", "linux"]),
   });
   if (!platforms.has(platform)) fail(`Theme package does not support ${platform}`);
   const capabilities = assertStringSet(manifest.capabilities, "manifest.capabilities", {
