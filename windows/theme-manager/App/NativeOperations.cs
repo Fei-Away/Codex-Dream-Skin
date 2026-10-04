@@ -35,11 +35,11 @@ internal static class RecycleBin
     // RECYCLEONDELETE requires recycling; there is no permanent-delete fallback.
     public static void MoveDirectory(string path, IntPtr owner)
     {
-        object? item = null;
+        IShellItem? item = null;
         IFileOperation? operation = null;
         try
         {
-            var iid = new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe");
+            var iid = typeof(IShellItem).GUID;
             Marshal.ThrowExceptionForHR(SHCreateItemFromParsingName(path, IntPtr.Zero, ref iid, out item));
             operation = (IFileOperation)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("3ad05575-8857-4850-9277-11b85bdb8e09"), true)!)!;
             operation.SetOwnerWindow(owner);
@@ -57,7 +57,20 @@ internal static class RecycleBin
     }
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
-    private static extern int SHCreateItemFromParsingName(string path, IntPtr bindContext, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out object item);
+    private static extern int SHCreateItemFromParsingName(string path, IntPtr bindContext, ref Guid iid, out IShellItem item);
+
+    // Native IFileOperation methods require IShellItem*, not the default interface
+    // selected when marshalling System.Object. Passing that other vtable can crash
+    // inside the shell instead of returning an HRESULT.
+    [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellItem
+    {
+        void BindToHandler(IntPtr bindContext, ref Guid handler, ref Guid iid, out IntPtr result);
+        void GetParent(out IShellItem parent);
+        void GetDisplayName(uint displayNameType, out IntPtr name);
+        void GetAttributes(uint mask, out uint attributes);
+        void Compare(IShellItem other, uint hint, out int order);
+    }
 
     [ComImport, Guid("947AAB5F-0A5C-4C13-B4D6-4BF7836FC9F8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IFileOperation
@@ -69,17 +82,17 @@ internal static class RecycleBin
         void SetProgressDialog(IntPtr dialog);
         void SetProperties(IntPtr properties);
         void SetOwnerWindow(IntPtr owner);
-        void ApplyPropertiesToItem([MarshalAs(UnmanagedType.Interface)] object item);
+        void ApplyPropertiesToItem(IShellItem item);
         void ApplyPropertiesToItems([MarshalAs(UnmanagedType.IUnknown)] object items);
-        void RenameItem([MarshalAs(UnmanagedType.Interface)] object item, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr sink);
+        void RenameItem(IShellItem item, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr sink);
         void RenameItems([MarshalAs(UnmanagedType.IUnknown)] object items, [MarshalAs(UnmanagedType.LPWStr)] string name);
-        void MoveItem([MarshalAs(UnmanagedType.Interface)] object item, [MarshalAs(UnmanagedType.Interface)] object destination, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr sink);
-        void MoveItems([MarshalAs(UnmanagedType.IUnknown)] object items, [MarshalAs(UnmanagedType.Interface)] object destination);
-        void CopyItem([MarshalAs(UnmanagedType.Interface)] object item, [MarshalAs(UnmanagedType.Interface)] object destination, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr sink);
-        void CopyItems([MarshalAs(UnmanagedType.IUnknown)] object items, [MarshalAs(UnmanagedType.Interface)] object destination);
-        void DeleteItem([MarshalAs(UnmanagedType.Interface)] object item, IntPtr sink);
+        void MoveItem(IShellItem item, IShellItem destination, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr sink);
+        void MoveItems([MarshalAs(UnmanagedType.IUnknown)] object items, IShellItem destination);
+        void CopyItem(IShellItem item, IShellItem destination, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr sink);
+        void CopyItems([MarshalAs(UnmanagedType.IUnknown)] object items, IShellItem destination);
+        void DeleteItem(IShellItem item, IntPtr sink);
         void DeleteItems([MarshalAs(UnmanagedType.IUnknown)] object items);
-        void NewItem([MarshalAs(UnmanagedType.Interface)] object destination, uint attributes, [MarshalAs(UnmanagedType.LPWStr)] string name, [MarshalAs(UnmanagedType.LPWStr)] string template, IntPtr sink);
+        void NewItem(IShellItem destination, uint attributes, [MarshalAs(UnmanagedType.LPWStr)] string name, [MarshalAs(UnmanagedType.LPWStr)] string template, IntPtr sink);
         void PerformOperations();
         void GetAnyOperationsAborted([MarshalAs(UnmanagedType.Bool)] out bool aborted);
     }

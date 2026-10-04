@@ -46,12 +46,25 @@ internal static class Program
         Console.WriteLine("PASS per-user operation mutex contention and release");
 
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DreamSkin.NativeTest-" + Guid.NewGuid().ToString("N"));
-        var name = "recycle-probe-" + Guid.NewGuid().ToString("N");
+        var name = "recycle-probe-主题 " + Guid.NewGuid().ToString("N");
         var directory = Path.Combine(root, name);
         Directory.CreateDirectory(directory);
-        File.WriteAllText(Path.Combine(directory, "probe.txt"), "DreamSkin native Recycle Bin verification fixture.");
+        const string contents = "DreamSkin native Recycle Bin verification fixture.";
+        File.WriteAllText(Path.Combine(directory, "probe.txt"), contents);
+        var nested = Path.Combine("子目录", "背景.bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(directory, nested))!);
+        byte[] nestedContents = [0, 1, 127, 128, 255];
+        File.WriteAllBytes(Path.Combine(directory, nested), nestedContents);
         try
         {
+            var missingRejected = false;
+            try { RecycleBin.MoveDirectory(Path.Combine(root, "missing"), IntPtr.Zero); }
+            catch (Exception ex) when (ex is COMException or FileNotFoundException or DirectoryNotFoundException)
+            { missingRejected = true; }
+            if (!missingRejected || File.ReadAllText(Path.Combine(directory, "probe.txt")) != contents)
+                throw new Exception("Missing recycle target was not rejected without changing its sibling.");
+            Console.WriteLine("PASS missing recycle target fails without changing sibling fixture");
+
             RecycleBin.MoveDirectory(directory, IntPtr.Zero);
             if (Directory.Exists(directory)) throw new Exception("Recycled test directory still exists.");
             dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application", true)!)!;
@@ -70,7 +83,15 @@ internal static class Program
                     {
                         string itemName = ((dynamic)item).Name;
                         string original = Convert.ToString(((dynamic)item).ExtendedProperty("System.Recycle.DeletedFrom")) ?? "";
-                        if (itemName == name && string.Equals(original.TrimEnd('\\'), root, StringComparison.OrdinalIgnoreCase)) { found = true; break; }
+                        if (itemName == name && string.Equals(original.TrimEnd('\\'), root, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string recycledPath = ((dynamic)item).Path;
+                            if (File.ReadAllText(Path.Combine(recycledPath, "probe.txt")) != contents ||
+                                !File.ReadAllBytes(Path.Combine(recycledPath, nested)).SequenceEqual(nestedContents))
+                                throw new Exception("Recycled directory contents were not preserved.");
+                            found = true;
+                            break;
+                        }
                     }
                     finally { Marshal.FinalReleaseComObject(item); }
                 }
@@ -82,7 +103,7 @@ internal static class Program
                 Marshal.FinalReleaseComObject((object)shell);
             }
             if (!found) throw new Exception("The removed fixture was not found in the Windows Recycle Bin.");
-            Console.WriteLine("PASS directory appears in Windows Recycle Bin with original location");
+            Console.WriteLine("PASS Unicode directory appears in Windows Recycle Bin with original location and intact nested contents");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
     }
