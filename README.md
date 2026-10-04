@@ -99,6 +99,8 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
 
 macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studio」入口，可以直接打开。
 
+本机主题的透明度调节和删除入口见[主题管理](./docs/theme-management.md)。
+
 ### 一键换肤
 
 在 DreamSkin.cc 上看到喜欢的主题，点「一键换肤」就能让本机客户端直接装上，不用先下载再手动导入。

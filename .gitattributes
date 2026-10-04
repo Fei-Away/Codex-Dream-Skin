@@ -18,6 +18,7 @@ windows/installer/languages/Inno-Setup-License.txt text eol=lf
 # from it stay LF on every platform -- sources included, not just outputs.
 runtime/** text eol=lf
 tools/selectors.json text eol=lf
+tools/windows-shell.css text eol=lf
 macos/assets/** text eol=lf
 windows/assets/** text eol=lf
 macos/scripts/image-metadata.mjs text eol=lf

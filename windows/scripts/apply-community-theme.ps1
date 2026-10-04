@@ -1,17 +1,21 @@
-﻿[CmdletBinding()]
+﻿[CmdletBinding(DefaultParameterSetName = 'Apply')]
 param(
-  [Parameter(Mandatory = $true, Position = 0)]
+  [Parameter(Mandatory = $true, Position = 0, ParameterSetName = 'Apply')]
   [ValidateNotNullOrEmpty()]
-  [string]$Uri
+  [string]$Uri,
+  [Parameter(Mandatory = $true, ParameterSetName = 'Functions')]
+  [switch]$FunctionsOnly
 )
 
-$ErrorActionPreference = 'Stop'
-Set-StrictMode -Version 2.0
-. (Join-Path $PSScriptRoot 'common-windows.ps1')
-. (Join-Path $PSScriptRoot 'theme-windows.ps1')
-. (Join-Path $PSScriptRoot 'localization-windows.ps1')
-$dreamSkinLanguage = Resolve-DreamSkinLanguage `
-  -StateRoot (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+if (-not $FunctionsOnly) {
+  $ErrorActionPreference = 'Stop'
+  Set-StrictMode -Version 2.0
+  . (Join-Path $PSScriptRoot 'common-windows.ps1')
+  . (Join-Path $PSScriptRoot 'theme-windows.ps1')
+  . (Join-Path $PSScriptRoot 'localization-windows.ps1')
+  $dreamSkinLanguage = Resolve-DreamSkinLanguage `
+    -StateRoot (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin')
+}
 
 function Get-DreamSkinCommunityText {
   param([Parameter(Mandatory = $true)][string]$Key, [object[]]$FormatArguments = @())
@@ -956,6 +960,8 @@ function Invoke-DreamSkinCommunityApply {
     $mutex.Dispose()
   }
 }
+
+if ($FunctionsOnly) { return }
 
 $previousProtocol = [System.Net.ServicePointManager]::SecurityProtocol
 try {

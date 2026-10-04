@@ -19,6 +19,8 @@ if ([regex]::Matches($rawSource, $dotSourcePattern).Count -ne 3) {
   throw 'Preserved-skin fixture could not isolate the three runtime imports.'
 }
 $rawSource = [regex]::Replace($rawSource, $dotSourcePattern, '')
+$rawSource = $rawSource.Replace(". (Join-Path (Split-Path -Parent `$Injector) 'apply-community-theme.ps1') -FunctionsOnly", '')
+$rawSource = $rawSource.Replace('exit 0', 'return')
 $rawSource = $rawSource.Replace(
   '$Injector = Join-Path $PSScriptRoot ''injector.mjs''',
   '$Injector = ''mock-injector.mjs'''
@@ -36,7 +38,15 @@ function Invoke-DreamSkinStartupFixture {
     [Parameter(Mandatory = $true)][string[]]$VerifyPayloads,
     [Parameter(Mandatory = $true)][string]$OncePayload,
     [switch]$ReuseExistingCdp,
-    [switch]$WithResultToken
+    [switch]$WithResultToken,
+    [switch]$ExplicitRestart,
+    [switch]$PromptForRestart,
+    [switch]$DeclineRestart,
+    [switch]$ChangeIdentityAfterConsent,
+    [switch]$SelectTheme,
+    [switch]$SupersedeTheme,
+    [switch]$WriteThemeFailure,
+    [switch]$SuccessfulVerification
   )
 
   $script:daemon = [pscustomobject]@{ Id = 4242; HasExited = $false }
@@ -57,6 +67,40 @@ function Invoke-DreamSkinStartupFixture {
   $script:oncePayload = $OncePayload
   $script:lastError = '(no error)'
   $script:resultAppearanceRecovery = $null
+  $script:restartPromptCalls = 0
+  $script:browserId = 'fixture-browser'
+  $script:themeFingerprint = 'previous'
+  $script:themeWriteCalls = 0
+  $script:themeRestoreCalls = 0
+  $script:snapshotRemoved = $false
+
+  function Confirm-DreamSkinRestart {
+    param([string]$Message)
+    $script:restartPromptCalls += 1
+    if ($ChangeIdentityAfterConsent) { $script:browserId = 'replacement-browser' }
+    return -not $DeclineRestart
+  }
+  function Get-DreamSkinThemeRuntimeContentFingerprint {
+    param([string]$ThemeDirectory)
+    if ([IO.Path]::GetFileName($ThemeDirectory).StartsWith('.tray-apply-')) { return 'previous' }
+    return $script:themeFingerprint
+  }
+  function Copy-DreamSkinActiveThemeSnapshot { param($Paths, $Destination) }
+  function Use-DreamSkinSavedTheme {
+    param($ThemeDirectory, $StateRoot)
+    $script:themeWriteCalls += 1
+    $script:themeFingerprint = 'selected'
+    if ($WriteThemeFailure) { throw 'fixture-theme-write-failure' }
+  }
+  function Restore-DreamSkinActiveThemeSnapshot {
+    param($SnapshotDirectory, $StateRoot, $ExpectedContentFingerprint)
+    $script:themeRestoreCalls += 1
+    $script:themeFingerprint = $ExpectedContentFingerprint
+  }
+  function Remove-DreamSkinManagedDirectoryVerified {
+    param($Path, $Root)
+    $script:snapshotRemoved = $true
+  }
 
   function Enter-DreamSkinOperationLock { param([int]$TimeoutMilliseconds); return 'mock-lock' }
   function Exit-DreamSkinOperationLock { param([object]$Mutex) }
@@ -110,7 +154,7 @@ function Invoke-DreamSkinStartupFixture {
   function Get-DreamSkinVerifiedCdpIdentity {
     param([int]$Port, [object]$Codex)
     if (-not $script:cdpReady) { return $null }
-    return [pscustomobject]@{ BrowserId = 'fixture-browser' }
+    return [pscustomobject]@{ BrowserId = $script:browserId }
   }
   function Get-DreamSkinVerifiedCdpIdentityForAnyRegistered { param([int]$Port); return $null }
   function Test-DreamSkinPortAvailable { param([int]$Port); return $true }
@@ -162,9 +206,11 @@ function Invoke-DreamSkinStartupFixture {
   function Invoke-DreamSkinNative {
     param([string]$FilePath, [object[]]$ArgumentList, [switch]$DiscardStderr)
     if ($ArgumentList -contains '--verify') {
+      if ($SupersedeTheme -and $script:themeWriteCalls -gt 0) { $script:themeFingerprint = 'newer' }
       $index = [Math]::Min($script:verifyPayloadIndex, $script:verifyPayloads.Count - 1)
       $script:verifyPayloadIndex += 1
-      return [pscustomobject]@{ ExitCode = 2; Output = @($script:verifyPayloads[$index]) }
+      $verifyCode = if ($SuccessfulVerification) { 0 } else { 2 }
+      return [pscustomobject]@{ ExitCode = $verifyCode; Output = @($script:verifyPayloads[$index]) }
     }
     if ($ArgumentList -contains '--once') {
       return [pscustomobject]@{ ExitCode = 2; Output = @($script:oncePayload) }
@@ -215,11 +261,10 @@ function Invoke-DreamSkinStartupFixture {
   try {
     $startBlock = [scriptblock]::Create($rawSource)
     try {
-      if ($WithResultToken) {
-        & $startBlock -Port 9335 -ResultToken '0123456789abcdef0123456789abcdef'
-      } else {
-        & $startBlock -Port 9335
-      }
+      $startParameters = @{ Port = 9335; RestartExisting = $ExplicitRestart; PromptRestart = $PromptForRestart }
+      if ($WithResultToken) { $startParameters.ResultToken = '0123456789abcdef0123456789abcdef' }
+      if ($SelectTheme) { $startParameters.SavedThemeDirectory = 'fixture-saved-theme' }
+      & $startBlock @startParameters
     } catch {
       $script:lastError = $_.Exception.Message
       $failed = $_.Exception.Message -like 'Dream Skin verification failed.*'
@@ -237,6 +282,11 @@ function Invoke-DreamSkinStartupFixture {
     RemoveCalls = $script:removeCalls
     ResultAppearanceRecovery = $script:resultAppearanceRecovery
     LastError = $script:lastError
+    RestartPromptCalls = $script:restartPromptCalls
+    ThemeFingerprint = $script:themeFingerprint
+    ThemeWriteCalls = $script:themeWriteCalls
+    ThemeRestoreCalls = $script:themeRestoreCalls
+    SnapshotRemoved = $script:snapshotRemoved
   }
 }
 
@@ -253,6 +303,7 @@ $renderedPayload = @'
 $hiddenPayload = @'
 {"mode":"verify","port":9335,"targets":[{"targetId":"fixture-target","result":{
 "installed":true,"stylePresent":true,
+"documentVisibility":"hidden","documentHidden":true,
 "readiness":{"windowPass":false,"documentPass":false,"viewportPass":true,"structurePass":true},
 "pass":false}}]}
 '@
@@ -310,6 +361,56 @@ if (-not $reusedHidden.Failed -or $reusedHidden.CodexStopped -or
   $reusedHidden.AppearanceRestoreCalls -ne 0 -or $reusedHidden.RemoveCalls -ne 1) {
   throw 'A hidden reused CDP session did not remove only its failed live injection.'
 }
+$explicitRestart = Invoke-DreamSkinStartupFixture `
+  -VerifyPayloads @($renderedPayload, $malformedPayload) -OncePayload $malformedPayload `
+  -ReuseExistingCdp -ExplicitRestart
+if (-not $explicitRestart.Failed -or -not $explicitRestart.CodexStopped -or
+  $explicitRestart.AppearanceInstallCalls -ne 1) {
+  throw "Explicit restart was ignored for a still-live CDP session: $($explicitRestart.LastError)"
+}
+$promptedHidden = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload, $renderedPayload) `
+  -OncePayload $renderedPayload -ReuseExistingCdp -PromptForRestart -SelectTheme -SuccessfulVerification
+if ($promptedHidden.RestartPromptCalls -ne 1 -or -not $promptedHidden.CodexStopped -or
+  $promptedHidden.ThemeFingerprint -cne 'selected' -or -not $promptedHidden.SnapshotRemoved) {
+  throw "Hidden manager apply did not recover with consent: $($promptedHidden.LastError)"
+}
+$declined = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
+  -OncePayload $hiddenPayload -ReuseExistingCdp -PromptForRestart -DeclineRestart -SelectTheme
+if ($declined.RestartPromptCalls -ne 1 -or $declined.CodexStopped -or $declined.ThemeWriteCalls -ne 0) {
+  throw 'Declining hidden-session recovery mutated the theme or stopped Codex.'
+}
+$replaced = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
+  -OncePayload $hiddenPayload -ReuseExistingCdp -PromptForRestart -ChangeIdentityAfterConsent -SelectTheme
+if ($replaced.RestartPromptCalls -ne 1 -or $replaced.CodexStopped -or $replaced.ThemeWriteCalls -ne 0 -or
+  $replaced.LastError -notlike '*session changed*') {
+  throw 'A replacement CDP session was stopped after consent for another identity.'
+}
+foreach ($probe in @($renderedPayload, $malformedPayload, '{"targets":[]}',
+  ('{"targets":[' + ((ConvertFrom-Json $hiddenPayload).targets[0] | ConvertTo-Json -Depth 8 -Compress) + ',{}]}'))) {
+  $visibleApply = Invoke-DreamSkinStartupFixture -VerifyPayloads @($probe, $renderedPayload) `
+    -OncePayload $renderedPayload -ReuseExistingCdp -PromptForRestart -SuccessfulVerification
+  if ($visibleApply.RestartPromptCalls -ne 0 -or $visibleApply.CodexStopped) {
+    throw 'Visible, malformed, empty or mixed target evidence triggered a restart prompt.'
+  }
+}
+$failedSelection = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
+  -OncePayload $hiddenPayload -ReuseExistingCdp -SelectTheme -WithResultToken
+if (-not $failedSelection.Failed -or $failedSelection.ThemeFingerprint -cne 'previous' -or
+  $failedSelection.ThemeRestoreCalls -ne 1 -or -not $failedSelection.SnapshotRemoved) {
+  throw "Failed verification did not roll back its selection: $($failedSelection.LastError)"
+}
+$supersededSelection = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
+  -OncePayload $hiddenPayload -ReuseExistingCdp -SelectTheme -SupersedeTheme
+if ($supersededSelection.ThemeFingerprint -cne 'newer' -or $supersededSelection.ThemeRestoreCalls -ne 0) {
+  throw 'Theme rollback overwrote a newer theme change.'
+}
+$partialWrite = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
+  -OncePayload $hiddenPayload -ReuseExistingCdp -SelectTheme -WriteThemeFailure
+if ($partialWrite.LastError -cne 'fixture-theme-write-failure' -or
+  $partialWrite.ThemeFingerprint -cne 'previous' -or $partialWrite.ThemeRestoreCalls -ne 1) {
+  throw 'A failed theme write was not restored inside its original operation lock.'
+}
+
 # The user-facing warning is asserted statically rather than through the
 # fixture: Write-Warning resolves to the real cmdlet inside the script block, so
 # a mock defined out here never sees it, and a fixture that silently captures

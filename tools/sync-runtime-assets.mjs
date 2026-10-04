@@ -4,6 +4,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { cssPredicateManifest } from "./css-predicate-cache.mjs";
+import { adaptWindowsHomeCss } from "./windows-home-css.mjs";
+import { adaptWindowsReducedMotionCss } from "./windows-motion-css.mjs";
 
 const toolsRoot = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(toolsRoot, "..");
@@ -36,7 +39,7 @@ function compileSelectorTokens(source, sourceName) {
   return compiled;
 }
 
-function compileRuntime(source) {
+function compileRuntime(source, expandedCss) {
   const token = "__DREAM_SKIN_SELECTORS_JSON__";
   const occurrences = source.split(token).length - 1;
   if (occurrences !== 1) {
@@ -54,7 +57,12 @@ function compileRuntime(source) {
     })),
     stableTestids: Array.isArray(contract.stableTestids) ? [...contract.stableTestids] : [],
   };
-  return source.replace(token, JSON.stringify(runtimeContract));
+  const predicateToken = "__DREAM_SKIN_CSS_PREDICATES_JSON__";
+  if (source.split(predicateToken).length - 1 !== 1) {
+    throw new Error(`runtime/renderer-inject.js must contain exactly one ${predicateToken} token`);
+  }
+  return source.replace(token, () => JSON.stringify(runtimeContract))
+    .replace(predicateToken, () => JSON.stringify(cssPredicateManifest(expandedCss)));
 }
 
 function compileSafeCssFileValidator(source) {
@@ -109,6 +117,9 @@ function compileWindowsImageMetadata(source) {
 }
 
 const sourceCss = await fs.readFile(path.join(projectRoot, "runtime", "dream-skin.css"), "utf8");
+const expandedCss = compileSelectorTokens(sourceCss, "runtime/dream-skin.css");
+const windowsShellCss = await fs.readFile(path.join(toolsRoot, "windows-shell.css"), "utf8");
+const windowsCss = compileSelectorTokens(adaptWindowsReducedMotionCss(adaptWindowsHomeCss(sourceCss)), "runtime/dream-skin.css (Windows)") + windowsShellCss;
 const sourceRuntime = await fs.readFile(path.join(projectRoot, "runtime", "renderer-inject.js"), "utf8");
 const sourceThemePackageValidator = await fs.readFile(
   path.join(projectRoot, "runtime", "theme-package-validator.mjs"),
@@ -132,6 +143,10 @@ const sourceImageMetadata = await fs.readFile(
 );
 const outputs = [
   {
+    content: await fs.readFile(path.join(projectRoot, "runtime", "theme-preferences.mjs"), "utf8"),
+    paths: ["macos/assets/theme-preferences.mjs", "windows/assets/theme-preferences.mjs"],
+  },
+  {
     // The injector runs from a packaged platform tree, so stage the same
     // contract beside the renderer assets while keeping tools/selectors.json
     // as the only editable source.
@@ -139,12 +154,20 @@ const outputs = [
     paths: ["macos/assets/selectors.json", "windows/assets/selectors.json"],
   },
   {
-    content: compileSelectorTokens(sourceCss, "runtime/dream-skin.css"),
-    paths: ["macos/assets/dream-skin.css", "windows/assets/dream-skin.css"],
+    content: expandedCss,
+    paths: ["macos/assets/dream-skin.css"],
   },
   {
-    content: compileRuntime(sourceRuntime),
-    paths: ["macos/assets/renderer-inject.js", "windows/assets/renderer-inject.js"],
+    content: windowsCss,
+    paths: ["windows/assets/dream-skin.css"],
+  },
+  {
+    content: compileRuntime(sourceRuntime, expandedCss),
+    paths: ["macos/assets/renderer-inject.js"],
+  },
+  {
+    content: compileRuntime(sourceRuntime, windowsCss),
+    paths: ["windows/assets/renderer-inject.js"],
   },
   {
     content: sourceThemePackageValidator,

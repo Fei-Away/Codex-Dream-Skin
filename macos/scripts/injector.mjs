@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { readThemeTransparency, themePreferencesPath } from "../assets/theme-preferences.mjs";
 import { constants as fsConstants, watch as watchFs } from "node:fs";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -639,7 +640,7 @@ async function loadSafeCss(assetsRoot) {
   }
 }
 
-export async function loadTheme(themeDir) {
+export async function loadTheme(themeDir, preferenceOptions = {}) {
   const requestedRoot = themeDir ?? path.join(root, "assets");
   const configPath = path.join(requestedRoot, "theme.json");
   let assetsRoot;
@@ -730,6 +731,8 @@ export async function loadTheme(themeDir) {
       line: normalizeThemeColor(rawColors?.line, "rgba(124, 255, 70, .28)"),
     },
   };
+  const userTransparency = await readThemeTransparency(theme.id, { preferencesPath: themePreferencesPath("darwin"), ...preferenceOptions });
+  if (userTransparency !== undefined) theme.userTransparency = userTransparency;
   if (appearance !== undefined) theme.appearance = appearance;
   if (Object.values(art).some((value) => value !== undefined)) {
     theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
@@ -807,11 +810,11 @@ function invalidateStaticPayloadAssets() {
   staticPayloadAssets = null;
 }
 
-export async function loadPayload(themeDir) {
+export async function loadPayload(themeDir, preferenceOptions = {}) {
   const startedAt = performance.now();
   const [staticAssets, loaded] = await Promise.all([
     loadStaticPayloadAssets(),
-    loadTheme(themeDir),
+    loadTheme(themeDir, preferenceOptions),
   ]);
   const { css, template } = staticAssets;
   const { art, extension, safeCssRuntime, safeCssStatus, theme } = loaded;
@@ -1140,14 +1143,23 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
         visible: Boolean(node.isConnected !== false && cssVisible && intersectsViewport),
       };
     };
-    const homeIndicator = document.querySelector(${selectorLiteral("home-icon")});
-    const homeSignal = homeIndicator ?? document.querySelector(${selectorLiteral("game-source")}) ??
-      document.querySelector(${selectorLiteral("home-suggestions")});
+    const activeNodes = (selector) => [...document.querySelectorAll(selector)]
+      .filter((node) => !node.closest?.('[data-app-shell-active-page="false"]'));
+    // Hidden home-icon is an intentional theme rule: use ancestry for signals,
+    // and the existing visibility test only for measured layout landmarks.
+    const firstActive = (selector) => activeNodes(selector)[0] ?? null;
+    const firstVisible = (selector) => {
+      const nodes = activeNodes(selector);
+      return nodes.find((node) => box(node)?.visible) ?? nodes[0] ?? null;
+    };
+    const homeIndicator = firstActive(${selectorLiteral("home-icon")});
+    const homeSignal = homeIndicator ?? firstActive(${selectorLiteral("game-source")}) ??
+      firstActive(${selectorLiteral("home-suggestions")});
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
     // Codex 26.721.x can render the home content before home-icon. Reuse the
     // already-resolved semantic home container so a healthy home session is
     // not rejected solely because the stricter home-icon selector is late.
-    const home = document.querySelector(${selectorLiteral("home-route")}) ?? homeRoute;
+    const home = firstVisible(${selectorLiteral("home-route")}) ?? homeRoute;
     const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
     const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
     const cardBoxes = cardButtons.map(box);
@@ -1186,15 +1198,15 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
       ?? siblingCandidates.find((item) => item?.visible)
       ?? box(boxableChain[boxableChain.length - 1]);
     const projectButton = box(home?.querySelector(${selectorLiteral("project-selector")} + " > button"));
-    const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
-    const composer = box(document.querySelector(${selectorLiteral("composer-chrome")}));
-    const sidebar = box(document.querySelector(${selectorLiteral("left-panel")}));
-    const genericMain = box(document.querySelector('[data-ds-part="main"], [data-ds-part="home"]'));
-    const genericInput = box(document.querySelector('[data-ds-part="composer"]'));
+    const shell = box(firstVisible(${selectorLiteral("shell-main")}));
+    const composer = box(firstVisible(${selectorLiteral("composer-chrome")}));
+    const sidebar = box(firstVisible(${selectorLiteral("left-panel")}));
+    const genericMain = box(firstVisible('[data-ds-part="main"], [data-ds-part="home"]'));
+    const genericInput = box(firstVisible('[data-ds-part="composer"]'));
     const settingsBoxes = [
-      box(document.querySelector(${selectorLiteral("settings-panel")})),
-      box(document.querySelector(${selectorLiteral("appearance-radio")})),
-      box(document.querySelector(${stableTestidLiteral("theme-preview")})),
+      box(firstVisible(${selectorLiteral("settings-panel")})),
+      box(firstVisible(${selectorLiteral("appearance-radio")})),
+      box(firstVisible(${stableTestidLiteral("theme-preview")})),
     ];
     const settings = settingsBoxes.find((item) => item?.visible) ??
       settingsBoxes.find(Boolean) ?? null;
@@ -1548,6 +1560,7 @@ function watchPayloadSources(themeDir, onDirty) {
         const staticChanged = directory === assetsRoot &&
           (!name || name === "dream-skin.css" || name === "renderer-inject.js");
         if (kind === "static" && !staticChanged) return;
+        if (kind === "preferences" && name && name !== "theme-preferences.json") return;
         onDirty({ staticChanged });
       });
       watcher.on("error", (error) => {
@@ -1559,6 +1572,7 @@ function watchPayloadSources(themeDir, onDirty) {
     }
   };
   add(themeRoot, "theme");
+  add(path.dirname(themePreferencesPath("darwin")), "preferences");
   if (themeRoot !== assetsRoot) add(assetsRoot, "static");
   return () => watchers.forEach((watcher) => watcher.close());
 }

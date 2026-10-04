@@ -366,6 +366,23 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Set up .NET for native theme management
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Test native theme management
+        shell: cmd
+        run: dotnet run --configuration Release --project windows/theme-manager/Tests/DreamSkin.ThemeManager.Tests.csproj
+
+      - name: Test Windows mutex and Recycle Bin integration
+        shell: cmd
+        run: dotnet run --configuration Release --project windows/theme-manager/NativeTests/DreamSkin.ThemeManager.NativeTests.csproj
+
+      - name: Build native theme manager
+        shell: cmd
+        run: node tools/build-theme-manager.mjs
+
       - name: Install Inno Setup 6
         shell: pwsh
         run: |

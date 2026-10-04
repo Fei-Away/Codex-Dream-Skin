@@ -170,9 +170,28 @@ jobs:
             executable: pwsh.exe
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
+
+      - name: Set up .NET for native theme management
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Test native theme management
+        shell: cmd
+        run: dotnet run --configuration Release --project windows/theme-manager/Tests/DreamSkin.ThemeManager.Tests.csproj
+
+      - name: Test Windows mutex and Recycle Bin integration
+        shell: cmd
+        run: dotnet run --configuration Release --project windows/theme-manager/NativeTests/DreamSkin.ThemeManager.NativeTests.csproj
+
+      - name: Build native theme manager
+        shell: cmd
+        run: node tools/build-theme-manager.mjs
 
       - name: Run Windows regression suite
         shell: cmd

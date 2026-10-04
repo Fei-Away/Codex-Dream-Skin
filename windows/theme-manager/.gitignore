@@ -1,0 +1,4 @@
+**/bin/
+**/obj/
+publish/
+.test-data-*/

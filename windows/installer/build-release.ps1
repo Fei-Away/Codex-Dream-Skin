@@ -413,6 +413,7 @@ try {
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
     'scripts\tray-dream-skin.ps1',
+    'assets\theme-manager\DreamSkin.ThemeManager.exe',
     'scripts\validate-safe-css-file.mjs',
     'scripts\verify-dream-skin.ps1',
     'runtime\node\node.exe',
