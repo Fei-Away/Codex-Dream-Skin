@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OpenGithubs/github-daily-rank/blob/577fe605d3e602a56233b6db656d21d777266238/README.md"><img src="docs/images/opengithubs-daily-2026-07-17.svg" alt="OpenGithubs daily star growth #2 · 2026-07-17" width="354" height="64"></a>
+  <a href="https://trendshift.io/repositories/84043?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/84043/daily" alt="Fei-Away%2FCodex-Dream-Skin | Trendshift" width="250" height="55"/></a>
 </p>
 
 <p align="center">
