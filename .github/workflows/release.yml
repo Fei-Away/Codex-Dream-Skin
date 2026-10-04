@@ -193,10 +193,12 @@ jobs:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
           set -euo pipefail
-          test -s "docs/releases/v${VERSION}.md" || {
-            echo "Missing release notes: docs/releases/v${VERSION}.md (see docs/releases/README.md)." >&2
-            exit 1
-          }
+          for notes in "docs/releases/v${VERSION}.md" "docs/releases/v${VERSION}-en.md"; do
+            test -s "$notes" || {
+              echo "Missing release notes: $notes (see docs/releases/README.md)." >&2
+              exit 1
+            }
+          done
 
       - name: Set up Node.js for portable regressions
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -489,6 +491,7 @@ jobs:
               "CodexDreamSkin-Setup-v${VERSION}.exe" > SHA256SUMS.txt
           )
           test -s "docs/releases/v${VERSION}.md"
+          test -s "docs/releases/v${VERSION}-en.md"
           cat "docs/releases/v${VERSION}.md" > release-notes.md
           cat >> release-notes.md <<EOF
 
