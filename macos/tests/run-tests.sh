@@ -171,8 +171,11 @@ fi
 PROJECT_ROOT="$(cd "$ROOT/.." && pwd -P)"
 "$NODE" "$PROJECT_ROOT/tools/sync-runtime-assets.mjs" --check
 "$NODE" "$PROJECT_ROOT/tools/doctor-selectors.test.mjs"
-if ! /usr/bin/cmp -s "$ROOT/assets/dream-skin.css" "$PROJECT_ROOT/windows/assets/dream-skin.css" ||
-    ! /usr/bin/cmp -s "$ROOT/assets/renderer-inject.js" "$PROJECT_ROOT/windows/assets/renderer-inject.js" ||
+# The sync check above validates each CSS output against its canonical source:
+# macOS keeps shared CSS, Windows applies explicit Home/motion/shell adapters.
+# Keep byte identity mandatory for the remaining shared executable assets.
+"$NODE" --test "$PROJECT_ROOT/tools/windows-home-css.test.mjs" "$PROJECT_ROOT/tools/windows-motion-css.test.mjs"
+if ! /usr/bin/cmp -s "$ROOT/assets/renderer-inject.js" "$PROJECT_ROOT/windows/assets/renderer-inject.js" ||
     ! /usr/bin/cmp -s "$ROOT/assets/safe-css-policy.json" "$PROJECT_ROOT/windows/assets/safe-css-policy.json" ||
     ! /usr/bin/cmp -s "$ROOT/assets/safe-css-validator.mjs" "$PROJECT_ROOT/windows/assets/safe-css-validator.mjs" ||
     ! /usr/bin/cmp -s "$ROOT/assets/selectors.json" "$PROJECT_ROOT/windows/assets/selectors.json" ||

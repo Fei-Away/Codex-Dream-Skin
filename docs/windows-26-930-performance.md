@@ -1,6 +1,6 @@
 # Windows 26.930 adaptation and performance verification
 
-The Windows follow-up to PR #423 keeps `runtime/`, `macos/`, and author theme packages unchanged. Windows CSS is generated from the shared source through explicit Home and reduced-motion adapters, then the Windows shell rules. This is an unreleased PR change, not a version bump.
+The Windows follow-up to PR #423 keeps `runtime/`, macOS production code/assets, and author theme packages unchanged. Windows CSS is generated from the shared source through explicit Home and reduced-motion adapters, then the Windows shell rules. The macOS test runner now checks these platform outputs through the canonical generator instead of assuming CSS byte identity. This is an unreleased PR change, not a version bump.
 
 ## Changes
 
