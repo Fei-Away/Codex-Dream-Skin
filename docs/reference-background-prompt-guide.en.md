@@ -6,6 +6,22 @@ Chinese guide: [`reference-background-prompt-guide.md`](./reference-background-p
 
 > Public prompts default to an original fictional adult. They do not name or imitate a celebrity, private individual, copyrighted character, or living artist's signature style. Use an authorized identity reference only when you hold the necessary likeness and asset rights. Generated artwork is not an official OpenAI/Codex visual or endorsement.
 
+## Turn generated artwork into an importable theme
+
+1. **Generate wallpaper only.** Aim for `2560 × 1440`, 16:9. Keep sidebars, input controls, text and translucent interface overlays out of the image; theme colors and the client control transparency.
+2. **Open [DreamSkin Studio](https://dreamskin.cc/en/studio).** Choose a JPEG, PNG or static WebP background no larger than **10 MiB**. Adjust composition, colors and `theme.json`, and keep non-empty `theme.css` that passes Safe CSS validation. Check readability across appearances, pages and window widths.
+3. **Export a complete ZIP from Studio.** Fill in theme details, platforms, license and provenance. The package must contain `manifest.json`, valid `theme.json`, non-empty validated `theme.css`, and exactly one background image referenced by the theme. An image and JSON alone are not a complete new package. Let Studio generate the manifest and do not use a screenshot as wallpaper.
+4. **Import, then explicitly apply.** On macOS, use menu bar → Themes → Import theme ZIP…; on Windows, use Import theme ZIP… in the tray. Importing only saves the theme; select it in Saved themes to apply. Exporting and local imports do not publish to the community.
+
+### Transparency and local theme management (v1.5.19+)
+
+- Per-theme local preferences take priority over explicit authored color alpha; without either, backgrounds default to **30% transparency**. Alpha describes opacity: `rgba(17, 19, 24, 0.7)` is 70% opaque, or 30% transparent.
+- On macOS, use the Themes menu. On Windows, open the native manager from the desktop, Start Menu or by double-clicking the tray icon. The slider ranges from 0% (opaque) to 100% (transparent). **Follow theme** clears the local override. Text, icons and theme packages are unchanged, and Studio does not read client preferences.
+- Switch away from a theme before deleting it. Confirmation moves the saved local theme to Trash or Recycle Bin for system restoration. Source ZIPs, recovery backups, transparency preferences and community publications are retained. Windows imports and theme switching remain in the tray.
+
+See [local theme management](./theme-management.md#english). The source presets and concept images below are references; use the Studio workflow above for ordinary theme creation and distribution.
+
+
 ## Source-Only Reference: Arina Hashimoto (Excluded From Public Packages)
 
 - **Source-only switchable reference:** `macos/presets/preset-arina-hashimoto/`; source Windows runs can use `windows/assets/theme.json` plus the byte-identical `windows/assets/dream-reference.jpg`. Public DMG and Setup.exe exclude these files and seed only the rights-reviewed Gothic Void Crusade.
@@ -29,11 +45,11 @@ The “effect” shown in a README is not automatically an importable wallpaper.
 
 `docs/images/hero-banner-red-white.png` and `macos/assets/portal-hero.png` are legacy 3:1 banner assets, not the current 16:9 universal-theme master. Do not substitute either for `preset-*/background.jpg` unless the output is intentionally homepage-banner-only.
 
-Rule of thumb: **public installers default to Gothic Void Crusade; use the source-only reference preset locally only after a rights review.** Generate from this guide; study directions in `docs/images/gallery/`; inspect runtime results in `docs/images/presets/*-light.jpg` / `*-dark.jpg`. A `theme.json` and a `background.jpg` in the same `preset-*` directory form a seedable theme; `docs/images/` is documentation/archive space, not a mirror of the theme library.
+Rule of thumb: **public installers default to Gothic Void Crusade; use the source-only reference preset locally only after a rights review.** Generate from this guide; study directions in `docs/images/gallery/`; inspect runtime results in `docs/images/presets/*-light.jpg` / `*-dark.jpg`. Source preset directories are implementation references; new theme imports and distribution also require non-empty validated `theme.css`, and formal ZIPs need a Studio-generated `manifest.json`; `docs/images/` is documentation/archive space, not a mirror of the theme library.
 
 Path classification is not a likeness or redistribution license. The current `preset-arina-hashimoto` contains user-provided human/AI portrait material included at the maintainer's direction. Public repository inclusion neither grants nor proves likeness, generation, commercial-use, or further-redistribution rights; see `macos/NOTICE.md` for the file-level boundary.
 
-Save new generations outside the repository while drafting and run the acceptance checklist at the end. Only after approval should you export the **pure wallpaper** as `background.jpg` beside its `theme.json` in a new `macos/presets/preset-<slug>/`. Do not place drafts, UI screenshots, or unverified human-likeness images in `docs/images/` and assume they become switchable themes.
+Save new generations outside the repository while drafting and run the acceptance checklist at the end. After checking it, load the **pure wallpaper** into Studio and export a complete theme ZIP using the workflow above. Do not place drafts, UI screenshots, or unverified human-likeness images in `docs/images/` and assume they become switchable themes.
 
 ## Copy From The skin-01 Concept: Render It In UI, Not In The Image Prompt
 

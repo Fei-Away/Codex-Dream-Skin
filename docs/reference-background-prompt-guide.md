@@ -6,6 +6,22 @@
 
 English guide: [`reference-background-prompt-guide.en.md`](./reference-background-prompt-guide.en.md)
 
+## 把生成图片做成可导入主题
+
+1. **只生成纯背景**：推荐 `2560 × 1440`、16:9。不要把侧栏、输入框、文字或半透明界面蒙层画进图片；透明效果由主题颜色和客户端控制。
+2. **打开 [DreamSkin Studio](https://dreamskin.cc/studio)**：选择 JPEG、PNG 或静态 WebP 背景，文件不超过 **10 MiB**。调整构图、配色和 `theme.json`，并保留通过 Safe CSS 校验的非空 `theme.css`。切换明暗、页面和窗口宽度检查可读性。
+3. **由 Studio 导出完整 ZIP**：填写主题信息、平台和授权来源。导出的包必须包含 `manifest.json`、有效 `theme.json`、非空且通过校验的 `theme.css`，以及唯一一张被主题引用的背景图。只有图片和 JSON 不是完整的新主题包；不要手工拼凑 manifest 或把截图当背景。
+4. **导入后明确应用**：macOS 菜单栏 →「主题 → 导入主题 ZIP…」；Windows 托盘 →「导入主题 ZIP…」。导入只保存，再从「已保存的主题」选择应用。导出和本地导入均不会自动发布到社区。
+
+### 透明度与本机主题管理（v1.5.19 起）
+
+- 背景透明度优先使用用户按主题保存的本机设置，其次是作者明确的颜色 alpha，未指定时默认 **30% 透明**。alpha 表示不透明度：例如 `rgba(17, 19, 24, 0.7)` 为 70% 不透明，即 30% 透明。
+- macOS 在「主题」菜单调节；Windows 从桌面、开始菜单或双击托盘图标打开原生管理窗口。滑块范围 0–100%，0% 不透明、100% 全透明；「跟随主题」清除本机覆盖。文字、图标及主题包不随之改写，Studio 也不会读取客户端的本机偏好。
+- 删除本机主题前先切换离开它；确认后移到废纸篓／回收站，可从系统还原。原始 ZIP、恢复备份、透明度偏好和社区发布记录保留。Windows 的导入和切换仍在托盘菜单中。
+
+完整操作见[本机主题管理](./theme-management.md)。以下源码预设与概念图用于参考；日常制作和分发使用上面的 Studio 流程。
+
+
 ## 当前源码参考：桥本有菜（不随公开安装包提供）
 
 - **源码中的可切换参考主题**：`macos/presets/preset-arina-hashimoto/`；源码 Windows 运行时使用 `windows/assets/theme.json` 与 byte-identical 的 `windows/assets/dream-reference.jpg`。公开 DMG 和 Setup.exe 不包含这套素材，公开包只播种已确认可分发的 Gothic Void Crusade。
@@ -29,11 +45,11 @@ README 里的“效果图”不等于可以导入的背景。下面这些文件�
 
 `docs/images/hero-banner-red-white.png` 与 `macos/assets/portal-hero.png` 是旧的 3:1 横幅资源，不是当前 16:9 通用主题母版；除非明确只做首页横幅，否则不要拿它们替代 `preset-*/background.jpg`。
 
-一句话判断：**公开安装包的默认主题是 Gothic Void Crusade；源码中的参考主题仅在完成权利核验后本地切换。** 要生成新图看本指南；要看视觉方向看 `docs/images/gallery/`；要看真实运行结果看 `docs/images/presets/*-light.jpg` / `*-dark.jpg`。`theme.json` 和 `background.jpg` 同在一个 `preset-*` 目录时才是一套可播种的主题；`docs/images/` 是文档/归档目录，不是主题库的镜像。
+一句话判断：**公开安装包的默认主题是 Gothic Void Crusade；源码中的参考主题仅在完成权利核验后本地切换。** 要生成新图看本指南；要看视觉方向看 `docs/images/gallery/`；要看真实运行结果看 `docs/images/presets/*-light.jpg` / `*-dark.jpg`。源码预设目录用于实现参考；新主题导入和分发还必须有通过校验的非空 `theme.css`，正式 ZIP 还需由 Studio 生成 `manifest.json`；`docs/images/` 是文档/归档目录，不是主题库的镜像。
 
 路径分类不代表肖像或再分发许可。当前 `preset-arina-hashimoto` 含维护者指示收录的用户提供真人/AI 肖像素材；仓库公开包含这些文件并不授予或证明肖像、生成、商业使用或再次分发权利，具体边界以 `macos/NOTICE.md` 为准。
 
-生成新图时先在仓库外保存草稿并按文末清单验收；通过后，才把**纯背景**等比导出为 `background.jpg`，与对应的 `theme.json` 放进新的 `macos/presets/preset-<slug>/`。不要把草稿、带 UI 的截图或未核验真人图放进 `docs/images/` 再误以为它会成为可切换主题。
+生成新图时先在仓库外保存草稿并按文末清单验收；通过后，将**纯背景**导入 Studio，按上面的流程导出完整主题 ZIP。不要把草稿、带 UI 的截图或未核验真人图放进 `docs/images/` 再误以为它会成为可切换主题。
 
 ## skin-01 概念图里的文案：只作 UI 叠加参考
 

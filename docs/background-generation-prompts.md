@@ -17,18 +17,20 @@
 | 只看效果或找风格 | `docs/images/gallery/skin-01.jpg` ～ `skin-08.jpg` | 带 UI 的概念效果图，不能改名为 `background.jpg` 后导入 |
 | 查看当前主题在浅/暗色下的实机结果 | `docs/images/presets/arina-hashimoto-light.jpg`、`arina-hashimoto-dark.jpg` | 仅预览，包含真实控件，不能作为背景素材 |
 
-特别注意：`skin-01` 的粉色玫瑰方向与 `preset-arina-hashimoto` 有相近气质，但**不是同一文件、同一尺寸或同一资产**。`skin-01`～`skin-08` 只提供灵感；实际预设以 `macos/presets/preset-*` 目录中的 `theme.json` + `background.jpg` 为准。任何 `banner-*.png` / `generated-*.png` 实验图也不自动获得预设或发行资格；真人肖像和模型输出必须先完成权利核验。
+特别注意：`skin-01` 的粉色玫瑰方向与 `preset-arina-hashimoto` 有相近气质，但**不是同一文件、同一尺寸或同一资产**。`skin-01`～`skin-08` 只提供灵感；源码参考预设的配色与背景以 `macos/presets/preset-*` 中的文件为准；新主题包的制作与导出要求见下文。任何 `banner-*.png` / `generated-*.png` 实验图也不自动获得预设或发行资格；真人肖像和模型输出必须先完成权利核验。
 
 另外，`docs/images/hero-banner-red-white.png` 与 `macos/assets/portal-hero.png` 是旧的 3:1 首页横幅资源，不是这份文档推荐的 16:9 通用背景母版。
 
-生成草稿建议先放在仓库外；通过统一检查后，才将纯背景导出为 `background.jpg`，和 `theme.json` 一起组成新的 `macos/presets/preset-<slug>/`。`docs/images/` 只保存文档图和预览，不是运行时主题目录。
+生成草稿建议先放在仓库外；通过统一检查后，将纯背景导入 [Studio](https://dreamskin.cc/studio)，调整配色、`theme.json` 和非空且通过 Safe CSS 校验的 `theme.css`，再导出含 `manifest.json` 和唯一背景图的完整 ZIP。只有背景图和 JSON 不构成完整的新主题包。`docs/images/` 只保存文档图和预览，不是运行时主题目录。
+
+完整的生成、打包、导入流程及 v1.5.19 透明度说明见[中文指南](./reference-background-prompt-guide.md#把生成图片做成可导入主题) / [English guide](./reference-background-prompt-guide.en.md#turn-generated-artwork-into-an-importable-theme)。不需要把半透明界面蒙层烘焙进背景图片。
 
 ## 建议参数
 
 - 母版画布：推荐 `2560 × 1440`（16:9）。提示词不能替代生成器尺寸设置，必须在生成器界面或 API 中同时选择该尺寸；导入脚本可能按需缩到最长边 2400。
 - 首页专用导出：只在明确不用于任务页时，另裁一份 `3072 × 1024`（3:1）横幅。不要把 3:1 当作通用母版，也不要把带 UI 的效果截图反推成背景。
 - 质量：高；写实人物建议使用最高人物细节档。
-- 格式：PNG 母版；导入主题前转换为高质量 JPEG，最终文件不超过 10 MB。
+- 格式：PNG 母版；导入主题前转换为高质量 JPEG，最终背景文件不超过 10 MiB；也可使用 PNG 或静态 WebP。
 - 构图：左侧 `x=0%～52%` 为低信息安全区；主视觉中心放在 `x=68%～76%`，脸、手和识别性道具控制在 `x=62%～88%`，非关键装饰最多延伸到 `x=90%`；任何关键内容距四边至少 8%。
 - 垂直安全：脸部/核心物体建议落在 `y=20%～52%`，手和次要主体落在 `y=30%～70%`，全部关键内容控制在 `y=16%～72%`；顶部与底部只放能自然延展的环境，避免超宽窗口裁切或底部输入框遮挡后断头、断手。
 - 浅/暗兼容：安全区要有连续、低频、低对比的明暗变化，避免纯白烧穿或纯黑死区；同一张图在浅色壳上能承载深色文字，在暗色壳叠加遮罩后仍保留层次。
