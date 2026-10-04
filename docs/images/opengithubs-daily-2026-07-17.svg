@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="354" height="64" viewBox="0 0 354 64" role="img" aria-labelledby="title desc">
+  <title id="title">OpenGithubs daily star growth: #2 on July 17, 2026</title>
+  <desc id="desc">Codex Dream Skin ranked second with 3,359 stars gained that day. Historical source: https://github.com/OpenGithubs/github-daily-rank/blob/577fe605d3e602a56233b6db656d21d777266238/README.md</desc>
+  <rect x="0.5" y="0.5" width="353" height="63" rx="8" fill="#faf9fd" stroke="#c9c1df"/>
+  <text x="36" y="42" text-anchor="middle" fill="#594582" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="28" font-weight="650">#2</text>
+  <path d="M70 15v34" stroke="#ded8ea"/>
+  <g font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+    <text x="86" y="28" fill="#493967" font-size="15" font-weight="600">OpenGithubs</text>
+    <text x="86" y="47" fill="#655b76" font-size="11">Daily star growth · 2026-07-17</text>
+  </g>
+</svg>

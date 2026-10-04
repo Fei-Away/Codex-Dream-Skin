@@ -12,6 +12,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/OpenGithubs/github-daily-rank/blob/577fe605d3e602a56233b6db656d21d777266238/README.md"><img src="docs/images/opengithubs-daily-2026-07-17.svg" alt="OpenGithubs 日增 Stars 榜第 2 · 2026-07-17" width="354" height="64"></a>
+</p>
+
+<p align="center">
   <strong>给 Codex 桌面端换一张会呼吸的脸。</strong><br>
   外部主题 / 换肤工具 · 本机 CDP 注入 · 不改官方安装包
 </p>

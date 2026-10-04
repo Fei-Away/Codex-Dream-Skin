@@ -12,6 +12,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/OpenGithubs/github-daily-rank/blob/577fe605d3e602a56233b6db656d21d777266238/README.md"><img src="docs/images/opengithubs-daily-2026-07-17.svg" alt="OpenGithubs daily star growth #2 · 2026-07-17" width="354" height="64"></a>
+</p>
+
+<p align="center">
   <strong>Give Codex a face that breathes.</strong><br>
   External themes for the Codex desktop app · Local CDP inject · No official package mutation
 </p>
