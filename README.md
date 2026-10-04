@@ -1,7 +1,14 @@
 # Codex Dream Skin
 
 <p align="center">
-  <strong>中文</strong> · <a href="./README.en.md">English</a>
+  <strong>中文</strong> · <a href="./README.en.md">English</a> ·
+  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases">更新日志</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest"><img src="https://img.shields.io/github/v/release/Fei-Away/Codex-Dream-Skin?color=blue&amp;label=version" alt="Latest release"></a>
+  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" alt="Platforms: macOS and Windows"></a>
+  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases"><img src="https://img.shields.io/github/downloads/Fei-Away/Codex-Dream-Skin/total?label=downloads" alt="GitHub Release asset downloads"></a>
 </p>
 
 <p align="center">
