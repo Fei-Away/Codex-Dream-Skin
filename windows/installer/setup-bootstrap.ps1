@@ -14,6 +14,7 @@ $commonPath = Join-Path $payloadScripts 'common-windows.ps1'
 $themePath = Join-Path $payloadScripts 'theme-windows.ps1'
 $stateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'Codex Dream Skin.lnk'
+$managerMaintenance = $null
 
 function Show-DreamSkinBootstrapMessage {
   param(
@@ -68,6 +69,8 @@ try {
   $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $stateRoot
   if ($Uninstall) {
     Stop-DreamSkinTrayProcess -ScriptPaths @($engine.Tray) -RequireStopped
+    Stop-DreamSkinThemeManagerProcess -StateRoot $stateRoot
+    $managerMaintenance = Enter-DreamSkinThemeManagerMaintenance
     $restoreRequired = (Test-Path -LiteralPath $engine.Root -PathType Container) -or
       (Test-Path -LiteralPath (Join-Path $stateRoot 'config.before-dream-skin.toml') -PathType Leaf)
     if ($restoreRequired -and -not (Test-Path -LiteralPath $engine.Restore -PathType Leaf)) {
@@ -150,6 +153,9 @@ try {
   if ($needsInstall) {
     Wait-DreamSkinCodexClosedForSetup
     Stop-DreamSkinTrayProcess -ScriptPaths @($engine.Tray) -RequireStopped
+    # Close before install acquires Operation: FormClosing must be able to
+    # acquire that lock itself to save a pending transparency adjustment.
+    Stop-DreamSkinThemeManagerProcess -StateRoot $stateRoot
     & (Join-Path $payloadScripts 'install-dream-skin.ps1') -NoShortcuts
     $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $stateRoot
     $committedVersion = if (Test-Path -LiteralPath $engine.Version -PathType Leaf) {
@@ -175,4 +181,9 @@ try {
   Show-DreamSkinBootstrapMessage -Message $_.Exception.Message -Kind Error
   Write-Error $_
   exit 1
+} finally {
+  if ($null -ne $managerMaintenance) {
+    $managerMaintenance.ReleaseMutex()
+    $managerMaintenance.Dispose()
+  }
 }

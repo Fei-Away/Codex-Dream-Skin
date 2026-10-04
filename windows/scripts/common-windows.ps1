@@ -312,6 +312,49 @@ function Stop-DreamSkinTrayProcess {
   }
 }
 
+function Stop-DreamSkinThemeManagerProcess {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+
+  $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $StateRoot
+  $manager = Join-Path $engine.Root 'assets\theme-manager\DreamSkin.ThemeManager.exe'
+  # Never close by process name alone. Check the complete managed path before
+  # sending WM_CLOSE; the manager's FormClosing handler flushes pending settings.
+  Assert-DreamSkinNoReparseComponents -Path $manager
+  $processes = @(Get-Process -Name 'DreamSkin.ThemeManager' -ErrorAction SilentlyContinue)
+  try {
+    foreach ($process in $processes) {
+      if ($process.HasExited) { continue }
+      if (-not (Test-DreamSkinPathEqual -Left $process.Path -Right $manager)) {
+        throw 'A theme manager outside the installed runtime is running. Close it manually before continuing.'
+      }
+    }
+    foreach ($process in $processes) {
+      if ($process.HasExited) { continue }
+      if (-not $process.CloseMainWindow() -or -not $process.WaitForExit(5000)) {
+        throw 'The theme manager could not close normally. Close it manually and retry; the runtime was not replaced.'
+      }
+    }
+  } finally {
+    foreach ($process in $processes) { $process.Dispose() }
+  }
+}
+
+function Enter-DreamSkinThemeManagerMaintenance {
+  # Hold the same single-instance mutex through replacement, so a shortcut
+  # cannot reopen the old executable between the close and the atomic swap.
+  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.ThemeManager")
+  try {
+    $acquired = $false
+    try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
+    if (-not $acquired) { throw 'Close the DreamSkin theme manager before replacing the runtime.' }
+    return $mutex
+  } catch {
+    $mutex.Dispose()
+    throw
+  }
+}
+
 function Assert-DreamSkinRuntimeTree {
   param([Parameter(Mandatory = $true)][string]$Path)
   $root = [System.IO.Path]::GetFullPath($Path)
@@ -413,7 +456,9 @@ function Install-DreamSkinRuntimeEngine {
   $backupRoot = Join-Path $fullStateRoot ".engine-backup-$token"
   Ensure-DreamSkinManagedDirectory -Path $stagingRoot -Root $fullStateRoot
 
+  $managerMaintenance = $null
   try {
+    $managerMaintenance = Enter-DreamSkinThemeManagerMaintenance
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'VERSION') -Destination $stagingRoot `
       -Force -ErrorAction Stop
     foreach ($directoryName in $sourceDirectories) {
@@ -492,6 +537,10 @@ function Install-DreamSkinRuntimeEngine {
     }
     return Get-DreamSkinRuntimeEnginePaths -StateRoot $fullStateRoot
   } finally {
+    if ($null -ne $managerMaintenance) {
+      $managerMaintenance.ReleaseMutex()
+      $managerMaintenance.Dispose()
+    }
     if (Test-Path -LiteralPath $stagingRoot) {
       try { Remove-DreamSkinRuntimeTree -Path $stagingRoot -StateRoot $fullStateRoot } catch {
         try {

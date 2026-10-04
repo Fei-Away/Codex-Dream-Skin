@@ -6,6 +6,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $Root 'scripts\common-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
 . (Join-Path $Root 'scripts\localization-windows.ps1')
+& (Join-Path $PSScriptRoot 'theme-manager-maintenance.tests.ps1')
 
 if ((Resolve-DreamSkinLanguage -Language 'zh-CN') -cne 'zh-CN' -or
   (Resolve-DreamSkinLanguage -Language 'en-US') -cne 'en-US') {
