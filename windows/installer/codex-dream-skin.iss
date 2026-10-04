@@ -8,6 +8,10 @@
   #error OutputDir must be supplied by build-release.ps1
 #endif
 
+#if !FileExists(StageRoot + "\payload\assets\theme-manager\DreamSkin.ThemeManager.exe")
+  #error Build the native theme manager with node tools/build-theme-manager.mjs before packaging
+#endif
+
 #define AppName "Codex Dream Skin"
 #define AppPublisher "Codex Dream Skin contributors"
 #define AppUrl "https://dreamskin.cc"

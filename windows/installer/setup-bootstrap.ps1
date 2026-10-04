@@ -133,7 +133,7 @@ try {
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
-    'scripts\theme-window.ps1',
+    'assets\theme-manager\DreamSkin.ThemeManager.exe',
     'scripts\tray-dream-skin.ps1',
     'scripts\validate-safe-css-file.mjs',
     'scripts\verify-dream-skin.ps1',

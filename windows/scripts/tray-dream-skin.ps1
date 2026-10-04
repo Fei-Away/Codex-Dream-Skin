@@ -88,9 +88,6 @@ try {
 
   function Set-DreamSkinTrayApplyStatus {
     param([string]$Message, [bool]$Success = $false)
-    if ($null -ne $script:themeStatusLabel -and -not $script:themeStatusLabel.IsDisposed) {
-      $script:themeStatusLabel.Text = $Message
-    }
     $script:trayApplyStatus = $Message
     $script:trayApplySucceeded = $Success
   }
@@ -446,11 +443,23 @@ try {
   }
 
   $menu.add_Opening({ Rebuild-DreamSkinTrayMenu })
-  . (Join-Path $PSScriptRoot 'theme-window.ps1')
-  Initialize-DreamSkinThemeWindow
+  function Start-DreamSkinThemeManager {
+    $manager = Join-Path $SkillRoot 'assets\theme-manager\DreamSkin.ThemeManager.exe'
+    Assert-DreamSkinRuntimeTree -Path (Split-Path -Parent $manager)
+    if (-not (Test-Path -LiteralPath $manager -PathType Leaf)) {
+      throw 'The native theme manager is missing. Reinstall Codex Dream Skin.'
+    }
+    $previousLanguage = $env:DREAMSKIN_LANG
+    try {
+      $env:DREAMSKIN_LANG = Resolve-DreamSkinLanguage -StateRoot $StateRoot
+      Start-Process -FilePath $manager -WorkingDirectory (Split-Path -Parent $manager) | Out-Null
+    } finally {
+      $env:DREAMSKIN_LANG = $previousLanguage
+    }
+  }
   $notify.add_DoubleClick({
     try {
-      Show-DreamSkinThemeWindow
+      Start-DreamSkinThemeManager
     } catch {
       Show-DreamSkinTrayError -Message $_.Exception.Message
     }
@@ -459,11 +468,11 @@ try {
   $showTimer.Interval = 400
   $showTimer.add_Tick({
     if ($showEvent.WaitOne(0)) {
-      try { Show-DreamSkinThemeWindow } catch { Show-DreamSkinTrayError -Message $_.Exception.Message }
+      try { Start-DreamSkinThemeManager } catch { Show-DreamSkinTrayError -Message $_.Exception.Message }
     }
   })
   $showTimer.Start()
-  if ($ShowWindow) { Show-DreamSkinThemeWindow }
+  if ($ShowWindow) { Start-DreamSkinThemeManager }
   [System.Windows.Forms.Application]::Run()
 } finally {
   if ($null -ne $showTimer) { $showTimer.Dispose() }
@@ -471,7 +480,6 @@ try {
     $script:trayApplyOperation.Timer.Dispose()
     $script:trayApplyOperation.Process.Dispose()
   }
-  if ($null -ne $script:themeWindow) { $script:themeWindow.Dispose() }
   $showEvent.Dispose()
   if ($null -ne $notify) { $notify.Dispose() }
   if ($null -ne $trayIcon) { $trayIcon.Dispose() }

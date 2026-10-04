@@ -353,6 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     addActionItem(copy.text(.changeBackground), action: #selector(chooseBackgroundImage), enabled: enabled, to: submenu)
     addActionItem(copy.text(.importZip), action: #selector(chooseThemeArchive), enabled: enabled, to: submenu)
     addSavedThemesMenu(enabled: enabled, to: submenu)
+    addDeleteThemesMenu(enabled: enabled, to: submenu)
     submenu.addItem(.separator())
     addTransparencyControl(enabled: enabled, to: submenu)
     submenu.addItem(.separator())
@@ -556,6 +557,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
     root.submenu = submenu
     (destination ?? menu).addItem(root)
+  }
+
+  private func addDeleteThemesMenu(enabled: Bool, to destination: NSMenu) {
+    let chinese = copy.resolvedLanguage == .chinese
+    let title = chinese ? "删除已保存主题…" : "Delete saved theme…"
+    let root = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: title)
+    submenu.autoenablesItems = false
+    let themes = savedThemes()
+    if themes.isEmpty {
+      addDisabledItem(copy.text(.noSavedThemes), to: submenu)
+    } else {
+      let activeID = activeTransparencyTheme()?.id ?? snapshot.themeID
+      for theme in themes {
+        let active = theme.id.caseInsensitiveCompare(activeID) == .orderedSame
+          || theme.id.caseInsensitiveCompare(snapshot.themeID) == .orderedSame
+        let suffix = active ? (chinese ? "（使用中）" : " (in use)") : ""
+        let item = addActionItem(theme.name + suffix, action: #selector(deleteSavedTheme(_:)),
+                                 enabled: enabled && !active, to: submenu)
+        item.representedObject = theme.id
+      }
+      submenu.addItem(.separator())
+      addDisabledItem(chinese ? "使用中的主题需先切换" : "Switch away before deleting the active theme", to: submenu)
+    }
+    root.submenu = submenu
+    destination.addItem(root)
+  }
+
+  @objc private func deleteSavedTheme(_ sender: NSMenuItem) {
+    guard !operationInFlight, !engineInstallInFlight, !themeRecoveryInFlight, !snapshot.busy,
+          let id = sender.representedObject as? String,
+          let theme = savedThemes().first(where: { $0.id == id }) else { return }
+    let chinese = copy.resolvedLanguage == .chinese
+    operationInFlight = true
+    defer {
+      operationInFlight = false
+      rebuildMenu()
+    }
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = chinese ? "删除“\(theme.name)”？" : "Delete “\(theme.name)”?"
+    alert.informativeText = chinese
+      ? "将已保存的主题移到废纸篓，可从废纸篓恢复。原始 ZIP 文件和社区发布记录会保留。"
+      : "The saved theme will move to Trash, where you can restore it. The original ZIP and community publication will be kept."
+    alert.addButton(withTitle: chinese ? "取消" : "Cancel")
+    alert.addButton(withTitle: chinese ? "移到废纸篓" : "Move to Trash")
+    NSApp.activate(ignoringOtherApps: true)
+    guard alert.runModal() == .alertSecondButtonReturn else { return }
+    do {
+      try SavedThemeDeletion.moveToTrash(id: id, stateRoot: stateRootURL) { url in
+        try fileManager.trashItem(at: url, resultingItemURL: nil)
+      }
+    } catch {
+      let message: String
+      switch error {
+      case SavedThemeDeletionError.activeTheme:
+        message = chinese ? "主题正在使用中，请先切换到其他主题。" : "This theme is in use. Switch to another theme first."
+      case SavedThemeDeletionError.busy:
+        message = chinese ? "另一个主题操作正在进行，请稍后重试。" : "Another theme operation is running. Try again when it finishes."
+      default:
+        message = chinese ? "未能将主题移到废纸篓。请检查主题文件夹和权限后重试。" : "Could not move the theme to Trash. Check the theme folder and its permissions, then try again."
+      }
+      showError(title: chinese ? "无法删除主题" : "Could not delete theme", message: message)
+    }
   }
 
   private func savedThemes() -> [SavedThemeOption] {
