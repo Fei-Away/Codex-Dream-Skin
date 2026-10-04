@@ -187,6 +187,17 @@ jobs:
           ref: ${{ needs.guard.outputs.release_sha }}
           persist-credentials: false
 
+      - name: Require version-specific release notes
+        shell: bash
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -s "docs/releases/v${VERSION}.md" || {
+            echo "Missing release notes: docs/releases/v${VERSION}.md (see docs/releases/README.md)." >&2
+            exit 1
+          }
+
       - name: Set up Node.js for portable regressions
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -477,26 +488,22 @@ jobs:
             sha256sum "CodexDreamSkin-v${VERSION}.dmg" \
               "CodexDreamSkin-Setup-v${VERSION}.exe" > SHA256SUMS.txt
           )
-          cat > release-notes.md <<EOF
-          ## Codex Dream Skin v${VERSION}
+          test -s "docs/releases/v${VERSION}.md"
+          cat "docs/releases/v${VERSION}.md" > release-notes.md
+          cat >> release-notes.md <<EOF
 
-          ### Downloads
+          ## 下载与安装 / Downloads
 
-          - **macOS:** [CodexDreamSkin-v${VERSION}.dmg](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg)
-          - **Windows:** [CodexDreamSkin-Setup-v${VERSION}.exe](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe)
-          - [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt)
+          | 平台 / Platform | 安装包 / Package | 安装说明 / Guide |
+          | --- | --- | --- |
+          | macOS · Apple Silicon / Intel | [CodexDreamSkin-v${VERSION}.dmg](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-v${VERSION}.dmg) | [macOS](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-macos.md) |
+          | Windows · x64 | [CodexDreamSkin-Setup-v${VERSION}.exe](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/CodexDreamSkin-Setup-v${VERSION}.exe) | [Windows](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md) |
 
-          The packages are currently unsigned. Follow the graphical first-run steps in
-          [macOS installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-macos.md)
-          or [Windows installation](https://github.com/Fei-Away/Codex-Dream-Skin/blob/v${VERSION}/docs/install-windows.md).
-          No terminal trust command is required for ordinary users.
+          安装包目前未签名，首次打开请按对应平台的图形化安装说明操作。
+          Packages are currently unsigned; follow the platform guide for first-run steps.
 
-          This release was built automatically from ${RELEASE_SHA} after the version bump reached main.
+          [SHA256SUMS.txt](https://github.com/Fei-Away/Codex-Dream-Skin/releases/download/v${VERSION}/SHA256SUMS.txt) · [Source commit](https://github.com/Fei-Away/Codex-Dream-Skin/commit/${RELEASE_SHA})
           EOF
-          if [[ -f "docs/releases/v${VERSION}.md" ]]; then
-            printf '\n' >> release-notes.md
-            cat "docs/releases/v${VERSION}.md" >> release-notes.md
-          fi
 
       - name: Stage, verify, and publish release
         env:
