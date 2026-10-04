@@ -1189,6 +1189,7 @@ export async function verifySession(
         x: Math.round(r.x), y: Math.round(r.y),
         width: Math.round(r.width), height: Math.round(r.height),
         visible: Boolean(node.isConnected !== false && cssVisible && intersectsViewport),
+        withinViewport: r.x >= 0 && r.y >= 0 && right <= innerWidth && bottom <= innerHeight,
       };
     };
     const activeNodes = (selector) => [...document.querySelectorAll(selector)]
@@ -1321,7 +1322,16 @@ export async function verifySession(
       windowPass, documentPass, viewportPass, structurePass,
       nativeWindowPass, fallbackWindowPass,
     };
+    // A visible shell can coexist with a Home composer pushed below the window.
+    // Mere intersection is insufficient: the observed Windows regression left
+    // only 37px of a 98px composer inside a 600px viewport. Keep this requirement
+    // scoped to Home, since tool/settings pages can legitimately omit input.
+    const homeComposer = result.composer ?? result.genericInput;
+    result.homeComposerPass = !homeScope || Boolean(
+      homeComposer?.visible && homeComposer.withinViewport
+    );
     const homePass = !homeScope || (
+      result.homeComposerPass &&
       result.homePresent && Boolean(result.homeSurface?.visible) &&
       ((result.hero?.visible && result.hero.width >= 280 && result.hero.height >= 120) ||
         Boolean(result.genericMain?.visible)) &&

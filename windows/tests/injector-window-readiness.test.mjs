@@ -301,7 +301,7 @@ test("visible settings is the only L0 structure exception", async () => {
     "A renderer that claims Home must expose a real Home identity signal.");
 });
 
-test("home verification matches macOS and does not require a fixed suggestion-card count", async () => {
+test("home verification does not require a fixed suggestion-card count", async () => {
   const oneSuggestion = {
     querySelectorAll: (selector) => selector === "button"
       ? [makeSuggestionButton({ text: "One real card" })]
@@ -340,6 +340,30 @@ test("home verification matches macOS and does not require a fixed suggestion-ca
   });
   assert.equal(badHome.result.suggestionLabelColorsMatch, false);
   assert.equal(badHome.result.pass, false);
+});
+
+test("home composer must fit completely inside the viewport", async () => {
+  for (const [label, rect, expected] of [
+    ["observed clipping", makeRect(1031, 98, 100, 563), false],
+    ["bottom boundary", makeRect(1031, 98, 100, 502), true],
+    ["above viewport", makeRect(800, 98, 100, -1), false],
+    ["right clipping", makeRect(1031, 98, 200, 400), false],
+  ]) {
+    const { result } = await verify({ dom: makeDomFixture({
+      viewportWidth: 1183, viewportHeight: 600,
+      home: makeHome({ rect: makeRect(1127, 500, 52, 96) }),
+      composer: makeElement({ rect }),
+    }) });
+    assert.equal(result.composer.visible, true, label);
+    assert.equal(result.homeComposerPass, expected, label);
+    assert.equal(result.pass, expected, label);
+  }
+  for (const composer of [null, makeElement({ visible: false })]) {
+    const { result } = await verify({ dom: makeDomFixture({ home: makeHome(), composer }) });
+    assert.equal(result.pass, false, "Missing or hidden Home input must fail");
+  }
+  const { result } = await verify({ dom: makeDomFixture({ composer: null }) });
+  assert.equal(result.pass, true, "Non-Home tools may omit a composer");
 });
 
 // Regression for #256. The previous version of this test asserted that a

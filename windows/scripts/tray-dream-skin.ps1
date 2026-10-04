@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([int]$Port = 9335)
+param([int]$Port = 9335, [switch]$ShowWindow)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -21,12 +21,17 @@ $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'Codex Dr
 
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $mutex = [System.Threading.Mutex]::new($false, "Local\CodexDreamSkin.$sid.Tray")
+$showEvent = [System.Threading.EventWaitHandle]::new($false,
+  [System.Threading.EventResetMode]::AutoReset, "Local\CodexDreamSkin.$sid.ShowWindow")
 $acquired = $false
 $notify = $null
 $trayIcon = $null
 try {
   try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
-  if (-not $acquired) { exit 0 }
+  if (-not $acquired) {
+    if ($ShowWindow) { [void]$showEvent.Set() }
+    exit 0
+  }
 
   $initializationLock = Enter-DreamSkinOperationLock
   try {
@@ -78,6 +83,102 @@ try {
       Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
     } finally {
       $env:DREAMSKIN_LANG = $previousLanguage
+    }
+  }
+
+  function Set-DreamSkinTrayApplyStatus {
+    param([string]$Message, [bool]$Success = $false)
+    if ($null -ne $script:themeStatusLabel -and -not $script:themeStatusLabel.IsDisposed) {
+      $script:themeStatusLabel.Text = $Message
+    }
+    $script:trayApplyStatus = $Message
+    $script:trayApplySucceeded = $Success
+  }
+
+  function Complete-DreamSkinTrayApply {
+    # Called on the UI timer only after the child exits. A selected theme or
+    # a successful process launch is not evidence of rendered appearance.
+    $operation = $script:trayApplyOperation
+    if ($null -eq $operation) { return }
+    $success = $false
+    $message = Get-DreamSkinTrayText -Key 'ApplyNotConfirmed'
+    try {
+      $result = Read-DreamSkinStartResult -StateRoot $StateRoot -Token $operation.Token
+      $success = $operation.Process.ExitCode -eq 0 -and $result.outcome -ceq 'success'
+      if ($success) {
+        $message = Get-DreamSkinTrayText -Key 'Applied' -FormatArguments @($operation.ThemeName)
+      } elseif ($result.outcome -ceq 'failure') {
+        $message = Get-DreamSkinTrayText -Key 'ApplyFailed' -FormatArguments @($result.category)
+      }
+    } catch {
+      # Missing, malformed, stale and oversized results all fail closed.
+    } finally {
+      $operation.Timer.Stop()
+      $operation.Timer.Dispose()
+      $operation.Process.Dispose()
+      Remove-Item -LiteralPath $operation.ResultPath -Force -ErrorAction SilentlyContinue
+      $script:trayApplyOperation = $null
+      $script:trayApplyPending = $false
+    }
+    Set-DreamSkinTrayApplyStatus -Message $message -Success $success
+    $icon = if ($success) { [System.Windows.Forms.ToolTipIcon]::Info } else { [System.Windows.Forms.ToolTipIcon]::Warning }
+    $notify.ShowBalloonTip(3500, 'Codex Dream Skin', $message, $icon)
+  }
+
+  function Start-DreamSkinVerifiedTrayApply {
+    param([string]$ThemeName = '', [string]$ThemeDirectory = '')
+    if ($script:trayApplyPending) { return }
+    $script:trayApplyPending = $true
+    $script:trayApplyOperation = $null
+    $process = $null
+    $timer = $null
+    try {
+      if (-not $ThemeName) {
+        $selected = Read-DreamSkinTheme -ThemeDirectory $paths.Active -SkipImageMetadata
+        $ThemeName = $selected.Theme.name
+      }
+      $token = [guid]::NewGuid().ToString('N')
+      $resultPath = Get-DreamSkinStartResultPath -StateRoot $StateRoot -Token $token
+      if (Test-Path -LiteralPath $resultPath) { throw 'Theme application result token already exists.' }
+      $arguments = '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' +
+        (ConvertTo-DreamSkinProcessArgument -Value $startScript) + ' -Port ' + $Port +
+        ' -PromptRestart -ResultToken ' + $token
+      if ($ThemeDirectory) {
+        $arguments += ' -SavedThemeDirectory ' + (ConvertTo-DreamSkinProcessArgument -Value $ThemeDirectory)
+      }
+      $timer = [System.Windows.Forms.Timer]::new()
+      $timer.Interval = 300
+      $timer.add_Tick({
+        $operation = $script:trayApplyOperation
+        if ($null -eq $operation) { return }
+        try {
+          $operation.Process.Refresh()
+          if ($operation.Process.HasExited) { Complete-DreamSkinTrayApply }
+        } catch {
+          # Do not report success or permit another selection while the child
+          # may still own the operation lock. The next tick retries observation.
+          Set-DreamSkinTrayApplyStatus -Message (Get-DreamSkinTrayText -Key 'ApplyWaiting')
+        }
+      })
+      $previousLanguage = $env:DREAMSKIN_LANG
+      try {
+        $env:DREAMSKIN_LANG = Resolve-DreamSkinLanguage -StateRoot $StateRoot
+        $process = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru
+      } finally {
+        $env:DREAMSKIN_LANG = $previousLanguage
+      }
+      $script:trayApplyOperation = [pscustomobject]@{
+        Process = $process; Timer = $timer; Token = $token; ResultPath = $resultPath; ThemeName = $ThemeName
+      }
+      $timer.Start()
+      Set-DreamSkinTrayApplyStatus -Message (Get-DreamSkinTrayText -Key 'Applying')
+    } catch {
+      if ($null -ne $timer) { $timer.Stop(); $timer.Dispose() }
+      if ($null -ne $process) { $process.Dispose() }
+      $script:trayApplyOperation = $null
+      $script:trayApplyPending = $false
+      Set-DreamSkinTrayApplyStatus -Message (Get-DreamSkinTrayText -Key 'ApplyCouldNotStart')
+      throw
     }
   }
 
@@ -170,41 +271,13 @@ try {
     [void]$menu.Items.Add([System.Windows.Forms.ToolStripSeparator]::new())
 
     $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Apply') -Action {
-      $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
-      $begin = $null
-      if ($null -ne $session) {
-        $begin = Show-DreamSkinOperationUi -Session $session -Phase begin -Kind apply -TimeoutMs 3000
-      }
-      Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
-      # start-dream-skin is async; close the in-window loading so it does not stick for 180s.
-      if ($null -ne $session -and $null -ne $begin -and $begin.Ok) {
-        $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $begin.Token `
-          -UiState success -Message (Get-DreamSkinTrayText -Key 'ApplyStarted') -TimeoutMs 1500
-      }
-      $notify.ShowBalloonTip(1800, 'Codex Dream Skin', (Get-DreamSkinTrayText -Key 'Applying'), [System.Windows.Forms.ToolTipIcon]::Info)
+      Start-DreamSkinVerifiedTrayApply
     }
     # Match macOS menubar: pause = mark + live remove; resume lets the serialized
     # start path clear pause only after its safety checks and any restart consent.
     if ($paused) {
       $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Resume') -Action {
-        # Keep pause set while the start path validates and prompts; show in-window
-        # loading when the existing CDP session is still reachable.
-        $session = Get-DreamSkinLiveSessionContext -StateRoot $StateRoot
-        $begin = $null
-        if ($null -ne $session) {
-          $begin = Show-DreamSkinOperationUi -Session $session -Phase begin -Kind apply -TimeoutMs 3000
-        }
-        Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
-        if ($null -ne $session -and $null -ne $begin -and $begin.Ok) {
-          $null = Show-DreamSkinOperationUi -Session $session -Phase finish -Token $begin.Token `
-          -UiState success -Message (Get-DreamSkinTrayText -Key 'ResumeStarted') -TimeoutMs 1500
-        }
-        $notify.ShowBalloonTip(
-          1800,
-          'Codex Dream Skin',
-          (Get-DreamSkinTrayText -Key 'Reapplying'),
-          [System.Windows.Forms.ToolTipIcon]::Info
-        )
+        Start-DreamSkinVerifiedTrayApply
       }
     } else {
       $null = Add-DreamSkinTrayItem -Items $menu.Items -Text (Get-DreamSkinTrayText -Key 'Pause') -Action {
@@ -323,16 +396,7 @@ try {
         $savedPath = $saved.Path
         $savedName = $saved.Name
         $savedAction = {
-          $null = Invoke-DreamSkinTrayThemeOperation -Action {
-            $null = Use-DreamSkinSavedTheme -ThemeDirectory $savedPath -StateRoot $StateRoot
-            Set-DreamSkinPaused -Paused $false -StateRoot $StateRoot | Out-Null
-          }
-          $notify.ShowBalloonTip(
-            1800,
-            'Codex Dream Skin',
-            (Get-DreamSkinTrayText -Key 'Applied' -FormatArguments @($savedName)),
-            [System.Windows.Forms.ToolTipIcon]::Info
-          )
+          Start-DreamSkinVerifiedTrayApply -ThemeName $savedName -ThemeDirectory $savedPath
         }.GetNewClosure()
         $null = Add-DreamSkinTrayItem -Items $savedMenu.DropDownItems -Text $savedName -Action $savedAction
       }
@@ -382,15 +446,33 @@ try {
   }
 
   $menu.add_Opening({ Rebuild-DreamSkinTrayMenu })
+  . (Join-Path $PSScriptRoot 'theme-window.ps1')
+  Initialize-DreamSkinThemeWindow
   $notify.add_DoubleClick({
     try {
-      Start-DreamSkinPowerShell -Script $startScript -Arguments @('-Port', "$Port", '-PromptRestart')
+      Show-DreamSkinThemeWindow
     } catch {
       Show-DreamSkinTrayError -Message $_.Exception.Message
     }
   })
+  $showTimer = [System.Windows.Forms.Timer]::new()
+  $showTimer.Interval = 400
+  $showTimer.add_Tick({
+    if ($showEvent.WaitOne(0)) {
+      try { Show-DreamSkinThemeWindow } catch { Show-DreamSkinTrayError -Message $_.Exception.Message }
+    }
+  })
+  $showTimer.Start()
+  if ($ShowWindow) { Show-DreamSkinThemeWindow }
   [System.Windows.Forms.Application]::Run()
 } finally {
+  if ($null -ne $showTimer) { $showTimer.Dispose() }
+  if ($null -ne $script:trayApplyOperation) {
+    $script:trayApplyOperation.Timer.Dispose()
+    $script:trayApplyOperation.Process.Dispose()
+  }
+  if ($null -ne $script:themeWindow) { $script:themeWindow.Dispose() }
+  $showEvent.Dispose()
   if ($null -ne $notify) { $notify.Dispose() }
   if ($null -ne $trayIcon) { $trayIcon.Dispose() }
   if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }

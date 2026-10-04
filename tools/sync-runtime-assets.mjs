@@ -5,6 +5,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { cssPredicateManifest } from "./css-predicate-cache.mjs";
+import { adaptWindowsHomeCss } from "./windows-home-css.mjs";
+import { adaptWindowsReducedMotionCss } from "./windows-motion-css.mjs";
 
 const toolsRoot = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(toolsRoot, "..");
@@ -116,6 +118,8 @@ function compileWindowsImageMetadata(source) {
 
 const sourceCss = await fs.readFile(path.join(projectRoot, "runtime", "dream-skin.css"), "utf8");
 const expandedCss = compileSelectorTokens(sourceCss, "runtime/dream-skin.css");
+const windowsShellCss = await fs.readFile(path.join(toolsRoot, "windows-shell.css"), "utf8");
+const windowsCss = compileSelectorTokens(adaptWindowsReducedMotionCss(adaptWindowsHomeCss(sourceCss)), "runtime/dream-skin.css (Windows)") + windowsShellCss;
 const sourceRuntime = await fs.readFile(path.join(projectRoot, "runtime", "renderer-inject.js"), "utf8");
 const sourceThemePackageValidator = await fs.readFile(
   path.join(projectRoot, "runtime", "theme-package-validator.mjs"),
@@ -151,11 +155,19 @@ const outputs = [
   },
   {
     content: expandedCss,
-    paths: ["macos/assets/dream-skin.css", "windows/assets/dream-skin.css"],
+    paths: ["macos/assets/dream-skin.css"],
+  },
+  {
+    content: windowsCss,
+    paths: ["windows/assets/dream-skin.css"],
   },
   {
     content: compileRuntime(sourceRuntime, expandedCss),
-    paths: ["macos/assets/renderer-inject.js", "windows/assets/renderer-inject.js"],
+    paths: ["macos/assets/renderer-inject.js"],
+  },
+  {
+    content: compileRuntime(sourceRuntime, windowsCss),
+    paths: ["windows/assets/renderer-inject.js"],
   },
   {
     content: sourceThemePackageValidator,

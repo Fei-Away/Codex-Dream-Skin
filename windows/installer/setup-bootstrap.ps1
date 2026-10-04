@@ -2,6 +2,7 @@
 param(
   [switch]$Install,
   [switch]$LaunchTray,
+  [switch]$ShowWindow,
   [switch]$Uninstall,
   [switch]$Silent
 )
@@ -132,6 +133,7 @@ try {
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
+    'scripts\theme-window.ps1',
     'scripts\tray-dream-skin.ps1',
     'scripts\validate-safe-css-file.mjs',
     'scripts\verify-dream-skin.ps1',
@@ -162,10 +164,11 @@ try {
     }
   }
 
-  if ($LaunchTray -and -not (Test-DreamSkinTrayActive)) {
+  if ($LaunchTray) {
     $powershell = (Get-Command powershell.exe -ErrorAction Stop).Source
     $argumentLine = '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' +
       (ConvertTo-DreamSkinProcessArgument -Value $engine.Tray)
+    if ($ShowWindow) { $argumentLine += ' -ShowWindow' }
     Start-Process -FilePath $powershell -ArgumentList $argumentLine -WindowStyle Hidden | Out-Null
   }
 } catch {

@@ -1,0 +1,71 @@
+
+/* Windows 26.930 application-menu chrome already overlays the painted main.
+   The macOS titlebar extension instead paints at y=0, doubling the Windows
+   menu scrim and ending mid-header. Keep only the existing native surfaces.
+   Verified on Gothic Void Crusade; no theme colors/alpha or controls changed. */
+html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+  [data-app-shell-titlebar="true"][data-app-shell-application-menu-bar="true"]::after {
+  content: none !important;
+}
+
+html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+  [data-app-shell-titlebar="true"][data-app-shell-application-menu-bar="true"] [data-app-shell-header-slot="start"] {
+  background: transparent !important;
+}
+
+/* Native inset gutters exposed unpainted wallpaper around the scrim, making
+   a second frame (8px above main, 4px at right/bottom). Fill the native client
+   area; keep the menu height, resize behavior and native titlebar controls. */
+html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+  [data-app-shell-frame="true"][data-app-shell-application-menu-bar="true"] {
+  --app-shell-titlebar-top-inset: 0px !important;
+  --app-shell-page-inline-end-inset: 0px !important;
+  padding: 0 !important;
+}
+
+html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+  [data-app-shell-main-surface],
+html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+  [data-app-shell-workspace-row] > aside.app-shell-left-panel {
+  margin-top: 0 !important;
+}
+
+/* Do not blur the wallpaper a second time through the Windows menu bar. */
+html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+  :is([class~="group/application-menu-top-bar"], [class*="_ApplicationMenuTopBar_"]) {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* The docked sidebar meets a square main surface. Community surface-radius
+   must not cut holes at this internal seam. Use the native earliest layer
+   so this narrow shell geometry invariant wins over community !important;
+   preserve left corners and exclude overlay/peeking/collapsed sidebars. */
+@layer properties {
+  html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+    [data-app-shell-frame][data-app-shell-sidebar-open="true"][data-app-shell-responsive-sidebar="false"][data-app-shell-docking-peek="false"]
+    [data-app-shell-workspace-row] > aside.app-shell-left-panel {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+}
+
+/* Windows thread messages scroll behind the floating composer. Wide artwork
+   disables shared composer blur, leaving readable message glyphs behind its
+   translucent surface. Restore blur on the single outer input surface only;
+   keep author alpha, text, nested surfaces and Home layout unchanged. */
+@layer utilities {
+  /* Continue the main scrim through the Windows menu strip, without an
+     extra accent-colored horizontal seam. Keep its native height/controls. */
+  html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="application-menu"]
+    :is([class~="group/application-menu-top-bar"], [class*="_ApplicationMenuTopBar_"]) {
+    background: rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .7)) !important;
+    border-bottom-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html[data-dream-skin="active"][data-codex-os="win32"]
+    [data-codex-composer-root][data-composer-placement="thread"] [data-ds-part="composer"] {
+    backdrop-filter: blur(16px) saturate(108%) !important;
+  }
+}

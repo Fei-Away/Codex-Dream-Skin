@@ -14,8 +14,8 @@ const warnings = [];
 const options = { preferencesPath, warn: (message) => warnings.push(message) };
 const write = (themes) => fs.writeFile(preferencesPath, JSON.stringify({ schemaVersion: 1, themes }));
 try {
-  assert.equal(themePreferencesPath("darwin", {}, "/test"), "/test/Library/Application Support/CodexDreamSkinStudio/theme-preferences.json");
-  assert.equal(themePreferencesPath("win32", { LOCALAPPDATA: "/local" }, "/test"), "/local/CodexDreamSkin/theme-preferences.json");
+  assert.equal(themePreferencesPath("darwin", {}, "/test"), path.join("/test", "Library", "Application Support", "CodexDreamSkinStudio", "theme-preferences.json"));
+  assert.equal(themePreferencesPath("win32", { LOCALAPPDATA: "/local" }, "/test"), path.join("/local", "CodexDreamSkin", "theme-preferences.json"));
   assert.equal(await readThemeTransparency("test", options), undefined);
   for (const transparency of [0, 30, 100]) {
     await write({ test: { transparency }, other: { transparency: 75 } });

@@ -1178,6 +1178,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\restore-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\start-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-windows.ps1') -Destination $releaseFixtureScripts -Force
+  Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-window.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\tray-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\validate-safe-css-file.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\verify-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
@@ -1296,10 +1297,17 @@ try {
     throw 'Canonical CSS still contains retired marker classes or fossil selectors.'
   }
   $macCssPath = Join-Path (Split-Path -Parent $Root) 'macos\assets\dream-skin.css'
-  if (-not (Test-Path -LiteralPath $macCssPath) -or
-    (Get-FileHash -Algorithm SHA256 -LiteralPath $macCssPath).Hash -cne
-    (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Root 'assets\dream-skin.css')).Hash) {
-    throw 'macOS and Windows canonical CSS assets are not byte-identical.'
+  if (-not (Test-Path -LiteralPath $macCssPath)) {
+    throw 'macOS canonical CSS asset is missing.'
+  }
+  $macCss = Read-DreamSkinUtf8File -Path $macCssPath
+  $legacyHomeChain = '[role="main"]:has([data-testid="home-icon"]) > div:first-child'
+  $windowsHomeGuard = ':not(:where([class~="group/home-composer-layout"]))'
+  $windowsShellCss = Read-DreamSkinUtf8File -Path (Join-Path (Split-Path -Parent $Root) 'tools\windows-shell.css')
+  $expectedWindowsCss = $macCss.Replace($legacyHomeChain, $legacyHomeChain + $windowsHomeGuard) + $windowsShellCss
+  $expectedWindowsCss = $expectedWindowsCss.Replace('transition-duration: .01ms !important;', 'transition: none !important;')
+  if (-not $macCss.Contains($legacyHomeChain) -or $css -cne $expectedWindowsCss) {
+    throw 'Windows CSS must equal shared CSS plus the Home guard and explicit Windows shell adaptation.'
   }
   $macSelectorsPath = Join-Path (Split-Path -Parent $Root) 'macos\assets\selectors.json'
   if (-not (Test-Path -LiteralPath $macSelectorsPath) -or
@@ -1367,7 +1375,7 @@ try {
       throw "Windows injector operation UI is missing: $requiredOperationUi"
     }
   }
-  if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 2 -or
+  if ([regex]::Matches($traySource, '-ExecutionPolicy RemoteSigned').Count -ne 3 -or
     $traySource.Contains('-ExecutionPolicy Bypass')) {
     throw 'Tray actions still bypass the PowerShell execution policy.'
   }
@@ -1519,6 +1527,7 @@ try {
   & (Join-Path $PSScriptRoot 'theme-zip-import.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'config-startup-rollback.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-result-contract.tests.ps1') -Root $Root
+  & (Join-Path $PSScriptRoot 'tray-apply-result.tests.ps1')
   & (Join-Path $PSScriptRoot 'start-cdp-failure-appearance-recovery.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-post-launch-appearance-recovery.tests.ps1') -Root $Root
   & (Join-Path $PSScriptRoot 'start-renderer-readiness.tests.ps1') -Root $Root
