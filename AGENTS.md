@@ -57,6 +57,8 @@
 
 ## Git 与发布
 
+- 每次发布遵循 [`docs/releases/README.md`](docs/releases/README.md)：版本 PR 必须包含中文 `docs/releases/vX.Y.Z.md` 和完整英文 `docs/releases/vX.Y.Z-en.md`，顶部互链；以用户可感知的新增、修复和升级说明为先，附贡献者与完整变更链接；Release 展示中文正文，下载信息由工作流追加。
+
 - 保留用户现有改动；禁止未经授权的 reset、checkout 丢弃、强推、移动已公开 tag 或覆盖已公开 Release。
 - 功能开发、版本准备和紧急修复使用独立分支；提交只包含当前范围，推送前审查 staged diff。
 - 客户端发布由 `main` 上的版本变化驱动。版本未变化的普通合并不得重复构建或覆盖 Release。
