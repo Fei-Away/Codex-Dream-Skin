@@ -1,40 +1,33 @@
+<div align="center">
+
 # Codex Dream Skin
 
-<p align="center">
-  <strong>中文</strong> · <a href="./README.en.md">English</a> ·
-  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases">更新日志</a>
-</p>
+### Give the Codex desktop app a face that breathes
 
-<p align="center">
-  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest"><img src="https://img.shields.io/github/v/release/Fei-Away/Codex-Dream-Skin?color=blue&amp;label=version" alt="Latest release"></a>
-  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" alt="Platforms: macOS and Windows"></a>
-  <a href="https://github.com/Fei-Away/Codex-Dream-Skin/releases"><img src="https://img.shields.io/github/downloads/Fei-Away/Codex-Dream-Skin/total?label=downloads" alt="GitHub Release asset downloads"></a>
-</p>
+**One image, one mood. Swap the wallpaper, keep every native control — sidebar, cards, project picker and composer stay real.**
 
-<p align="center">
-  <a href="https://trendshift.io/repositories/84043?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/84043/daily" alt="Fei-Away%2FCodex-Dream-Skin | Trendshift" width="250" height="55"/></a>
-</p>
+[![Latest release](https://img.shields.io/github/v/release/Fei-Away/Codex-Dream-Skin?color=blue&label=version)](https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest)
+[![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)](https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest)
+[![Stars](https://img.shields.io/github/stars/Fei-Away/Codex-Dream-Skin?label=stars&color=blue)](https://github.com/Fei-Away/Codex-Dream-Skin/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/Fei-Away/Codex-Dream-Skin/total?label=downloads)](https://github.com/Fei-Away/Codex-Dream-Skin/releases)
+[![License](https://img.shields.io/github/license/Fei-Away/Codex-Dream-Skin?label=license)](./macos/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Fei-Away/Codex-Dream-Skin/ci.yml?label=CI)](https://github.com/Fei-Away/Codex-Dream-Skin/actions/workflows/ci.yml)
 
-<p align="center">
-  <strong>给 Codex 桌面端换一张会呼吸的脸。</strong><br>
-  外部主题 / 换肤工具 · 本机 CDP 注入 · 不改官方安装包
-</p>
+<a href="https://trendshift.io/repositories/84043?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/84043/daily" alt="Fei-Away%2FCodex-Dream-Skin | Trendshift" width="250" height="55"/></a>
 
-<p align="center">
-  一张图，一种心情 · 写代码，也要有氛围感
-</p>
+English | [中文](README.zh-CN.md) | [Changelog](https://github.com/Fei-Away/Codex-Dream-Skin/releases)
 
-<p align="center">
-  官方主题库：<a href="https://dreamskin.cc"><strong>DreamSkin.cc</strong></a> ·
-  <a href="https://dreamskin.cc/gallery">主题库 Gallery</a> ·
-  <a href="https://dreamskin.cc/studio">在线 Studio</a>
-</p>
+**[Install](#install) · [Theme library](#theme-library--community) · [Features](#what-it-does) · [Import](#import-a-theme-zip) · [Developers](#for-developers) · [Safety](#safety)**
 
-<p align="center">
-  非 OpenAI 官方产品。不修改 <code>.app</code> / <code>app.asar</code> / WindowsApps。
-</p>
+### 🌐 Official website & theme library: **[dreamskin.cc](https://dreamskin.cc)**
 
-## 🤝 独家赞助
+[Gallery](https://dreamskin.cc/gallery) · [Online Studio](https://dreamskin.cc/studio)
+
+Unofficial. Does not modify `.app` / `app.asar` / WindowsApps.
+
+</div>
+
+## ❤️ Sponsor
 
 <table>
 <tr>
@@ -42,29 +35,29 @@
 <a href="https://passion8.cc/sign-up?aff=ZgLT"><img src="docs/images/sponsor-passion8.png" alt="Passion8" width="150"></a>
 </td>
 <td>
-感谢 Passion8 独家赞助本项目！Passion8 是一家面向开发者的 AI API 中转服务商，为个人开发者与团队提供稳定、低成本的主流大模型接入。<br><br>
-<strong>满血 AI · 触手可及</strong>：OpenAI、Claude 全系列原版模型，无降智、无套壳；使用前沿 AI 模型仅需官方价格的一小部分，充值 1:1，<strong>1$ = 1¥</strong>。保留原有官方 SDK，只把 Base URL 换成 Passion8，Claude Code、Codex、Grok 以及任意 OpenAI 兼容客户端都能直接跑——一行配置，代码不用改。
-<strong>全球节点加速</strong>：Cloudflare 全球边缘 + 多线路 BBR 加速，低延迟、高可用、稳定如一；7×24 稳定中转，99.9% SLA，首 Token 目标 1 秒内。
-<strong>安全可靠</strong>：独立 API Key、密钥加密存储、全链路 HTTPS，隐私优先。<br><br>
-Passion8 为本项目用户准备了专属福利：通过<a href="https://passion8.cc/sign-up?aff=ZgLT">此链接</a>注册，首次充值自动赠送 10% 额度，无需申请，30 分钟内到账。有问题联系 <a href="mailto:support@passion8.cc">support@passion8.cc</a>。
+Thanks to Passion8 for being this project's exclusive sponsor! Passion8 is an AI API relay for developers, giving individuals and teams stable, low-cost access to mainstream large models.<br><br>
+<strong>Full-power AI, within reach</strong>: the full OpenAI and Claude lineups, original models, no silent downgrades and no wrapper shells; frontier models for a fraction of official pricing, with top-ups at 1:1 — <strong>$1 = ¥1</strong>. Keep your official SDK and point the base URL at Passion8: Claude Code, Codex, Grok, and any OpenAI-compatible client just work — one line of config, no code changes.
+<strong>Global edge acceleration</strong>: Cloudflare's global edge plus multi-route BBR acceleration for low latency and high availability; 7×24 relay, 99.9% SLA, sub-second TTFT target.
+<strong>Secure by default</strong>: isolated API keys, encrypted key storage, and HTTPS end to end — privacy first.<br><br>
+Passion8 has a benefit for this project's users: register through <a href="https://passion8.cc/sign-up?aff=ZgLT">this link</a> and your first top-up earns an automatic 10% bonus — no application needed, credited within 30 minutes. Questions go to <a href="mailto:support@passion8.cc">support@passion8.cc</a>.
 </td>
 </tr>
 </table>
 
-<sub>换肤与 API 配置互相独立，本项目不会自动改写你的模型供应商设置。</sub>
+<sub>Theme install and API config stay separate — this project never rewrites your provider settings.</sub>
 
-## 直接安装
+## Install
 
-普通用户只需先安装并退出一次官方 Codex / ChatGPT，然后从
-[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载：
+Install the official Codex / ChatGPT app once and quit it, then download the package for your platform from [GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases):
 
-- macOS：打开 `CodexDreamSkin-vX.Y.Z.dmg`，把 App 拖进 Applications。
-- Windows：双击 `CodexDreamSkin-Setup-vX.Y.Z.exe`，按安装向导完成。
+| Platform | Download | First-run guide |
+|---|---|---|
+| macOS · Apple Silicon / Intel | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
+| Windows · x64 | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
 
-不需要 clone 源码、安装 Node.js 或手动运行 `.sh` / `.ps1`。首次未签名放行、更新和卸载步骤见
-[macOS 安装说明](./docs/install-macos.md) / [Windows 安装说明](./docs/install-windows.md)。
+No source checkout, Node.js install, `.sh` or `.ps1` command is required. After installation, use the macOS menu bar or the Windows system tray. Updates are manual: install the new package over the existing one and your themes and images are preserved. Because the public packages are unsigned, a new download may show a one-time OS security warning — the guides cover the safe GUI approval path, updates and uninstall steps.
 
-## 主题库与社区
+## Theme library & community
 
 <p align="center">
   <a href="https://dreamskin.cc">
@@ -73,187 +66,157 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
 </p>
 
 <p align="center">
-  <strong>DreamSkin.cc</strong> · 本项目的官方主题库与创作平台<br>
+  <strong>DreamSkin.cc</strong> · the official theme library and authoring platform<br>
   <sub>Make your workspace <em>yours.</em></sub>
 </p>
 
 <p align="center">
-  <a href="https://dreamskin.cc/gallery"><strong>浏览主题库 →</strong></a>
+  <a href="https://dreamskin.cc/gallery"><strong>Browse the Gallery →</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://dreamskin.cc/studio"><strong>在线 Studio →</strong></a>
+  <a href="https://dreamskin.cc/studio"><strong>Online Studio →</strong></a>
 </p>
 
-- [**主题库 Gallery**](https://dreamskin.cc/gallery)：浏览社区已审核的主题，支持最新 / 热门排序和创作者榜单。
-  每套主题都能先在网页里的桌面模拟器中试穿，再决定装不装。
+- [**Gallery**](https://dreamskin.cc/gallery) — browse reviewed community themes with recent/popular sorting and creator rankings. Try any theme on in the in-page desktop simulator before you install it.
 
 <table align="center">
   <tr>
     <td align="center">
-      <img src="docs/images/悟空.png" alt="社区主题「悟空（WUKONG）」在桌面模拟器里的实机效果" width="420"><br>
-      <sub>「悟空（WUKONG）」by JamesOpsLab</sub>
+      <img src="docs/images/悟空.png" alt="Community theme 悟空（WUKONG） rendered live on desktop" width="420"><br>
+      <sub>悟空（WUKONG） by JamesOpsLab</sub>
     </td>
     <td align="center">
-      <img src="docs/images/DeepSeek-鲸鱼娘.png" alt="社区主题「DeepSeek-鲸鱼娘」在桌面模拟器里的实机效果" width="420"><br>
-      <sub>「DeepSeek-鲸鱼娘」by powerdog996</sub>
+      <img src="docs/images/DeepSeek-鲸鱼娘.png" alt="Community theme DeepSeek-鲸鱼娘 rendered live on desktop" width="420"><br>
+      <sub>DeepSeek-鲸鱼娘 by powerdog996</sub>
     </td>
   </tr>
 </table>
 
-- [**在线 Studio**](https://dreamskin.cc/studio)：在浏览器里换背景图、调主题色、写 Safe CSS，导出 `.zip` 主题包，
-  也可以直接投稿到主题库（需登录，经人工审核后公开）。
+- [**Online Studio**](https://dreamskin.cc/studio) — swap the background, tune theme colors, and write Safe CSS in the browser, then export a `.zip` pack or submit it to the library (sign-in required; published after human review).
 
 <p align="center">
-  <img src="docs/images/studio-custom-look.png" alt="在 DreamSkin.cc 在线 Studio 里调好的一套自定义背景效果" width="900">
+  <img src="docs/images/studio-custom-look.png" alt="A custom background tuned in the DreamSkin.cc online Studio" width="900">
   <br>
-  <sub>在线 Studio · 换一张喜欢的背景图，调好焦点与配色，就是你自己的主题</sub>
+  <sub>Online Studio · swap in a background you like, dial in the focal point and palette — now it's your theme</sub>
 </p>
 
-macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studio」入口，可以直接打开。
+The macOS menu bar and Windows tray both link straight to **Gallery** and **Online Studio**. For background transparency and deleting local themes, see [theme management](./docs/theme-management.md).
 
-本机主题的透明度调节和删除入口见[主题管理](./docs/theme-management.md)。
+<details>
+<summary><strong>One-click apply</strong> — install a theme from DreamSkin.cc without downloading and importing it by hand</summary>
 
-### 一键换肤
+Found a theme you like on DreamSkin.cc? **Apply** hands it to the local client directly. Requires client v1.5.0 or newer (v1.5.5+ recommended).
 
-在 DreamSkin.cc 上看到喜欢的主题，点「一键换肤」就能让本机客户端直接装上，不用先下载再手动导入。
-需要 v1.5.0 或更新的客户端（建议 v1.5.5 及以上）。
+Flow and safety boundary:
 
-流程与安全边界：
+- The page invokes the local app through `dreamskin://apply?version=ver_...`. The link can carry exactly one theme version ID — **never** an arbitrary URL, file path, or command — and there is no silent-apply parameter.
+- The app fetches the package only from the fixed official API, and refuses redirects.
+- A native confirmation appears first, and the app checks the version's review status, apply-compatibility flag, version, package size, actually downloaded byte count, and SHA-256.
+- It then reuses exactly the same ZIP, manifest, image, and Safe CSS validation as a manual import.
+- Success requires the real renderer to report the new theme as rendered. On a launch or render failure the app tries to restore the previous theme, and the restore is itself visibility-verified; if it cannot confirm either state it reports the status as unconfirmed rather than claiming a rollback.
 
-- 网页通过 `dreamskin://apply?version=ver_...` 唤起本机 App。链接只能携带一个主题版本 ID，**不能**携带
-  任意 URL、文件路径或命令，也不存在静默应用参数。
-- App 只向固定的官方 API 取包，并拒绝重定向。
-- 换肤前弹出原生确认框，并核对该版本的审核状态、一键兼容标记、版本号、包大小、实际下载字节数和 SHA-256。
-- 通过后复用与手动导入完全相同的 ZIP、manifest、图片与 Safe CSS 校验。
-- 只有真实渲染进程确认新主题已生效才算成功。启动或渲染失败会自动尝试恢复换肤前的主题，恢复结果
-  同样要经过可见性验证；无法确认时会明确报告状态未确认，而不是假装已恢复。
+Only themes that fully satisfy the current pack contract (background image + `theme.json` + non-empty `theme.css` + declared `safe-css` capability) show the one-click button. Anything else goes through the manual import below.
 
-只有完整满足当前主题包契约（背景图 + `theme.json` + 非空 `theme.css` + 声明 `safe-css` 能力）的主题
-才会显示一键换肤按钮；不满足的走下面的手动导入。
+</details>
 
-## 实测精选预设
+## What it does
+
+| Feature | |
+|---|---|
+| **Real UI** | Sidebar, cards, project picker and input stay native. Not a fake full-window screenshot. |
+| **Continuous wallpaper** | One 16:9 image spans the full window; adaptive focus, safe-area and route treatment keep native content readable. |
+| **Swappable art** | Drop in a UI-free image you like and it becomes your theme. |
+| **Saved themes** | Switch local themes from the macOS menu bar or Windows system tray. |
+| **One-click apply** | Hit apply on [DreamSkin.cc](https://dreamskin.cc); the client verifies origin and checksum, then installs it. |
+| **Theme ZIP import** | Pick an ordinary `.zip` on either platform and add a validated pack to the local library. |
+| **Restorable** | One-click restore to the stock look. |
+| **Safer path** | Local-loopback CDP inject only. No official binary or signature changes. |
+
+## Tested featured presets
 
 ### Gothic Void Crusade / 哥特虚空远征
 
-**特别感谢 [@seansong-ideogram](https://github.com/seansong-ideogram) 为社区设计并贡献这套精美、极具氛围感的原创哥特科幻作品。** 它是当前实测精选的第一套预设，也是 macOS 全新安装时默认启用的主题。
+**Special thanks to [@seansong-ideogram](https://github.com/seansong-ideogram) for designing and contributing this striking, atmospheric original gothic science-fiction work to the community.** It leads the tested featured presets and is the default theme for fresh macOS installs.
 
 <p align="center">
-  <img src="docs/images/presets/gothic-void-crusade-preview.jpg" alt="哥特虚空远征主题实机效果" width="900"><br>
-  <sub>真实 Codex 首页注入效果（仅预览）</sub>
+  <img src="docs/images/presets/gothic-void-crusade-preview.jpg" alt="Gothic Void Crusade theme running in Codex" width="900"><br>
+  <sub>Real injected Codex home screen (preview only)</sub>
 </p>
 
-安装后可直接从 macOS 菜单栏的「已保存主题」切换。
+After installing on macOS, switch directly from **Saved Themes** in the menu bar.
 
-### 桥本有菜 / Arina Hashimoto
+### Arina Hashimoto / 桥本有菜
 
-下面这套「桥本有菜 / Arina Hashimoto」已经在真实 Codex 首页分别验证浅色和暗色外观。用户提供的源 PNG 为 `1672 × 941`，主题包在保持源图近 16:9 构图的前提下派生导出 `2560 × 1440` JPEG，并不代表增加了源图细节。截图中的侧栏、卡片、项目选择和输入框都是 Codex 原生控件。
+Verified on the real Codex home screen in both light and dark appearances. The user-provided source PNG is `1672 × 941`; the preset's `2560 × 1440` JPEG is a standardized derived export that preserves the source's near-16:9 composition and does not add source detail. The sidebar, cards, project picker and composer shown below are native Codex controls.
 
 <p align="center">
-  <img src="docs/images/presets/arina-hashimoto-light.jpg" alt="桥本有菜主题浅色实机效果" width="900"><br>
-  <sub>浅色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
+  <img src="docs/images/presets/arina-hashimoto-light.jpg" alt="Arina Hashimoto theme tested in light appearance" width="900"><br>
+  <sub>Light · real injected screenshot; unsent input hidden during capture (preview only)</sub>
+  <br><br>
+  <img src="docs/images/presets/arina-hashimoto-dark.jpg" alt="Arina Hashimoto theme tested in dark appearance" width="900"><br>
+  <sub>Dark · real injected screenshot; unsent input hidden during capture (preview only)</sub>
 </p>
 
-<p align="center">
-  <img src="docs/images/presets/arina-hashimoto-dark.jpg" alt="桥本有菜主题暗色实机效果" width="900"><br>
-  <sub>暗色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
-</p>
+This portrait material remains in the source repository for reference and rights review; it is excluded from public DMG and `Setup.exe` assets. Public installers seed only the redistributable Gothic Void Crusade preset. Users can still choose **Change Background** to import UI-free artwork they are entitled to use and save it for one-click switching.
 
-这组人物素材留在源码仓库用于参考与权利核验，不进入公开 DMG / Setup.exe；公开安装包只预置已确认
-可分发的 Gothic Void Crusade。普通用户仍可从菜单里的「更换背景图」导入自己有权使用的纯背景，
-保存后继续一键切换。
+> The downloadable user source is [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png) (`1672 × 941`); the source-only reference preset uses the normalized derived [`background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg) (`2560 × 1440`). **Do not import either screenshot above** — they contain real UI and are previews only. The background is a user-provided AI-generated example, not an official OpenAI/Codex visual or endorsement; do not put it in a public installer without confirmed likeness and asset rights.
 
-> 可下载的用户源图是 [`docs/images/presets/arina-hashimoto-source.png`](./docs/images/presets/arina-hashimoto-source.png)（`1672 × 941`）；源码参考预设使用 [`macos/presets/preset-arina-hashimoto/background.jpg`](./macos/presets/preset-arina-hashimoto/background.jpg)（规范化派生 `2560 × 1440`）。上面两个效果图包含真实 UI，**只作预览，绝不能当背景导入**。背景为用户提供的 AI 生成示例，不代表 OpenAI/Codex 官方视觉或背书；未确认人物与素材权利前不得把它打进公开安装包。
+## Import a theme ZIP
 
-## 它能做什么
+For themes from DreamSkin.cc, prefer [one-click apply](#theme-library--community). The manual path below is the fallback, and covers packs from any other source.
 
-- **真·可交互**：侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去
-- **真背景层**：一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰
-- **可换图**：换一张喜欢的纯背景，自适应焦点、安全区和配色后变成你的主题
-- **可存主题**：macOS 菜单栏与 Windows 系统托盘都能保存/切换本地主题
-- **一键换肤**：在 [DreamSkin.cc](https://dreamskin.cc) 上点一下，客户端核对来源与校验和后直接装上
-- **可导入主题包**：两端都可直接选择普通 `.zip`，安全校验后加入本地主题库
-- **可恢复**：一键还原官方外观
-- **相对安全**：本机回环 CDP 注入，不改官方二进制与签名
+<details>
+<summary><strong>Read the full import contract</strong> — accepted formats, validation and limits</summary>
 
-## 快速开始
+Choose **Import Theme ZIP…** from the macOS menu bar app or the Windows tray. Only ordinary `.zip` files are accepted; the legacy `.dreamskin` extension is not supported, and renaming the suffix is not a supported migration path.
 
-### 普通用户：下载安装包
+An official Studio pack contains `manifest.json`, `theme.json`, `theme.css` and exactly one `background.webp|jpg|png`, plus optional `LICENSE.txt` and the reserved `manifest.sig`. Put these files at the ZIP root or inside exactly one top-level theme folder. The importer verifies platform and minimum-client compatibility plus every declared payload file's byte length and SHA-256. `theme.css` must pass the local Safe CSS validator and can affect only the 12 registered parts; it is revalidated on every import and apply. `manifest.sig` is not used for signature verification.
 
-不需要 clone 仓库，也不需要安装 Node.js 或运行 `.sh` / `.ps1`。从
-[GitHub Releases](https://github.com/Fei-Away/Codex-Dream-Skin/releases) 下载对应平台的最新安装包，
-按平台文档完成一次图形界面安装：
+The local simplified ZIP must contain exactly non-empty `theme.json`, non-empty `theme.css`, and its referenced image. That format has no official manifest integrity or compatibility declaration and should come from a trusted source. Limits are 32 MiB per archive, 32 entries, and 64 MiB expanded.
 
-| 平台 | 下载 | 安装说明 |
-|------|------|----------|
-| macOS | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
-| Windows | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
+Import adds the pack to **Saved Themes** without changing the active theme. Identical content is not duplicated. A newer pack with the same ID updates the saved theme in place after the old directory identity is confirmed, and only legacy `-2`/`-3` directories with an identical semantic fingerprint are cleaned up. If the existing directory identity cannot be confirmed, import fails closed instead of overwriting it; names alone are never used to delete another theme.
 
-安装后从菜单栏（macOS）或系统托盘（Windows）使用。更新时下载新安装包覆盖安装，主题和图片会保留；
-未签名的新下载文件在个别系统上仍可能再次出现一次安全提示，文档列出了放行方法。
+**Manual fallback** — extract the archive and move the complete directory containing `theme.json`, `theme.css` and its image into the saved-theme folder:
 
-### 导入下载的主题
+- macOS: `~/Library/Application Support/CodexDreamSkinStudio/themes/`
+- Windows: `%LOCALAPPDATA%\CodexDreamSkin\themes\`
 
-从 DreamSkin.cc 装主题优先用[一键换肤](#一键换肤)。下面是手动导入 `.zip` 的兜底路径，也适用于任何
-其他来源的主题包。
+Both controls include **Open Themes Folder**. Reopen the menu/tray after moving the directory. Do not add another wrapper level, links, nested archives, or an image-only folder without `theme.json`. Manual placement bypasses the ZIP importer's archive checks, so use trusted content only.
 
-在 macOS 菜单栏选择“导入主题 ZIP…”，或在 Windows 托盘选择同名菜单。只支持普通 `.zip`，
-不支持 `.dreamskin` 后缀，也不要仅改后缀伪装。正式 Studio 主题包包含 `manifest.json`、
-`theme.json`、非空 `theme.css` 和恰好一张 `background.webp|jpg|png`；还可包含 `LICENSE.txt` 和预留的
-`manifest.sig`。这些文件可以位于 ZIP 根目录或唯一一层主题目录。导入器会核对适用平台、最低客户端
-版本，以及清单中每个负载文件的大小和 SHA-256。`theme.css` 必须通过本机 Safe CSS 校验，导入后只会
-作用于 12 个注册部件；每次切换/应用仍会重新校验。`manifest.sig` 当前不参与签名验证。
+</details>
 
-本地简化 ZIP 也必须恰好包含非空 `theme.json`、非空 `theme.css` 和其引用图片；该格式没有正式清单的
-完整性与兼容性声明，只应从可信来源使用。压缩包最大 32 MiB、最多 32 个条目、解压后最多 64 MiB。
-导入成功后主题只会加入“已保存的主题”，不会自动替换当前主题；相同内容不会重复写入。同 ID 的新版本会在
-确认旧目录身份后原地更新，并仅清理语义指纹完全一致、已确认属于同一主题的旧版 `-2`/`-3` 重复目录；无法
-确认身份时会拒绝覆盖，也不会根据名称猜测并删除其他主题。
+## For developers
 
-也可以先手动解压，再把包含 `theme.json`、`theme.css` 和背景图的完整主题目录移动到本机主题库：
+Platform scripts are ready — different plumbing, same goal: theme Codex.
 
-- macOS：`~/Library/Application Support/CodexDreamSkinStudio/themes/`
-- Windows：`%LOCALAPPDATA%\CodexDreamSkin\themes\`
-
-菜单里有“打开主题文件夹”快捷入口。移动后重新打开菜单/托盘即可；不要再套一层目录，也不要放链接、
-嵌套压缩包或缺少三件套的文件夹。手动目录不会经过 ZIP 导入器的归档校验，请只使用可信内容。升级前
-已经保存且没有 CSS 的 legacy 主题仍可切换，但不会注入额外 CSS。
-
-### 开发者：从源码运行
-
-仓库内按平台放了现成脚本（实现细节不同，效果都是「主题化 Codex」）：
-
-| 平台 | 目录 | 入口 |
-|------|------|------|
-| Apple Silicon / Intel Mac | [`macos/`](./macos/) | 双击 `Install Codex Dream Skin.command` |
+| Platform | Directory | Entry point |
+|---|---|---|
+| Apple Silicon / Intel Mac | [`macos/`](./macos/) | Double-click `Install Codex Dream Skin.command` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
 
-更细的说明：
+- Mac: [`macos/README.md`](./macos/README.md) · Windows: [`windows/README.md`](./windows/README.md) · [Windows EN](./windows/README.en.md)
+- Paths and capability matrix: [`docs/platforms.md`](./docs/platforms.md)
+- Copy-ready background prompt guide: [`docs/reference-background-prompt-guide.en.md`](./docs/reference-background-prompt-guide.en.md) · eight concept breakdowns: [`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
+- Project notes: [`docs/PROJECT.md`](./docs/PROJECT.md)
 
-- Mac：[`macos/README.md`](./macos/README.md)
-- Windows：[`windows/README.md`](./windows/README.md)
-- 路径对照：[`docs/platforms.md`](./docs/platforms.md)
-- 可直接复制的参考生图模板：[`docs/reference-background-prompt-guide.md`](./docs/reference-background-prompt-guide.md)
-- 八种概念方向详细提示词：[`docs/background-generation-prompts.md`](./docs/background-generation-prompts.md)
-- 项目记录：[`docs/PROJECT.md`](./docs/PROJECT.md)
+## Feedback & contributions
 
-## 反馈与贡献
+- **Issues** — use the [issue templates](./.github/ISSUE_TEMPLATE/) (bug / feature); blank issues are disabled. Please run the Verify / Restore self-checks before filing a bug.
+- **PRs** — follow the [PR template](./.github/pull_request_template.md), describe the change, and tick the self-checks you actually ran (e.g. `macos/tests/run-tests.sh`, verify / restore).
 
-- **Issue：** 请用 [Issue 模板](./.github/ISSUE_TEMPLATE/)（Bug / 功能）；已关闭空白 Issue。提交前建议先跑 Verify / Restore 自检。
-- **PR：** 请按 [PR 模板](./.github/pull_request_template.md) 写清改动，并勾选对应自测（如 `macos/tests/run-tests.sh`、verify / restore）。
+## Safety
 
-## 安全边界
+- CDP binds `127.0.0.1` only, but it has **no authentication**; another process on the same computer may still connect and inspect or control the renderer.
+- Pausing the theme or stopping only the injector does not close the debug port of an already running Codex process. Use a full Restore/restart, or quit every Codex process and reopen the official app normally, to end the exposure window.
+- Does not touch the official install directory or code signature.
+- **Never** rewrites API Key / Base URL; relay and theme stay separate.
+- See [`SECURITY.md`](./SECURITY.md) for the complete threat model and operating guidance.
 
-- CDP 只绑 `127.0.0.1`，但**没有身份认证**；同一台电脑上的其他进程仍可能连接并读取或控制 renderer
-- 暂停主题或只停止 injector 不会关闭已启动 Codex 的调试端口；使用完整 Restore/重启，或退出全部 Codex 后从官方普通入口重新打开，风险窗口才结束
-- 不修改官方安装目录与代码签名
-- **不会**自动改写 API Key / Base URL；中转与换肤分开
-- 完整威胁模型与操作建议见 [`SECURITY.md`](./SECURITY.md)
+## License
 
-## 许可与声明
-
-- 见 [`macos/LICENSE`](./macos/LICENSE)（MIT）与 [`macos/NOTICE.md`](./macos/NOTICE.md)
-- 非 OpenAI 官方产品；Codex 及相关权利归其权利人
-- 随仓库预设及效果图中的人物 / IP 素材仅作主题示意；商用或公开再分发请自行确认肖像、素材与商标权利
+- [`macos/LICENSE`](./macos/LICENSE) (MIT) and [`macos/NOTICE.md`](./macos/NOTICE.md)
+- Unofficial; Codex and related rights belong to their owners.
+- People / IP material in bundled presets and previews is illustrative only — clear likeness, asset and trademark rights before commercial redistribution.
 
 ---
 
-Star 一下，然后挑一张图，把你的 Codex 变成今天想要的样子。
+Star it, pick a look, and make Codex yours for today.

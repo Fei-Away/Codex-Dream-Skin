@@ -1,7 +1,7 @@
 # Codex Dream Skin · 项目记录
 
 > 本地归档说明。面向维护者，不是用户安装手册。  
-> 仓库首页：[`../README.md`](../README.md)（中文）· [`../README.en.md`](../README.en.md)（English）  
+> 仓库首页：[`../README.md`](../README.md)（English，默认）· [`../README.zh-CN.md`](../README.zh-CN.md)（中文）  
 > GitHub：https://github.com/Fei-Away/Codex-Dream-Skin
 
 ---
@@ -29,7 +29,7 @@
 | 本地美化 | Mac 本机引擎装在 `~/.codex/codex-dream-skin-studio`；CSS 走浅色壳 + 可选底部赞助 chip |
 | 赞助 | Passion8（`aff=TuPe`）写在 README 顶部；强调满血中转卖点，且与换肤配置隔离 |
 | 图库 | `docs/images/gallery/skin-01`～`08`；粉系定制 → 财神打工 → 红白科幻… |
-| i18n | 默认中文 `README.md`，英文 `README.en.md`，顶部互链 |
+| i18n | 默认英文 `README.md`，中文 `README.zh-CN.md`，顶部互链 |
 
 本地曾用过 `8765` 静态预览与临时 injector；**发布后不要求**常驻这两个进程。桌面快捷方式指向已安装引擎，不依赖本仓库路径。
 
@@ -55,8 +55,8 @@
 
 ```text
 Codex-Dream-Skin/
-├── README.md              # 默认中文
-├── README.en.md           # English
+├── README.md              # English (default)
+├── README.zh-CN.md        # 中文
 ├── docs/
 │   ├── PROJECT.md         # 本文件（项目记录）
 │   ├── platforms.md       # Win/Mac 路径与能力矩阵
@@ -119,7 +119,7 @@ Logo 资源：`docs/images/sponsor-passion8.png`（及 svg）。
 | 动作 | 说明 |
 |------|------|
 | 换图库图 | 替换 `docs/images/gallery/skin-XX.jpg`，同步改 README 两份 caption |
-| 改赞助文案 | 同时改 `README.md` 与 `README.en.md` |
+| 改赞助文案 | 同时改 `README.md` 与 `README.zh-CN.md` |
 | 发版推送 | 在本仓库目录 `git add` → `commit` → `push origin main` |
 | Mac 本机主题 | 改 `~/.codex/codex-dream-skin-studio` 的 CSS/inject；与 GitHub 源码可不同步，属本机实验位 |
 

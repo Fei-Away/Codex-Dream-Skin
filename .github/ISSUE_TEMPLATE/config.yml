@@ -5,8 +5,11 @@
 blank_issues_enabled: false
 
 contact_links:
-  - name: 中文 README / Chinese README
+  - name: README (English)
     url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/README.md
+    about: Install guide, security boundary, previews · 安装说明、安全边界、效果预览
+  - name: 中文 README
+    url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/README.zh-CN.md
     about: 安装说明、安全边界、效果预览 · Install guide, security boundary, previews
   - name: macOS 使用说明 / macOS README
     url: https://github.com/Fei-Away/Codex-Dream-Skin/blob/main/macos/README.md
