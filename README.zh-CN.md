@@ -8,7 +8,10 @@
 
 [![Latest release](https://img.shields.io/github/v/release/Fei-Away/Codex-Dream-Skin?color=blue&label=version)](https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest)
 [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)](https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest)
+[![Stars](https://img.shields.io/github/stars/Fei-Away/Codex-Dream-Skin?label=stars&color=blue)](https://github.com/Fei-Away/Codex-Dream-Skin/stargazers)
 [![Downloads](https://img.shields.io/github/downloads/Fei-Away/Codex-Dream-Skin/total?label=downloads)](https://github.com/Fei-Away/Codex-Dream-Skin/releases)
+[![License](https://img.shields.io/github/license/Fei-Away/Codex-Dream-Skin?label=license)](./macos/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Fei-Away/Codex-Dream-Skin/ci.yml?label=CI)](https://github.com/Fei-Away/Codex-Dream-Skin/actions/workflows/ci.yml)
 
 <a href="https://trendshift.io/repositories/84043?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/84043/daily" alt="Fei-Away%2FCodex-Dream-Skin | Trendshift" width="250" height="55"/></a>
 
@@ -115,7 +118,7 @@ macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studi
 
 ## 它能做什么
 
-| | |
+| 特性 | |
 |---|---|
 | **真·可交互** | 侧栏、建议卡、项目选择、输入框都是原生控件，不是整窗假截图贴上去。 |
 | **真背景层** | 一张 16:9 纯壁纸连续铺满整窗，首页突出氛围，任务页自动降低干扰。 |
@@ -146,9 +149,7 @@ macOS 菜单栏和 Windows 托盘都有「主题库 Gallery」和「在线 Studi
 <p align="center">
   <img src="docs/images/presets/arina-hashimoto-light.jpg" alt="桥本有菜主题浅色实机效果" width="900"><br>
   <sub>浅色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
-</p>
-
-<p align="center">
+  <br><br>
   <img src="docs/images/presets/arina-hashimoto-dark.jpg" alt="桥本有菜主题暗色实机效果" width="900"><br>
   <sub>暗色 · 真实注入截图（未发送输入已在截图时遮蔽，仅预览）</sub>
 </p>

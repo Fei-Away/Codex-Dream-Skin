@@ -8,7 +8,10 @@
 
 [![Latest release](https://img.shields.io/github/v/release/Fei-Away/Codex-Dream-Skin?color=blue&label=version)](https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest)
 [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)](https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest)
+[![Stars](https://img.shields.io/github/stars/Fei-Away/Codex-Dream-Skin?label=stars&color=blue)](https://github.com/Fei-Away/Codex-Dream-Skin/stargazers)
 [![Downloads](https://img.shields.io/github/downloads/Fei-Away/Codex-Dream-Skin/total?label=downloads)](https://github.com/Fei-Away/Codex-Dream-Skin/releases)
+[![License](https://img.shields.io/github/license/Fei-Away/Codex-Dream-Skin?label=license)](./macos/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Fei-Away/Codex-Dream-Skin/ci.yml?label=CI)](https://github.com/Fei-Away/Codex-Dream-Skin/actions/workflows/ci.yml)
 
 <a href="https://trendshift.io/repositories/84043?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/84043/daily" alt="Fei-Away%2FCodex-Dream-Skin | Trendshift" width="250" height="55"/></a>
 
@@ -115,7 +118,7 @@ Only themes that fully satisfy the current pack contract (background image + `th
 
 ## What it does
 
-| | |
+| Feature | |
 |---|---|
 | **Real UI** | Sidebar, cards, project picker and input stay native. Not a fake full-window screenshot. |
 | **Continuous wallpaper** | One 16:9 image spans the full window; adaptive focus, safe-area and route treatment keep native content readable. |
@@ -146,9 +149,7 @@ Verified on the real Codex home screen in both light and dark appearances. The u
 <p align="center">
   <img src="docs/images/presets/arina-hashimoto-light.jpg" alt="Arina Hashimoto theme tested in light appearance" width="900"><br>
   <sub>Light · real injected screenshot; unsent input hidden during capture (preview only)</sub>
-</p>
-
-<p align="center">
+  <br><br>
   <img src="docs/images/presets/arina-hashimoto-dark.jpg" alt="Arina Hashimoto theme tested in dark appearance" width="900"><br>
   <sub>Dark · real injected screenshot; unsent input hidden during capture (preview only)</sub>
 </p>
