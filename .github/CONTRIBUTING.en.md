@@ -8,7 +8,7 @@ Thanks for contributing to Codex Dream Skin. The project loads external themes i
 
 ## Before you start
 
-1. Read the [project README](../README.en.md) and [platform reference](../docs/platforms.md). macOS usage is documented in [`macos/README.md`](../macos/README.md), while Windows implementation constraints live in [`windows/SKILL.md`](../windows/SKILL.md).
+1. Read the [project README](../README.md) and [platform reference](../docs/platforms.md). macOS usage is documented in [`macos/README.md`](../macos/README.md), while Windows implementation constraints live in [`windows/SKILL.md`](../windows/SKILL.md).
 2. Search the [existing issues](https://github.com/Fei-Away/Codex-Dream-Skin/issues) and [open pull requests](https://github.com/Fei-Away/Codex-Dream-Skin/pulls). If an active change already touches the same files, add to that discussion or split out a smaller change with no overlap.
 3. Create a branch from the latest upstream `main`. Keep each pull request focused on one problem. Do not mix a new theme, a runtime fix, and unrelated cleanup.
 
