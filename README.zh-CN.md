@@ -14,7 +14,6 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Fei-Away/Codex-Dream-Skin/ci.yml?label=CI)](https://github.com/Fei-Away/Codex-Dream-Skin/actions/workflows/ci.yml)
 
 <a href="https://trendshift.io/repositories/84043?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/84043/daily" alt="Fei-Away%2FCodex-Dream-Skin | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/84043" alt="Fei-Away%2FCodex-Dream-Skin | Global Rank" width="250" height="55"/></a>
 
 [English](README.md) | 中文 | [更新日志](https://github.com/Fei-Away/Codex-Dream-Skin/releases)
 
