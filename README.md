@@ -24,9 +24,6 @@ Unofficial. Does not modify `.app` / `app.asar` / WindowsApps.
 
 ## ❤️ Sponsor
 
-<details open>
-<summary>Exclusive sponsor</summary>
-
 <table>
 <tr>
 <td width="180">
@@ -41,8 +38,6 @@ Passion8 has a benefit for this project's users: register through <a href="https
 </td>
 </tr>
 </table>
-
-</details>
 
 <sub>Theme install and API config stay separate — this project never rewrites your provider settings.</sub>
 

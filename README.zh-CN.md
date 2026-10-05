@@ -24,9 +24,6 @@
 
 ## ❤️ 赞助
 
-<details open>
-<summary>独家赞助</summary>
-
 <table>
 <tr>
 <td width="180">
@@ -41,8 +38,6 @@ Passion8 为本项目用户准备了专属福利：通过<a href="https://passio
 </td>
 </tr>
 </table>
-
-</details>
 
 <sub>换肤与 API 配置互相独立，本项目不会自动改写你的模型供应商设置。</sub>
 
