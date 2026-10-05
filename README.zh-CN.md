@@ -14,12 +14,15 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Fei-Away/Codex-Dream-Skin/ci.yml?label=CI)](https://github.com/Fei-Away/Codex-Dream-Skin/actions/workflows/ci.yml)
 
 <a href="https://trendshift.io/repositories/84043?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/84043/daily" alt="Fei-Away%2FCodex-Dream-Skin | Trendshift" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/84043" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/84043" alt="Fei-Away%2FCodex-Dream-Skin | Global Rank" width="250" height="55"/></a>
 
 [English](README.md) | 中文 | [更新日志](https://github.com/Fei-Away/Codex-Dream-Skin/releases)
 
 **[安装](#安装) · [主题库](#主题库与社区) · [它能做什么](#它能做什么) · [导入主题](#导入主题-zip) · [开发者](#开发者) · [安全边界](#安全边界)**
 
-官方主题库：**[DreamSkin.cc](https://dreamskin.cc)** · [主题库 Gallery](https://dreamskin.cc/gallery) · [在线 Studio](https://dreamskin.cc/studio)
+### 🌐 官方网站与主题库：**[dreamskin.cc](https://dreamskin.cc)**
+
+[主题库 Gallery](https://dreamskin.cc/gallery) · [在线 Studio](https://dreamskin.cc/studio)
 
 非 OpenAI 官方产品。不修改 `.app` / `app.asar` / WindowsApps。
 
