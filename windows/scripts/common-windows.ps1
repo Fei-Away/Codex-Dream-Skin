@@ -6,6 +6,7 @@ $script:DreamSkinStartResultCategories = @(
   'cdp-direct-access-denied',
   'cdp-endpoint-unavailable',
   'port-unavailable',
+  'operation-busy',
   'state-reconciliation-failed',
   'injector-start-failed',
   'renderer-verification-failed',
@@ -44,7 +45,7 @@ function Get-DreamSkinStartFailureCategory {
     [Parameter(Mandatory = $true)][System.Exception]$Exception,
     [ValidateSet(
       'cdp-launch-failed', 'cdp-direct-access-denied', 'cdp-endpoint-unavailable',
-      'port-unavailable', 'state-reconciliation-failed', 'injector-start-failed',
+      'port-unavailable', 'operation-busy', 'state-reconciliation-failed', 'injector-start-failed',
       'renderer-verification-failed', 'superseded', 'internal-start-failure'
     )]
     [string]$FallbackCategory = 'internal-start-failure'
@@ -241,6 +242,8 @@ function Get-DreamSkinRuntimeEnginePaths {
     Version = Join-Path $root 'VERSION'
     CommunityApply = Join-Path $scripts 'apply-community-theme.ps1'
     Start = Join-Path $scripts 'start-dream-skin.ps1'
+    DefaultLaunch = Join-Path $scripts 'launch-themed-codex.ps1'
+    PanelOperation = Join-Path $scripts 'panel-operation.ps1'
     Restore = Join-Path $scripts 'restore-dream-skin.ps1'
     Tray = Join-Path $scripts 'tray-dream-skin.ps1'
     CheckUpdate = Join-Path $scripts 'check-update.ps1'
@@ -419,6 +422,9 @@ function Install-DreamSkinRuntimeEngine {
     'scripts\injector.mjs',
     'scripts\install-dream-skin.ps1',
     'scripts\localization-windows.ps1',
+    'scripts\launch-themed-codex.ps1',
+    'scripts\operation-log.ps1',
+    'scripts\panel-operation.ps1',
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',

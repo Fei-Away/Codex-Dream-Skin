@@ -81,6 +81,48 @@ try
         File.Delete(store.PreferencesPath);
     }
     Check(!Directory.EnumerateFiles(root, ".theme-preferences-*.tmp").Any(), "atomic write leaves no temporary files");
+    var resultPath = Path.Combine(root, ".panel-result-test.json");
+    var operationId = new string('a', 32);
+    var result = new JsonObject { ["schemaVersion"] = 1, ["operationId"] = operationId, ["action"] = "Apply", ["outcome"] = "success",
+        ["category"] = "none", ["message"] = "Loaded", ["diskRecovery"] = "not-needed", ["visibleRecovery"] = "not-needed" };
+    File.WriteAllText(resultPath, result.ToJsonString());
+    Check(PanelResult.Read(resultPath, operationId, "Apply").Outcome == "success", "matched versioned result accepted");
+    Refuses(() => PanelResult.Read(resultPath, new string('b', 32), "Apply"), "stale operation result refused");
+    Refuses(() => PanelResult.Read(resultPath, operationId, "Save"), "result action mismatch refused");
+    result["outcome"] = "started"; File.WriteAllText(resultPath, result.ToJsonString());
+    Refuses(() => PanelResult.Read(resultPath, operationId, "Apply"), "process-started result cannot claim apply success");
+    result["outcome"] = "success"; result["schemaVersion"] = 2; File.WriteAllText(resultPath, result.ToJsonString());
+    Refuses(() => PanelResult.Read(resultPath, operationId, "Apply"), "unknown result schema refused");
+    result["schemaVersion"] = 1; result["diskRecovery"] = "pretend-restored"; File.WriteAllText(resultPath, result.ToJsonString());
+    Refuses(() => PanelResult.Read(resultPath, operationId, "Apply"), "unknown recovery state refused");
+    result["diskRecovery"] = "not-needed"; result["category"] = "verify-failed"; File.WriteAllText(resultPath, result.ToJsonString());
+    Refuses(() => PanelResult.Read(resultPath, operationId, "Apply"), "contradictory success category refused");
+    var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCekAAAAASUVORK5CYII=");
+    var imagePath = Path.Combine(root, "背景 ' $test;.png"); File.WriteAllBytes(imagePath, png);
+    Check(PreviewFiles.Read(imagePath).Width == 1, "bounded PNG dimensions with special path");
+    var themeData = SafeFiles.ReadObject(Path.Combine(active, "theme.json"));
+    themeData["image"] = "../outside.png"; File.WriteAllText(Path.Combine(active, "theme.json"), themeData.ToJsonString());
+    Refuses(() => PreviewFiles.Background(ThemeStore.ReadTheme(active)), "preview theme image traversal refused");
+    var huge = png.ToArray(); huge[16] = 0; huge[17] = 1; huge[18] = 0; huge[19] = 0; File.WriteAllBytes(imagePath, huge);
+    Refuses(() => PreviewFiles.Read(imagePath), "preview rejects large dimensions before decode");
+    File.WriteAllBytes(imagePath, new byte[PreviewFiles.MaxBytes + 1]);
+    Refuses(() => PreviewFiles.Read(imagePath), "preview image byte limit");
+    File.WriteAllBytes(imagePath, [1, 2, 3]); Refuses(() => PreviewFiles.Read(imagePath), "fake PNG image refused");
+    var logs = new OperationLogStore(root); Directory.CreateDirectory(logs.DirectoryPath);
+    var log = new JsonObject { ["schemaVersion"] = 1, ["timestamp"] = "2026-10-08T08:00:00Z", ["operationId"] = operationId,
+        ["source"] = "shortcut", ["action"] = "Apply", ["stage"] = "verify", ["outcome"] = "failure", ["category"] = "verify-failed", ["message"] = "中文加载失败" };
+    var logPath = Path.Combine(logs.DirectoryPath, "operations.jsonl");
+    File.WriteAllText(logPath, log.ToJsonString() + "\n{broken}\n{\"timestamp\":");
+    var read = logs.Read(); Check(read.Events.Count == 1 && read.Skipped == 1 && read.Events[0].Message == "中文加载失败", "malformed and unfinished logs preserve valid events");
+    log["timestamp"] = "2026-10-07T08:00:00Z";
+    File.WriteAllText(Path.Combine(logs.DirectoryPath, "operations.1.jsonl"), log.ToJsonString() + "\n");
+    Check(logs.Read().Events[0].Timestamp.Day == 8 && logs.Read(1).Truncated, "rotated events ordered and bounded");
+    File.WriteAllText(logPath, new string('中', 400000) + "\n" + log.ToJsonString() + "\n");
+    Check(logs.Read().Events.Count == 2 && logs.Read().Truncated, "tail read skips partial UTF-8 without losing recent logs");
+    var user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    Check(!OperationLogStore.Redact(user + "\\private token=secret").Contains(user) &&
+        !OperationLogStore.Redact("token=secret").Contains("secret"), "diagnostic copy redacts user path and secrets");
+    Check(!OperationLogStore.Redact("{\"token\":\"private-value\",\"message\":\"Bearer private-value sk-private-value\"}").Contains("private-value"), "JSON credentials bearer and API key redacted");
     Console.WriteLine($"{passed} checks passed.");
 }
 finally { Directory.Delete(root, recursive: true); }

@@ -78,6 +78,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-d
 
 ## 更换和保存主题
 
+原生主题面板现在提供主题/背景草稿预览、保存为启动设置、验证应用、创建默认启动快捷方式及操作日志。日常可以直接从默认启动图标读取保存的外观；详细使用和本机更新流程见 [`docs/windows-panel-startup.md`](../docs/windows-panel-startup.md)。
+
 打开 `Codex Dream Skin - Tray` 后可以：
 
 - 更换 PNG、JPEG 或 WebP 背景图。

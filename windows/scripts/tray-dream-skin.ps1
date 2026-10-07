@@ -8,6 +8,7 @@ Add-Type -AssemblyName Microsoft.VisualBasic
 . (Join-Path $PSScriptRoot 'localization-windows.ps1')
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
+. (Join-Path $PSScriptRoot 'operation-log.ps1')
 
 Assert-DreamSkinPort -Port $Port
 $SkillRoot = Split-Path -Parent $PSScriptRoot
@@ -35,6 +36,8 @@ try {
 
   $initializationLock = Enter-DreamSkinOperationLock
   try {
+    . (Join-Path $PSScriptRoot 'panel-operation.ps1') -FunctionsOnly -StateRoot $StateRoot
+    $null = Repair-DreamSkinPanelSave -StateRoot $StateRoot
     $paths = Initialize-DreamSkinThemeStore -SkillRoot $SkillRoot -StateRoot $StateRoot
   } finally {
     Exit-DreamSkinOperationLock -Mutex $initializationLock
@@ -224,11 +227,26 @@ try {
 
   function Invoke-DreamSkinTrayThemeOperation {
     param([Parameter(Mandatory = $true)][scriptblock]$Action)
-    $themeOperationLock = Enter-DreamSkinOperationLock
+    $operationId = [guid]::NewGuid().ToString('N')
+    $themeOperationLock = $null
+    $null = Write-DreamSkinOperationEvent -StateRoot $StateRoot -OperationId $operationId `
+      -Source tray -Action theme-edit -Stage request -Outcome started
     try {
-      return & $Action
+      $themeOperationLock = Enter-DreamSkinOperationLock
+      $null = Repair-DreamSkinPanelSave -StateRoot $StateRoot
+      $result = & $Action
+      $null = Write-DreamSkinOperationEvent -StateRoot $StateRoot -OperationId $operationId `
+        -Source tray -Action theme-edit -Stage saved -Outcome success `
+        -Message 'The requested theme edit was saved; renderer verification is a separate operation.'
+      return $result
+    } catch {
+      $category = if ($null -eq $themeOperationLock) { 'operation-busy' } else { 'theme-edit-failed' }
+      $null = Write-DreamSkinOperationEvent -StateRoot $StateRoot -OperationId $operationId `
+        -Source tray -Action theme-edit -Stage failed -Outcome failure -Category $category `
+        -Message 'The tray edit did not finish. Inspect the saved settings before retrying.'
+      throw
     } finally {
-      Exit-DreamSkinOperationLock -Mutex $themeOperationLock
+      if ($null -ne $themeOperationLock) { Exit-DreamSkinOperationLock -Mutex $themeOperationLock }
     }
   }
 

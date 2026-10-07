@@ -14,7 +14,17 @@ $commonPath = Join-Path $payloadScripts 'common-windows.ps1'
 $themePath = Join-Path $payloadScripts 'theme-windows.ps1'
 $stateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'Codex Dream Skin.lnk'
+$defaultName = 'Codex ' + [char]0x00b7 + ' ' + (-join ([char[]]@(0x9ed8,0x8ba4,0x4e3b,0x9898,0x542f,0x52a8))) + '.lnk'
 $managerMaintenance = $null
+
+function Assert-DreamSkinBootstrapActions {
+  param([switch]$Install, [switch]$LaunchTray, [switch]$ShowWindow, [switch]$Uninstall)
+  # Install may open the manager after committing the runtime. Uninstall must
+  # remain exclusive and must never fall through into installation or launch.
+  if ($Uninstall -and ($Install -or $LaunchTray -or $ShowWindow)) {
+    throw 'Uninstall cannot be combined with installation or launch.'
+  }
+}
 
 function Show-DreamSkinBootstrapMessage {
   param(
@@ -56,9 +66,7 @@ function Wait-DreamSkinCodexClosedForSetup {
 }
 
 try {
-  if ($Install -and ($LaunchTray -or $Uninstall)) {
-    throw 'Choose exactly one installer bootstrap action.'
-  }
+  Assert-DreamSkinBootstrapActions -Install:$Install -LaunchTray:$LaunchTray -ShowWindow:$ShowWindow -Uninstall:$Uninstall
   if (-not (Test-Path -LiteralPath $commonPath -PathType Leaf) -or
     -not (Test-Path -LiteralPath $themePath -PathType Leaf)) {
     throw 'The installer payload is incomplete.'
@@ -86,6 +94,10 @@ try {
         $restoreParameters.RestoreBaseTheme = $true
       }
       & $engine.Restore @restoreParameters
+    }
+    if (Test-Path -LiteralPath (Join-Path $payloadScripts 'launch-themed-codex.ps1') -PathType Leaf) {
+      . (Join-Path $payloadScripts 'launch-themed-codex.ps1') -FunctionsOnly
+      Remove-DreamSkinDefaultShortcut -StateRoot $stateRoot -ShortcutPath (Join-Path $PSScriptRoot $defaultName)
     }
     if (Test-Path -LiteralPath $engine.Root -PathType Container) {
       Remove-DreamSkinRuntimeTree -Path $engine.Root -StateRoot $stateRoot
@@ -133,6 +145,9 @@ try {
     'scripts\injector.mjs',
     'scripts\install-dream-skin.ps1',
     'scripts\localization-windows.ps1',
+    'scripts\launch-themed-codex.ps1',
+    'scripts\operation-log.ps1',
+    'scripts\panel-operation.ps1',
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',
@@ -168,6 +183,16 @@ try {
       -not (Test-Path -LiteralPath (Join-Path $stateRoot 'config.before-dream-skin.toml') -PathType Leaf)) {
       throw 'Runtime installation did not commit a complete managed engine.'
     }
+  }
+
+  if ($Install) {
+    . (Join-Path $engine.Scripts 'launch-themed-codex.ps1') -FunctionsOnly
+    $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Codex Dream Skin'
+    Assert-DreamSkinNoReparseComponents -Path $menu
+    [IO.Directory]::CreateDirectory($menu) | Out-Null
+    $null = New-DreamSkinDefaultShortcut -StateRoot $stateRoot
+    $null = New-DreamSkinDefaultShortcut -StateRoot $stateRoot -ShortcutPath (Join-Path $menu $defaultName)
+    $null = New-DreamSkinDefaultShortcut -StateRoot $stateRoot -ShortcutPath (Join-Path $PSScriptRoot $defaultName)
   }
 
   if ($LaunchTray) {

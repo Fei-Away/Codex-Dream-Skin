@@ -25,6 +25,8 @@ try {
   }
 
   $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+  . (Join-Path $PSScriptRoot 'panel-operation.ps1') -FunctionsOnly -StateRoot $StateRoot
+  $null = Repair-DreamSkinPanelSave -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
   $StatePath = Join-Path $StateRoot 'state.json'
@@ -46,6 +48,7 @@ try {
     -AppearanceTheme (Get-DreamSkinActiveThemeAppearance -ThemeDirectory $themePaths.Active)
 
   if (-not $NoShortcuts) {
+    . (Join-Path $engine.Scripts 'launch-themed-codex.ps1') -FunctionsOnly
     $shell = New-Object -ComObject WScript.Shell
     $desktop = [Environment]::GetFolderPath('Desktop')
     $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
@@ -57,6 +60,8 @@ try {
     $portArgument = if ($PortExplicit) { " -Port $Port" } else { '' }
 
     foreach ($folder in @($desktop, $startMenu)) {
+      $defaultName = 'Codex ' + [char]0x00b7 + ' ' + (-join ([char[]]@(0x9ed8,0x8ba4,0x4e3b,0x9898,0x542f,0x52a8))) + '.lnk'
+      $null = New-DreamSkinDefaultShortcut -StateRoot $StateRoot -ShortcutPath (Join-Path $folder $defaultName)
       $shortcut = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin.lnk'))
       $shortcut.TargetPath = $powershell
       $shortcut.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File `"$trayScript`"$portArgument -ShowWindow"

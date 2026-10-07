@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $managerPath) -Force | Ou
 [System.IO.File]::WriteAllText($managerPath, 'isolated process-boundary fixture')
 $script:fixtureProcesses = @()
 $script:passes = 0
+$originalMaintenance = (Get-Item 'function:Enter-DreamSkinThemeManagerMaintenance').ScriptBlock
 
 function Check([bool]$Condition, [string]$Name) {
   if (-not $Condition) { throw $Name }
@@ -104,8 +105,14 @@ public static class DreamSkinMaintenanceMutexProbe {
 }
 '@
   }
-  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-  $mutexName = "Local\CodexDreamSkin.$sid.ThemeManager"
+  # Keep the real acquisition/rejection/release code, substituting only its OS
+  # resource name. A live user panel must not make an isolated test fail or close.
+  $mutexName = 'Local\DreamSkinMaintenanceTest.' + [guid]::NewGuid().ToString('N')
+  $productionNameLiteral = '"Local\CodexDreamSkin.$sid.ThemeManager"'
+  $maintenanceBody = $originalMaintenance.ToString()
+  if (-not $maintenanceBody.Contains($productionNameLiteral)) { throw 'Maintenance mutex name binding changed; update the isolated fixture.' }
+  Set-Item 'function:Enter-DreamSkinThemeManagerMaintenance' -Value ([scriptblock]::Create(
+    $maintenanceBody.Replace($productionNameLiteral, ("'" + $mutexName + "'"))))
   $maintenance = Enter-DreamSkinThemeManagerMaintenance
   try {
     Check (-not [DreamSkinMaintenanceMutexProbe]::CanAcquire($mutexName)) 'Maintenance prevents a second thread from starting the manager'
@@ -120,6 +127,7 @@ public static class DreamSkinMaintenanceMutexProbe {
   Check ($closedGuard -gt $installStart -and $closeManager -gt $closedGuard -and $install -gt $closeManager) 'Setup closes manager after Codex guard and before installer acquires Operation lock'
   Write-Host "$script:passes manager maintenance checks passed."
 } finally {
+  Set-Item 'function:Enter-DreamSkinThemeManagerMaintenance' -Value $originalMaintenance
   $resolvedFixture = [System.IO.Path]::GetFullPath($fixture)
   $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\') + '\'
   if (-not $resolvedFixture.StartsWith($tempRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
