@@ -16,6 +16,12 @@ while IFS= read -r file; do "$NODE" --check "$file" >/dev/null; done < <(
 # same source aborts at runtime under a UTF-8 locale with `set -u` and masks
 # the real failure behind a bogus "unbound variable" (#251).
 "$NODE" "$ROOT/tests/shell-braced-vars-before-cjk.test.mjs"
+# `ps -o lstart=` is locale-formatted and is persisted as the injector's start
+# identity.  A state written under one locale failed to verify under another,
+# so start/restore aborted fail-closed on the double-click entry points.  Every
+# lstart read pins LC_ALL=C; this covers the static scan and both directions of
+# the identity check.
+"$NODE" --test "$ROOT/tests/locale-lstart-identity.test.mjs"
 "$NODE" --test "$ROOT/tests/restart-cancellation.test.mjs"
 
 ZH_COPY="$(DREAMSKIN_LANG=zh-CN /bin/bash -c '
@@ -704,7 +710,10 @@ STATUS_FAKE_INJECTOR="$TMP/status-fake-injector.mjs"
 "$NODE" "$STATUS_FAKE_INJECTOR" --watch --port 93410 --theme-dir "$TMP" &
 STATUS_PID="$!"
 /bin/sleep 0.08
-STATUS_START="$(/bin/ps -p "$STATUS_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
+# lstart is formatted per the ambient locale (zh_CN prints "四 10/ 8 …"), and
+# process_started_at pins LC_ALL=C.  Record this fixture the same way, or the
+# identity only matches on an English-locale host.
+STATUS_START="$(LC_ALL=C /bin/ps -p "$STATUS_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
 "$NODE" -e '
   const fs = require("node:fs");
   const [file, pid, node, injector, startedAt] = process.argv.slice(1);
@@ -734,7 +743,7 @@ STATUS_PID=""
   >"$TMP/near-prefix-injector.out" 2>&1 &
 WATCH_PID="$!"
 /bin/sleep 0.2
-WATCH_START="$(/bin/ps -p "$WATCH_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
+WATCH_START="$(LC_ALL=C /bin/ps -p "$WATCH_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
 [ -n "$WATCH_START" ] || { printf 'Could not record near-prefix watcher start time.\n' >&2; exit 1; }
 /usr/bin/env HOME="$STOP_HOME" NODE="$NODE" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
@@ -1185,5 +1194,5 @@ else
   DOCTOR_RESULT="passed"
 fi
 
-printf 'PASS: syntax, CJK-adjacent shell expansions, nested :has() CSS, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, switch-theme signed runtime %s, runtime-state integration %s, and Doctor %s.\n' \
+printf 'PASS: syntax, CJK-adjacent shell expansions, locale-invariant lstart identity, nested :has() CSS, payload, bundled presets, preset seeding, runtime-state safety, custom-theme, config round-trips, HOME recovery, signature, switch-theme signed runtime %s, runtime-state integration %s, and Doctor %s.\n' \
   "$SWITCH_RUNTIME_RESULT" "$RUNTIME_STATE_RESULT" "$DOCTOR_RESULT"

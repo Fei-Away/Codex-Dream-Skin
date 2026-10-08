@@ -86,7 +86,9 @@ injector_identity_matches() {
   # Requiring that following token prevents 93410 from matching saved port
   # 9341 via a loose prefix pattern.
   case "$command_lower" in *"--port $expected_port --theme-dir "*) ;; *) return 1 ;; esac
-  actual_start="$(/bin/ps -p "$pid" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
+  # Pin C: lstart is locale-formatted, and this must stay comparable with the
+  # identity recorded by process_started_at under any locale.
+  actual_start="$(LC_ALL=C /bin/ps -p "$pid" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
   [ -n "$actual_start" ] && [ "$actual_start" = "$expected_start" ]
 }
 

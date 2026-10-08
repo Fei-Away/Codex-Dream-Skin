@@ -368,7 +368,11 @@ sync_appearance_pin() {
 }
 
 process_started_at() {
-  /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
+  # lstart is formatted per the ambient locale (zh_CN prints "四 10/ 8 …"
+  # instead of "Thu Oct  8 …"), and this string is compared verbatim against
+  # the recorded identity.  Pin C so a state written under one locale still
+  # verifies under another.
+  LC_ALL=C /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
 }
 
 recorded_injector_process_matches() {
