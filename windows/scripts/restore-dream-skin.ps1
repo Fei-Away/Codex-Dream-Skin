@@ -26,6 +26,13 @@ try {
   $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
+  $backup = $null
+  $config = $null
+  if ($RecoverConfigBackup -or $RestoreBaseTheme) {
+    $configPaths = Resolve-DreamSkinConfigPaths -StateRoot $StateRoot -AllowMissingConfig:$RecoverConfigBackup
+    $backup = $configPaths.BackupPath
+    $config = $configPaths.ConfigPath
+  }
   $StatePath = Join-Path $StateRoot 'state.json'
   $state = Read-DreamSkinState -Path $StatePath
   if (-not $PortExplicit -and $null -ne $state -and $state.port) {
@@ -90,8 +97,6 @@ try {
     }
   }
 
-  $backup = Join-Path $StateRoot 'config.before-dream-skin.toml'
-  $config = Join-Path $HOME '.codex\config.toml'
   if ($RecoverConfigBackup) {
     if (-not (Test-Path -LiteralPath $backup)) { throw 'No pre-install config backup is available.' }
     $null = Read-DreamSkinUtf8File -Path $backup

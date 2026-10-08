@@ -561,6 +561,14 @@ function compileRuntimeCss(parsed) {
       .join("\n");
     compiledRules.push(`  ${selector} {\n${body}\n  }`);
 
+    // The tagline is the hero's generated text. Keep its responsive defaults
+    // unless the author sets a validated size on the public home-hero part.
+    const taglineSize = part === "home-hero"
+      ? declarations.find(({ property }) => property === "font-size") : null;
+    if (taglineSize) {
+      compiledRules.push(`  ${selector}::after {\n    font-size: ${taglineSize.value} !important;\n  }`);
+    }
+
     if (part === "root") {
       const bodyDeclarations = [];
       for (const declaration of declarations) {

@@ -94,8 +94,6 @@ function Restore-DreamSkinStartupThemeSelection {
 }
 
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
-$ConfigPath = Join-Path $HOME '.codex\config.toml'
-$BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
 $operationLock = $null
 $startFailureCategory = 'internal-start-failure'
 $appearanceTransaction = $null
@@ -115,6 +113,9 @@ try {
   $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
+  $configPaths = Resolve-DreamSkinConfigPaths -StateRoot $StateRoot -BindBackup
+  $ConfigPath = $configPaths.ConfigPath
+  $BackupPath = $configPaths.BackupPath
   if (-not $ProfilePathExplicit) {
     # Chromium 136+ ignores remote-debugging switches for its default data
     # directory. Keep Dream Skin on a separate persistent profile so current

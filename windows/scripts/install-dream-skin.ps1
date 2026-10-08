@@ -38,10 +38,11 @@ try {
   if (Test-DreamSkinTrayActive) {
     throw 'Exit the Codex Dream Skin tray before reinstalling so every shortcut can move to the new runtime safely.'
   }
+  $configPaths = Resolve-DreamSkinConfigPaths -StateRoot $StateRoot -BindBackup
   $engine = Install-DreamSkinRuntimeEngine -SkillRoot $SkillRoot -StateRoot $StateRoot
   $null = Initialize-DreamSkinThemeStore -SkillRoot $engine.Root -StateRoot $StateRoot
-  $ConfigPath = Join-Path $HOME '.codex\config.toml'
-  $BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
+  $ConfigPath = $configPaths.ConfigPath
+  $BackupPath = $configPaths.BackupPath
   Install-DreamSkinBaseTheme -ConfigPath $ConfigPath -BackupPath $BackupPath `
     -AppearanceTheme (Get-DreamSkinActiveThemeAppearance -ThemeDirectory $themePaths.Active)
 
