@@ -1,5 +1,11 @@
 # Windows Changelog
 
+## 1.5.20
+
+- 修复首页副文案不跟随 `home-hero` 的 Safe CSS 字号和颜色的问题（[#427](https://github.com/Fei-Away/Codex-Dream-Skin/issues/427)）：支持 12–20px 合法字号，保留 76% 不透明度；未指定字号时仍为桌面 13px、窄窗口 11px。
+- 安装、启动和恢复遵循已有的 `CODEX_HOME`，未设置或为空时使用默认 `.codex`；无效路径明确报错。配置备份绑定来源目录，拒绝跨目录恢复；切换前需先在原目录完成恢复（[#428](https://github.com/Fei-Away/Codex-Dream-Skin/issues/428)、[#431](https://github.com/Fei-Away/Codex-Dream-Skin/pull/431)）。
+- 自定义目录要求安装器、托盘与官方 Codex 获得同一个已有的 `CODEX_HOME`；终端变量可能无法传给 Store 激活的应用，需确认用户级设置对新进程生效。新目录可能要求登录或首次设置。换肤仍备份并调整外观配置，不自动改写 API Key、Base URL 或模型供应商设置。完整说明见 [v1.5.20 发布说明](../docs/releases/v1.5.20.md)。
+
 ## 1.5.19
 
 - 修复 Windows 26.930 首页输入框裁切、顶栏重复底色和停靠侧栏内侧圆角漏底；保留作者主题色及透明度，适配仅生成到 Windows 资产。
