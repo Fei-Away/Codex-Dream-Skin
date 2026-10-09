@@ -57,6 +57,17 @@ preset-<slug>/
 | `projectPrefix` / `projectLabel` | 「选择项目」按钮的前缀与占位文案 |
 | `promoTitle` / `promoSub` / `promoUrl` | 分享/宣传场景使用，可选 |
 
+在显示首页副标语的布局中，可以通过 `theme.css` 的公开 `home-hero` 部件同时调整首页标题和副标语：
+
+```css
+[data-ds-part="home-hero"] {
+  font-size: 18px;
+  color: #f5e7d0;
+}
+```
+
+字号沿用 Safe CSS 的 `12–20px` 范围；副标语使用相同字号、继承颜色并保留 `76%` 不透明度。未指定字号时保留桌面 `13px`、窄窗口 `11px` 的默认值。无需写伪元素、自定义属性或新增 `theme.json` 字段；这些 CSS 入口仍受原有安全限制。
+
 ### colors 调色板（键 → 界面用途）
 
 所有键都会被注入为主题变量，整套皮肤 UI 跟着走：

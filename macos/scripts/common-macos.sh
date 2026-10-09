@@ -368,7 +368,8 @@ sync_appearance_pin() {
 }
 
 process_started_at() {
-  /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
+  # Persist the same timestamp format across Terminal, Finder and launchd locales.
+  LC_ALL=C /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
 }
 
 recorded_injector_process_matches() {
