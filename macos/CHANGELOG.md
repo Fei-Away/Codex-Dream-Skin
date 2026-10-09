@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.20
+
+- 修复首页副文案不跟随 `home-hero` 的 Safe CSS 字号和颜色的问题（[#427](https://github.com/Fei-Away/Codex-Dream-Skin/issues/427)）：支持 12–20px 合法字号，保留 76% 不透明度；未指定字号时仍为桌面 13px、窄窗口 11px。
+- 统一以 `LC_ALL=C` 读取进程 `lstart`，修复不同语言环境造成的会话身份误判（[#429](https://github.com/Fei-Away/Codex-Dream-Skin/issues/429)）；保留进程身份校验。感谢 @z460440448 在 [#430](https://github.com/Fei-Away/Codex-Dream-Skin/pull/430) 中的分析和修复建议，实际修复通过 [#431](https://github.com/Fei-Away/Codex-Dream-Skin/pull/431) 交付。
+- 旧记录中的非英文启动时间不会自动迁移；若升级后无法确认旧会话，请完整退出旧会话后重新启动，必要时重启 macOS，不要仅凭旧 PID 强制结束进程。完整说明见 [v1.5.20 发布说明](../docs/releases/v1.5.20.md)。
+
 ## 1.5.19
 
 - 适配 Codex / ChatGPT 26.930 的缓存页面、标题栏、工具页面、代码块和展开表格，修复原生鼠标被装饰层拖动区域拦截的问题。保留 #416（@yes-10）与 #418（@chenzhaoxuan0）的原作者提交。
