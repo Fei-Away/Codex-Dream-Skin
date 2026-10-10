@@ -26,6 +26,9 @@
   --ds-secondary: var(--ds-cyan);
   --ds-highlight: var(--ds-purple);
   --ds-on-accent: rgb(var(--ds-bg-rgb) / 1);
+  --ds-sidebar-surface: rgb(var(--ds-panel-rgb) / var(--ds-sidebar-alpha, .90));
+  --ds-composer-surface: rgb(var(--ds-panel-rgb) / var(--ds-composer-alpha, 1));
+  --ds-message-surface: rgb(var(--ds-panel-rgb) / var(--ds-message-alpha, 1));
   --ds-focus-x: var(--dream-skin-focus-x, var(--dream-art-focus-x, 50%));
   --ds-focus-y: var(--dream-skin-focus-y, var(--dream-art-focus-y, 50%));
   --ds-art-position: var(--dream-art-position, var(--dream-skin-art-position, var(--ds-focus-x) var(--ds-focus-y)));
@@ -50,13 +53,11 @@
   --ds-immersive-edge: rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .40));
   --ds-immersive-mid: rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .26));
   --ds-immersive-far: rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .16));
-  --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .46));
-  --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .70));
+  --ds-immersive-sidebar: var(--ds-sidebar-surface);
+  --ds-task-immersive-sidebar: var(--ds-sidebar-surface);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .28));
-  --ds-immersive-composer: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .44));
-  --ds-immersive-composer-solid: color-mix(in srgb,
-    rgb(var(--ds-panel-2-rgb)) 88%,
-    rgb(var(--ds-muted-rgb)) 12%);
+  --ds-immersive-composer: var(--ds-composer-surface);
+  --ds-immersive-composer-solid: var(--ds-composer-surface);
   --ds-immersive-line: rgb(var(--ds-muted-rgb) / .42);
   --ds-task-immersive-edge: rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .82));
   --ds-task-immersive-mid: rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .74));
@@ -100,11 +101,11 @@ html[data-dream-skin="active"][data-dream-shell="light"] {
   --ds-immersive-edge: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .44));
   --ds-immersive-mid: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .28));
   --ds-immersive-far: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .14));
-  --ds-immersive-sidebar: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .48));
-  --ds-task-immersive-sidebar: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .72));
+  --ds-immersive-sidebar: var(--ds-sidebar-surface);
+  --ds-task-immersive-sidebar: var(--ds-sidebar-surface);
   --ds-immersive-chrome: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .34));
-  --ds-immersive-composer: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .46));
-  --ds-immersive-composer-solid: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .74));
+  --ds-immersive-composer: var(--ds-composer-surface);
+  --ds-immersive-composer-solid: var(--ds-composer-surface);
   --ds-immersive-line: rgb(var(--ds-accent-rgb) / .24);
   --ds-task-immersive-edge: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .86));
   --ds-task-immersive-mid: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .78));
@@ -217,16 +218,25 @@ html[data-dream-skin="active"] body::before {
 }
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ {
-  background:
-    linear-gradient(180deg,
-      rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .98)),
-      rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .96))) !important;
+  background: var(--ds-sidebar-surface) !important;
   border: 1px solid var(--ds-line) !important;
   border-left: 0 !important;
   border-radius: 0 16px 16px 0 !important;
   box-shadow: 10px 0 30px rgb(var(--ds-bg-rgb) / .22) !important;
   color: var(--ds-text) !important;
   backdrop-filter: none !important;
+}
+
+/* The native page's bottom padding is outside the sidebar box. The sidebar is
+   positioned and overflow-visible, so extend only its paint into that gap. */
+html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline: 0;
+  height: calc(var(--spacing) + 1px);
+  background: var(--ds-sidebar-surface);
+  pointer-events: none;
 }
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ nav { background: transparent !important; }
@@ -371,9 +381,7 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__:not([data-app-shell-active-page="false"], [data-app-shell-active-page="false"] *) __DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_LEFT_PANEL__ {
-  background: linear-gradient(90deg,
-    var(--ds-immersive-sidebar),
-    var(--ds-immersive-edge) 100%) !important;
+  background: var(--ds-sidebar-surface) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -403,9 +411,7 @@ html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art
 
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])[data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__):not(:has(__DREAM_SELECTOR_SHELL_MAIN__:not([data-app-shell-active-page="false"], [data-app-shell-active-page="false"] *) __DREAM_SELECTOR_HOME_ROUTE_CSS__))
   __DREAM_SELECTOR_LEFT_PANEL__ {
-  background: linear-gradient(90deg,
-    var(--ds-task-immersive-sidebar),
-    var(--ds-task-immersive-edge) 100%) !important;
+  background: var(--ds-sidebar-surface) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -904,7 +910,7 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ {
   overflow: visible !important;
   border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
   border-radius: 22px !important;
-  background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .94)) !important;
+  background: var(--ds-composer-surface) !important;
   box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
   backdrop-filter: blur(16px) saturate(108%) !important;
 }
@@ -937,7 +943,7 @@ html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placemen
    Match its surface to the public composer without affecting task routes. */
 html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placement="home"]
   [data-composer-home-utility-bar-position="above"] {
-  background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .94)) !important;
+  background: var(--ds-composer-surface) !important;
   border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
   border-bottom: 0 !important;
   border-radius: 22px 22px 0 0 !important;
@@ -950,10 +956,7 @@ html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placemen
    structure; keep the minimum background and transparency contract functional
    before a new exact selector contract is available. */
 html[data-dream-skin="active"]:not(:has(__DREAM_SELECTOR_SHELL_MAIN__)) [data-ds-part="sidebar"] {
-  background:
-    linear-gradient(180deg,
-      rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .98)),
-      rgb(var(--ds-bg-rgb) / var(--ds-upload-bg-alpha, .96))) !important;
+  background: var(--ds-sidebar-surface) !important;
   border: 1px solid var(--ds-line) !important;
   color: var(--ds-text) !important;
   box-shadow: 10px 0 30px rgb(var(--ds-bg-rgb) / .22) !important;
@@ -1000,7 +1003,7 @@ html[data-dream-skin="active"]:not(:has(__DREAM_SELECTOR_SHELL_MAIN__)) [data-ds
   overflow: visible !important;
   border: 1px solid rgb(var(--ds-muted-rgb) / .18) !important;
   border-radius: 22px !important;
-  background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .94)) !important;
+  background: var(--ds-composer-surface) !important;
   box-shadow: 0 10px 28px rgb(var(--ds-bg-rgb) / .24) !important;
   backdrop-filter: blur(16px) saturate(108%) !important;
 }
@@ -1020,9 +1023,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:not(:has(__DREAM_SELE
 
 html[data-dream-skin="active"][data-dream-art-wide="true"]:not(:has(__DREAM_SELECTOR_SHELL_MAIN__))
   [data-ds-part="sidebar"] {
-  background: linear-gradient(90deg,
-    var(--ds-immersive-sidebar),
-    var(--ds-immersive-edge) 100%) !important;
+  background: var(--ds-sidebar-surface) !important;
   border: 0 !important;
   box-shadow: none !important;
 }
@@ -1058,9 +1059,7 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_
 
 html[data-dream-skin="active"][data-dream-art-wide="true"]:has(__DREAM_SELECTOR_SHELL_MAIN__:not([data-app-shell-active-page="false"], [data-app-shell-active-page="false"] *) __DREAM_SELECTOR_HOME_ROUTE_CSS__)
   __DREAM_SELECTOR_LEFT_PANEL__ {
-  background: linear-gradient(90deg,
-    var(--ds-immersive-sidebar),
-    var(--ds-immersive-edge) 100%) !important;
+  background: var(--ds-sidebar-surface) !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -1169,7 +1168,7 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_UTILITY__ {
   margin-inline: 0 !important;
   padding-inline: 18px !important;
   border-radius: 22px 22px 0 0 !important;
-  background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .94)) !important;
+  background: var(--ds-composer-surface) !important;
   box-shadow:
     inset 1px 0 rgb(var(--ds-muted-rgb) / .18),
     inset -1px 0 rgb(var(--ds-muted-rgb) / .18),
@@ -1585,7 +1584,7 @@ html[data-dream-skin="active"]:is([data-dream-shell="light"][data-theme="dark"],
   background-color: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1)) !important;
 }
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] {
-  --ds-immersive-composer-solid: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
+  --ds-immersive-composer-solid: var(--ds-composer-surface);
   --color-surface: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
   --color-surface-secondary: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
   --color-surface-tertiary: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
@@ -1603,7 +1602,7 @@ html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] [role="menu"] 
 /* Work and Codex place the same composer body at different depths. Paint the
    public root once; nested body/action-bar surfaces must not cover its alpha. */
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] [data-ds-part="composer"] {
-  background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha)) !important;
+  background: var(--ds-composer-surface) !important;
 }
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"]
   [data-ds-part="composer"] [class*="_ComposerLayoutBody_"],
@@ -1612,13 +1611,70 @@ html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"]
   background: transparent !important;
 }
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] {
-  --color-background-composer: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
-  --color-background-composer-action-bar: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
+  --color-background-composer: var(--ds-composer-surface);
+  --color-background-composer-action-bar: var(--ds-composer-surface);
   --color-background-panel: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
   --color-token-diff-surface: rgb(var(--ds-panel-2-rgb) / var(--ds-upload-panel-alt-alpha, var(--ds-upload-panel-alpha)));
 }
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] {
-  --color-background-other-user-message: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
+  --color-background-other-user-message: var(--ds-message-surface);
+}
+
+/* These three readable surfaces have independent background alpha. Keep text
+   and icons opaque, including when community Safe CSS paints a public part. */
+html[data-dream-skin="active"] [data-ds-part="sidebar"] {
+  --ds-user-surface-alpha: var(--ds-sidebar-alpha, .90);
+}
+html[data-dream-skin="active"] [data-ds-part="message"] {
+  --ds-user-surface-alpha: var(--ds-message-alpha, 1);
+  --color-token-diff-surface: rgb(var(--ds-panel-2-rgb) / var(--ds-message-alpha, 1));
+  background: var(--ds-message-surface) !important;
+}
+html[data-dream-skin="active"] [data-ds-part="message"]:is(:hover, :focus-within) {
+  --ds-message-alpha: var(--ds-message-focused-alpha, .63);
+  --ds-user-surface-alpha: var(--ds-message-alpha);
+  --ds-message-surface: rgb(var(--ds-panel-rgb) / var(--ds-message-alpha));
+}
+html[data-dream-skin="active"] [data-ds-part="composer"] {
+  --ds-user-surface-alpha: var(--ds-composer-alpha, 1);
+}
+html[data-dream-skin="active"] [data-ds-part="composer"]:focus-within {
+  --ds-composer-alpha: var(--ds-composer-focused-alpha, .63);
+  --ds-user-surface-alpha: var(--ds-composer-alpha);
+  --ds-composer-surface: rgb(var(--ds-panel-rgb) / var(--ds-composer-alpha));
+  --ds-immersive-composer-solid: var(--ds-composer-surface);
+  --color-background-composer: var(--ds-composer-surface);
+  --color-background-composer-action-bar: var(--ds-composer-surface);
+  background: var(--ds-composer-surface) !important;
+}
+html[data-dream-skin="active"] [data-codex-composer-root]:focus-within {
+  --ds-composer-surface: rgb(var(--ds-panel-rgb) / var(--ds-composer-focused-alpha, .63));
+  --ds-immersive-composer-solid: var(--ds-composer-surface);
+  --color-background-composer: var(--ds-composer-surface);
+  --color-background-composer-action-bar: var(--ds-composer-surface);
+}
+html[data-dream-skin="active"] [data-codex-composer-root]:focus-within
+  [data-composer-home-utility-bar-position="above"],
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_ROUTE__:has([data-ds-part="composer"]:focus-within)
+  __DREAM_SELECTOR_HOME_UTILITY__ {
+  background: rgb(var(--ds-panel-rgb) / var(--ds-composer-focused-alpha, .63)) !important;
+}
+
+/* Native important utility backgrounds otherwise erase the full sidebar tint
+   and can keep message bubbles on the shared panel alpha. */
+@layer utilities {
+  html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__,
+  html[data-dream-skin="active"] [data-ds-part="sidebar"] {
+    background: var(--ds-sidebar-surface) !important;
+  }
+  html[data-dream-skin="active"] [data-ds-part="message"] {
+    background: var(--ds-message-surface) !important;
+  }
+}
+@layer dreamskin-community {
+  html[data-dream-skin="active"] [data-ds-part="message"] {
+    background-color: var(--ds-message-surface) !important;
+  }
 }
 
 /* 26.930 neutral text tokens are consumed inside button labels and Work's

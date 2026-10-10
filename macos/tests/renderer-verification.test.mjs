@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import vm from "node:vm";
-import { SKIN_VERSION, verifySession, waitForVerifiedSession } from "../scripts/injector.mjs";
+import { SKIN_VERSION, verifySession, waitForVerifiedSession,
+  verifyAppliedPayloadSession, waitForAppliedPayloadSession } from "../scripts/injector.mjs";
 
 // Mirrors macos/assets/selectors.json — keep these in sync when that file's
 // selector strings change, since this mock's querySelector matches by exact
@@ -192,4 +193,34 @@ test("verification rethrows the last transient error when no sample succeeds", a
     waitForVerifiedSession(session, 15, "fixture-theme", "fixture-revision", 1),
     /Execution context stayed unavailable/,
   );
+});
+
+test("preference refresh verifies installed revision without requiring page structure", async () => {
+  const session = makeSession({ dom: makeDomFixture({ shell: null, sidebar: null }) });
+  assert.equal((await verifySession(session, "fixture-theme", "fixture-revision")).pass, false);
+  assert.equal(await verifyAppliedPayloadSession(session, "fixture-theme", "fixture-revision"), true);
+  assert.equal(await verifyAppliedPayloadSession(session, "fixture-theme", "stale-revision"), false);
+});
+
+test("preference refresh retries a transient navigation failure", async () => {
+  const session = makeSession({ evaluateErrors: [new Error("Execution context was destroyed")] });
+  assert.equal(await waitForAppliedPayloadSession(session, "fixture-theme", "fixture-revision", 100, 1), true);
+  assert.equal(session.evaluateCount, 2);
+});
+
+test("preference refresh stops checking a revision superseded by a newer slider value", async () => {
+  const session = makeSession();
+  let superseded = false;
+  const evaluate = session.evaluate.bind(session);
+  session.evaluate = async (...args) => {
+    const result = await evaluate(...args);
+    if (session.evaluateCount === 2) superseded = true;
+    return result;
+  };
+  const result = await waitForAppliedPayloadSession(
+    session, "fixture-theme", "stale-revision", 1000, 1,
+    () => superseded,
+  );
+  assert.equal(result, false);
+  assert.equal(session.evaluateCount, 2);
 });

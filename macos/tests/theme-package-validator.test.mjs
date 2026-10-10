@@ -172,6 +172,35 @@ try {
     "theme.json",
   ]);
 
+  const surfaceTheme = await makeOfficial("official-surface-transparency", {
+    mutateTheme: (theme) => {
+      theme.surfaceTransparency = { general: 37, composer: 100, composerFocused: 37, sidebar: 10,
+        message: 0, messageFocused: 37 };
+    },
+  });
+  for (const platform of ["macos", "windows"]) {
+    const accepted = await validate(surfaceTheme.source, platform, `surface-transparency-${platform}`);
+    const loaded = platform === "macos"
+      ? await loadMacTheme(accepted.stage) : await loadWindowsTheme(accepted.stage);
+    assert.deepEqual(loaded.theme.surfaceTransparency, { general: 37, composer: 100, composerFocused: 37, sidebar: 10,
+      message: 0, messageFocused: 37 });
+  }
+  for (const [name, value] of [
+    ["general-negative", { general: -1 }],
+    ["general-overflow", { general: 101 }],
+    ["negative", { composer: -1 }],
+    ["overflow", { sidebar: 101 }],
+    ["string", { message: "40" }],
+    ["unknown", { toolbar: 20 }],
+    ["null", null],
+  ]) {
+    const invalid = await makeOfficial(`official-surface-${name}`, {
+      mutateTheme: (theme) => { theme.surfaceTransparency = value; },
+    });
+    await expectRejected(invalid.source, "macos", /surfaceTransparency/, `surface-${name}`);
+    await assert.rejects(loadMacTheme(invalid.source), /surfaceTransparency/);
+  }
+
   const impossibleTimestamp = await makeOfficial("official-impossible-timestamp", {
     mutateManifest: (manifest) => { manifest.createdAt = "2026-02-30T00:00:00Z"; },
   });

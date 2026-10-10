@@ -3,9 +3,17 @@
 Open **Codex Dream Skin** from the desktop or Start Menu, or double-click its tray
 icon. All entries open the same native manager; repeat launches activate the
 existing window. The former PowerShell theme-selection window is removed. The window
-adjusts the current theme's transparency (0–100%) and can restore **Follow theme**.
-The existing renderer observes `theme-preferences.json`; authored alpha is used
-when there is no local override, with 30% as the default.
+adjusts four areas of the current theme's transparency (0–100%), in the order
+left sidebar, conversation info cards, input box, and other backgrounds.
+Conversation cards and input box each have separate selected and unselected
+values. Every value has a slider and a numeric field for direct entry. **Enable area
+transparency** temporarily makes all four backgrounds opaque when off, while
+**Follow theme for all areas** temporarily uses the theme's values. Both preserve
+the saved sliders; adjusting one area restores custom mode. Each area also has
+its own **Follow theme** action.
+The existing renderer observes `theme-preferences.json`; authored
+`surfaceTransparency` values are used when there is no local override. The area defaults,
+including both selected states, are also 37% unless a theme authors an area value.
 
 Select an inactive saved theme and choose **Move to Recycle Bin…** to remove its
 local directory after confirmation. The active theme must be switched from the

@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { readThemeTransparency, themePreferencesPath } from "../assets/theme-preferences.mjs";
+import { readThemePreferences, themePreferencesPath } from "../assets/theme-preferences.mjs";
 import { constants as fsConstants } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -550,6 +550,24 @@ export async function loadTheme(themeDir, preferenceOptions = {}) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
+  if (raw.surfaceTransparency !== undefined &&
+      (!raw.surfaceTransparency || typeof raw.surfaceTransparency !== "object" ||
+       Array.isArray(raw.surfaceTransparency))) {
+    throw new Error("surfaceTransparency must be an object");
+  }
+  const rawSurfaces = raw.surfaceTransparency || {};
+  const surfaceTransparency = {};
+  for (const key of ["general", "composer", "composerFocused", "sidebar", "message", "messageFocused"]) {
+    const value = rawSurfaces[key];
+    if (value === undefined) continue;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) {
+      throw new Error(`surfaceTransparency.${key} must be between 0 and 100`);
+    }
+    surfaceTransparency[key] = value;
+  }
+  if (Object.keys(rawSurfaces).some((key) => !["general", "composer", "composerFocused", "sidebar", "message", "messageFocused"].includes(key))) {
+    throw new Error("surfaceTransparency has an unknown field");
+  }
   const rawColors = raw.colors && typeof raw.colors === "object" && !Array.isArray(raw.colors)
     ? raw.colors : null;
   const colorKeys = [
@@ -586,12 +604,18 @@ export async function loadTheme(themeDir, preferenceOptions = {}) {
       safeArea: normalizedChoice(art.safeArea, "art.safeArea", THEME_CHOICES.safeArea, "auto"),
       taskMode: normalizedChoice(art.taskMode, "art.taskMode", THEME_CHOICES.taskMode, "auto"),
     },
+    surfaceTransparency,
     colorMode: rawColors ? "explicit" : "auto",
     explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
     colors,
   };
-  const userTransparency = await readThemeTransparency(theme.id, { preferencesPath: themePreferencesPath("win32"), ...preferenceOptions });
-  if (userTransparency !== undefined) theme.userTransparency = userTransparency;
+  const preferences = await readThemePreferences(theme.id, {
+    preferencesPath: themePreferencesPath("win32"), ...preferenceOptions,
+  });
+  if (preferences.transparency !== undefined) theme.userTransparency = preferences.transparency;
+  if (preferences.surfaceTransparency) theme.userSurfaceTransparency = preferences.surfaceTransparency;
+  theme.transparencyEnabled = preferences.transparencyEnabled !== false;
+  theme.followTheme = preferences.followTheme === true;
   const [themeStat, imageStat, safeCss] = await Promise.all([
     fs.stat(themePath),
     fs.stat(realImagePath),
@@ -613,7 +637,12 @@ export async function loadTheme(themeDir, preferenceOptions = {}) {
   theme.artMetadata = artMetadata;
   const fingerprint = createHash("sha256")
     .update(themeText, "utf8")
-    .update(JSON.stringify({ userTransparency: theme.userTransparency }))
+    .update(JSON.stringify({
+      userTransparency: theme.userTransparency,
+      userSurfaceTransparency: theme.userSurfaceTransparency,
+      transparencyEnabled: theme.transparencyEnabled,
+      followTheme: theme.followTheme,
+    }))
     .update("\0")
     .update(imageBytes)
     .update("\0")
@@ -1615,10 +1644,14 @@ async function runWatch(options) {
           const now = Date.now();
           let shouldAudit = !loadedPayload || now - lastStrongThemeAuditAt >= STRONG_THEME_AUDIT_MS;
           if (!shouldAudit) {
-            const userTransparency = await readThemeTransparency(loadedPayload.theme.id, {
+            const preferences = await readThemePreferences(loadedPayload.theme.id, {
               preferencesPath: themePreferencesPath("win32"),
             });
-            shouldAudit = userTransparency !== loadedPayload.theme.userTransparency;
+            shouldAudit = preferences.transparency !== loadedPayload.theme.userTransparency
+              || JSON.stringify(preferences.surfaceTransparency ?? {})
+                !== JSON.stringify(loadedPayload.theme.userSurfaceTransparency ?? {})
+              || (preferences.transparencyEnabled !== false) !== loadedPayload.theme.transparencyEnabled
+              || (preferences.followTheme === true) !== loadedPayload.theme.followTheme;
           }
           if (!shouldAudit) {
             try {
