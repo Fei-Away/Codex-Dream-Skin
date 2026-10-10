@@ -38,6 +38,13 @@ Check what you actually ran. Skip items that do not apply and say so under Notes
 
 - [ ] Links and wording reviewed / 已检查链接与表述
 
+### Shared source / 共享源（when applicable / 如适用）
+
+- [ ] Edited canonical runtime/selectors and regenerated platform copies / 修改规范源并生成双端副本
+- [ ] Runtime sync, portable regressions and both payload checks passed / 同步、共享回归和双端 payload 检查通过
+- [ ] Contract changes list affected site/server/client consumers / 合同改动列明网站、服务端和客户端影响
+- [ ] New background work defines cancellation, failure and cleanup / 新后台功能有取消、失败和清理行为
+
 ### macOS (when code under `macos/` changes)
 
 - [ ] `macos/tests/run-tests.sh` passed / 已通过

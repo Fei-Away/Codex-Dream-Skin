@@ -29,9 +29,36 @@ Bug 报告应包含：
 
 请先 fork 仓库，并让分支基于最新的上游 `main`。尽量复用现有脚本和平台 helper，不要为小改动增加新依赖。
 
+### 代码归属与共享源
+
+| 改动 | 修改入口 |
+| --- | --- |
+| renderer、基础 CSS、图片与主题包校验 | `runtime/`；用 `node tools/sync-runtime-assets.mjs` 生成双端副本 |
+| 选择器 | `tools/selectors.json`；同步 provenance、fixture 和生成资产 |
+| 系统发现、启动、权限、恢复 | 对应平台 helper；复用现有锁、状态和回滚 |
+| 主题 schema、限制、公开 part/token | `dreamskin-cc` 的 `packages/theme-schema` / `packages/skin-api`，协调客户端消费者 |
+
+不要只修改 `macos/assets` 或 `windows/assets` 中由同步工具生成的文件。共享源改动
+需要同时验证两个平台，即使改动没有落在平台脚本目录：
+
+```bash
+node tools/sync-runtime-assets.mjs --check
+node --test macos/tests/*.test.mjs windows/tests/*.test.mjs tools/*.test.mjs
+node macos/scripts/injector.mjs --check-payload
+node windows/scripts/injector.mjs --check-payload
+```
+
+新增可选功能要说明启用、停用、取消、失败和资源清理；不要另建一套操作状态或
+无界轮询。把视觉调整、平台扩展和状态桥接拆成独立 PR。Controller 的迁移阶段与
+未来接口见 [实施方案](../docs/controller-implementation-plan.md)，尚未落地的接口
+不能当作当前可用 API。现阶段仍复用上述已有模块。
+
 ### macOS
 
-运行完整测试：
+在专用测试会话运行完整测试。该入口包含原生安装 fixture 和 Doctor；Doctor 会
+连接已安装客户端，可能清理被排除窗口的主题。如果当前客户端承载工作对话，
+使用上面的 portable 检查和已审阅的隔离 fixture，并把原生验收记录为待完成。
+临时 HOME 不隔离本机 CDP 端口；进程身份测试使用不联网的假 injector。
 
 ```bash
 (cd macos && npm test)
