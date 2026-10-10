@@ -141,6 +141,10 @@ const sourceImageMetadata = await fs.readFile(
   path.join(projectRoot, "runtime", "image-metadata.mjs"),
   "utf8",
 );
+const sourceCdpDiscovery = await fs.readFile(
+  path.join(projectRoot, "runtime", "cdp-discovery.mjs"),
+  "utf8",
+);
 const outputs = [
   {
     content: await fs.readFile(path.join(projectRoot, "runtime", "theme-preferences.mjs"), "utf8"),
@@ -204,6 +208,10 @@ const outputs = [
   {
     content: compileWindowsImageMetadata(sourceImageMetadata),
     paths: ["windows/scripts/image-metadata.mjs"],
+  },
+  {
+    content: sourceCdpDiscovery,
+    paths: ["macos/scripts/cdp-discovery.mjs", "windows/scripts/cdp-discovery.mjs"],
   },
 ];
 
