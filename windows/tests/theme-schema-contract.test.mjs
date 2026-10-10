@@ -49,3 +49,19 @@ test("Windows runtime rejects missing and future theme schema versions", async (
     await assert.rejects(loadTheme(root), /must use schemaVersion 1/);
   });
 });
+
+test("Windows runtime validates independent surface transparency", async () => {
+  await withTheme(1, true, async (root) => {
+    const themePath = path.join(root, "theme.json");
+    const theme = JSON.parse(await fs.readFile(themePath, "utf8"));
+    theme.surfaceTransparency = { general: 37, composer: 100, composerFocused: 37, sidebar: 10,
+      message: 0, messageFocused: 37 };
+    await fs.writeFile(themePath, JSON.stringify(theme));
+    assert.deepEqual((await loadTheme(root)).theme.surfaceTransparency, theme.surfaceTransparency);
+    for (const invalid of [{ general: -1 }, { general: 101 }, { composer: -1 }, { sidebar: 101 }, { message: "40" }, { rail: 20 }, null]) {
+      theme.surfaceTransparency = invalid;
+      await fs.writeFile(themePath, JSON.stringify(theme));
+      await assert.rejects(loadTheme(root), /surfaceTransparency/);
+    }
+  });
+});

@@ -182,6 +182,8 @@ Import adds the pack to **Saved Themes** without changing the active theme. Iden
 
 Both controls include **Open Themes Folder**. Reopen the menu/tray after moving the directory. Do not add another wrapper level, links, nested archives, or an image-only folder without `theme.json`. Manual placement bypasses the ZIP importer's archive checks, so use trusted content only.
 
+The macOS **Transparency** menu and Windows Theme Manager list four per-theme areas in this order: complete left sidebar (icon rail and directory), conversation message cards, input box, and other backgrounds. Conversation cards and the input box each have separate values for selected and unselected states. On macOS, each area opens a submenu with sliders and direct 0–100 number entry. **Enable area transparency** temporarily makes all four backgrounds opaque when off; **Follow theme for all areas** temporarily uses the theme's values. Both modes preserve saved values, and adjusting an area restores custom mode. Each state can also return to **Follow theme** separately without closing its submenu. Authors may set `surfaceTransparency` in `theme.json` using `general` (other backgrounds), `sidebar`, `message`, `messageFocused`, `composer`, and `composerFocused`; missing values default to 37% transparency. A selected conversation card is hovered or contains keyboard focus; the input box is selected when it has focus. Only backgrounds fade; text and icons stay opaque.
+
 </details>
 
 ## For developers

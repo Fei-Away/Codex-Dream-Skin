@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { readThemeTransparency, themePreferencesPath } from "../assets/theme-preferences.mjs";
+import { readThemePreferences, themePreferencesPath } from "../assets/theme-preferences.mjs";
 import { constants as fsConstants, watch as watchFs } from "node:fs";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -705,6 +705,25 @@ export async function loadTheme(themeDir, preferenceOptions = {}) {
     safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"]),
     taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "full", "off"]),
   };
+  if (raw.surfaceTransparency !== undefined &&
+      (!raw.surfaceTransparency || typeof raw.surfaceTransparency !== "object" ||
+       Array.isArray(raw.surfaceTransparency))) {
+    throw new Error(`${configPath} has an invalid surfaceTransparency field`);
+  }
+  const rawSurfaces = raw.surfaceTransparency || {};
+  const surfaceTransparency = {};
+  const surfaceKeys = ["general", "composer", "composerFocused", "sidebar", "message", "messageFocused"];
+  for (const key of surfaceKeys) {
+    const value = rawSurfaces[key];
+    if (value === undefined) continue;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) {
+      throw new Error(`${configPath} has an invalid surfaceTransparency.${key} field`);
+    }
+    surfaceTransparency[key] = value;
+  }
+  if (Object.keys(rawSurfaces).some((key) => !surfaceKeys.includes(key))) {
+    throw new Error(`${configPath} has an unknown surfaceTransparency field`);
+  }
   const theme = {
     schemaVersion: 1,
     id: normalizeThemeText(raw.id, "custom", 80, "id", configPath),
@@ -717,6 +736,7 @@ export async function loadTheme(themeDir, preferenceOptions = {}) {
     quote: normalizeThemeText(raw.quote, "MAKE SOMETHING WONDERFUL", 120, "quote", configPath),
     image: raw.image,
     colorMode: rawColors ? "explicit" : "auto",
+    surfaceTransparency,
     explicitColorKeys: rawColors ? colorKeys.filter((key) => Object.hasOwn(rawColors, key)) : [],
     colors: {
       background: normalizeThemeColor(rawColors?.background, "#071116"),
@@ -731,8 +751,13 @@ export async function loadTheme(themeDir, preferenceOptions = {}) {
       line: normalizeThemeColor(rawColors?.line, "rgba(124, 255, 70, .28)"),
     },
   };
-  const userTransparency = await readThemeTransparency(theme.id, { preferencesPath: themePreferencesPath("darwin"), ...preferenceOptions });
-  if (userTransparency !== undefined) theme.userTransparency = userTransparency;
+  const preferences = await readThemePreferences(theme.id, {
+    preferencesPath: themePreferencesPath("darwin"), ...preferenceOptions,
+  });
+  if (preferences.transparency !== undefined) theme.userTransparency = preferences.transparency;
+  if (preferences.surfaceTransparency) theme.userSurfaceTransparency = preferences.surfaceTransparency;
+  theme.transparencyEnabled = preferences.transparencyEnabled !== false;
+  theme.followTheme = preferences.followTheme === true;
   if (appearance !== undefined) theme.appearance = appearance;
   if (Object.values(art).some((value) => value !== undefined)) {
     theme.art = Object.fromEntries(Object.entries(art).filter(([, value]) => value !== undefined));
@@ -1285,6 +1310,44 @@ export async function waitForVerifiedSession(
   return lastResult;
 }
 
+/** Confirm a preference-only refresh installed its exact payload and stylesheet. */
+export async function verifyAppliedPayloadSession(session, expectedThemeId, expectedRevision) {
+  return session.evaluate(`(() => {
+    const state = window.__CODEX_DREAM_SKIN_STATE__;
+    const stylePresent = state?.styleMode === 'adopted'
+      ? [...document.adoptedStyleSheets].includes(state.styleSheet)
+      : state?.styleMode === 'style'
+        && document.getElementById('codex-dream-skin-style') === state.styleNode;
+    return Boolean(document.documentElement.getAttribute('data-dream-skin') === 'active'
+      && state?.themeId === ${JSON.stringify(expectedThemeId)}
+      && state?.revision === ${JSON.stringify(expectedRevision)}
+      && stylePresent);
+  })()`);
+}
+
+/** Retry transient navigation gaps briefly without rechecking unrelated page layout. */
+export async function waitForAppliedPayloadSession(
+  session, expectedThemeId, expectedRevision, timeoutMs = 1000, retryDelayMs = 75,
+  isSuperseded = () => false,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  do {
+    if (isSuperseded()) return false;
+    try {
+      if (await verifyAppliedPayloadSession(session, expectedThemeId, expectedRevision)) return true;
+      lastError = null;
+    } catch (error) {
+      lastError = error;
+    }
+    if (isSuperseded() || Date.now() >= deadline) break;
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  } while (Date.now() < deadline);
+  if (isSuperseded()) return false;
+  if (lastError) throw lastError;
+  return false;
+}
+
 async function capture(session, outputPath) {
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   const result = await session.send("Page.captureScreenshot", {
@@ -1561,7 +1624,7 @@ function watchPayloadSources(themeDir, onDirty) {
           (!name || name === "dream-skin.css" || name === "renderer-inject.js");
         if (kind === "static" && !staticChanged) return;
         if (kind === "preferences" && name && name !== "theme-preferences.json") return;
-        onDirty({ staticChanged });
+        onDirty({ staticChanged, preferenceOnly: kind === "preferences" });
       });
       watcher.on("error", (error) => {
         console.error(`[dream-skin] file watch unavailable for ${directory}: ${error.message}`);
@@ -1680,6 +1743,8 @@ async function runWatch(options) {
   let stopping = false;
   let reloadTimer = null;
   let reloadChain = Promise.resolve();
+  let refreshGeneration = 0;
+  let lastPreferenceAuditAt = 0;
   let discoveryDelayMs = DISCOVERY_BACKOFF.initialMs;
   let lastListErrorAt = 0;
   let discoveryOutageSince = 0;
@@ -1817,15 +1882,21 @@ async function runWatch(options) {
     wakeControlLoop();
   };
 
-  const refreshPayload = async () => {
+  const refreshPayload = async ({ preferenceOnly = false, generation = refreshGeneration } = {}) => {
     const refreshEpoch = mutationEpoch;
+    // Slider writes can arrive while an earlier refresh is reading or
+    // verifying. Only the newest preference refresh should reach the page.
+    const supersededPreference = () => preferenceOnly && !activeOperation
+      && generation !== refreshGeneration;
     let next;
     try {
       next = await loadPayload(options.themeDir);
     } catch (error) {
+      if (supersededPreference()) return;
       await Promise.all([...sessions.values()].map(async (record) => {
         if (record.session.closed) return;
         const externalOperation = activeOperation;
+        if (preferenceOnly && !externalOperation) return;
         const operationToken = externalOperation?.token ?? nextOperationToken();
         record.operationToken = operationToken;
         record.operationExternal = Boolean(externalOperation);
@@ -1838,6 +1909,7 @@ async function runWatch(options) {
       }));
       throw error;
     }
+    if (supersededPreference()) return;
     if (next.revision === current.revision) return;
     current = next;
     if (controlOnly || mutationEpoch !== refreshEpoch) {
@@ -1847,19 +1919,24 @@ async function runWatch(options) {
     for (const record of sessions.values()) {
       const { session } = record;
       if (session.closed) continue;
+      if (supersededPreference()) break;
       const externalOperation = activeOperation;
       const operationToken = externalOperation?.token ?? nextOperationToken();
       record.operationToken = operationToken;
       record.operationExternal = Boolean(externalOperation);
       try {
-        await presentOperationUi(
-          session, operationToken, "loading", `正在应用「${current.theme.name}」…`,
-        );
-        if (controlOnly || mutationEpoch !== refreshEpoch) continue;
+        // A slider change is a small local preference update. Keep the page
+        // usable while it is rechecked instead of showing a blocking spinner.
+        if (!preferenceOnly || externalOperation) {
+          await presentOperationUi(
+            session, operationToken, "loading", `正在应用「${current.theme.name}」…`,
+          );
+        }
+        if (controlOnly || mutationEpoch !== refreshEpoch || supersededPreference()) continue;
         const nextIdentifier = await registerEarlyForRecord(
           record, current.payload, current.revision,
         );
-        if (controlOnly || mutationEpoch !== refreshEpoch) {
+        if (controlOnly || mutationEpoch !== refreshEpoch || supersededPreference()) {
           await removeEarlyIdentifier(record, nextIdentifier);
           continue;
         }
@@ -1869,20 +1946,38 @@ async function runWatch(options) {
         record.earlyScriptId = nextIdentifier;
         record.needsLoadFallback = !nextIdentifier;
         await applyToSession(session, current.payload);
-        if (controlOnly || mutationEpoch !== refreshEpoch) continue;
-        const verification = await waitForVerifiedSession(
-          session,
-          Math.min(options.timeoutMs, 8000),
-          current.theme.id,
-          current.revision,
-        );
-        if (!verification?.pass) throw new Error("Theme refresh verification failed");
-        if (!externalOperation) {
+        if (controlOnly || mutationEpoch !== refreshEpoch || supersededPreference()) continue;
+        const quickRefresh = preferenceOnly && !externalOperation;
+        const verification = quickRefresh
+          ? await waitForAppliedPayloadSession(
+            session, current.theme.id, current.revision, 1000, 75, supersededPreference,
+          )
+          : await waitForVerifiedSession(
+            session,
+            Math.min(options.timeoutMs, 8000),
+            current.theme.id,
+            current.revision,
+          );
+        if (supersededPreference()) continue;
+        if (!(quickRefresh ? verification : verification?.pass)) {
+          if (quickRefresh) throw new Error("Preference refresh payload verification failed");
+          const checks = verification?.checks ?? {};
+          console.error(`[dream-skin] theme refresh checks: ${JSON.stringify({
+            installed: Boolean(verification?.installed),
+            stylePresent: Boolean(verification?.stylePresent),
+            structurePass: Boolean(checks.structurePass),
+            windowPass: Boolean(checks.windowPass),
+            payloadPass: Boolean(checks.payloadPass),
+            horizontalOverflow: Boolean(verification?.documentOverflow?.x),
+          })}`);
+          throw new Error("Theme refresh verification failed");
+        }
+        if (!externalOperation && !preferenceOnly) {
           await presentOperationUi(session, operationToken, "success", `已应用「${current.theme.name}」`);
         }
       } catch (error) {
         record.needsLoadFallback = true;
-        if (!externalOperation) {
+        if (!externalOperation && !preferenceOnly && !supersededPreference()) {
           await presentOperationUi(session, operationToken, "error", "主题切换失败，未确认应用");
         }
         console.error(`[dream-skin] theme refresh failed: ${error.message}`);
@@ -1891,12 +1986,17 @@ async function runWatch(options) {
     console.log(`[dream-skin] refreshed theme ${current.theme.id} (${current.timings.buildMs}ms)`);
   };
 
-  const queuePayloadRefresh = ({ staticChanged = false } = {}) => {
+  let pendingPreferenceOnly = true;
+  const queuePayloadRefresh = ({ staticChanged = false, preferenceOnly = false } = {}) => {
+    refreshGeneration += 1;
     if (staticChanged) invalidateStaticPayloadAssets();
+    pendingPreferenceOnly &&= preferenceOnly;
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       reloadTimer = null;
-      reloadChain = reloadChain.then(refreshPayload).catch((error) => {
+      const refreshOptions = { preferenceOnly: pendingPreferenceOnly, generation: refreshGeneration };
+      pendingPreferenceOnly = true;
+      reloadChain = reloadChain.then(() => refreshPayload(refreshOptions)).catch((error) => {
         console.error(`[dream-skin] theme reload failed: ${error.message}`);
       });
     }, 45);
@@ -2011,6 +2111,26 @@ async function runWatch(options) {
         await new Promise((resolve) => setTimeout(resolve, discoveryDelayMs));
         discoveryDelayMs = nextDiscoveryDelayMs(discoveryDelayMs, outageMs);
         continue;
+      }
+
+      // Directory watchers can miss an atomic preference-file replacement.
+      // A bounded audit keeps the final slider value from waiting indefinitely.
+      if (!controlOnly && !activeOperation && Date.now() - lastPreferenceAuditAt >= 2000) {
+        lastPreferenceAuditAt = Date.now();
+        try {
+          const preferences = await readThemePreferences(current.theme.id, {
+            preferencesPath: themePreferencesPath("darwin"),
+          });
+          if (preferences.transparency !== current.theme.userTransparency
+            || JSON.stringify(preferences.surfaceTransparency ?? {})
+              !== JSON.stringify(current.theme.userSurfaceTransparency ?? {})
+            || (preferences.transparencyEnabled !== false) !== current.theme.transparencyEnabled
+            || (preferences.followTheme === true) !== current.theme.followTheme) {
+            queuePayloadRefresh({ preferenceOnly: true });
+          }
+        } catch (error) {
+          console.error(`[dream-skin] transparency preference audit failed: ${error.message}`);
+        }
       }
 
       if (controlOnly && !activeOperation) {

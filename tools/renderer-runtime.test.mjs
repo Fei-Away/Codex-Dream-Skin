@@ -595,9 +595,13 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
-    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome,[^)]*\)|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ var\(--ds-upload-panel-alpha, \.94\)\)/,
-    "Composer background must honor uploaded alpha with the historical 94% fallback",
+    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome,[^)]*\)|\.composer-surface-chrome)\s*\{[^}]*background:\s*var\(--ds-composer-surface\)/,
+    "Composer background must use its independent surface transparency",
   );
+  assert.match(css, /\[data-ds-part="composer"\]:focus-within\s*\{[^}]*--ds-composer-alpha:\s*var\(--ds-composer-focused-alpha/,
+    "Focused composer must use its selected-state transparency");
+  assert.match(css, /\[data-ds-part="message"\]\s*\{[^}]*background:\s*var\(--ds-message-surface\)\s*!important/,
+    "Message cards must use their own background transparency");
   assert.match(
     css,
     /data-composer-utility-bar-variant="home"\][\s\S]{0,180}> \[class\*="_ComposerLayoutBody_"\][\s\S]{0,220}background:\s*transparent\s*!important;[\s\S]{0,180}backdrop-filter:\s*none\s*!important;/,
@@ -695,6 +699,11 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-radius"), "12px");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-opacity"), "1");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-blur"), "0px");
+  assert.equal(home.rootStyle.values.get("--ds-composer-alpha"), "0.63");
+  assert.equal(home.rootStyle.values.get("--ds-composer-focused-alpha"), "0.63");
+  assert.equal(home.rootStyle.values.get("--ds-sidebar-alpha"), "0.63");
+  assert.equal(home.rootStyle.values.get("--ds-message-alpha"), "0.63");
+  assert.equal(home.rootStyle.values.get("--ds-message-focused-alpha"), "0.63");
   const publicDefaults = {
     "--ds-theme-font-family": "system",
     "--ds-theme-font-scale": "1",
@@ -972,9 +981,9 @@ export async function runRendererRuntimeTest(assetRoot) {
   };
   for (const [variable, colorKey] of Object.entries(publicColorVariables)) {
     const backgroundValues = {
-      background: `rgb(170 187 204 / ${221 / 255})`,
-      panel: `rgb(170 187 204 / ${221 / 255})`,
-      panelAlt: `rgb(17 34 51 / ${68 / 255})`,
+      background: "rgb(170 187 204 / 0.63)",
+      panel: "rgb(170 187 204 / 0.63)",
+      panelAlt: "rgb(17 34 51 / 0.63)",
     };
     assert.equal(explicitLight.rootStyle.values.get(variable), backgroundValues[colorKey] ?? explicitColors[colorKey],
       `${variable} must expose resolved background alpha and unchanged foreground colors`);
@@ -1024,7 +1033,7 @@ export async function runRendererRuntimeTest(assetRoot) {
 
   for (const { nativeAppearance, panel, expectedInk } of [
     { nativeAppearance: "light", panel: "#0000", expectedInk: "rgb(255 255 255)" },
-    { nativeAppearance: "dark", panel: "#fff0", expectedInk: "rgb(255 255 255)" },
+    { nativeAppearance: "dark", panel: "#fff0", expectedInk: "rgb(0 0 0)" },
   ]) {
     const transparentSurfaces = makeFixture({ nativeAppearance });
     vm.runInNewContext(transparentSurfaces.payloadFor({
@@ -1082,41 +1091,117 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(currentSettings.document.adoptedStyleSheets.length, 1);
 
   const alphaNames = ["--ds-upload-panel-alpha", "--ds-upload-bg-alpha", "--ds-upload-panel-alt-alpha"];
-  for (const [panel, expected] of [["#1e1e1e55", 85 / 255], ["#1230", 0], ["#123f", 1],
-    ["rgba(30, 30, 30, 0)", 0], ["rgba(30, 30, 30, 1)", 1], ["rgba(30, 30, 30, .4)", 0.4]]) {
+  const surfaceAlpha = makeFixture();
+  vm.runInNewContext(surfaceAlpha.payloadFor({
+    userTransparency: 80,
+    surfaceTransparency: { composer: 55, sidebar: 25, message: 40 },
+  }), surfaceAlpha.context);
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-upload-panel-alpha"), "0.2");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-alpha"), "0.45");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-sidebar-alpha"), "0.75");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-alpha"), "0.6");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-focused-alpha"), "0.45");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-focused-alpha"), "0.6");
+  vm.runInNewContext(surfaceAlpha.payloadFor({
+    surfaceTransparency: { composer: 55, composerFocused: 20, message: 40, messageFocused: 75 },
+    followTheme: true,
+  }), surfaceAlpha.context);
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-upload-panel-alpha"), "0.63");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-focused-alpha"), "0.8");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-focused-alpha"), "0.25");
+  vm.runInNewContext(surfaceAlpha.payloadFor({
+    surfaceTransparency: { composer: 55, message: 40 },
+    userSurfaceTransparency: { composer: 90, message: 95 },
+  }), surfaceAlpha.context);
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-alpha"), "0.1");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-alpha"), "0.05");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-focused-alpha"), "0.45",
+    "Selected input follows theme independently of the unselected override");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-focused-alpha"), "0.6",
+    "Selected message follows theme independently of the unselected override");
+  vm.runInNewContext(surfaceAlpha.payloadFor({
+    userTransparency: 80,
+    surfaceTransparency: { composer: 55, sidebar: 25, message: 40 },
+    userSurfaceTransparency: { sidebar: 5, message: 100, composerFocused: 70, messageFocused: 15 },
+  }), surfaceAlpha.context);
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-alpha"), "0.45");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-sidebar-alpha"), "0.95");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-alpha"), "0");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-focused-alpha"), "0.3");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-focused-alpha"), "0.85");
+  vm.runInNewContext(surfaceAlpha.payloadFor({
+    userTransparency: 80,
+    surfaceTransparency: { composer: 55, sidebar: 25, message: 40 },
+    userSurfaceTransparency: { sidebar: 5, message: 100 },
+    followTheme: true,
+  }), surfaceAlpha.context);
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-user-surface-alpha"), "0.63");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-sidebar-alpha"), "0.75");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-alpha"), "0.6");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-composer-focused-alpha"), "0.45");
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-message-focused-alpha"), "0.6");
+  vm.runInNewContext(surfaceAlpha.payloadFor({
+    userTransparency: 80,
+    surfaceTransparency: { composer: 55, sidebar: 25, message: 40 },
+    userSurfaceTransparency: { sidebar: 5, message: 100 },
+    followTheme: true,
+    transparencyEnabled: false,
+  }), surfaceAlpha.context);
+  for (const name of [...alphaNames, "--ds-composer-alpha", "--ds-sidebar-alpha", "--ds-message-alpha",
+    "--ds-composer-focused-alpha", "--ds-message-focused-alpha"]) {
+    assert.equal(surfaceAlpha.rootStyle.values.get(name), "1", `${name} must be opaque when disabled`);
+  }
+  vm.runInNewContext(surfaceAlpha.payloadFor({
+    userTransparency: 80,
+    surfaceTransparency: { composer: 55, sidebar: 25, message: 40 },
+    userSurfaceTransparency: { sidebar: 5, message: 100 },
+  }), surfaceAlpha.context);
+  assert.equal(surfaceAlpha.rootStyle.values.get("--ds-sidebar-alpha"), "0.95",
+    "Disabling and re-enabling must preserve the user override");
+  vm.runInNewContext(surfaceAlpha.payloadFor({ userTransparency: 80 }), surfaceAlpha.context);
+  for (const name of ["--ds-composer-alpha", "--ds-sidebar-alpha", "--ds-message-alpha",
+    "--ds-composer-focused-alpha", "--ds-message-focused-alpha"]) {
+    assert.equal(surfaceAlpha.rootStyle.values.get(name), "0.63", `${name} defaults to 37% transparency`);
+  }
+  for (const panel of ["#1e1e1e55", "#1230", "#123f",
+    "rgba(30, 30, 30, 0)", "rgba(30, 30, 30, 1)", "rgba(30, 30, 30, .4)"]) {
     const uploaded = makeFixture();
     vm.runInNewContext(uploaded.payloadFor({ colorMode: "explicit", colors: { panel } }), uploaded.context);
     assert.equal(uploaded.attrs.get("data-dream-upload-alpha"), "true");
-    for (const name of alphaNames) assert.equal(Number(uploaded.rootStyle.values.get(name)), expected, name);
+    for (const name of alphaNames) assert.equal(uploaded.rootStyle.values.get(name), "0.63", name);
     assert.equal(uploaded.rootStyle.values.get("--ds-theme-surface-opacity"), "1",
       "Background alpha must not change public element opacity");
     vm.runInNewContext(uploaded.payloadFor({ colors: { panel: "#1e1e1e" } }), uploaded.context);
     assert.equal(uploaded.attrs.get("data-dream-upload-alpha"), "true");
-    for (const name of alphaNames) assert.equal(uploaded.rootStyle.values.get(name), "0.7",
-      "Switching back to legacy colors must restore default30% transparency");
+    for (const name of alphaNames) assert.equal(uploaded.rootStyle.values.get(name), "0.63",
+      "Changing colors must preserve the 37% default transparency");
   }
   for (const theme of [{}, { colors: { panel: "#123" } }, { colors: { panel: "rgb(30, 30, 30)" } },
     { colors: { panel: "#1e1e1e55" }, explicitColorKeys: [] }]) {
     const legacyAlpha = makeFixture();
     vm.runInNewContext(legacyAlpha.payloadFor(theme), legacyAlpha.context);
     assert.equal(legacyAlpha.attrs.get("data-dream-upload-alpha"), "true");
-    for (const name of alphaNames) assert.equal(legacyAlpha.rootStyle.values.get(name), "0.7");
+    for (const name of alphaNames) assert.equal(legacyAlpha.rootStyle.values.get(name), "0.63");
   }
   const specificAlpha = makeFixture();
   vm.runInNewContext(specificAlpha.payloadFor({ colorMode: "explicit", colors: {
     panel: "#1e1e1e55", background: "#0000", panelAlt: "rgba(40, 40, 40, 1)",
   } }), specificAlpha.context);
-  assert.equal(specificAlpha.rootStyle.values.get("--ds-upload-bg-alpha"), "0");
-  assert.equal(specificAlpha.rootStyle.values.get("--ds-upload-panel-alt-alpha"), "1");
+  assert.equal(specificAlpha.rootStyle.values.get("--ds-upload-bg-alpha"), "0.63");
+  assert.equal(specificAlpha.rootStyle.values.get("--ds-upload-panel-alt-alpha"), "0.63");
   specificAlpha.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
   assert.equal(specificAlpha.attrs.has("data-dream-upload-alpha"), false);
   for (const name of alphaNames) assert.equal(specificAlpha.rootStyle.values.has(name), false);
   const backgroundOnly = makeFixture();
   vm.runInNewContext(backgroundOnly.payloadFor({ colors: { background: "#0008" } }), backgroundOnly.context);
   assert.equal(backgroundOnly.attrs.get("data-dream-upload-alpha"), "true");
-  assert.equal(backgroundOnly.rootStyle.values.get("--ds-upload-panel-alpha"), "0.7");
-  assert.equal(backgroundOnly.rootStyle.values.get("--ds-upload-panel-alt-alpha"), "0.7");
-  assert.equal(Number(backgroundOnly.rootStyle.values.get("--ds-upload-bg-alpha")), 136 / 255);
+  assert.equal(backgroundOnly.rootStyle.values.get("--ds-upload-panel-alpha"), "0.63");
+  assert.equal(backgroundOnly.rootStyle.values.get("--ds-upload-panel-alt-alpha"), "0.63");
+  assert.equal(backgroundOnly.rootStyle.values.get("--ds-upload-bg-alpha"), "0.63");
+  vm.runInNewContext(backgroundOnly.payloadFor({
+    surfaceTransparency: { general: 22 }, followTheme: true,
+  }), backgroundOnly.context);
+  for (const name of alphaNames) assert.equal(backgroundOnly.rootStyle.values.get(name), "0.78");
 
   const predicates = makeFixture();
   const nativeQueryAll = predicates.document.querySelectorAll;
@@ -1201,14 +1286,14 @@ export async function runRendererRuntimeTest(assetRoot) {
     assert.equal(custom.rootStyle.values.get("--ds-theme-surface-opacity"), "1");
     assert.equal(custom.rootStyle.values.get("--ds-theme-color-text"), "#fafafa");
     vm.runInNewContext(custom.payloadFor({ colors: { panel: "#1e1e1e55" } }), custom.context);
-    assert.equal(Number(custom.rootStyle.values.get("--ds-upload-panel-alpha")), 85 / 255);
-    assert.equal(custom.rootStyle.values.has("--ds-user-surface-alpha"), false,
-      "Reset/switch must remove a previous user override");
+    assert.equal(custom.rootStyle.values.get("--ds-upload-panel-alpha"), "0.63");
+    assert.equal(custom.rootStyle.values.get("--ds-user-surface-alpha"), "0.63",
+      "Reset/switch must restore the 37% default");
   }
   for (const invalid of [-1, 101, "30", null]) {
     const custom = makeFixture();
     vm.runInNewContext(custom.payloadFor({ userTransparency: invalid }), custom.context);
-    assert.equal(custom.rootStyle.values.get("--ds-upload-panel-alpha"), "0.7");
+    assert.equal(custom.rootStyle.values.get("--ds-upload-panel-alpha"), "0.63");
   }
 
   for (const nativeTheme of ["dark", "light"]) {
