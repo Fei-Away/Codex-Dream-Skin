@@ -1152,6 +1152,32 @@ html[data-dream-skin="active"][data-dream-shell="light"][data-dream-art-wide="tr
   backdrop-filter: blur(8px) saturate(102%) !important;
 }
 
+/* Task composer stays readable even when panel transparency is enabled.
+   A theme may explicitly show artwork while idle; focus restores a solid panel. */
+html[data-dream-skin="active"][data-dream-art-wide="true"]
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_COMPOSER_CHROME__ {
+  --ds-theme-color-panel-alt: rgb(var(--ds-panel-rgb) / 1) !important;
+  background: rgb(var(--ds-panel-rgb) / 1) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-idle-composer="transparent"][data-dream-art-wide="true"]
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_COMPOSER_CHROME__:not(:focus-within) {
+  --ds-theme-color-panel-alt: transparent !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-idle-composer="transparent"][data-dream-art-wide="true"]
+  __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))
+  __DREAM_SELECTOR_COMPOSER_CHROME__:focus-within {
+  --ds-theme-color-panel-alt: rgb(var(--ds-panel-rgb) / 1) !important;
+  background: rgb(var(--ds-panel-rgb) / 1) !important;
+  backdrop-filter: none !important;
+}
+
 html[data-dream-skin="active"][data-dream-shell="light"]
   __DREAM_SELECTOR_COMPOSER_CHROME__ p.placeholder::after {
   color: rgb(var(--ds-muted-rgb) / .78) !important;

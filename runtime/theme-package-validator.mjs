@@ -309,7 +309,7 @@ function validateOfficialTheme(value) {
   }
   if (theme.art !== undefined) {
     const art = assertObject(theme.art, "theme.json.art");
-    assertExactKeys(art, [], ["focusX", "focusY", "safeArea", "taskMode"], "theme.json.art");
+    assertExactKeys(art, [], ["focusX", "focusY", "safeArea", "taskMode", "idleComposer"], "theme.json.art");
     for (const key of ["focusX", "focusY"]) {
       if (art[key] !== undefined && (typeof art[key] !== "number" || !Number.isFinite(art[key]) || art[key] < 0 || art[key] > 1)) {
         fail(`theme.json.art.${key} must be between 0 and 1`);
@@ -320,6 +320,9 @@ function validateOfficialTheme(value) {
     }
     if (art.taskMode !== undefined && !new Set(["ambient", "full", "off"]).has(art.taskMode)) {
       fail("theme.json.art.taskMode is unsupported");
+    }
+    if (art.idleComposer !== undefined && !new Set(["opaque", "transparent"]).has(art.idleComposer)) {
+      fail("theme.json.art.idleComposer is unsupported");
     }
   }
   if (theme.colors !== undefined) {

@@ -182,6 +182,12 @@ Import adds the pack to **Saved Themes** without changing the active theme. Iden
 
 Both controls include **Open Themes Folder**. Reopen the menu/tray after moving the directory. Do not add another wrapper level, links, nested archives, or an image-only folder without `theme.json`. Manual placement bypasses the ZIP importer's archive checks, so use trusted content only.
 
+On wide-image task pages, the composer is opaque by default, independently of
+panel transparency. Theme authors can set `art.idleComposer` in `theme.json` to
+`"transparent"` to show artwork through the idle composer; it becomes opaque
+on focus. Omitting the field or setting `"opaque"` keeps the default. The Home
+composer is unaffected.
+
 </details>
 
 ## For developers

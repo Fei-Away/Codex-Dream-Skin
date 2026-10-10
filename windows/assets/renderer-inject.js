@@ -20,7 +20,7 @@
     "data-dream-skin", SHELL_ATTR, "data-dream-upload-alpha",
     "data-dream-art-wide", "data-dream-art-safe", "data-dream-task-mode",
     "data-dream-art-safe-area", "data-dream-art-task-mode", "data-dream-art-aspect",
-    "data-dream-art-ready",
+    "data-dream-art-ready", "data-dream-idle-composer",
   ];
   const initialRoute = new URLSearchParams(String(location.search || ""))
     .get("initialRoute") || "";
@@ -487,6 +487,7 @@
     setAttribute(root, "data-dream-art-wide", wide ? "true" : "false");
     setAttribute(root, "data-dream-art-safe", canonicalSafe);
     setAttribute(root, "data-dream-task-mode", taskMode);
+    setAttribute(root, "data-dream-idle-composer", ART.idleComposer === "transparent" ? "transparent" : "opaque");
     setAttribute(root, "data-dream-art-safe-area", safeArea);
     setAttribute(root, "data-dream-art-task-mode", taskMode);
     setAttribute(root, "data-dream-art-aspect", aspect);

@@ -704,6 +704,7 @@ export async function loadTheme(themeDir, preferenceOptions = {}) {
     focusY: unit(rawArt.focusY, "art.focusY"),
     safeArea: choice(rawArt.safeArea, "art.safeArea", ["auto", "left", "right", "center", "none"]),
     taskMode: choice(rawArt.taskMode, "art.taskMode", ["auto", "ambient", "banner", "full", "off"]),
+    idleComposer: choice(rawArt.idleComposer, "art.idleComposer", ["opaque", "transparent"]),
   };
   const theme = {
     schemaVersion: 1,

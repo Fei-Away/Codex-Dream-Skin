@@ -598,6 +598,22 @@ export async function runRendererRuntimeTest(assetRoot) {
     /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome,[^)]*\)|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ var\(--ds-upload-panel-alpha, \.94\)\)/,
     "Composer background must honor uploaded alpha with the historical 94% fallback",
   );
+  const taskComposerRules = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, selector]) => selector.includes('data-dream-art-wide="true"')
+      && selector.includes('main:is(.main-surface')
+      && selector.includes('composer-surface-chrome'));
+  const taskComposerRule = (optIn, state) => taskComposerRules.find(([, selector, body]) =>
+    selector.includes('data-dream-idle-composer="transparent"') === optIn
+    && body.includes('--ds-theme-color-panel-alt:')
+    && (state === "idle" ? selector.includes(':not(:focus-within)')
+      : state === "focused" ? selector.includes(':focus-within') && !selector.includes(':not(:focus-within)')
+        : !selector.includes(':focus-within')));
+  assert.match(taskComposerRule(false)?.[2] || "", /background:\s*rgb\(var\(--ds-panel-rgb\) \/ 1\)\s*!important;/,
+    "Wide task composer must stay opaque by default even when the panel has uploaded alpha");
+  assert.match(taskComposerRule(true, "idle")?.[2] || "", /background:\s*transparent\s*!important;/,
+    "Only an opted-in idle task composer may show the artwork");
+  assert.match(taskComposerRule(true, "focused")?.[2] || "", /background:\s*rgb\(var\(--ds-panel-rgb\) \/ 1\)\s*!important;/,
+    "Opted-in composer must be opaque while focused");
   assert.match(
     css,
     /data-composer-utility-bar-variant="home"\][\s\S]{0,180}> \[class\*="_ComposerLayoutBody_"\][\s\S]{0,220}background:\s*transparent\s*!important;[\s\S]{0,180}backdrop-filter:\s*none\s*!important;/,
@@ -685,6 +701,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   const state = home.window.__CODEX_DREAM_SKIN_STATE__;
   assert.equal(home.attrs.get("data-dream-skin"), "active");
   assert.equal(home.attrs.get("data-dream-shell"), "dark");
+  assert.equal(home.attrs.get("data-dream-idle-composer"), "opaque");
   assert.equal(home.attrs.get("data-ds-part"), "root");
   assert.equal(state.styleMode, "adopted");
   assert.equal(home.document.adoptedStyleSheets.length, 1);
@@ -695,6 +712,9 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-radius"), "12px");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-opacity"), "1");
   assert.equal(home.rootStyle.values.get("--ds-theme-surface-blur"), "0px");
+  const transparentComposer = makeFixture({ nativeAppearance: "light" });
+  vm.runInNewContext(transparentComposer.payloadFor({ art: { idleComposer: "transparent" } }), transparentComposer.context);
+  assert.equal(transparentComposer.attrs.get("data-dream-idle-composer"), "transparent");
   const publicDefaults = {
     "--ds-theme-font-family": "system",
     "--ds-theme-font-scale": "1",
