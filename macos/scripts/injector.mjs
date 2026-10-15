@@ -1743,6 +1743,7 @@ async function runWatch(options) {
   let stopping = false;
   let reloadTimer = null;
   let reloadChain = Promise.resolve();
+  let refreshRetryInFlight = false;
   let refreshGeneration = 0;
   let lastPreferenceAuditAt = 0;
   let discoveryDelayMs = DISCOVERY_BACKOFF.initialMs;
@@ -1910,7 +1911,10 @@ async function runWatch(options) {
       throw error;
     }
     if (supersededPreference()) return;
-    if (next.revision === current.revision) return;
+    // The disk may already match the desired payload while a renderer still
+    // has the previous revision after a failed CDP refresh.
+    if (next.revision === current.revision && ![...sessions.values()].some((record) =>
+      !record.session.closed && record.appliedRevision !== next.revision)) return;
     current = next;
     if (controlOnly || mutationEpoch !== refreshEpoch) {
       console.log(`[dream-skin] staged theme ${current.theme.id} while skin is paused`);
@@ -1920,6 +1924,7 @@ async function runWatch(options) {
       const { session } = record;
       if (session.closed) continue;
       if (supersededPreference()) break;
+      if (record.appliedRevision === current.revision) continue;
       const externalOperation = activeOperation;
       const operationToken = externalOperation?.token ?? nextOperationToken();
       record.operationToken = operationToken;
@@ -1972,18 +1977,35 @@ async function runWatch(options) {
           })}`);
           throw new Error("Theme refresh verification failed");
         }
+        record.appliedRevision = current.revision;
+        record.refreshFailures = 0;
+        record.refreshRetryAt = 0;
         if (!externalOperation && !preferenceOnly) {
           await presentOperationUi(session, operationToken, "success", `已应用「${current.theme.name}」`);
         }
       } catch (error) {
         record.needsLoadFallback = true;
-        if (!externalOperation && !preferenceOnly && !supersededPreference()) {
+        if (preferenceOnly && !externalOperation && !supersededPreference()) {
+          record.refreshFailures = (record.refreshFailures ?? 0) + 1;
+          record.refreshRetryAt = Date.now()
+            + Math.min(30000, 1000 * 2 ** Math.min(record.refreshFailures - 1, 5));
+        }
+        // A timed-out command can leave the socket open but unusable. Let
+        // target discovery reconnect rather than retrying that connection.
+        if (error.message.startsWith("CDP command timed out:")) session.close();
+        if (!session.closed && !externalOperation && !preferenceOnly && !supersededPreference()) {
           await presentOperationUi(session, operationToken, "error", "主题切换失败，未确认应用");
         }
         console.error(`[dream-skin] theme refresh failed: ${error.message}`);
       }
     }
-    console.log(`[dream-skin] refreshed theme ${current.theme.id} (${current.timings.buildMs}ms)`);
+    const pendingCount = [...sessions.values()].filter((record) =>
+      record.appliedRevision !== current.revision).length;
+    if (pendingCount) {
+      console.error(`[dream-skin] theme ${current.theme.id} awaits retry in ${pendingCount} renderer(s)`);
+    } else {
+      console.log(`[dream-skin] refreshed theme ${current.theme.id} (${current.timings.buildMs}ms)`);
+    }
   };
 
   let pendingPreferenceOnly = true;
@@ -2151,6 +2173,18 @@ async function runWatch(options) {
         }
       }
 
+      const dueRefreshes = [...sessions.values()].filter((record) =>
+        !record.session.closed && record.appliedRevision !== current.revision
+        && record.refreshRetryAt && Date.now() >= record.refreshRetryAt);
+      if (!controlOnly && !activeOperation && dueRefreshes.length && !refreshRetryInFlight) {
+        refreshRetryInFlight = true;
+        reloadChain = reloadChain.then(() => refreshPayload({
+          preferenceOnly: true, generation: refreshGeneration,
+        })).catch((error) => {
+          console.error(`[dream-skin] theme retry failed: ${error.message}`);
+        }).finally(() => { refreshRetryInFlight = false; });
+      }
+
       const cycleRecovery = activeOperation ? null : pauseRecovery;
       let recoveredPauseThisCycle = false;
       let recoveryFailedThisCycle = false;
@@ -2168,6 +2202,7 @@ async function runWatch(options) {
             earlyScriptId: null,
             earlyScriptIds: new Set(),
             needsLoadFallback: false,
+            appliedRevision: null,
             operationToken: null,
             operationExternal: false,
           };
@@ -2256,13 +2291,15 @@ async function runWatch(options) {
             await invalidateEarly(record);
             continue;
           }
+          const initialRevision = current.revision;
           const verification = await waitForVerifiedSession(
             session,
             Math.min(options.timeoutMs, 8000),
             current.theme.id,
-            current.revision,
+            initialRevision,
           );
           if (!verification?.pass) throw new Error("Initial theme verification failed");
+          record.appliedRevision = initialRevision;
           if (recoveryOperation && !activeOperation
             && pauseRecovery?.token === recoveryOperation.token) {
             await presentOperationUi(
