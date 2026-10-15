@@ -227,16 +227,11 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ {
   backdrop-filter: none !important;
 }
 
-/* The native page's bottom padding is outside the sidebar box. The sidebar is
-   positioned and overflow-visible, so extend only its paint into that gap. */
-html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__::before {
-  content: "";
-  position: absolute;
-  inset-block-start: 100%;
-  inset-inline: 0;
-  height: calc(var(--spacing) + 1px);
-  background: var(--ds-sidebar-surface);
-  pointer-events: none;
+/* Native bottom padding ends both the sidebar and main surface above the
+   window edge. Let those surfaces fill the frame instead of painting over it. */
+html[data-dream-skin="active"][data-codex-os="darwin"]
+  [data-app-shell-page-surface="true"][data-app-shell-page-sidebar="true"] {
+  padding-block-end: 0 !important;
 }
 
 html[data-dream-skin="active"] __DREAM_SELECTOR_LEFT_PANEL__ nav { background: transparent !important; }
