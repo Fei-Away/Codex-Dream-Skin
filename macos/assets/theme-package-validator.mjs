@@ -292,7 +292,7 @@ function validateOfficialTheme(value) {
   assertExactKeys(
     theme,
     THEME_REQUIRED,
-    [...THEME_COPY_KEYS, "promoUrl", "appearance", "art", "colors"],
+    [...THEME_COPY_KEYS, "promoUrl", "appearance", "art", "colors", "surfaceTransparency"],
     "theme.json",
   );
   if (theme.schemaVersion !== 1) fail("theme.json must use schemaVersion 1");
@@ -320,6 +320,15 @@ function validateOfficialTheme(value) {
     }
     if (art.taskMode !== undefined && !new Set(["ambient", "full", "off"]).has(art.taskMode)) {
       fail("theme.json.art.taskMode is unsupported");
+    }
+  }
+  if (theme.surfaceTransparency !== undefined) {
+    const surfaces = assertObject(theme.surfaceTransparency, "theme.json.surfaceTransparency");
+    assertExactKeys(surfaces, [], ["general", "composer", "composerFocused", "sidebar", "message", "messageFocused"], "theme.json.surfaceTransparency");
+    for (const [key, value] of Object.entries(surfaces)) {
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) {
+        fail(`theme.json.surfaceTransparency.${key} must be between 0 and 100`);
+      }
     }
   }
   if (theme.colors !== undefined) {

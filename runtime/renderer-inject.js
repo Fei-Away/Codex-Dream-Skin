@@ -71,7 +71,7 @@
   const ANALYSIS_CACHE_KEY = "__CODEX_DREAM_SKIN_ANALYSIS_CACHE__";
   const THEME_VARIABLES = [
     "--ds-upload-panel-alpha", "--ds-upload-bg-alpha", "--ds-upload-panel-alt-alpha",
-    "--ds-user-surface-alpha",
+    "--ds-user-surface-alpha", "--ds-composer-alpha", "--ds-sidebar-alpha", "--ds-message-alpha",
     "--ds-bg", "--ds-panel", "--ds-panel-2", "--ds-green", "--ds-lime", "--ds-on-accent",
     "--ds-cyan", "--ds-purple", "--ds-text", "--ds-muted", "--ds-line",
     "--ds-bg-rgb", "--ds-panel-rgb", "--ds-panel-2-rgb", "--ds-accent-rgb",
@@ -348,25 +348,40 @@
       for (const key of Object.keys(declaredColors)) explicit.add(key);
     }
     if (typeof legacyPalette.accent === "string") explicit.add("accent");
-    const explicitAlpha = (name) => {
-      const value = declaredColors[name];
-      if (!explicit.has(name) || typeof value !== "string") return null;
-      const source = value.trim();
-      const supplied = /^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i.test(source)
-        || /^rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*\)$/i.test(source);
-      return supplied ? parseRgb(source)?.alpha ?? null : null;
-    };
     // Preferences are supplied by the local injector, never by the theme ZIP.
     // Transparency is the visible wallpaper percentage (30 => alpha .70).
-    const userAlpha = typeof THEME.userTransparency === "number"
-      && Number.isFinite(THEME.userTransparency)
-      && THEME.userTransparency >= 0 && THEME.userTransparency <= 100
-      ? (100 - THEME.userTransparency) / 100 : null;
-    const panelAlpha = userAlpha ?? explicitAlpha("panel") ?? 0.70;
-    const backgroundAlpha = userAlpha ?? explicitAlpha("background") ?? panelAlpha;
-    const panelAltAlpha = userAlpha ?? explicitAlpha("panelAlt") ?? panelAlpha;
-    if (userAlpha !== null) setStyleProperty(root, "--ds-user-surface-alpha", String(userAlpha));
-    else root.style.removeProperty("--ds-user-surface-alpha");
+    const transparencyEnabled = THEME.transparencyEnabled !== false;
+    const followTheme = THEME.followTheme === true;
+    const surfaceTransparency = THEME.surfaceTransparency && typeof THEME.surfaceTransparency === "object"
+      ? THEME.surfaceTransparency : {};
+    const userSurfaceTransparency = THEME.userSurfaceTransparency
+      && typeof THEME.userSurfaceTransparency === "object" ? THEME.userSurfaceTransparency : {};
+    const configuredGeneral = !transparencyEnabled ? 0
+      : followTheme ? surfaceTransparency.general
+        : THEME.userTransparency ?? surfaceTransparency.general;
+    const generalTransparency = typeof configuredGeneral === "number" && Number.isFinite(configuredGeneral)
+      && configuredGeneral >= 0 && configuredGeneral <= 100 ? configuredGeneral : 37;
+    const panelAlpha = (100 - generalTransparency) / 100;
+    const backgroundAlpha = panelAlpha;
+    const panelAltAlpha = panelAlpha;
+    for (const [key, fallback] of Object.entries({ composer: 37, sidebar: 37, message: 37 })) {
+      const configured = !transparencyEnabled ? 0
+        : followTheme ? surfaceTransparency[key]
+          : userSurfaceTransparency[key] ?? surfaceTransparency[key];
+      const transparency = typeof configured === "number" && Number.isFinite(configured)
+        && configured >= 0 && configured <= 100 ? configured : fallback;
+      setStyleProperty(root, `--ds-${key}-alpha`, String((100 - transparency) / 100));
+    }
+    for (const key of ["composer", "message"]) {
+      const focused = `${key}Focused`;
+      const configured = !transparencyEnabled ? 0
+        : followTheme ? surfaceTransparency[focused] ?? surfaceTransparency[key]
+          : userSurfaceTransparency[focused] ?? surfaceTransparency[focused] ?? surfaceTransparency[key];
+      const transparency = typeof configured === "number" && Number.isFinite(configured)
+        && configured >= 0 && configured <= 100 ? configured : 37;
+      setStyleProperty(root, `--ds-${key}-focused-alpha`, String((100 - transparency) / 100));
+    }
+    setStyleProperty(root, "--ds-user-surface-alpha", String(panelAlpha));
     const uploadAlphas = {
       "--ds-upload-panel-alpha": panelAlpha,
       "--ds-upload-bg-alpha": backgroundAlpha,

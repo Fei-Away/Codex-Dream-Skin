@@ -5,7 +5,38 @@ import ServiceManagement
 import UniformTypeIdentifiers
 import UserNotifications
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, UNUserNotificationCenterDelegate {
+  private enum TransparencyArea: Int, CaseIterable {
+    case sidebar, message, messageFocused, composer, composerFocused, general
+
+    static let groups: [TransparencyArea] = [.sidebar, .message, .composer, .general]
+
+    var variants: [TransparencyArea] {
+      switch self {
+      case .message: return [.message, .messageFocused]
+      case .composer: return [.composer, .composerFocused]
+      default: return [self]
+      }
+    }
+
+    var title: (en: String, zh: String) {
+      switch self {
+      case .general: return ("Other backgrounds", "其他背景")
+      case .composer, .composerFocused: return ("Input box", "输入框")
+      case .sidebar: return ("Left sidebar (icons + directory)", "左侧栏（图标和目录）")
+      case .message, .messageFocused: return ("Conversation info cards", "会话信息卡片")
+      }
+    }
+
+    var stateTitle: (en: String, zh: String)? {
+      switch self {
+      case .message, .composer: return ("Not selected", "未选中时")
+      case .messageFocused, .composerFocused: return ("Selected", "选中时")
+      default: return nil
+      }
+    }
+  }
+
   private enum CommunityRollbackRetention {
     case preserved(URL)
     case retainedInOperationRoot(URL)
@@ -23,9 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   private var snapshot = StatusSnapshot()
   private var menuTracking = false
   private var transparencyThemeID = ""
-  private var transparencySlider: NSSlider?
-  private var transparencyLabel: NSTextField?
-  private var transparencyResetItem: NSMenuItem?
+  private var transparencyAreaItems: [TransparencyArea: NSMenuItem] = [:]
+  private var transparencyControls: [TransparencyArea: (slider: NSSlider, input: NSTextField, label: NSTextField, reset: NSButton)] = [:]
+  private var transparencyEnabledItem: NSMenuItem?
+  private var followThemeButton: NSButton?
   private var statusRefreshRunning = false
   private var operationInFlight = false
   private var engineInstallInFlight = false
@@ -334,6 +366,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     menu.addItem(.separator())
     addThemeMenu(enabled: !busy)
+    addTransparencyMenu(enabled: !busy)
     addLinksMenu()
 
     menu.addItem(.separator())
@@ -355,10 +388,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     addSavedThemesMenu(enabled: enabled, to: submenu)
     addDeleteThemesMenu(enabled: enabled, to: submenu)
     submenu.addItem(.separator())
-    addTransparencyControl(enabled: enabled, to: submenu)
-    submenu.addItem(.separator())
     addActionItem(copy.text(.openThemes), action: #selector(openThemesFolder), to: submenu)
     addActionItem(copy.text(.openImages), action: #selector(openImagesFolder), to: submenu)
+    root.submenu = submenu
+    menu.addItem(root)
+  }
+
+  private func addTransparencyMenu(enabled: Bool) {
+    let chinese = copy.resolvedLanguage == .chinese
+    let title = chinese ? "透明度" : "Transparency"
+    let root = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+    let submenu = NSMenu(title: title)
+    submenu.autoenablesItems = false
+    transparencyAreaItems.removeAll()
+    transparencyControls.removeAll()
+    transparencyEnabledItem = nil
+    followThemeButton = nil
+    if let theme = activeTransparencyTheme() {
+      transparencyThemeID = theme.id
+      let entry = try? ThemeTransparencyPreferences.read(from: transparencyPreferencesURL).themes[theme.id]
+      let enabledItem = addActionItem(
+        chinese ? "启用区域透明度" : "Enable area transparency",
+        action: #selector(toggleTransparencyEnabled(_:)), enabled: enabled, to: submenu
+      )
+      transparencyEnabledItem = enabledItem
+      submenu.addItem(.separator())
+      for area in TransparencyArea.groups {
+        addTransparencyControl(area: area, theme: theme, entry: entry, enabled: enabled, to: submenu)
+      }
+      submenu.addItem(.separator())
+      let followView = NSView(frame: NSRect(x: 0, y: 0, width: 310, height: 28))
+      let follow = NSButton(checkboxWithTitle: chinese ? "全部跟随主题" : "Follow theme for all areas",
+                            target: self, action: #selector(toggleFollowTheme(_:)))
+      follow.frame = NSRect(x: 16, y: 3, width: 282, height: 22)
+      follow.isEnabled = enabled
+      followView.addSubview(follow)
+      let followItem = NSMenuItem()
+      followItem.view = followView
+      submenu.addItem(followItem)
+      followThemeButton = follow
+      updateTransparencyControls(theme: theme, entry: entry)
+    } else {
+      addDisabledItem(chinese ? "请先应用主题" : "Apply a theme first", to: submenu)
+    }
     root.submenu = submenu
     menu.addItem(root)
   }
@@ -367,66 +439,172 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     stateRootURL.appendingPathComponent("theme-preferences.json")
   }
 
-  private func activeTransparencyTheme() -> (id: String, authored: Int)? {
+  private func activeTransparencyTheme() -> (id: String, authored: Int, surfaces: ThemeTransparencyPreferences.Surfaces)? {
     let url = stateRootURL.appendingPathComponent("theme/theme.json")
     guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
     defer { try? handle.close() }
     guard let data = try? handle.read(upToCount: 1_048_577), data.count <= 1_048_576,
           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let id = object["id"] as? String, !id.isEmpty else { return nil }
-    let colors = object["colors"] as? [String: Any]
-    return (id, authoredThemeTransparency(panel: colors?["panel"] as? String))
+    let configured = object["surfaceTransparency"] as? [String: Double] ?? [:]
+    let surfaces = ThemeTransparencyPreferences.Surfaces(
+      composer: configured["composer"] ?? 37,
+      composerFocused: configured["composerFocused"] ?? configured["composer"] ?? 37,
+      sidebar: configured["sidebar"] ?? 37,
+      message: configured["message"] ?? 37,
+      messageFocused: configured["messageFocused"] ?? configured["message"] ?? 37
+    )
+    let general = configured["general"].flatMap { $0.isFinite && (0...100).contains($0) ? $0 : nil } ?? 37
+    return (id, Int(general.rounded()), surfaces)
   }
 
-  private func transparencyTitle(_ value: Int, following: Bool) -> String {
+  private func transparencyValue(
+    area: TransparencyArea,
+    authored: (id: String, authored: Int, surfaces: ThemeTransparencyPreferences.Surfaces),
+    entry: ThemeTransparencyPreferences.Entry?
+  ) -> (value: Int, following: Bool) {
+    let override: Double?
+    let fallback: Double
+    switch area {
+    case .general: override = entry?.transparency; fallback = Double(authored.authored)
+    case .composer: override = entry?.surfaceTransparency?.composer; fallback = authored.surfaces.composer ?? 37
+    case .composerFocused:
+      override = entry?.surfaceTransparency?.composerFocused
+      fallback = authored.surfaces.composerFocused ?? authored.surfaces.composer ?? 37
+    case .sidebar: override = entry?.surfaceTransparency?.sidebar; fallback = authored.surfaces.sidebar ?? 37
+    case .message: override = entry?.surfaceTransparency?.message; fallback = authored.surfaces.message ?? 37
+    case .messageFocused:
+      override = entry?.surfaceTransparency?.messageFocused
+      fallback = authored.surfaces.messageFocused ?? authored.surfaces.message ?? 37
+    }
+    let followsTheme = entry?.followTheme == true || override == nil
+    return (Int(((entry?.followTheme == true ? nil : override) ?? fallback).rounded()), followsTheme)
+  }
+
+  private func transparencyTitle(_ area: TransparencyArea, value: Int, following: Bool) -> String {
     let chinese = copy.resolvedLanguage == .chinese
-    let title = chinese ? "背景透明度：\(value)%" : "Background transparency: \(value)%"
+    let name = area.stateTitle.map { chinese ? $0.zh : $0.en }
+      ?? (chinese ? area.title.zh : area.title.en)
+    let title = "\(name)：\(value)%"
     return following ? title + (chinese ? " · 跟随主题" : " · Theme default") : title
   }
 
-  private func addTransparencyControl(enabled: Bool, to submenu: NSMenu) {
-    guard let theme = activeTransparencyTheme() else { return }
-    let preferences = try? ThemeTransparencyPreferences.read(from: transparencyPreferencesURL)
-    let override = preferences?.themes[theme.id]?.transparency
-    let value = override.map { Int($0.rounded()) } ?? theme.authored
-    transparencyThemeID = theme.id
+  private func transparencyGroupTitle(
+    _ area: TransparencyArea,
+    theme: (id: String, authored: Int, surfaces: ThemeTransparencyPreferences.Surfaces),
+    entry: ThemeTransparencyPreferences.Entry?
+  ) -> String {
     let chinese = copy.resolvedLanguage == .chinese
-    let view = NSView(frame: NSRect(x: 0, y: 0, width: 310, height: 82))
-    let label = NSTextField(labelWithString: transparencyTitle(value, following: override == nil))
-    label.frame = NSRect(x: 18, y: 55, width: 280, height: 20)
+    let name = chinese ? area.title.zh : area.title.en
+    if area.variants.count == 1 {
+      let value = transparencyValue(area: area, authored: theme, entry: entry)
+      return "\(name)：\(value.value)%"
+    }
+    let idle = transparencyValue(area: area, authored: theme, entry: entry).value
+    let selected = transparencyValue(area: area.variants[1], authored: theme, entry: entry).value
+    return chinese ? "\(name)：未选中 \(idle)% · 选中 \(selected)%"
+      : "\(name): idle \(idle)% · selected \(selected)%"
+  }
+
+  private func addTransparencyControl(
+    area: TransparencyArea,
+    theme: (id: String, authored: Int, surfaces: ThemeTransparencyPreferences.Surfaces),
+    entry: ThemeTransparencyPreferences.Entry?,
+    enabled: Bool,
+    to submenu: NSMenu
+  ) {
+    let chinese = copy.resolvedLanguage == .chinese
+    let areaMenu = NSMenu(title: chinese ? area.title.zh : area.title.en)
+    areaMenu.autoenablesItems = false
+    let areaItem = NSMenuItem(title: transparencyGroupTitle(area, theme: theme, entry: entry),
+                              action: nil, keyEquivalent: "")
+    areaItem.submenu = areaMenu
+    submenu.addItem(areaItem)
+    transparencyAreaItems[area] = areaItem
+    for variant in area.variants {
+      addTransparencyVariant(variant, theme: theme, entry: entry, enabled: enabled, to: areaMenu)
+    }
+  }
+
+  private func addTransparencyVariant(
+    _ area: TransparencyArea,
+    theme: (id: String, authored: Int, surfaces: ThemeTransparencyPreferences.Surfaces),
+    entry: ThemeTransparencyPreferences.Entry?,
+    enabled: Bool,
+    to areaMenu: NSMenu
+  ) {
+    let displayed = transparencyValue(area: area, authored: theme, entry: entry)
+    let chinese = copy.resolvedLanguage == .chinese
+    let view = NSView(frame: NSRect(x: 0, y: 0, width: 310, height: 96))
+    let label = NSTextField(labelWithString: transparencyTitle(area, value: displayed.value, following: displayed.following))
+    label.frame = NSRect(x: 18, y: 69, width: 217, height: 20)
     label.font = .menuFont(ofSize: 12)
     view.addSubview(label)
-    let slider = NSSlider(value: Double(value), minValue: 0, maxValue: 100,
+    let input = NSTextField(frame: NSRect(x: 243, y: 67, width: 48, height: 22))
+    input.tag = area.rawValue
+    input.stringValue = String(displayed.value)
+    input.alignment = .right
+    input.target = self
+    input.action = #selector(changeTransparencyText(_:))
+    input.delegate = self
+    input.isEnabled = enabled
+    input.setAccessibilityLabel(chinese ? "输入透明度百分比" : "Enter transparency percentage")
+    view.addSubview(input)
+    let slider = NSSlider(value: Double(displayed.value), minValue: 0, maxValue: 100,
                           target: self, action: #selector(changeTransparency(_:)))
-    slider.frame = NSRect(x: 18, y: 27, width: 274, height: 24)
+    slider.tag = area.rawValue
+    slider.frame = NSRect(x: 18, y: 43, width: 274, height: 24)
     slider.isContinuous = false // AppKit sends the action on release (and keyboard adjustment).
     slider.isEnabled = enabled
-    slider.setAccessibilityLabel(chinese ? "背景透明度" : "Background transparency")
+    slider.setAccessibilityLabel(chinese ? (area.stateTitle?.zh ?? area.title.zh)
+                                        : (area.stateTitle?.en ?? area.title.en))
     view.addSubview(slider)
     let limits = NSTextField(labelWithString: chinese ? "0% 不透明                       100% 全透明" : "0% Opaque                          100% Transparent")
-    limits.frame = NSRect(x: 18, y: 6, width: 280, height: 18)
+    limits.frame = NSRect(x: 18, y: 26, width: 280, height: 18)
     limits.font = .systemFont(ofSize: 10)
     limits.textColor = .secondaryLabelColor
     view.addSubview(limits)
+    let reset = NSButton(checkboxWithTitle: chinese ? "跟随主题" : "Follow theme",
+                         target: self, action: #selector(resetTransparency(_:)))
+    reset.frame = NSRect(x: 18, y: 2, width: 274, height: 22)
+    reset.tag = area.rawValue
+    reset.isEnabled = enabled
+    reset.state = displayed.following ? .on : .off
+    view.addSubview(reset)
     let item = NSMenuItem()
     item.view = view
-    submenu.addItem(item)
-    let reset = addActionItem(chinese ? "跟随主题" : "Follow theme", action: #selector(resetTransparency), enabled: enabled, to: submenu)
-    reset.state = override == nil ? .on : .off
-    transparencySlider = slider
-    transparencyLabel = label
-    transparencyResetItem = reset
+    areaMenu.addItem(item)
+    transparencyControls[area] = (slider, input, label, reset)
   }
 
-  private func saveTransparency(_ value: Int?) {
+  private func updateTransparencyControls(
+    theme: (id: String, authored: Int, surfaces: ThemeTransparencyPreferences.Surfaces),
+    entry: ThemeTransparencyPreferences.Entry?
+  ) {
+    transparencyEnabledItem?.state = entry?.transparencyEnabled == false ? .off : .on
+    followThemeButton?.state = entry?.followTheme == true ? .on : .off
+    for area in TransparencyArea.groups {
+      transparencyAreaItems[area]?.title = transparencyGroupTitle(area, theme: theme, entry: entry)
+    }
+    for area in TransparencyArea.allCases {
+      let displayed = transparencyValue(area: area, authored: theme, entry: entry)
+      let title = transparencyTitle(area, value: displayed.value, following: displayed.following)
+      transparencyControls[area]?.slider.integerValue = displayed.value
+      transparencyControls[area]?.input.stringValue = String(displayed.value)
+      transparencyControls[area]?.label.stringValue = title
+      transparencyControls[area]?.reset.state = displayed.following ? .on : .off
+    }
+  }
+
+  private func saveTransparencyChange(_ change: (inout ThemeTransparencyPreferences.Entry) -> Void) {
     guard let theme = activeTransparencyTheme(), theme.id == transparencyThemeID else { return }
     do {
       var preferences = try ThemeTransparencyPreferences.read(from: transparencyPreferencesURL)
-      preferences.themes[theme.id] = value.map { .init(transparency: Double($0)) }
+      var entry = preferences.themes[theme.id] ?? .init()
+      change(&entry)
+      preferences.themes[theme.id] = entry.isEmpty ? nil : entry
       try preferences.write(to: transparencyPreferencesURL)
-      transparencySlider?.integerValue = value ?? theme.authored
-      transparencyLabel?.stringValue = transparencyTitle(value ?? theme.authored, following: value == nil)
-      transparencyResetItem?.state = value == nil ? .on : .off
+      updateTransparencyControls(theme: theme, entry: preferences.themes[theme.id])
     } catch {
       let chinese = copy.resolvedLanguage == .chinese
       showError(title: chinese ? "无法保存透明度" : "Could not save transparency",
@@ -434,13 +612,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
   }
 
-  @objc private func changeTransparency(_ sender: NSSlider) {
-    let value = min(100, max(0, Int(sender.doubleValue.rounded())))
-    saveTransparency(value)
+  private func saveTransparency(_ value: Int?, area: TransparencyArea) {
+    saveTransparencyChange { entry in
+      // A direct area adjustment leaves the global follow mode so it takes effect immediately.
+      entry.followTheme = nil
+      if value != nil { entry.transparencyEnabled = nil }
+      switch area {
+      case .general: entry.transparency = value.map(Double.init)
+      case .composer, .composerFocused, .sidebar, .message, .messageFocused:
+        var surfaces = entry.surfaceTransparency ?? .init()
+        switch area {
+        case .composer: surfaces.composer = value.map(Double.init)
+        case .composerFocused: surfaces.composerFocused = value.map(Double.init)
+        case .sidebar: surfaces.sidebar = value.map(Double.init)
+        case .message: surfaces.message = value.map(Double.init)
+        case .messageFocused: surfaces.messageFocused = value.map(Double.init)
+        case .general: break
+        }
+        entry.surfaceTransparency = surfaces.isEmpty ? nil : surfaces
+      }
+    }
   }
 
-  @objc private func resetTransparency() {
-    saveTransparency(nil)
+  @objc private func toggleTransparencyEnabled(_ sender: NSMenuItem) {
+    saveTransparencyChange { entry in
+      entry.transparencyEnabled = sender.state == .on ? false : nil
+    }
+  }
+
+  @objc private func toggleFollowTheme(_ sender: NSButton) {
+    saveTransparencyChange { entry in
+      // NSButton has already toggled its state before invoking the action.
+      entry.followTheme = sender.state == .on ? true : nil
+    }
+  }
+
+  @objc private func changeTransparency(_ sender: NSSlider) {
+    guard let area = TransparencyArea(rawValue: sender.tag) else { return }
+    let value = min(100, max(0, Int(sender.doubleValue.rounded())))
+    saveTransparency(value, area: area)
+  }
+
+  @objc private func changeTransparencyText(_ sender: NSTextField) {
+    guard let area = TransparencyArea(rawValue: sender.tag) else { return }
+    let raw = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let value = Int(raw), (0...100).contains(value) else {
+      sender.stringValue = String(transparencyControls[area]?.slider.integerValue ?? 37)
+      NSSound.beep()
+      return
+    }
+    if transparencyControls[area]?.slider.integerValue == value { return }
+    saveTransparency(value, area: area)
+  }
+
+  func controlTextDidEndEditing(_ notification: Notification) {
+    guard let field = notification.object as? NSTextField,
+          TransparencyArea(rawValue: field.tag) != nil else { return }
+    changeTransparencyText(field)
+  }
+
+  @objc private func resetTransparency(_ sender: NSButton) {
+    guard let area = TransparencyArea(rawValue: sender.tag) else { return }
+    let current = transparencyControls[area]?.slider.integerValue ?? 37
+    saveTransparency(sender.state == .on ? nil : current, area: area)
   }
 
   private func addLinksMenu() {
@@ -1691,6 +1925,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
       }
       if relativePath.hasSuffix(".sh") && !fileManager.isExecutableFile(atPath: url.path) {
         return true
+      }
+    }
+    // Local builds can share a version while carrying different renderer assets.
+    // Compare the files that determine live theme behavior before reusing the engine.
+    if installed == bundled {
+      guard let bundledEngineURL else { return true }
+      for relativePath in [
+        "scripts/injector.mjs",
+        "assets/renderer-inject.js",
+        "assets/dream-skin.css",
+        "assets/theme-preferences.mjs"
+      ] {
+        let bundledFile = bundledEngineURL.appendingPathComponent(relativePath)
+        let installedFile = installedEngineURL.appendingPathComponent(relativePath)
+        guard fileManager.contentsEqual(atPath: bundledFile.path, andPath: installedFile.path) else {
+          return true
+        }
       }
     }
     return false

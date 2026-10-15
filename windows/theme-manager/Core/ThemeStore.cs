@@ -5,7 +5,10 @@ using System.Text.RegularExpressions;
 namespace DreamSkin.ThemeManager;
 
 public sealed class StoreException(string code) : Exception(code);
-public sealed record SavedTheme(string Directory, string Id, string Name, int AuthoredTransparency);
+public sealed record SavedTheme(string Directory, string Id, string Name, int AuthoredTransparency)
+{
+    public IReadOnlyDictionary<string, int> AuthoredSurfaces { get; init; } = ThemeStore.SurfaceDefaults;
+}
 
 public static class SafeFiles
 {
@@ -59,6 +62,11 @@ public static class SafeFiles
 
 public sealed class ThemeStore(string root)
 {
+    public static readonly IReadOnlyDictionary<string, int> SurfaceDefaults = new Dictionary<string, int>
+    {
+        ["sidebar"] = 37, ["message"] = 37, ["messageFocused"] = 37,
+        ["composer"] = 37, ["composerFocused"] = 37
+    };
     public string Root { get; } = Path.GetFullPath(root);
     public string SavedRoot => Path.Combine(Root, "themes");
     public string PreferencesPath => Path.Combine(Root, "theme-preferences.json");
@@ -89,8 +97,23 @@ public sealed class ThemeStore(string root)
         var id = data["id"]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(id) || id.Length > 256) throw new StoreException("invalidData");
         var name = data["name"]?.GetValue<string>();
+        var surfaces = SurfaceDefaults.ToDictionary(entry => entry.Key, entry => entry.Value);
+        if (data["surfaceTransparency"] is JsonObject authored)
+        {
+            foreach (var key in SurfaceDefaults.Keys)
+                if (authored[key] is JsonValue number && number.TryGetValue<double>(out var value) &&
+                    double.IsFinite(value) && value is >= 0 and <= 100)
+                    surfaces[key] = (int)Math.Round(value, MidpointRounding.AwayFromZero);
+            if (!authored.ContainsKey("composerFocused")) surfaces["composerFocused"] = surfaces["composer"];
+            if (!authored.ContainsKey("messageFocused")) surfaces["messageFocused"] = surfaces["message"];
+        }
+        var general = data["surfaceTransparency"] is JsonObject generalSurfaces &&
+            generalSurfaces["general"] is JsonValue generalNode &&
+            generalNode.TryGetValue<double>(out var authoredGeneral) &&
+            double.IsFinite(authoredGeneral) && authoredGeneral is >= 0 and <= 100
+            ? authoredGeneral : 37;
         return new(directory, id, string.IsNullOrWhiteSpace(name) ? Path.GetFileName(directory) : name,
-            AuthoredTransparency(data["colors"]?["panel"]?.GetValue<string>()));
+            (int)Math.Round(general, MidpointRounding.AwayFromZero)) { AuthoredSurfaces = surfaces };
     }
 
     public JsonObject ReadPreferences()
@@ -101,28 +124,120 @@ public sealed class ThemeStore(string root)
         if (data["schemaVersion"]?.GetValue<int>() != 1 || data["themes"] is not JsonObject themes)
             throw new StoreException("invalidData");
         foreach (var entry in themes)
-            if (entry.Value is not JsonObject value || value["transparency"] is not JsonValue number ||
-                !number.TryGetValue<double>(out var transparency) || !double.IsFinite(transparency) || transparency < 0 || transparency > 100)
-                throw new StoreException("invalidData");
+        {
+            if (entry.Value is not JsonObject value) throw new StoreException("invalidData");
+            var hasOverride = false;
+            if (value.ContainsKey("transparency"))
+            {
+                ValidatePercent(value["transparency"]);
+                hasOverride = true;
+            }
+            if (value.ContainsKey("surfaceTransparency"))
+            {
+                if (value["surfaceTransparency"] is not JsonObject surfaces || surfaces.Count == 0)
+                    throw new StoreException("invalidData");
+                foreach (var surface in surfaces)
+                {
+                    if (!SurfaceDefaults.ContainsKey(surface.Key)) throw new StoreException("invalidData");
+                    ValidatePercent(surface.Value);
+                }
+                hasOverride = true;
+            }
+            foreach (var mode in new[] { "transparencyEnabled", "followTheme" })
+                if (value.ContainsKey(mode))
+                {
+                    if (value[mode] is not JsonValue flag || !flag.TryGetValue<bool>(out _))
+                        throw new StoreException("invalidData");
+                    hasOverride = true;
+                }
+            if (!hasOverride) throw new StoreException("invalidData");
+        }
         return data;
+    }
+
+    private static void ValidatePercent(JsonNode? node)
+    {
+        if (node is not JsonValue number || !number.TryGetValue<double>(out var value) ||
+            !double.IsFinite(value) || value is < 0 or > 100)
+            throw new StoreException("invalidData");
     }
 
     public double? Override(string id) => ReadPreferences()["themes"]?[id]?["transparency"]?.GetValue<double>();
 
+    public double? SurfaceOverride(string id, string surface)
+    {
+        if (!SurfaceDefaults.ContainsKey(surface)) throw new StoreException("invalidData");
+        return ReadPreferences()["themes"]?[id]?["surfaceTransparency"]?[surface]?.GetValue<double>();
+    }
+
+    public bool TransparencyEnabled(string id) =>
+        ReadPreferences()["themes"]?[id]?["transparencyEnabled"]?.GetValue<bool>() ?? true;
+
+    public bool FollowTheme(string id) =>
+        ReadPreferences()["themes"]?[id]?["followTheme"]?.GetValue<bool>() ?? false;
+
+    // Mode switches mask saved slider values; turning a mode off restores them.
+    public void SetTransparencyEnabled(string expectedActiveId, bool enabled) =>
+        SetMode(expectedActiveId, "transparencyEnabled", enabled ? null : false);
+
+    public void SetFollowTheme(string expectedActiveId, bool follow) =>
+        SetMode(expectedActiveId, "followTheme", follow ? true : null);
+
+    private void SetMode(string expectedActiveId, string key, bool? value)
+    {
+        if (Active()?.Id != expectedActiveId) throw new StoreException("activeChanged");
+        var preferences = ReadPreferences();
+        var themes = (JsonObject)preferences["themes"]!;
+        var entry = themes[expectedActiveId] as JsonObject ?? new JsonObject();
+        if (value == null) entry.Remove(key);
+        else entry[key] = value.Value;
+        WriteEntry(preferences, themes, entry, expectedActiveId);
+    }
+
     // Caller holds the existing per-user Operation and ThemeImport mutexes.
     public void SetTransparency(string expectedActiveId, int? value)
+    {
+        SetPreference(expectedActiveId, null, value);
+    }
+
+    // A null value removes only the named override and keeps the other sliders.
+    public void SetSurfaceTransparency(string expectedActiveId, string surface, int? value)
+    {
+        if (!SurfaceDefaults.ContainsKey(surface)) throw new StoreException("invalidData");
+        SetPreference(expectedActiveId, surface, value);
+    }
+
+    private void SetPreference(string expectedActiveId, string? surface, int? value)
     {
         if (value is < 0 or > 100) throw new StoreException("invalidData");
         if (Active()?.Id != expectedActiveId) throw new StoreException("activeChanged");
         var preferences = ReadPreferences();
         var themes = (JsonObject)preferences["themes"]!;
-        if (value == null) themes.Remove(expectedActiveId);
+        var entry = themes[expectedActiveId] as JsonObject ?? new JsonObject();
+        if (surface == null)
+        {
+            if (value == null) entry.Remove("transparency");
+            else entry["transparency"] = value;
+        }
         else
         {
-            var entry = themes[expectedActiveId] as JsonObject ?? new JsonObject();
-            entry["transparency"] = value;
-            if (entry.Parent == null) themes[expectedActiveId] = entry;
+            var surfaces = entry["surfaceTransparency"] as JsonObject ?? new JsonObject();
+            if (value == null) surfaces.Remove(surface);
+            else surfaces[surface] = value;
+            if (surfaces.Count == 0) entry.Remove("surfaceTransparency");
+            else if (surfaces.Parent == null) entry["surfaceTransparency"] = surfaces;
         }
+        // Direct area edits make their result visible immediately.
+        entry.Remove("transparencyEnabled");
+        entry.Remove("followTheme");
+        WriteEntry(preferences, themes, entry, expectedActiveId);
+    }
+
+    private void WriteEntry(JsonObject preferences, JsonObject themes, JsonObject entry, string expectedActiveId)
+    {
+        if (!entry.ContainsKey("transparency") && !entry.ContainsKey("surfaceTransparency") &&
+            !entry.ContainsKey("transparencyEnabled") && !entry.ContainsKey("followTheme")) themes.Remove(expectedActiveId);
+        else if (entry.Parent == null) themes[expectedActiveId] = entry;
         var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(preferences);
         if (bytes.Length > 262144) throw new StoreException("invalidData");
         SafeFiles.CheckPath(Root);
@@ -166,7 +281,7 @@ public sealed class ThemeStore(string root)
 
     public static int AuthoredTransparency(string? panel)
     {
-        if (panel == null) return 30;
+        if (panel == null) return 37;
         var value = panel.Trim().ToLowerInvariant();
         double alpha;
         if (Regex.IsMatch(value, "^#(?:[0-9a-f]{4}|[0-9a-f]{8})$", RegexOptions.CultureInvariant))
@@ -177,13 +292,13 @@ public sealed class ThemeStore(string root)
         else
         {
             var match = Regex.Match(value, @"^rgba?\([^()]*[,/]\s*([0-9]*\.?[0-9]+%?)\s*\)$", RegexOptions.CultureInvariant);
-            if (!match.Success) return 30;
+            if (!match.Success) return 37;
             // A comma rgb() without a fourth component has no authored alpha.
-            if (!value.Contains('/') && value.Count(c => c == ',') != 3) return 30;
+            if (!value.Contains('/') && value.Count(c => c == ',') != 3) return 37;
             var token = match.Groups[1].Value;
-            if (!double.TryParse(token.TrimEnd('%'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out alpha)) return 30;
+            if (!double.TryParse(token.TrimEnd('%'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out alpha)) return 37;
             if (token.EndsWith('%')) alpha /= 100;
         }
-        return alpha is >= 0 and <= 1 ? (int)Math.Round((1 - alpha) * 100, MidpointRounding.AwayFromZero) : 30;
+        return alpha is >= 0 and <= 1 ? (int)Math.Round((1 - alpha) * 100, MidpointRounding.AwayFromZero) : 37;
     }
 }
