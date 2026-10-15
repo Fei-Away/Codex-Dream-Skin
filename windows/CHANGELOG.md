@@ -1,5 +1,10 @@
 # Windows Changelog
 
+## 1.5.21
+
+- 修复启用 `NODE_USE_ENV_PROXY` 时，Node 的无害 stderr 警告被 Windows PowerShell 5.1 升级为终止错误、导致安装或主题操作失败的问题；图片、Safe CSS、主题 ZIP 和 payload 校验统一通过原生命令封装执行。
+- 将启动和主题包验证的 JSON 输出与 stderr 分开处理，保留真实失败退出码和诊断信息；不修改用户代理设置，也不全局关闭 Node 警告。
+
 ## 1.5.20
 
 - 修复首页副文案不跟随 `home-hero` 的 Safe CSS 字号和颜色的问题（[#427](https://github.com/Fei-Away/Codex-Dream-Skin/issues/427)）：支持 12–20px 合法字号，保留 76% 不透明度；未指定字号时仍为桌面 13px、窄窗口 11px。
@@ -20,11 +25,6 @@
 - 发布候选：原生字体保留（#399 / #403）、首页圆角（#394 / #396，感谢 @chenzhaoxuan0），以及此前未发布的横向溢出校验（#386）和受管 CDP profile（#390）。首次使用受管 profile 需要重新登录；发布前必须验证第二次启动保留登录且 runtime 交接后 CDP 可用。完整说明见 [v1.5.17 发布说明](../docs/releases/v1.5.17.md)。
 
 ## Unreleased
-
-### Issue #435
-
-- 修复启用 `NODE_USE_ENV_PROXY` 时，Node 的无害 stderr 警告被 Windows PowerShell 5.1 升级为终止错误、导致安装或主题操作失败的问题；图片、Safe CSS、主题 ZIP 和 payload 校验统一通过原生命令封装执行。
-- 将启动和主题包验证的 JSON 输出与 stderr 分开处理，保留真实失败退出码和诊断信息；不修改用户代理设置，也不全局关闭 Node 警告。
 
 ### 新增
 

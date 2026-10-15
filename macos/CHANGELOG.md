@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.21
+
+- 本版修复 Windows Node.js 代理警告问题；macOS 无运行时行为变更，仅同步版本号。完整说明见 [v1.5.21 发布说明](../docs/releases/v1.5.21.md)。
+
 ## 1.5.20
 
 - 修复首页副文案不跟随 `home-hero` 的 Safe CSS 字号和颜色的问题（[#427](https://github.com/Fei-Away/Codex-Dream-Skin/issues/427)）：支持 12–20px 合法字号，保留 76% 不透明度；未指定字号时仍为桌面 13px、窄窗口 11px。
