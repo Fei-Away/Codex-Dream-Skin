@@ -150,7 +150,7 @@ function Write-DreamSkinState {
   $script:stateWritten = $true
 }
 function Invoke-DreamSkinNative {
-  param([string]$FilePath, [object[]]$ArgumentList, [switch]$DiscardStderr)
+  param([string]$FilePath, [object[]]$ArgumentList, [switch]$DiscardStderr, [switch]$SeparateStderr)
   if ($ArgumentList -contains '--verify') {
     $script:verifyCalls += 1
     return [pscustomobject]@{ ExitCode = 2; Output = @('{"pass":false}') }
