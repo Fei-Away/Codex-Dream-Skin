@@ -89,6 +89,7 @@ RUNTIME_SCRIPTS=(
   apply-from-menubar-macos.sh
   apply-community-theme-macos.sh
   check-update-macos.sh
+  cdp-discovery.mjs
   common-macos.sh
   customize-theme-macos.sh
   doctor-macos.sh
