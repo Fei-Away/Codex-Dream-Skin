@@ -29,9 +29,40 @@ A feature request should explain the use case, expected behavior, alternatives c
 
 Fork the repository and base your branch on the latest upstream `main`. Reuse existing scripts and platform helpers where possible. A small change should not require a new dependency.
 
+### Ownership and shared sources
+
+| Change | Editable source |
+| --- | --- |
+| Renderer, base CSS, image and package validation | `runtime/`; generate both platform copies with `node tools/sync-runtime-assets.mjs` |
+| Selectors | `tools/selectors.json`; update provenance, fixtures and generated assets |
+| System discovery, launch, permissions and recovery | Platform helpers; preserve existing locks, state and rollback |
+| Theme schema, limits, public parts and tokens | `dreamskin-cc` packages `theme-schema` / `skin-api`; coordinate client consumers |
+
+Do not edit generated files in `macos/assets` or `windows/assets` independently.
+Shared changes require both platform checks even when no platform script changed:
+
+```bash
+node tools/sync-runtime-assets.mjs --check
+node --test macos/tests/*.test.mjs windows/tests/*.test.mjs tools/*.test.mjs
+node macos/scripts/injector.mjs --check-payload
+node windows/scripts/injector.mjs --check-payload
+```
+
+Optional features must define enabling, disabling, cancellation, failure and
+resource cleanup. Reuse operation state and keep background work bounded. Split
+visual changes, platform additions and state bridges into separate PRs. The
+[implementation plan](../docs/controller-implementation-plan.md) describes the
+future Controller migration; planned interfaces are not available APIs yet.
+Use the existing modules above until their replacements are implemented.
+
 ### macOS
 
-Run the full test suite:
+Run the full suite in a dedicated test session. It includes native installer
+fixtures and Doctor; Doctor can connect to the installed client and clean theme
+state from excluded windows. When that client hosts active work, use the
+portable checks above and reviewed isolated fixtures, and record native
+acceptance as pending. A temporary HOME does not isolate loopback CDP ports;
+process-identity fixtures use an inert injector with no network activity.
 
 ```bash
 (cd macos && npm test)

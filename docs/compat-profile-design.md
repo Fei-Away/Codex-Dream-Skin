@@ -1,6 +1,7 @@
 # 兼容档案（compat profile）设计草案
 
-状态：**草案，未实现**。本文只定义契约与边界，供后续按 P1 落地。
+状态：**草案，未实现**。执行顺序以 [实施方案](./controller-implementation-plan.md)
+为准，先完成稳定性批次和统一 payload 装配。第一版只分发 selector，不含远端 CSS。
 背景问题见 `tools/selectors.json` 的 `verifiedAgainst.gaps` 与 issue #277。
 
 ## 为什么需要它
@@ -22,9 +23,9 @@
 也是"发版粒度不对"最直白的证据。
 
 结构性结论：**选择器契约的变更频率由上游决定，不该由我们的发版节奏决定。**
-运行时其实已经具备解耦条件——安装后的 injector 是在运行时从磁盘读
-`assets/selectors.json` 的（`macos/scripts/injector.mjs`、`windows/scripts/injector.mjs`），
-它只是没有第二个来源。
+现有 injector 在运行时读取 `assets/selectors.json`，但生成的 CSS 和 renderer
+也各自编入了 selector。实施前必须统一装配，使 CSS、renderer 与 Verify 使用
+同一份有效合同；仅增加 JSON 下载来源不足以完成热更新。
 
 ## 契约
 
@@ -47,7 +48,6 @@ GET https://api.dreamskin.cc/v1/compat/profile
   "expiresAt": "2026-09-26T00:00:00Z", // 过期即整份作废，回落到内置合同
   "minClient": "1.5.16",               // 低于此版本的客户端必须忽略本档案
   "selectors": [ /* 与 tools/selectors.json 的 selectors[] 同构 */ ],
-  "css": "…",                          // 可选，必须整体通过 dreamskin-safe-css/1
   "signature": "ed25519:…"             // 对上面全部字段规范化后的签名
 }
 ```
@@ -58,10 +58,13 @@ GET https://api.dreamskin.cc/v1/compat/profile
 2. **fail-closed 校验顺序**：HTTPS 固定 origin → 有界读取 → 签名 → `schema` → `revision`
    单调 → `expiresAt` 未过期 → `minClient` 满足 → 每条 selector 的 `key` 在内置合同里存在。
    任何一步不过，整份丢弃，不做部分应用。
-3. **只允许覆盖 `selector` 字符串**，不允许新增 key、不允许改 `tier`、不允许改 `required`。
-   降级面因此是有界的：最坏情况等于"某个锚点选不中"，也就是今天已经能处理的 L2 缺失。
-4. **`css` 必须整份通过既有 `dreamskin-safe-css/1` 白名单**，与社区主题走同一个验证器。
-   验证失败 → 丢弃整份档案（不是只丢 CSS）。
+3. **只允许覆盖 `selector` 字符串**，不允许新增 key，或改变 `tier`、`scope`、`required`。
+   selector 也可能错误命中业务节点，因此签名不能代替兼容性验收。发布档案前用
+   对应版本的脱敏 DOM fixture 验证作用域、命中数量、可见性与业务节点未被污染；
+   客户端继续执行原有 readiness 和精确主题/payload 验证，不降低成功条件。
+4. **第一版不接受 `css` 字段**。样式来自可信本地模板，以有效 selector 装配。
+   CSS、renderer、Verify 必须报告同一 revision；校验或装配失败时三者一起回退。
+   不在一个操作执行途中切换合同，下一次安全装配边界才激活新 revision。
 5. **绝不接受脚本、URL、文件路径、命令。** 这是硬边界：档案是数据，不是代码。
    服务端也不得把用户可控内容拼进档案。
 
