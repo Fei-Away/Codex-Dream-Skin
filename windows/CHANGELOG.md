@@ -21,6 +21,11 @@
 
 ## Unreleased
 
+### Issue #435
+
+- 修复启用 `NODE_USE_ENV_PROXY` 时，Node 的无害 stderr 警告被 Windows PowerShell 5.1 升级为终止错误、导致安装或主题操作失败的问题；图片、Safe CSS、主题 ZIP 和 payload 校验统一通过原生命令封装执行。
+- 将启动和主题包验证的 JSON 输出与 stderr 分开处理，保留真实失败退出码和诊断信息；不修改用户代理设置，也不全局关闭 Node 警告。
+
 ### 新增
 
 - 托盘新增 System / English / 中文语言选择，选择会持久保存，并覆盖状态、主题操作、更新、恢复/卸载和一键换肤流程；System 会根据系统 UI 语言自动选择中文或英文（#351）。

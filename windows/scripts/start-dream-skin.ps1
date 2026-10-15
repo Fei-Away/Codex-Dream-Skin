@@ -206,7 +206,7 @@ try {
   if ($PromptRestart -and -not $RestartExisting -and $debugReady) {
     $visibility = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
       $Injector, '--verify', '--port', "$Port", '--browser-id', $cdpIdentity.BrowserId,
-      '--theme-dir', $themePaths.Active, '--timeout-ms', '5000')
+      '--theme-dir', $themePaths.Active, '--timeout-ms', '5000') -SeparateStderr
     if (Test-DreamSkinHiddenVerificationOutput -Output $visibility.Output) {
       $hiddenSessionIdentity = $cdpIdentity
       $debugReady = $false
@@ -582,8 +582,8 @@ try {
       $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
         $Injector, '--verify', '--port', "$Port",
         '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
-        '--timeout-ms', '30000')
-      Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
+        '--timeout-ms', '30000') -SeparateStderr
+      Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content ((($verify.Output + $verify.ErrorOutput) -join "`r`n") + "`r`n")
       if ($verify.ExitCode -eq 0) { break }
       # A verify can fail while the theme is demonstrably on screen: the
       # renderer reports the document visible, the viewport sized and the shell
@@ -602,9 +602,9 @@ try {
         $once = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
           $Injector, '--once', '--port', "$Port",
           '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
-          '--timeout-ms', '15000')
+          '--timeout-ms', '15000') -SeparateStderr
         Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (
-          (($verify.Output + $once.Output) -join "`r`n") + "`r`n"
+          (($verify.Output + $verify.ErrorOutput + $once.Output + $once.ErrorOutput) -join "`r`n") + "`r`n"
         )
         if (Test-DreamSkinRenderedVerificationOutput -Output $once.Output) {
           $skinLooksRendered = $true

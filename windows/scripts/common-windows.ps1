@@ -691,20 +691,41 @@ function Invoke-DreamSkinNative {
   param(
     [Parameter(Mandatory = $true)][string]$FilePath,
     [string[]]$ArgumentList = @(),
-    [switch]$DiscardStderr
+    [switch]$DiscardStderr,
+    [switch]$SeparateStderr
   )
+  if ($DiscardStderr -and $SeparateStderr) {
+    throw 'Choose either discarded or separate native stderr.'
+  }
   $previousPreference = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
+  # PowerShell 7 callers may opt into native exit-code errors. This wrapper
+  # reports the actual exit code instead, without changing the caller's policy.
+  $PSNativeCommandUseErrorActionPreference = $false
+  $stderrPath = $null
   try {
-    if ($DiscardStderr) {
+    if ($SeparateStderr) {
+      # JSON consumers must not mix harmless startup warnings into stdout.
+      # Keep stderr separately so failed validators retain their diagnostics.
+      $stderrPath = [System.IO.Path]::GetTempFileName()
+      $nativeOutput = @(& $FilePath @ArgumentList 2>$stderrPath)
+    } elseif ($DiscardStderr) {
       $nativeOutput = @(& $FilePath @ArgumentList 2>$null)
     } else {
       $nativeOutput = @(& $FilePath @ArgumentList 2>&1)
     }
     $exitCode = $LASTEXITCODE
     $output = @($nativeOutput | ForEach-Object { "$_" })
-    return [pscustomobject]@{ Output = $output; ExitCode = $exitCode }
+    $errorOutput = @()
+    if ($stderrPath) {
+      # PS 5.1 redirects as UTF-16 with a BOM; PS 7 uses UTF-8.
+      $reader = [System.IO.StreamReader]::new($stderrPath, [System.Text.Encoding]::UTF8, $true)
+      try { $errorText = $reader.ReadToEnd() } finally { $reader.Dispose() }
+      $errorOutput = @($errorText -split '\r?\n' | Where-Object { $_.Length -gt 0 })
+    }
+    return [pscustomobject]@{ Output = $output; ErrorOutput = $errorOutput; ExitCode = $exitCode }
   } finally {
+    if ($stderrPath) { Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue }
     $ErrorActionPreference = $previousPreference
   }
 }
