@@ -193,6 +193,7 @@ test("Windows payload uses the same compiled Safe CSS cascade as macOS", async (
       appearance: "auto",
     }), "utf8");
     const source = `[data-ds-part="sidebar"] { background-color: #123456; }
+[data-ds-part="home-hero"] { font-size: 18px; color: #f5e7d0; }
 [data-ds-part="composer"] { border-radius: 17px; }`;
     await fs.writeFile(path.join(themeDir, "theme.css"), source, "utf8");
     const loaded = await loadPayload(themeDir);
@@ -203,6 +204,7 @@ test("Windows payload uses the same compiled Safe CSS cascade as macOS", async (
     assert.ok(captured.cssText.includes("background-color: #123456 !important;"));
     assert.ok(captured.cssText.includes("background-image: none !important;"));
     assert.ok(captured.cssText.includes("border-radius: 17px !important;"));
+    assert.ok(captured.cssText.includes('[data-ds-part="home-hero"]::after {\n    font-size: 18px !important;'));
     assert.ok(!captured.cssText.includes("background-color: #123456; }"));
   } finally {
     await fs.rm(themeDir, { recursive: true, force: true });

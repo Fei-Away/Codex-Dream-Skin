@@ -6,6 +6,17 @@
 - 新生成的默认启动入口固定为 `Codex Dream Skin - Launch`，读取已保存的主题与背景。创建和卸载兼容原中文入口名，仅迁移已确认归属的链接，保留陌生同名图标。
 - 更新英文使用说明，区分管理入口与直接带主题启动入口。
 
+## 1.5.21
+
+- 修复启用 `NODE_USE_ENV_PROXY` 时，Node 的无害 stderr 警告被 Windows PowerShell 5.1 升级为终止错误、导致安装或主题操作失败的问题；图片、Safe CSS、主题 ZIP 和 payload 校验统一通过原生命令封装执行。
+- 将启动和主题包验证的 JSON 输出与 stderr 分开处理，保留真实失败退出码和诊断信息；不修改用户代理设置，也不全局关闭 Node 警告。
+
+## 1.5.20
+
+- 修复首页副文案不跟随 `home-hero` 的 Safe CSS 字号和颜色的问题（[#427](https://github.com/Fei-Away/Codex-Dream-Skin/issues/427)）：支持 12–20px 合法字号，保留 76% 不透明度；未指定字号时仍为桌面 13px、窄窗口 11px。
+- 安装、启动和恢复遵循已有的 `CODEX_HOME`，未设置或为空时使用默认 `.codex`；无效路径明确报错。配置备份绑定来源目录，拒绝跨目录恢复；切换前需先在原目录完成恢复（[#428](https://github.com/Fei-Away/Codex-Dream-Skin/issues/428)、[#431](https://github.com/Fei-Away/Codex-Dream-Skin/pull/431)）。
+- 自定义目录要求安装器、托盘与官方 Codex 获得同一个已有的 `CODEX_HOME`；终端变量可能无法传给 Store 激活的应用，需确认用户级设置对新进程生效。新目录可能要求登录或首次设置。换肤仍备份并调整外观配置，不自动改写 API Key、Base URL 或模型供应商设置。完整说明见 [v1.5.20 发布说明](../docs/releases/v1.5.20.md)。
+
 ## 1.5.19
 
 - 修复 Windows 26.930 首页输入框裁切、顶栏重复底色和停靠侧栏内侧圆角漏底；保留作者主题色及透明度，适配仅生成到 Windows 资产。

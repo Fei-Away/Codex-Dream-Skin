@@ -57,6 +57,7 @@
 
 ## Git 与发布
 
+- Write all new commit messages in English, including squash/merge commit titles and bodies.
 - 每次发布遵循 [`docs/releases/README.md`](docs/releases/README.md)：版本 PR 必须包含中文 `docs/releases/vX.Y.Z.md` 和完整英文 `docs/releases/vX.Y.Z-en.md`，顶部互链；以用户可感知的新增、修复和升级说明为先，附贡献者与完整变更链接；Release 展示中文正文，下载信息由工作流追加。
 
 - 保留用户现有改动；禁止未经授权的 reset、checkout 丢弃、强推、移动已公开 tag 或覆盖已公开 Release。

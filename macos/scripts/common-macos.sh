@@ -30,7 +30,7 @@ CODEX_APP_JOB_LABEL="com.openai.codex-dream-skin-studio.app"
 INJECTOR_JOB_LABEL="com.openai.codex-dream-skin-studio.injector"
 EXPECTED_CODEX_TEAM_ID="2DC432GLL2"
 EXPECTED_CODEX_REQUIREMENT="anchor apple generic and certificate leaf[subject.OU] = \"$EXPECTED_CODEX_TEAM_ID\""
-SKIN_VERSION="1.5.19"
+SKIN_VERSION="1.5.21"
 DREAM_SKIN_VALIDATED_RUNTIME_PID=""
 DREAM_SKIN_VALIDATED_RUNTIME_BUNDLE=""
 DREAM_SKIN_VALIDATED_RUNTIME_EXE=""
@@ -368,7 +368,8 @@ sync_appearance_pin() {
 }
 
 process_started_at() {
-  /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
+  # Persist the same timestamp format across Terminal, Finder and launchd locales.
+  LC_ALL=C /bin/ps -p "$1" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}'
 }
 
 recorded_injector_process_matches() {

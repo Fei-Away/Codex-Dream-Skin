@@ -129,8 +129,6 @@ $startupOperationId = if ($ResultToken) { $ResultToken } else { [guid]::NewGuid(
 $selectionDiskRecovery = 'not-needed'
 $selectionVisibleRecovery = 'not-needed'
 Write-DreamSkinStartupEvent -Stage request -Outcome started -Category none -Message 'Managed startup requested.'
-$ConfigPath = Join-Path $HOME '.codex\config.toml'
-$BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
 $operationLock = $null
 $startFailureCategory = 'operation-busy'
 $appearanceTransaction = $null
@@ -151,6 +149,9 @@ try {
   $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
+  $configPaths = Resolve-DreamSkinConfigPaths -StateRoot $StateRoot -BindBackup
+  $ConfigPath = $configPaths.ConfigPath
+  $BackupPath = $configPaths.BackupPath
   if (-not $ProfilePathExplicit) {
     # Chromium 136+ ignores remote-debugging switches for its default data
     # directory. Keep Dream Skin on a separate persistent profile so current
@@ -253,7 +254,7 @@ try {
   if ($PromptRestart -and -not $RestartExisting -and $debugReady) {
     $visibility = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
       $Injector, '--verify', '--port', "$Port", '--browser-id', $cdpIdentity.BrowserId,
-      '--theme-dir', $themePaths.Active, '--timeout-ms', '5000')
+      '--theme-dir', $themePaths.Active, '--timeout-ms', '5000') -SeparateStderr
     if (Test-DreamSkinHiddenVerificationOutput -Output $visibility.Output) {
       $hiddenSessionIdentity = $cdpIdentity
       $debugReady = $false
@@ -661,8 +662,8 @@ try {
       $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
         $Injector, '--verify', '--port', "$Port",
         '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
-        '--timeout-ms', '30000')
-      Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
+        '--timeout-ms', '30000') -SeparateStderr
+      Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content ((($verify.Output + $verify.ErrorOutput) -join "`r`n") + "`r`n")
       if ($verify.ExitCode -eq 0) { break }
       # A verify can fail while the theme is demonstrably on screen: the
       # renderer reports the document visible, the viewport sized and the shell
@@ -681,9 +682,9 @@ try {
         $once = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
           $Injector, '--once', '--port', "$Port",
           '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
-          '--timeout-ms', '15000')
+          '--timeout-ms', '15000') -SeparateStderr
         Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (
-          (($verify.Output + $once.Output) -join "`r`n") + "`r`n"
+          (($verify.Output + $verify.ErrorOutput + $once.Output + $once.ErrorOutput) -join "`r`n") + "`r`n"
         )
         if (Test-DreamSkinRenderedVerificationOutput -Output $once.Output) {
           $skinLooksRendered = $true

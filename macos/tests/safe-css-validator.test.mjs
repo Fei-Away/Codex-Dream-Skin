@@ -165,6 +165,32 @@ test("compiles bounded root and toolbar bridges for visible inherited styling", 
   }
 });
 
+test("home hero sizes reach the tagline without widening the author selector contract", () => {
+  for (const validator of validators) {
+    for (const state of ["", ":hover", ":focus-visible"]) {
+      for (const size of [12, 18, 20]) {
+        const selector = `[data-ds-part="home-hero"]${state}`;
+        const source = `${selector} { font-size: ${size}px; color: #f5e7d0; }`;
+        assert.equal(validator.validateSafeCss(source).declarationCount, 2);
+        const compiled = validator.compileSafeCss(source);
+        assert.ok(compiled.includes(`${selector}::after {\n    font-size: ${size}px !important;\n  }`));
+        assert.ok(compiled.includes("color: #f5e7d0 !important;"));
+      }
+    }
+    assert.doesNotMatch(validator.compileSafeCss(
+      '[data-ds-part="home-hero"] { color: #f5e7d0; }',
+    ), /::after/, "Color-only themes keep the responsive default size");
+    assert.doesNotMatch(validator.compileSafeCss(
+      '[data-ds-part="sidebar"] { font-size: 18px; }',
+    ), /::after/, "Other parts do not acquire generated text styling");
+  }
+  assertRejected('[data-ds-part="home-hero"]::after { font-size: 18px; }', "selector/unsupported");
+  assertRejected('[data-ds-part="home-hero"] { --tagline-size: 18px; }', "property/name");
+  for (const size of [11, 21]) {
+    assertRejected(`[data-ds-part="home-hero"] { font-size: ${size}px; }`, "value/unsupported");
+  }
+});
+
 test("clears only registered core surface background images", () => {
   const surfaceParts = ["sidebar", "main", "home"];
   const otherParts = validators[0].SAFE_CSS_PARTS.filter((part) =>

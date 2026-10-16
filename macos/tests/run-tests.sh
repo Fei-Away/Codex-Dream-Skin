@@ -100,7 +100,7 @@ UPDATE_JSON="$({
 })"
 "$NODE" -e '
   const value = JSON.parse(process.argv[1]);
-  if (value.currentVersion !== "v1.5.19" || value.latestVersion !== "v9.8.7") process.exit(1);
+  if (value.currentVersion !== "v1.5.21" || value.latestVersion !== "v9.8.7") process.exit(1);
   if (!value.updateAvailable) process.exit(1);
   if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
 ' "$UPDATE_JSON"
@@ -110,7 +110,7 @@ UPDATE_REDIRECT_JSON="$({
 })"
 "$NODE" -e '
   const value = JSON.parse(process.argv[1]);
-  if (value.currentVersion !== "v1.5.19" || value.latestVersion !== "v9.8.7") process.exit(1);
+  if (value.currentVersion !== "v1.5.21" || value.latestVersion !== "v9.8.7") process.exit(1);
   if (!value.updateAvailable) process.exit(1);
   if (value.releaseUrl !== "https://github.com/Fei-Away/Codex-Dream-Skin/releases/latest") process.exit(1);
 ' "$UPDATE_REDIRECT_JSON"
@@ -704,7 +704,7 @@ STATUS_FAKE_INJECTOR="$TMP/status-fake-injector.mjs"
 "$NODE" "$STATUS_FAKE_INJECTOR" --watch --port 93410 --theme-dir "$TMP" &
 STATUS_PID="$!"
 /bin/sleep 0.08
-STATUS_START="$(/bin/ps -p "$STATUS_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
+STATUS_START="$(LC_ALL=C /bin/ps -p "$STATUS_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
 "$NODE" -e '
   const fs = require("node:fs");
   const [file, pid, node, injector, startedAt] = process.argv.slice(1);
@@ -734,7 +734,7 @@ STATUS_PID=""
   >"$TMP/near-prefix-injector.out" 2>&1 &
 WATCH_PID="$!"
 /bin/sleep 0.2
-WATCH_START="$(/bin/ps -p "$WATCH_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
+WATCH_START="$(LC_ALL=C /bin/ps -p "$WATCH_PID" -o lstart= 2>/dev/null | /usr/bin/awk '{$1=$1; print}')"
 [ -n "$WATCH_START" ] || { printf 'Could not record near-prefix watcher start time.\n' >&2; exit 1; }
 /usr/bin/env HOME="$STOP_HOME" NODE="$NODE" /bin/bash -c '
   . "$1/scripts/common-macos.sh"
@@ -1176,7 +1176,7 @@ CRLF_BACKUP="$TMP/config-crlf-backup.json"
 "$NODE" "$ROOT/scripts/theme-config.mjs" restore "$CRLF_CONFIG" "$CRLF_BACKUP" >/dev/null
 /usr/bin/cmp -s "$CRLF_CONFIG" "$TMP/original-crlf.toml"
 
-/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.19" ]' _ "$ROOT"
+/usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.5.21" ]' _ "$ROOT"
 if [ "${CODEX_DREAM_SKIN_SKIP_DOCTOR:-0}" = "1" ]; then
   printf 'SKIP: Doctor requires an installed, signed Codex app.\n'
   DOCTOR_RESULT="skipped"

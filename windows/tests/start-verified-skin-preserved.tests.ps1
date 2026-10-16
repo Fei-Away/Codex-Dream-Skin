@@ -12,6 +12,14 @@ param([Parameter(Mandatory = $true)][string]$Root)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $Root 'scripts\localization-windows.ps1')
+# This lifecycle fixture stubs config I/O; never resolve the real user home.
+function Resolve-DreamSkinConfigPaths {
+  param([string]$StateRoot, [switch]$BindBackup)
+  return [pscustomobject]@{
+    ConfigPath = (Join-Path $StateRoot 'fixture-config.toml')
+    BackupPath = (Join-Path $StateRoot 'fixture-backup.toml')
+  }
+}
 $startPath = Join-Path $Root 'scripts\start-dream-skin.ps1'
 $rawSource = [System.IO.File]::ReadAllText($startPath)
 $dotSourcePattern = '(?m)^\.\s+\(Join-Path \$PSScriptRoot ''(?:common-windows|theme-windows|localization-windows)\.ps1''\)\r?\n'
@@ -212,16 +220,22 @@ function Invoke-DreamSkinStartupFixture {
   }
 
   function Invoke-DreamSkinNative {
-    param([string]$FilePath, [object[]]$ArgumentList, [switch]$DiscardStderr)
+    param([string]$FilePath, [object[]]$ArgumentList, [switch]$DiscardStderr, [switch]$SeparateStderr)
     if ($ArgumentList -contains '--verify') {
       if ($SupersedeTheme -and $script:themeWriteCalls -gt 0) { $script:themeFingerprint = 'newer' }
       $index = [Math]::Min($script:verifyPayloadIndex, $script:verifyPayloads.Count - 1)
       $script:verifyPayloadIndex += 1
       $verifyCode = if ($SuccessfulVerification) { 0 } else { 2 }
-      return [pscustomobject]@{ ExitCode = $verifyCode; Output = @($script:verifyPayloads[$index]) }
+      $warning = 'Harmless native startup warning'
+      $output = @($script:verifyPayloads[$index])
+      if (-not $SeparateStderr) { $output = @($warning) + $output }
+      return [pscustomobject]@{ ExitCode = $verifyCode; Output = $output; ErrorOutput = @($warning) }
     }
     if ($ArgumentList -contains '--once') {
-      return [pscustomobject]@{ ExitCode = 2; Output = @($script:oncePayload) }
+      $warning = 'Harmless native startup warning'
+      $output = @($script:oncePayload)
+      if (-not $SeparateStderr) { $output = @($warning) + $output }
+      return [pscustomobject]@{ ExitCode = 2; Output = $output; ErrorOutput = @($warning) }
     }
     if ($ArgumentList -contains '--remove') {
       $script:removeCalls += 1

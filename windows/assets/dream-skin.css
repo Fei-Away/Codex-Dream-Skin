@@ -805,7 +805,8 @@ html[data-dream-skin="active"] [role="main"]:has([data-testid="home-icon"]) [dat
   content: var(--dream-skin-tagline, "把喜欢的画面变成可交互的 Codex 工作台。");
   display: block;
   margin-top: 13px;
-  color: rgb(var(--ds-text-rgb) / .76);
+  color: currentColor;
+  opacity: .76;
   font-size: 13px;
   line-height: 1.5;
   font-weight: 500;
