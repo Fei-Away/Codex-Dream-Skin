@@ -55,6 +55,8 @@ Install the official Codex / ChatGPT app once and quit it, then download the pac
 | macOS · Apple Silicon / Intel | `CodexDreamSkin-vX.Y.Z.dmg` | [`docs/install-macos.md`](./docs/install-macos.md) |
 | Windows · x64 | `CodexDreamSkin-Setup-vX.Y.Z.exe` | [`docs/install-windows.md`](./docs/install-windows.md) |
 
+On macOS, theme-switch progress appears in the main Codex window and clears once the switch passes display verification; detached windows and the Pet overlay do not show a duplicate progress card.
+
 No source checkout, Node.js install, `.sh` or `.ps1` command is required. After installation, use the macOS menu bar or the Windows system tray. Updates are manual: install the new package over the existing one and your themes and images are preserved. Because the public packages are unsigned, a new download may show a one-time OS security warning — the guides cover the safe GUI approval path, updates and uninstall steps.
 
 ## Theme library & community

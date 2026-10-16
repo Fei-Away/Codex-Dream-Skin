@@ -892,17 +892,24 @@ function nextOperationToken() {
   return `${process.pid}:${Date.now()}:${operationSequence}`;
 }
 
-function operationUiExpression(action, token, state = "loading", message = "") {
+/** Build renderer-side status UI code; completed tokens reject delayed loading updates. */
+export function operationUiExpression(action, token, state = "loading", message = "") {
   const config = { action, token, state, message };
   return `(() => {
     const config = ${JSON.stringify(config)};
     const hostId = ${JSON.stringify(OPERATION_UI_HOST_ID)};
     const registryKey = ${JSON.stringify(OPERATION_UI_REGISTRY_KEY)};
+    const closedKey = registryKey + "_closed";
     const css = ${JSON.stringify(OPERATION_UI_CSS)};
     const revealDelayMs = 16;
     const minimumLoadingMs = 700;
     const stateTtl = (value) => value === "loading" ? 180000
       : value === "success" ? 1800 : value === "cancelled" ? 2400 : 6000;
+    const primaryPage = () => {
+      const route = new URLSearchParams(location.search).get("initialRoute") || "";
+      return location.protocol === "app:" && location.pathname === "/index.html"
+        && route !== "/avatar-overlay" && !route.startsWith("/avatar-overlay/");
+    };
     const issuedAt = (value) => Number(String(value).split(":")[1]) || 0;
     const positionInMainArea = (host) => {
       const main = document.querySelector(${selectorLiteral("shell-main")}) ||
@@ -921,23 +928,45 @@ function operationUiExpression(action, token, state = "loading", message = "") {
     const removeHost = (expectedToken, force = false) => {
       const host = document.getElementById(hostId);
       const registry = window[registryKey];
-      if (!force && host?.dataset.operationToken !== expectedToken) return false;
+      if (!force && host && host.dataset.operationToken !== expectedToken) return false;
       if (!force && registry?.token && registry.token !== expectedToken) return false;
       clearTimer(registry?.showTimer);
       clearTimer(registry?.expiryTimer);
       clearTimer(registry?.terminalTimer);
+      if (registry?.routeTimer) clearInterval(registry.routeTimer);
       host?.remove();
       if (force || registry?.token === expectedToken) delete window[registryKey];
       return true;
     };
     if (config.action === "clear") {
       removeHost("", true);
+      delete window[closedKey];
       return { visible: false, cleared: true };
     }
+    if (!primaryPage()) {
+      removeHost("", true);
+      return { visible: false, excluded: true };
+    }
     if (config.action === "hide") {
-      return { visible: false, removed: removeHost(config.token) };
+      const currentHost = document.getElementById(hostId);
+      const currentRegistry = window[registryKey];
+      const matching = (!currentHost || currentHost.dataset.operationToken === config.token)
+        && (!currentRegistry?.token || currentRegistry.token === config.token);
+      if (matching) {
+        removeHost(config.token);
+        const closed = window[closedKey] || [];
+        window[closedKey] = [...closed.filter((token) => token !== config.token), config.token].slice(-8);
+      }
+      return { visible: false, removed: matching };
     }
     let host = document.getElementById(hostId);
+    if (config.state === "loading" && window[closedKey]?.includes(config.token)) {
+      return { visible: false, stale: true };
+    }
+    if (config.state === "loading" && host?.dataset.operationToken === config.token
+      && (host.dataset.state !== "loading" || host.dataset.terminalPending === "true")) {
+      return { visible: true, stale: true };
+    }
     if (config.action === "show") {
       const currentIssuedAt = Number(host?.dataset.operationIssuedAt || 0);
       if (host?.dataset.operationToken !== config.token && currentIssuedAt > issuedAt(config.token)) {
@@ -978,7 +1007,11 @@ function operationUiExpression(action, token, state = "loading", message = "") {
         showTimer: null,
         expiryTimer: null,
         terminalTimer: null,
+        routeTimer: null,
       };
+      registry.routeTimer = setInterval(() => {
+        if (!primaryPage()) removeHost(config.token, true);
+      }, 250);
       registry.showTimer = setTimeout(() => {
         const current = document.getElementById(hostId);
         if (current?.dataset.operationToken === config.token) current.dataset.visible = "true";
@@ -999,11 +1032,13 @@ function operationUiExpression(action, token, state = "loading", message = "") {
       ? Math.max(0, registry.startedAt + minimumLoadingMs - Date.now())
       : 0;
     if (remainingLoadingMs > 0 && registry?.token === config.token) {
+      host.dataset.terminalPending = "true";
       registry.terminalTimer = setTimeout(() => {
         const current = document.getElementById(hostId);
         const currentRegistry = window[registryKey];
         if (current?.dataset.operationToken !== config.token || currentRegistry?.token !== config.token) return;
         current.dataset.state = config.state;
+        delete current.dataset.terminalPending;
         current.dataset.visible = "true";
         const currentMessage = current.shadowRoot?.querySelector(".message");
         if (currentMessage) currentMessage.textContent = config.message;
@@ -1013,6 +1048,7 @@ function operationUiExpression(action, token, state = "loading", message = "") {
       return { visible: true, state: "loading", deferred: true };
     }
     host.dataset.state = config.state;
+    delete host.dataset.terminalPending;
     host.dataset.visible = "true";
     const messageNode = host.shadowRoot?.querySelector(".message");
     if (messageNode) messageNode.textContent = config.message;
@@ -1023,13 +1059,31 @@ function operationUiExpression(action, token, state = "loading", message = "") {
   })()`;
 }
 
+/** Update one renderer status host; excluded pages only accept hide/clear cleanup. */
 async function updateOperationUi(session, action, token, state, message, timeoutMs = 10000) {
   if (session.closed) return false;
+  // A detached Codex window has its own renderer. Drawing status in both
+  // windows puts two progress cards on screen during one theme switch.
+  if (action !== "hide" && action !== "clear" && !isPrimaryOperationUiTarget(session.target)) {
+    return false;
+  }
   const result = await session.evaluate(
     operationUiExpression(action, token, state, message),
     timeoutMs,
   );
   return Boolean(result?.visible || result?.cleared || result?.removed);
+}
+
+/** Return whether a CDP target is the main Codex page that may show operation status. */
+export function isPrimaryOperationUiTarget(target) {
+  try {
+    const url = new URL(target?.url);
+    const route = url.searchParams.get("initialRoute") || "";
+    return url.protocol === "app:" && url.pathname === "/index.html"
+      && route !== "/avatar-overlay" && !route.startsWith("/avatar-overlay/");
+  } catch {
+    return false;
+  }
 }
 
 async function bestEffortOperationUi(session, action, token, state, message, timeoutMs = 10000) {
@@ -1098,7 +1152,9 @@ async function verifyRemovedSession(session) {
   })()`);
 }
 
+/** Clear operation UI and skin state on an excluded renderer, returning verified removal. */
 export async function cleanupExcludedSurface(session) {
+  await bestEffortOperationUi(session, "clear", "", "loading", "");
   if (!await removeFromSession(session)) return false;
   return verifyRemovedSession(session);
 }
@@ -1321,17 +1377,18 @@ async function runBeginOperation(options) {
   process.stdout.write(`${operationToken}\n`);
 }
 
+/** Finish a token on connected targets: hide verified success, preserve error/cancel feedback. */
 async function runFinishOperation(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs);
   let shown = false;
   try {
-    const results = await Promise.all(connected.map(({ session }) => presentOperationUi(
-      session,
-      options.operationToken,
-      options.operationUiState,
-      options.operationMessage,
-      Math.max(250, Math.floor(options.timeoutMs / 2)),
-    )));
+    const results = await Promise.all(connected.map(({ session }) =>
+      options.operationUiState === "success"
+        ? bestEffortOperationUi(session, "hide", options.operationToken, "loading", "",
+          Math.max(250, Math.floor(options.timeoutMs / 2)))
+        : presentOperationUi(session, options.operationToken, options.operationUiState,
+          options.operationMessage, Math.max(250, Math.floor(options.timeoutMs / 2))),
+    ));
     shown = results.some(Boolean);
   } finally {
     for (const { session } of connected) session.close();
@@ -1339,6 +1396,7 @@ async function runFinishOperation(options) {
   if (!shown) throw new Error("Could not show the completed operation state in the verified ChatGPT renderer");
 }
 
+/** Apply, verify, or remove once on discovered targets; clear progress only for verified success. */
 async function runOneShot(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs);
   const operationToken = options.mode === "once" || options.mode === "remove"
@@ -1412,13 +1470,10 @@ async function runOneShot(options) {
       results.push({ targetId: target.id, markers: probe?.markers, result });
       if (operationToken) {
         const passed = options.mode === "remove" ? result === true : result?.pass;
-        await presentOperationUi(
-          session,
-          operationToken,
-          passed ? "success" : "error",
-          passed
-            ? options.mode === "remove" ? "皮肤已暂停" : `已应用「${loaded.theme.name}」`
-            : options.mode === "remove" ? "暂停校验失败" : "显示校验失败",
+        if (passed) await bestEffortOperationUi(session, "hide", operationToken, "loading", "");
+        else await presentOperationUi(
+          session, operationToken, "error",
+          options.mode === "remove" ? "暂停校验失败" : "显示校验失败",
         );
       }
 
@@ -1617,12 +1672,22 @@ function isFreshBusyOperation(operation) {
   return ageSeconds >= -5 && ageSeconds <= maxAgeSeconds;
 }
 
-async function watchOperationState(statePath, onState) {
+/** Map operation-file terminal statuses to UI states; return null while nonterminal. */
+export function terminalOperationUiState(status) {
+  if (status === "failed") return "error";
+  if (status === "cancelled") return "cancelled";
+  if (status === "success" || status === "paused") return "success";
+  return null;
+}
+
+/** Watch and periodically reconcile a plist path, emit changed snapshots, and return cleanup. */
+export async function watchOperationState(statePath, onState) {
   if (!statePath) return () => {};
   const directory = path.dirname(statePath);
   const basename = path.basename(statePath);
   let watcher = null;
   let readTimer = null;
+  let auditTimer = null;
   let readChain = Promise.resolve();
   let closed = false;
   let lastSnapshotKey = "";
@@ -1665,14 +1730,20 @@ async function watchOperationState(statePath, onState) {
 
   readChain = readChain.then(readLatest);
   await readChain;
+  // Atomic replacement can lose a filesystem notification. Reconcile the
+  // terminal state so a renderer progress indicator cannot wait for its TTL.
+  auditTimer = setInterval(scheduleRead, 1000);
+  auditTimer.unref?.();
 
   return () => {
     closed = true;
     if (readTimer) clearTimeout(readTimer);
+    if (auditTimer) clearInterval(auditTimer);
     watcher?.close();
   };
 }
 
+/** Maintain renderer injection and reconcile token-scoped progress with operation-file state. */
 async function runWatch(options) {
   let current = await loadPayload(options.themeDir);
   const sessions = new Map();
@@ -1685,6 +1756,7 @@ async function runWatch(options) {
   let discoveryOutageSince = 0;
   let operationSignalChain = Promise.resolve();
   let activeOperation = null;
+  let latestOperation = null;
   let pauseRecovery = null;
   let controlOnly = false;
   let mutationEpoch = 0;
@@ -1852,9 +1924,8 @@ async function runWatch(options) {
       record.operationToken = operationToken;
       record.operationExternal = Boolean(externalOperation);
       try {
-        await presentOperationUi(
-          session, operationToken, "loading", `正在应用「${current.theme.name}」…`,
-        );
+        // The foreground switch owns its progress indicator. A delayed file
+        // watch refresh must not reopen it after that switch has completed.
         if (controlOnly || mutationEpoch !== refreshEpoch) continue;
         const nextIdentifier = await registerEarlyForRecord(
           record, current.payload, current.revision,
@@ -1877,9 +1948,6 @@ async function runWatch(options) {
           current.revision,
         );
         if (!verification?.pass) throw new Error("Theme refresh verification failed");
-        if (!externalOperation) {
-          await presentOperationUi(session, operationToken, "success", `已应用「${current.theme.name}」`);
-        }
       } catch (error) {
         record.needsLoadFallback = true;
         if (!externalOperation) {
@@ -1904,6 +1972,7 @@ async function runWatch(options) {
   const closePayloadWatchers = watchPayloadSources(options.themeDir, queuePayloadRefresh);
   const closeOperationWatcher = await watchOperationState(options.operationState, (operation) => {
     operationSignalChain = operationSignalChain.then(async () => {
+      latestOperation = operation;
       const previousOperation = activeOperation?.token === operation.token ? activeOperation : null;
       const busy = isFreshBusyOperation(operation);
       if (pauseRecovery && pauseRecovery.token !== operation.token) pauseRecovery = null;
@@ -1935,11 +2004,21 @@ async function runWatch(options) {
           );
           return;
         }
-        if (record.operationToken !== operation.token) return;
-        const state = operation.status === "failed" ? "error"
-          : operation.status === "cancelled" ? "cancelled"
-            : operation.status === "success" || operation.status === "paused" ? "success" : null;
+        const state = terminalOperationUiState(operation.status);
         if (!state) return;
+        if (state === "success") {
+          await bestEffortOperationUi(record.session, "hide", operation.token, "loading", "");
+          return;
+        }
+        if (record.operationToken !== operation.token) {
+          // A one-shot apply may have shown progress before this watcher saw
+          // the busy state. Update only an already matching renderer host.
+          await bestEffortOperationUi(
+            record.session, "update", operation.token, state,
+            operation.message || (state === "error" ? "操作失败，请重试" : "操作已完成"),
+          );
+          return;
+        }
         await presentOperationUi(
           record.session,
           operation.token,
@@ -2157,6 +2236,22 @@ async function runWatch(options) {
             await presentOperationUi(
               session, record.operationToken, "success", `已应用「${current.theme.name}」`,
             );
+          } else if (activeOperation?.token !== record.operationToken) {
+            // Completion may have arrived while this target was still probing.
+            // Do not leave the loading host behind after that terminal update.
+            if (latestOperation?.token === record.operationToken) {
+              const terminalState = terminalOperationUiState(latestOperation.status);
+              if (terminalState === "success") await bestEffortOperationUi(
+                session, "hide", record.operationToken, "loading", "",
+              );
+              else if (terminalState) await presentOperationUi(
+                session, record.operationToken, terminalState,
+                latestOperation.message || "操作已完成",
+              );
+              else await bestEffortOperationUi(
+                session, "hide", record.operationToken, "loading", "",
+              );
+            } else await bestEffortOperationUi(session, "hide", record.operationToken, "loading", "");
           }
           console.log(`[dream-skin] injected verified ChatGPT target ${target.id}`);
         } catch (error) {
@@ -2175,6 +2270,10 @@ async function runWatch(options) {
             } else if (!record.operationExternal) {
               await presentOperationUi(
                 session, record.operationToken, "error", "应用失败，未通过显示校验",
+              );
+            } else {
+              await bestEffortOperationUi(
+                session, "hide", record.operationToken, "loading", "",
               );
             }
           }

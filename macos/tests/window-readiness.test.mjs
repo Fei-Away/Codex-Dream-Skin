@@ -301,6 +301,7 @@ NODE="$NODE_MOCK"
 fail() { /usr/bin/printf '%s\\n' "$*" >&2; exit 1; }
 ensure_state_root() { /bin/mkdir -p "$STATE_ROOT" "$THEME_DIR"; }
 new_operation_token() { /usr/bin/printf '123:1234567890123:1\\n'; }
+operation_token_is_valid() { [[ "$1" =~ ^[0-9]{1,12}:[0-9]{13}:[0-9]{1,8}$ ]]; }
 write_operation_state() { return 0; }
 finish_client_operation() { return 0; }
 discover_codex_app() { return 0; }

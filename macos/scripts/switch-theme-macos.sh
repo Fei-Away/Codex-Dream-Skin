@@ -175,13 +175,18 @@ if hot_reapply_theme "$PORT" 8000 "$OPERATION_TOKEN"; then
   progress "$(dreamskin_text verifying_rendered_theme)"
   "$NODE" "$INJECTOR" --verify --port "$PORT" --theme-dir "$THEME_DIR" --timeout-ms 10000 >/dev/null \
     || fail "Theme injection completed but the visible renderer did not verify the exact active theme."
+  # The native completion notice can appear before the watcher observes the
+  # terminal state; clear this operation's renderer progress before returning.
+  finish_client_operation "$PORT" success "$(dreamskin_text skin_applied)" \
+    "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
   progress "$(dreamskin_text skin_applied): ${THEME_NAME}"
   exit 0
 fi
 
 # Cold path only when debug port is missing
 progress "$(dreamskin_text restarting_chatgpt_for_apply)"
-if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing; then
+if "$SCRIPT_DIR/start-dream-skin-macos.sh" --port "$PORT" --restart-existing \
+  --operation-token "$OPERATION_TOKEN"; then
   progress "$(dreamskin_text skin_applied): ${THEME_NAME}"
   exit 0
 fi

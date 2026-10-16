@@ -55,6 +55,7 @@ while [ "$#" -gt 0 ]; do
     --restart-existing) RESTART_EXISTING="true"; shift ;;
     --prompt-restart) PROMPT_RESTART="true"; shift ;;
     --foreground-injector) FOREGROUND_INJECTOR="true"; shift ;;
+    --operation-token) OPERATION_TOKEN="${2:-}"; shift 2 ;;
     *) fail "Unknown start argument: $1" ;;
   esac
 done
@@ -63,7 +64,8 @@ case "$PORT" in ''|*[!0-9]*) fail "Invalid port: $PORT" ;; esac
 
 ensure_state_root
 if [ "$FOREGROUND_INJECTOR" != "true" ]; then
-  OPERATION_TOKEN="$(new_operation_token)"
+  [ -n "$OPERATION_TOKEN" ] || OPERATION_TOKEN="$(new_operation_token)"
+  operation_token_is_valid "$OPERATION_TOKEN" || fail "Invalid operation token."
   write_operation_state applying "$(dreamskin_text applying_skin)" "$OPERATION_TOKEN" \
     || fail "Could not publish the apply operation state."
 fi
@@ -204,5 +206,7 @@ cleanup_verify_output
 mark_state_active || fail "Could not commit the verified active skin state."
 write_operation_state success "$(dreamskin_text skin_applied)" "$OPERATION_TOKEN" \
   || fail "Could not publish the completed apply state."
+finish_client_operation "$PORT" success "$(dreamskin_text skin_applied)" \
+  "$OPERATION_TOKEN" 1500 >/dev/null 2>&1 || true
 OPERATION_FINISHED="true"
 printf 'ChatGPT Dream Skin %s is active on loopback port %s.\n' "$SKIN_VERSION" "$PORT"
