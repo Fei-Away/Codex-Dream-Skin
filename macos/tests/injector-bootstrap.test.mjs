@@ -193,9 +193,10 @@ const cleanupEvaluations = [];
 assert.equal(await cleanupExcludedSurface({
   async evaluate(expression) { cleanupEvaluations.push(expression); return true; },
 }), true, "Excluded Pet cleanup must remove and verify stale renderer state.");
-assert.equal(cleanupEvaluations.length, 2);
-assert.match(cleanupEvaluations[0], /__CODEX_DREAM_SKIN_DISABLED__/);
-assert.match(cleanupEvaluations[1], /hasAttributes/);
+assert.equal(cleanupEvaluations.length, 3);
+assert.match(cleanupEvaluations[0], /chatgpt-dream-skin-operation/);
+assert.match(cleanupEvaluations[1], /__CODEX_DREAM_SKIN_DISABLED__/);
+assert.match(cleanupEvaluations[2], /hasAttributes/);
 assert.ok((source.match(/probe\?\.excludedPetSurface && !await cleanupExcludedSurface/g) || []).length >= 2,
   "One-shot and watcher discovery must both clean excluded Pet targets.");
 assert.match(identityProbeSource, /selectorLiteral\("settings-panel"\)/,

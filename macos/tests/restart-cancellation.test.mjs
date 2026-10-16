@@ -25,7 +25,7 @@ codex_main_pids() { printf '12345\\n'; }
 state_field() { case "$1" in port) printf '9341\\n';; session) printf 'active\\n';; esac; }
 write_operation_state() { record "operation $1"; }
 begin_client_operation() { record begin; }
-finish_client_operation() { record "finish $2"; }
+finish_client_operation() { record "finish $2"; record "finish-token $4"; }
 release_codex_launchd_job() { record release-launchd; }
 stop_recorded_injector() { record stop-injector; }
 sync_appearance_pin() { record config; }
@@ -189,6 +189,14 @@ test("cold launch needs no restart consent or quit request", async (t) => {
   assert.ok(!result.events.includes("official-quit"));
   assert.ok(result.events.includes("launch"));
   assert.ok(result.events.includes("operation success"));
+  assert.ok(result.events.includes("finish success"));
+});
+
+test("cold start reuses its caller's operation token through completion", async (t) => {
+  const token = "456:1234567890123:7";
+  const result = await runFixture(t, "cold", "start-dream-skin-macos.sh", ["--operation-token", token]);
+  assert.equal(result.status, 0, result.stderr + result.log);
+  assert.ok(result.events.includes(`finish-token ${token}`));
 });
 
 test("explicit CLI restart consent still respects official quit cancellation", async (t) => {
