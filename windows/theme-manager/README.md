@@ -17,9 +17,14 @@ reports that a visual preview is unavailable and the backend validates them on s
 Codex. An existing watcher may also update the currently visible skin. **Apply /
 reapply and launch Codex** uses the managed startup transaction and only reports
 success after a matching verified operation result. **Create / repair launch
-shortcut** creates **Codex Dream Skin - Launch** on the desktop. This entry reads
-the latest saved startup snapshot on every launch; it does not implicitly save a
-draft. Saving a different theme or background does not require a new shortcut.
+shortcut** creates two **Codex Dream Skin - Launch** shortcuts in one operation:
+one on the desktop and one in the installation directory. For Setup users, this
+is the registered, validated installation location; for source installations, it
+is `%LOCALAPPDATA%\CodexDreamSkin`, beside `engine`, so an engine upgrade does
+not erase it. Both shortcuts point to the same
+managed launcher and read the latest saved startup snapshot on every launch.
+Creating them neither saves a draft nor launches Codex. Saving a different theme
+or background does not require new shortcuts.
 Changes preserve the source theme and Safe CSS.
 
 Buttons and operation messages follow the manager's Chinese or English language
@@ -28,6 +33,15 @@ preference. The launch shortcut filename remains
 older `Codex · 默认主题启动.lnk` only after checking that it belongs to Dream Skin;
 unrelated same-name entries are preserved. The dedicated shortcut does not alter
 the official Codex entry or enable Windows sign-in startup.
+
+The button checks both destinations before writing. If either is occupied by an
+unrelated same-name file or is not writable, the request fails and preserves the
+original entries. A failure during writing reports its result and attempts to roll
+back changes made by that request; incomplete recovery keeps its backups.
+No Launch shortcut is automatically added by a
+build, install, update, Windows sign-in, or ordinary launch; no Launch entry is
+added to the Start Menu. The upstream management, tray, restore, and optional
+sign-in entries retain their existing behavior.
 
 The window also adjusts the current active theme's transparency (0–100%) immediately
 and can restore **Follow theme**. This section explicitly operates on the active

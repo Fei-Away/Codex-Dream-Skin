@@ -3,6 +3,11 @@ param([Parameter(Mandatory = $true)][string]$Root)
 $ErrorActionPreference = 'Stop'
 $originalPanelLanguage = $env:DREAMSKIN_LANG
 . (Join-Path $Root 'scripts/common-windows.ps1')
+$originalPanelLock = (Get-Command Enter-DreamSkinOperationLock -CommandType Function).ScriptBlock
+$panelLockSource = $originalPanelLock.ToString()
+$isolatedPanelLock = $panelLockSource.Replace('Local\CodexDreamSkin.', ('Local\CodexDreamSkin.PanelTest-' + [guid]::NewGuid().ToString('N') + '.'))
+if ($isolatedPanelLock -ceq $panelLockSource) { throw 'Could not isolate panel fixture operation mutex.' }
+Set-Item Function:\Enter-DreamSkinOperationLock ([scriptblock]::Create($isolatedPanelLock))
 . (Join-Path $Root 'scripts/theme-windows.ps1')
 . (Join-Path $Root 'scripts/panel-operation.ps1') -FunctionsOnly
 $script:PanelScriptRoot = Join-Path $Root 'scripts'
@@ -84,7 +89,7 @@ try {
   Write-DreamSkinUtf8FileAtomically -Path $badImage -Content 'not an image'
   $bad = Save-DreamSkinPanelSettings -StateRoot $testRoot -OperationId ([guid]::NewGuid().ToString('N')) -SavedThemeDirectory $themeDir -BackgroundPath $badImage
   Assert-Panel ($bad.Outcome -eq 'failure' -and $bad.DiskRecovery -eq 'not-needed') 'Bad image was accepted or published.'
-  Assert-Panel ($bad.Message -match '^Settings validation failed\.') 'Validation failure did not use English result text.'
+  Assert-Panel ($bad.Message -match '^Settings validation failed\.') ('Validation failure did not use English result text: ' + $bad.Category + ' / ' + $bad.Message)
   Assert-Panel ((Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $paths.Active) -eq $good) 'Bad image damaged active settings.'
   $outside = Save-DreamSkinPanelSettings -StateRoot $testRoot -OperationId ([guid]::NewGuid().ToString('N')) -SavedThemeDirectory $paths.Active
   Assert-Panel ($outside.Outcome -eq 'failure') 'Unmanaged theme source accepted.'
@@ -252,6 +257,7 @@ try {
   } finally { Remove-Item function:Start-Process }
   Write-Output 'PASS: isolated panel draft, CSS, validation, publication recovery, pause/preferences, contention and result token.'
 } finally {
+  Set-Item Function:\Enter-DreamSkinOperationLock $originalPanelLock
   $env:DREAMSKIN_LANG = $originalPanelLanguage
   Remove-DreamSkinManagedDirectoryVerified -Path $testRoot -Root ([IO.Path]::GetDirectoryName($testRoot))
 }

@@ -40,9 +40,9 @@ launch Codex with a theme.
 2. Choose **Save startup settings** to save the complete theme and background
    combination. Saving does not launch Codex, although an existing skin watcher
    may update the current appearance.
-3. Choose **Create / repair launch shortcut** to create
-   **Codex Dream Skin - Launch** on your desktop. Creating the shortcut does not
-   save an unfinished draft.
+3. Choose **Create / repair launch shortcut** once to create two copies of
+   **Codex Dream Skin - Launch**, one on your desktop and one in the installation
+   directory. Creating the shortcuts neither saves a draft nor launches Codex.
 4. Double-click **Codex Dream Skin - Launch** whenever you want to start Codex
    with the saved combination. If Codex needs to restart, confirm the prompt.
 
@@ -53,7 +53,19 @@ automatic launch when you sign in to Windows. The interface retains Chinese and
 English labels; the launch shortcut filename is always
 `Codex Dream Skin - Launch.lnk` in either language. Older installations may still
 have `Codex · 默认主题启动.lnk`; shortcut repair checks ownership before migrating
-that name and preserves unrelated shortcuts.
+that name and preserves unrelated shortcuts. Both copies point to the same
+managed launcher. For Setup installations, the directory copy uses the registered,
+validated installation location. Without a valid Setup installation, it uses
+`%LOCALAPPDATA%\CodexDreamSkin`, beside `engine`, so replacing the engine during
+an upgrade does not erase the shortcut. A deleted historical Setup directory is
+not recreated.
+
+The existing management, tray, restore, and optional Windows sign-in entries keep
+their original behavior. Building, installing, updating, signing in to Windows,
+and ordinary launches never create new Launch shortcuts. Only the manager button
+creates or repairs these two copies; it adds no Launch entry to the Start Menu.
+Locations inside Windows menu or sign-in folders are refused, including a Setup
+installation placed there, so creating a Launch copy cannot enable sign-in launch.
 
 For recovery and log details, see the [Windows panel guide](../docs/windows-panel-startup.md)
 and the [native manager reference](./theme-manager/README.md).
@@ -70,7 +82,6 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
 
 - `Codex Dream Skin`: open the native theme manager.
-- `Codex Dream Skin - Launch`: launch Codex with the saved theme and background.
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 

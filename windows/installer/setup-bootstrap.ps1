@@ -16,15 +16,6 @@ $stateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'Codex Dream Skin.lnk'
 $managerMaintenance = $null
 
-function Assert-DreamSkinBootstrapActions {
-  param([switch]$Install, [switch]$LaunchTray, [switch]$ShowWindow, [switch]$Uninstall)
-  # Install may open the manager after committing the runtime. Uninstall must
-  # remain exclusive and must never fall through into installation or launch.
-  if ($Uninstall -and ($Install -or $LaunchTray -or $ShowWindow)) {
-    throw 'Uninstall cannot be combined with installation or launch.'
-  }
-}
-
 function Show-DreamSkinBootstrapMessage {
   param(
     [Parameter(Mandatory = $true)][string]$Message,
@@ -65,7 +56,9 @@ function Wait-DreamSkinCodexClosedForSetup {
 }
 
 try {
-  Assert-DreamSkinBootstrapActions -Install:$Install -LaunchTray:$LaunchTray -ShowWindow:$ShowWindow -Uninstall:$Uninstall
+  if ($Install -and ($LaunchTray -or $Uninstall)) {
+    throw 'Choose exactly one installer bootstrap action.'
+  }
   if (-not (Test-Path -LiteralPath $commonPath -PathType Leaf) -or
     -not (Test-Path -LiteralPath $themePath -PathType Leaf)) {
     throw 'The installer payload is incomplete.'
@@ -182,17 +175,6 @@ try {
       -not (Test-Path -LiteralPath (Join-Path $stateRoot 'config.before-dream-skin.toml') -PathType Leaf)) {
       throw 'Runtime installation did not commit a complete managed engine.'
     }
-  }
-
-  if ($Install) {
-    . (Join-Path $engine.Scripts 'launch-themed-codex.ps1') -FunctionsOnly
-    $defaultName = Get-DreamSkinDefaultShortcutName
-    $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Codex Dream Skin'
-    Assert-DreamSkinNoReparseComponents -Path $menu
-    [IO.Directory]::CreateDirectory($menu) | Out-Null
-    $null = New-DreamSkinDefaultShortcut -StateRoot $stateRoot
-    $null = New-DreamSkinDefaultShortcut -StateRoot $stateRoot -ShortcutPath (Join-Path $menu $defaultName)
-    $null = New-DreamSkinDefaultShortcut -StateRoot $stateRoot -ShortcutPath (Join-Path $PSScriptRoot $defaultName)
   }
 
   if ($LaunchTray) {

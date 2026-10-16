@@ -22,16 +22,15 @@ try {
   $tokens = $null; $parseErrors = $null
   $bootstrapAst = [Management.Automation.Language.Parser]::ParseFile($bootstrapPath, [ref]$tokens, [ref]$parseErrors)
   Check ($parseErrors.Count -eq 0) 'bootstrap parses'
-  $guard = $bootstrapAst.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Assert-DreamSkinBootstrapActions' }, $true)
+  $guard = $bootstrapAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Extent.Text.Contains('Choose exactly one installer bootstrap action.') }, $true)
   if ($null -eq $guard) { throw 'Bootstrap action guard is missing.' }
-  . ([scriptblock]::Create($guard.Extent.Text))
-  Assert-DreamSkinBootstrapActions -Install -LaunchTray -ShowWindow
-  Check $true 'maintenance update may install then open the panel'
-  Assert-DreamSkinBootstrapActions -LaunchTray -ShowWindow
-  Assert-DreamSkinBootstrapActions -Uninstall
-  Refuses { Assert-DreamSkinBootstrapActions -Uninstall -Install } 'uninstall cannot install'
-  Refuses { Assert-DreamSkinBootstrapActions -Uninstall -LaunchTray } 'uninstall cannot launch'
-  Refuses { Assert-DreamSkinBootstrapActions -Uninstall -ShowWindow } 'uninstall cannot show a manager'
+  $guardBlock = [scriptblock]::Create('param([switch]$Install,[switch]$LaunchTray,[switch]$Uninstall)' + "`n" + $guard.Extent.Text)
+  & $guardBlock -Install
+  & $guardBlock -LaunchTray
+  & $guardBlock -Uninstall
+  Check $true 'upstream standalone installer actions retained'
+  Refuses { & $guardBlock -Install -LaunchTray } 'upstream install and launch remain separate'
+  Refuses { & $guardBlock -Install -Uninstall } 'upstream install and uninstall remain separate'
   [IO.Directory]::CreateDirectory($engine.Scripts) | Out-Null
   foreach ($relative in @('VERSION','scripts\common-windows.ps1','scripts\theme-windows.ps1','scripts\config-utf8.ps1','scripts\operation-log.ps1','scripts\localization-windows.ps1','scripts\launch-themed-codex.ps1','scripts\start-dream-skin.ps1')) {
     [IO.File]::WriteAllText((Join-Path $engine.Root $relative), '1.5.19')

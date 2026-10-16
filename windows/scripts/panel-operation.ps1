@@ -422,12 +422,16 @@ try {
     'Apply' { $result = Invoke-DreamSkinPanelApply -StateRoot $StateRoot -OperationId $OperationId -SavedThemeDirectory $SavedThemeDirectory -BackgroundPath $BackgroundPath }
     'Shortcut' {
       . (Join-Path $PSScriptRoot 'launch-themed-codex.ps1') -FunctionsOnly
-      $null = New-DreamSkinDefaultShortcut -StateRoot $StateRoot
+      $null = New-DreamSkinDefaultShortcutPair -StateRoot $StateRoot
       $result = [pscustomobject]@{ Outcome = 'success'; Category = 'none'; Message = (Get-DreamSkinPanelText -Key 'PanelShortcutCreated' -StateRoot $StateRoot); DiskRecovery = 'not-needed'; VisibleRecovery = 'not-needed' }
     }
   }
 } catch {
-  $result = [pscustomobject]@{ Outcome = 'failure'; Category = 'operation-failed'; Message = (Get-DreamSkinPanelText -Key 'PanelOperationFailed' -StateRoot $StateRoot); DiskRecovery = 'unverified'; VisibleRecovery = 'unverified' }
+  if ($Action -eq 'Shortcut') {
+    Write-DreamSkinPanelEvent -StateRoot $StateRoot -OperationId $OperationId -Action $Action -Stage shortcut -Outcome failure -Category shortcut-creation-failed -Message $_.Exception.Message
+  }
+  $recoveryStatus = if ($Action -eq 'Shortcut') { 'not-needed' } else { 'unverified' }
+  $result = [pscustomobject]@{ Outcome = 'failure'; Category = 'operation-failed'; Message = (Get-DreamSkinPanelText -Key 'PanelOperationFailed' -StateRoot $StateRoot); DiskRecovery = $recoveryStatus; VisibleRecovery = $recoveryStatus }
 }
 Write-DreamSkinPanelEvent -StateRoot $StateRoot -OperationId $OperationId -Action $Action -Stage completed -Outcome $result.Outcome -Category $result.Category -Message $result.Message
 Write-DreamSkinPanelResult -StateRoot $StateRoot -OperationId $OperationId -Action $Action -Outcome $result.Outcome -Category $result.Category -Message $result.Message -DiskRecovery $result.DiskRecovery -VisibleRecovery $result.VisibleRecovery

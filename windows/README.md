@@ -34,7 +34,6 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 安装器会校验官方 Codex Store 包和 Node.js，保存可恢复的外观配置，并初始化本地主题仓库。默认还会创建这些快捷方式：
 
 - `Codex Dream Skin`：打开原生主题管理面板。
-- `Codex Dream Skin - Launch`：使用已保存的主题与背景直接启动 Codex。
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
@@ -52,7 +51,9 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 
 ## 启动与验证
 
-使用 `Codex Dream Skin - Launch` 快捷方式带主题启动。它发现 Codex 已经运行且需要重启时会先询问。`Codex Dream Skin` 打开管理面板，可选择主题和背景后保存为启动设置；保存后同一个启动图标会读取最新组合，无需重新生成。
+打开 `Codex Dream Skin` 管理面板，选择主题和背景后保存为启动设置，再点击 **创建 / 修复默认启动快捷方式**。这次点击同时在桌面和安装目录生成 `Codex Dream Skin - Launch` 两份快捷方式；创建本身既不保存草稿，也不启动 Codex。Setup 使用已注册并验证的安装目录；没有有效 Setup 安装的源码用户使用 `%LOCALAPPDATA%\CodexDreamSkin`（`engine` 的父目录），使目录副本在引擎升级后仍保留。
+
+两份入口指向同一个受管启动脚本，双击任意一份即可带保存的主题与背景启动。发现 Codex 已经运行且需要重启时会先询问。以后保存不同组合无需重新生成图标。安装、构建、升级和 Windows 登录不会自动新增 Launch，也不在开始菜单新增 Launch；原有入口保持不变。
 
 命令行启动：
 
@@ -79,7 +80,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-d
 
 ## 更换和保存主题
 
-原生主题面板现在提供主题/背景草稿预览、保存为启动设置、验证应用、创建默认启动快捷方式及操作日志。日常可以直接从默认启动图标读取保存的外观；详细使用和本机更新流程见 [`docs/windows-panel-startup.md`](../docs/windows-panel-startup.md)。
+原生主题面板现在提供主题/背景草稿预览、保存为启动设置、验证应用、创建默认启动快捷方式及操作日志。日常可以直接从用户明确创建的默认启动图标读取保存的外观；详细使用和更新流程见 [`docs/windows-panel-startup.md`](../docs/windows-panel-startup.md)。
 
 打开 `Codex Dream Skin - Tray` 后可以：
 

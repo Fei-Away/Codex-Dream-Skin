@@ -111,6 +111,213 @@ function Remove-DreamSkinDefaultShortcut {
   }
 }
 
+function Get-DreamSkinSetupInstallLocations {
+  $subkey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{DCCDAF1A-9ACD-4AAB-B55B-DF17EB2CDA2E}_is1'
+  foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32)) {
+    $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, $view)
+    $key = $null
+    try {
+      $key = $base.OpenSubKey($subkey)
+      if ($null -eq $key) { continue }
+      $name = $key.GetValue('DisplayName', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+      $location = $key.GetValue('InstallLocation', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+      if ($name -cne 'Codex Dream Skin' -or $location -isnot [string] -or $location.Length -gt 2048) {
+        throw 'The Dream Skin Setup registration is invalid.'
+      }
+      $location
+    } finally {
+      if ($null -ne $key) { $key.Dispose() }
+      $base.Dispose()
+    }
+  }
+}
+
+function Resolve-DreamSkinShortcutInstallDirectory {
+  param([Parameter(Mandatory = $true)][string]$StateRoot)
+  $engine = Assert-DreamSkinDefaultEngine -StateRoot $StateRoot
+  $valid = @()
+  foreach ($location in @(Get-DreamSkinSetupInstallLocations | Select-Object -Unique)) {
+    if ($location -notmatch '^[a-zA-Z]:[\\/]') { throw 'Setup shortcut locations must be absolute local paths.' }
+    $directory = [IO.Path]::GetFullPath($location)
+    if ($directory.Length -gt [IO.Path]::GetPathRoot($directory).Length) { $directory = $directory.TrimEnd('\') }
+    Assert-DreamSkinNoReparseComponents -Path $directory
+    # A removed historical Setup does not redirect a later source installation.
+    if (-not (Test-Path -LiteralPath $directory)) { continue }
+    if (-not (Test-Path -LiteralPath $directory -PathType Container)) { throw 'The registered Setup directory is invalid.' }
+    foreach ($relative in @('setup-bootstrap.ps1', 'payload\VERSION', 'payload\scripts\common-windows.ps1')) {
+      $marker = Join-Path $directory $relative
+      Assert-DreamSkinNoReparseComponents -Path $marker
+      if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) { throw 'The registered Setup directory is incomplete. Repair the installation first.' }
+    }
+    $versionPath = Join-Path $directory 'payload\VERSION'
+    if ((Get-Item -LiteralPath $versionPath).Length -gt 64 -or
+      (Read-DreamSkinUtf8File -Path $versionPath).Trim() -cnotmatch '^\d+\.\d+\.\d+$') {
+      throw 'The registered Setup payload version is invalid.'
+    }
+    if (@($valid | Where-Object { Test-DreamSkinPathEqual -Left $_ -Right $directory }).Count -eq 0) { $valid += $directory }
+  }
+  if ($valid.Count -gt 1) { throw 'More than one Dream Skin Setup directory is registered.' }
+  if ($valid.Count -eq 1) { return $valid[0] }
+  # Source installations keep their link beside engine, so an engine upgrade does not erase it.
+  return [IO.Path]::GetFullPath($StateRoot)
+}
+
+function Get-DreamSkinDesktopShortcutDirectory {
+  return [Environment]::GetFolderPath('Desktop')
+}
+
+function Get-DreamSkinRestrictedShortcutDirectories {
+  foreach ($kind in @('StartMenu', 'CommonStartMenu', 'Startup', 'CommonStartup')) {
+    $directory = [Environment]::GetFolderPath([Environment+SpecialFolder]::$kind)
+    if ($directory) { $directory }
+  }
+}
+
+function Assert-DreamSkinManualShortcutLocation {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  foreach ($directory in @(Get-DreamSkinRestrictedShortcutDirectories)) {
+    if ((Test-DreamSkinPathEqual -Left $Path -Right $directory) -or
+      (Test-DreamSkinPathWithin -Path $Path -Root $directory)) {
+      throw 'Optional launch shortcuts cannot be placed in Windows menu or sign-in folders.'
+    }
+  }
+}
+
+function Read-DreamSkinShortcutBytes {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  Assert-DreamSkinNoReparseComponents -Path $Path
+  if (-not (Test-Path -LiteralPath $Path)) { return $null }
+  $stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+  try {
+    if ($stream.Length -le 0 -or $stream.Length -gt 65536) { throw 'The existing shortcut is not a bounded ordinary link.' }
+    $bytes = [byte[]]::new([int]$stream.Length)
+    $offset = 0
+    while ($offset -lt $bytes.Length) {
+      $count = $stream.Read($bytes, $offset, $bytes.Length - $offset)
+      if ($count -le 0) { throw 'The shortcut could not be read completely.' }
+      $offset += $count
+    }
+    return ,$bytes
+  } finally { $stream.Dispose() }
+}
+
+function Read-DreamSkinOwnedShortcutBytes {
+  param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)]$Engine, [switch]$AllowUnrelated)
+  Assert-DreamSkinNoReparseComponents -Path $Path
+  if (-not (Test-Path -LiteralPath $Path)) { return $null }
+  try {
+    $bytes = Read-DreamSkinShortcutBytes -Path $Path
+    $shell = New-Object -ComObject WScript.Shell
+    $link = $shell.CreateShortcut($Path)
+    $hostPath = Join-Path ([Environment]::GetFolderPath('Windows')) 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-DreamSkinPathEqual -Left $link.TargetPath -Right $hostPath) -or
+      $link.Arguments -cne (Get-DreamSkinDefaultShortcutArguments -Launcher $Engine.DefaultLaunch)) {
+      throw 'An unrelated shortcut already exists at a requested destination.'
+    }
+    Assert-DreamSkinFileUnchanged -Path $Path -ExpectedBytes $bytes
+    return ,$bytes
+  } catch {
+    if ($AllowUnrelated) { return $null }
+    throw
+  }
+}
+
+function New-DreamSkinDefaultShortcutPair {
+  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $lock = $null; $backup = $null; $preserveBackup = $false
+  $plans = @(); $aliases = @()
+  try {
+    $lock = Enter-DreamSkinOperationLock
+    $engine = Assert-DreamSkinDefaultEngine -StateRoot $StateRoot
+    $desktop = [IO.Path]::GetFullPath((Get-DreamSkinDesktopShortcutDirectory))
+    $installation = Resolve-DreamSkinShortcutInstallDirectory -StateRoot $StateRoot
+    if (Test-DreamSkinPathEqual -Left $desktop -Right $installation) { throw 'Desktop and installation shortcut locations must be different.' }
+    $token = [guid]::NewGuid().ToString('N')
+    foreach ($directory in @($desktop, $installation)) {
+      Assert-DreamSkinNoReparseComponents -Path $directory
+      Assert-DreamSkinManualShortcutLocation -Path $directory
+      if (-not (Test-Path -LiteralPath $directory -PathType Container)) { throw 'A shortcut directory is unavailable.' }
+      $path = Join-Path $directory (Get-DreamSkinDefaultShortcutName)
+      $old = Read-DreamSkinOwnedShortcutBytes -Path $path -Engine $engine
+      $plans += [pscustomobject]@{ Path=$path; Old=$old; New=$null; Stage=(Join-Path $directory ('.dream-pair-' + $token + '.lnk')); Committed=$false }
+      foreach ($name in @(Get-DreamSkinLegacyDefaultShortcutNames)) {
+        $aliasPath = Join-Path $directory $name
+        $aliasBytes = Read-DreamSkinOwnedShortcutBytes -Path $aliasPath -Engine $engine -AllowUnrelated
+        if ($null -ne $aliasBytes) { $aliases += [pscustomobject]@{Path=$aliasPath; Old=$aliasBytes; Deleted=$false} }
+      }
+    }
+    # Stage both links before changing either public destination. This also tests write access.
+    foreach ($plan in $plans) {
+      $null = New-DreamSkinDefaultShortcut -StateRoot $StateRoot -ShortcutPath $plan.Stage
+      $plan.New = Read-DreamSkinOwnedShortcutBytes -Path $plan.Stage -Engine $engine
+    }
+    $backup = Join-Path $StateRoot ('.shortcut-recovery-' + $token)
+    Ensure-DreamSkinManagedDirectory -Path $backup -Root $StateRoot
+    $index = @(); $number = 0
+    foreach ($item in @($plans) + @($aliases)) {
+      $file = $null
+      if ($null -ne $item.Old) {
+        $file = "$number.lnk"
+        Write-DreamSkinBytesAtomically -Path (Join-Path $backup $file) -Bytes $item.Old -ExpectedBytes $null
+      }
+      $index += [ordered]@{path=$item.Path; backup=$file}
+      $number++
+    }
+    Write-DreamSkinUtf8FileAtomically -Path (Join-Path $backup 'recovery.json') -Content (
+      [ordered]@{schemaVersion=1; files=$index} | ConvertTo-Json -Depth 4 -Compress)
+    foreach ($plan in $plans) {
+      Assert-DreamSkinNoReparseComponents -Path $plan.Path
+      Write-DreamSkinBytesAtomically -Path $plan.Path -Bytes $plan.New -ExpectedBytes $plan.Old
+      $plan.Committed = $true
+    }
+    foreach ($plan in $plans) { Assert-DreamSkinFileUnchanged -Path $plan.Path -ExpectedBytes $plan.New }
+    # Retire only owned aliases, after both destinations have been published.
+    foreach ($alias in $aliases) {
+      Assert-DreamSkinNoReparseComponents -Path $alias.Path
+      Assert-DreamSkinFileUnchanged -Path $alias.Path -ExpectedBytes $alias.Old
+      Remove-DreamSkinDefaultShortcut -StateRoot $StateRoot -ShortcutPath $alias.Path
+      $alias.Deleted = -not (Test-Path -LiteralPath $alias.Path)
+    }
+    return [pscustomobject]@{ Desktop=$plans[0].Path; Installation=$plans[1].Path; Count=2 }
+  } catch {
+    $failure = $_
+    foreach ($alias in $aliases) {
+      if (-not $alias.Deleted) { continue }
+      try { Write-DreamSkinBytesAtomically -Path $alias.Path -Bytes $alias.Old -ExpectedBytes $null } catch { $preserveBackup = $true }
+    }
+    for ($i = $plans.Count - 1; $i -ge 0; $i--) {
+      $plan = $plans[$i]
+      if (-not $plan.Committed) { continue }
+      try {
+        Assert-DreamSkinNoReparseComponents -Path $plan.Path
+        if ($null -ne $plan.Old) {
+          Write-DreamSkinBytesAtomically -Path $plan.Path -Bytes $plan.Old -ExpectedBytes $plan.New
+        } else {
+          Assert-DreamSkinFileUnchanged -Path $plan.Path -ExpectedBytes $plan.New
+          Remove-Item -LiteralPath $plan.Path -Force -ErrorAction Stop
+        }
+      } catch { $preserveBackup = $true }
+    }
+    if ($preserveBackup) { Write-Warning 'Shortcut recovery was blocked by a newer change. The recovery backup was retained.' }
+    throw $failure
+  } finally {
+    foreach ($plan in $plans) {
+      try {
+        if (Test-Path -LiteralPath $plan.Stage) {
+          Assert-DreamSkinNoReparseComponents -Path $plan.Stage
+          if ($null -eq $plan.New) { throw 'Unverified shortcut staging bytes were preserved.' }
+          Assert-DreamSkinFileUnchanged -Path $plan.Stage -ExpectedBytes $plan.New
+          Remove-Item -LiteralPath $plan.Stage -Force -ErrorAction Stop
+        }
+      } catch { Write-Warning 'A private shortcut staging file was retained.' }
+    }
+    if ($backup -and -not $preserveBackup) {
+      try { Remove-DreamSkinManagedDirectoryVerified -Path $backup -Root $StateRoot } catch { Write-Warning 'Shortcut recovery files were retained.' }
+    }
+    if ($null -ne $lock) { Exit-DreamSkinOperationLock -Mutex $lock }
+  }
+}
+
 function Read-DreamSkinLaunchRecovery {
   param([Parameter(Mandatory = $true)][string]$StateRoot, [Parameter(Mandatory = $true)][string]$Token)
   if ($Token -cnotmatch '^[a-f0-9]{32}$') { throw 'Invalid recovery token.' }
