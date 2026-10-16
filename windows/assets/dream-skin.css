@@ -1774,6 +1774,61 @@ html[data-dream-skin="active"] [role="dialog"]:has([data-testid="image-preview-d
   background: transparent !important;
 }
 
+/* Dot embedded conversations (Windows Codex 26.1007).
+   These native surfaces mount before data-ds-part classification. Keep their
+   narrowly scoped :has predicates native so the first paint cannot depend on
+   the asynchronous predicate cache. Do not change geometry or nested widgets. */
+html[data-dream-skin="active"] main:is([data-ds-part="main"], [data-app-shell-main-surface]) :is(
+  .messaging-root.messaging-embedded:has(/* dream-skin-native-has */ > .workspace > main.thread-pane),
+  .messaging-root.messaging-embedded > .workspace > main.thread-pane,
+  .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded,
+  .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded > .thread-pane
+):not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *) {
+  background-color: transparent !important;
+}
+
+/* Rows are layout wrappers, not the readable bubble surface. The generic
+   article panel rule must not paint a second full-width panel behind them. */
+html[data-dream-skin="active"] main:is([data-ds-part="main"], [data-app-shell-main-surface]) .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded > .thread-pane .message-list > article.message-row:not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *) {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Multipart replies wrap text bubbles and code surfaces in an outer bubble.
+   Clear that wrapper only; preserve the native leaf text/code surfaces and
+   the existing theme/user transparency token rather than fixing an alpha. */
+html[data-dream-skin="active"] main:is([data-ds-part="main"], [data-app-shell-main-surface]) .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded > .thread-pane .message-list > article.message-row:not(.self) > .message-bubble-wrap .message-surface > .message-bubble:has(/* dream-skin-native-has */ .message-bubble):not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *) {
+  background-color: transparent !important;
+}
+
+/* The native composer bottom border is safe-area spacing: keep its 16px
+   width and layout while removing only its opaque paint. */
+html[data-dream-skin="active"] main:is([data-ds-part="main"], [data-app-shell-main-surface]):has(/* dream-skin-native-has */ .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded > .thread-pane:not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *)) .composer-wrap:not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *) {
+  border-bottom-color: transparent !important;
+}
+
+/* Full mode opts into artwork with the baseline readability veil. Only stop
+   painting Dot's decorative fades; never hide their containers (#415). */
+html[data-dream-skin="active"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])
+  main:is([data-ds-part="main"], [data-app-shell-main-surface]):has(/* dream-skin-native-has */ .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded > .thread-pane:not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *))
+  :is([class*="_floatingHeader_"], .composer-wrap [class*="_composer_"] > .pointer-events-none > .bg-gradient-to-t.from-surface):not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *) {
+  background-image: none !important;
+}
+
+/* Keep the normal wide main scrim during both part classification and
+   predicate-cache refresh. Scope by the native Dot tree, not marker timing. */
+html[data-dream-skin="active"][data-dream-art-wide="true"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-art-task-mode="banner"])
+  main[data-app-shell-main-surface]:has(/* dream-skin-native-has */ .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded > .thread-pane:not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *)):not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *) {
+  background: linear-gradient(90deg, var(--ds-task-immersive-edge), var(--ds-task-immersive-mid) 64%, var(--ds-task-immersive-far)) !important;
+}
+
+html[data-dream-skin="active"][data-dream-art-wide="true"]:is([data-dream-task-mode="full"], [data-dream-art-task-mode="full"])
+  main[data-app-shell-main-surface]:has(/* dream-skin-native-has */ .messaging-root.messaging-embedded > .workspace > main.thread-pane > .messaging-root.messaging-embedded > .thread-pane:not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *)):not(:is([data-app-shell-active-page="false"], [role="dialog"], [aria-modal="true"]) *) {
+  background: linear-gradient(90deg, var(--ds-immersive-edge), var(--ds-immersive-mid) 64%, var(--ds-immersive-far)) !important;
+}
+
 /* Windows 26.930 application-menu chrome already overlays the painted main.
    The macOS titlebar extension instead paints at y=0, doubling the Windows
    menu scrim and ending mid-header. Keep only the existing native surfaces.

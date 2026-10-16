@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix Dot conversation surfaces covering theme artwork, multipart reply wrapper panels, and opaque composer bottom spacing. Keep mount-sensitive selectors native to avoid a black flash before classification. Full task mode removes decorative Dot fades; bubble opacity continues to follow existing theme settings.
+
 ## 1.5.21
 
 - 本版修复 Windows Node.js 代理警告问题；macOS 无运行时行为变更，仅同步版本号。完整说明见 [v1.5.21 发布说明](../docs/releases/v1.5.21.md)。

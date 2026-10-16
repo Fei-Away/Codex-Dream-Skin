@@ -54,6 +54,10 @@ export function cssPredicateManifest(css) {
     }
     if (!closed) throw new Error("Unclosed :has() selector");
     const selector = css.slice(start, i + 1);
+    // Explicit canonical-source opt-out for mount-sensitive surfaces. Parse
+    // and validate the entire predicate above before leaving it native. This
+    // is a performance choice only; community Safe CSS policy is unchanged.
+    if (/^:has\(\s*\/\* dream-skin-native-has \*\//.test(selector)) continue;
     if (!predicates.has(selector)) {
       const attribute = `data-dream-has-${predicates.size}`;
       // :where(marker) adds no specificity. The impossible second branch

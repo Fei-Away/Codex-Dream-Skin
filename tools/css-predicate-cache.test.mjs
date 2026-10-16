@@ -64,7 +64,7 @@ test("malformed or nested predicates fail compilation", () => {
   }
 });
 
-test("current expanded platform CSS is supported and executable has predicates are fully replaced", async () => {
+test("current expanded platform CSS is supported and cacheable predicates are fully replaced", async () => {
   const css = await fs.readFile(new URL("../macos/assets/dream-skin.css", import.meta.url), "utf8");
   const manifest = cssPredicateManifest(css);
   assert.ok(manifest.length > 0);
@@ -72,4 +72,38 @@ test("current expanded platform CSS is supported and executable has predicates a
   for (const { selector, replacement } of manifest) optimized = optimized.replaceAll(selector, replacement);
   assert.deepEqual(cssPredicateManifest(optimized), []);
   assert.equal(new Set(manifest.map(({ attribute }) => attribute)).size, manifest.length);
+});
+
+
+test("mount-sensitive native predicates opt out without disabling other caching", () => {
+  const native = ':has(/* dream-skin-native-has */ > .workspace > main.thread-pane)';
+  const source = 'main' + native + '{} main:has(.normal) {}';
+  const manifest = cssPredicateManifest(source);
+  assert.deepEqual(manifest.map(p => p.selector), [':has(.normal)']);
+  assert.equal(manifest[0].attribute, 'data-dream-has-0');
+  assert.ok(source.includes(native));
+  assert.throws(() => cssPredicateManifest('main:has(/* dream-skin-native-has */ >) {}'), /Malformed/);
+  assert.throws(() => cssPredicateManifest('main:has(/* dream-skin-native-has */ .a:has(.b)) {}'), /Nested/);
+});
+
+test("generated Dot predicates stay native on both platforms before classification", async () => {
+  for (const platform of ['macos', 'windows']) {
+    const css = await fs.readFile(new URL('../' + platform + '/assets/dream-skin.css', import.meta.url), 'utf8');
+    const manifest = cssPredicateManifest(css);
+    assert.ok(css.includes(':has(/* dream-skin-native-has */ .messaging-root'));
+    assert.ok(!manifest.some(p => p.selector.includes('messaging-root') || p.selector.includes('.message-bubble')));
+    assert.ok(manifest.length > 0);
+  }
+});
+
+test("native opt-out is local to its fragment, even with an identical cached argument", () => {
+  const native = ':has(/* dream-skin-native-has */ .a)';
+  const source = 'main' + native + '{} section:has(.a){} p:has(.b){}';
+  let optimized = source;
+  for (const p of cssPredicateManifest(source)) optimized = optimized.replaceAll(p.selector, p.replacement);
+  assert.ok(optimized.includes(native));
+  assert.ok(!optimized.includes(':has(.a)'));
+  assert.ok(!optimized.includes(':has(.b)'));
+  assert.equal(cssPredicateManifest('/* dream-skin-native-has */ p:has(.a){}').length, 1);
+  assert.equal(cssPredicateManifest('p:has([title="/* dream-skin-native-has */"]){}').length, 1);
 });

@@ -1,5 +1,9 @@
 # Windows Changelog
 
+## Unreleased
+
+- Fix Dot conversation surfaces covering theme artwork, multipart reply wrapper panels, and opaque composer bottom spacing. Keep mount-sensitive selectors native to avoid a black flash before classification. Full task mode removes decorative Dot fades; bubble opacity continues to follow existing theme settings.
+
 ## 1.5.21
 
 - 修复启用 `NODE_USE_ENV_PROXY` 时，Node 的无害 stderr 警告被 Windows PowerShell 5.1 升级为终止错误、导致安装或主题操作失败的问题；图片、Safe CSS、主题 ZIP 和 payload 校验统一通过原生命令封装执行。
