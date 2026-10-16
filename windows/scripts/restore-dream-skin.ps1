@@ -138,9 +138,8 @@ try {
       . (Join-Path $PSScriptRoot 'launch-themed-codex.ps1') -FunctionsOnly
       $desktop = [Environment]::GetFolderPath('Desktop')
       $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-      $defaultName = 'Codex ' + [char]0x00b7 + ' ' + (-join ([char[]]@(0x9ed8,0x8ba4,0x4e3b,0x9898,0x542f,0x52a8))) + '.lnk'
       foreach ($folder in @($desktop, $startMenu, (Join-Path $startMenu 'Codex Dream Skin'))) {
-        Remove-DreamSkinDefaultShortcut -StateRoot $StateRoot -ShortcutPath (Join-Path $folder $defaultName)
+        Remove-DreamSkinDefaultShortcuts -StateRoot $StateRoot -Directory $folder
       }
       @(
         (Join-Path $desktop 'Codex Dream Skin.lnk'),

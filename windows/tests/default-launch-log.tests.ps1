@@ -33,7 +33,7 @@ try {
   Refuses { Assert-DreamSkinBootstrapActions -Uninstall -LaunchTray } 'uninstall cannot launch'
   Refuses { Assert-DreamSkinBootstrapActions -Uninstall -ShowWindow } 'uninstall cannot show a manager'
   [IO.Directory]::CreateDirectory($engine.Scripts) | Out-Null
-  foreach ($relative in @('VERSION','scripts\common-windows.ps1','scripts\theme-windows.ps1','scripts\config-utf8.ps1','scripts\operation-log.ps1','scripts\launch-themed-codex.ps1','scripts\start-dream-skin.ps1')) {
+  foreach ($relative in @('VERSION','scripts\common-windows.ps1','scripts\theme-windows.ps1','scripts\config-utf8.ps1','scripts\operation-log.ps1','scripts\localization-windows.ps1','scripts\launch-themed-codex.ps1','scripts\start-dream-skin.ps1')) {
     [IO.File]::WriteAllText((Join-Path $engine.Root $relative), '1.5.19')
   }
   $id = [guid]::NewGuid().ToString('N')
@@ -90,6 +90,56 @@ try {
   Remove-DreamSkinDefaultShortcut -StateRoot $state -ShortcutPath $shortcutPath
   Check (-not (Test-Path -LiteralPath $shortcutPath)) 'uninstall removes owned shortcut'
   Refuses { New-DreamSkinDefaultShortcut -StateRoot $state -ShortcutPath (Join-Path $fixture 'bad.txt') } 'non-shortcut destination refused'
+
+  $englishName = Get-DreamSkinDefaultShortcutName
+  Check ($englishName -ceq 'Codex Dream Skin - Launch.lnk') 'generated launch name is fixed English'
+  $canonical = Join-Path $fixture $englishName
+  $legacy = Join-Path $fixture (Get-DreamSkinLegacyDefaultShortcutNames)
+  Copy-Item -LiteralPath $copiedShortcut -Destination $legacy
+  $null = New-DreamSkinDefaultShortcut -StateRoot $state -ShortcutPath $canonical
+  Check ((Test-Path -LiteralPath $canonical) -and -not (Test-Path -LiteralPath $legacy)) 'owned legacy name migrated after English entry exists'
+  Copy-Item -LiteralPath $canonical -Destination $legacy
+  $null = New-DreamSkinDefaultShortcut -StateRoot $state -ShortcutPath $canonical
+  Check (-not (Test-Path -LiteralPath $legacy)) 'repair of existing English entry retires owned legacy alias'
+  $other = $shell.CreateShortcut($legacy); $other.TargetPath = Join-Path ([Environment]::GetFolderPath('Windows')) 'notepad.exe'; $other.Save()
+  $null = New-DreamSkinDefaultShortcut -StateRoot $state -ShortcutPath $canonical
+  Check (Test-Path -LiteralPath $legacy) 'migration preserves unrelated legacy-named shortcut'
+  Remove-DreamSkinDefaultShortcuts -StateRoot $state -Directory $fixture
+  Check (-not (Test-Path -LiteralPath $canonical) -and (Test-Path -LiteralPath $legacy)) 'uninstall removes English entry but preserves unrelated legacy name'
+  Remove-Item -LiteralPath $legacy
+  Copy-Item -LiteralPath $copiedShortcut -Destination $legacy
+  $other = $shell.CreateShortcut($canonical); $other.TargetPath = Join-Path ([Environment]::GetFolderPath('Windows')) 'notepad.exe'; $other.Save()
+  Refuses { New-DreamSkinDefaultShortcut -StateRoot $state -ShortcutPath $canonical } 'unrelated English-named shortcut blocks migration'
+  Check (Test-Path -LiteralPath $legacy) 'blocked migration retains original owned entry'
+  Remove-Item -LiteralPath $canonical
+  Remove-DreamSkinDefaultShortcuts -StateRoot $state -Directory $fixture
+  Check (-not (Test-Path -LiteralPath $legacy)) 'uninstall recognizes the owned former Chinese name'
+
+  $previousLanguage = $env:DREAMSKIN_LANG
+  try {
+    $failure = [pscustomobject]@{category='renderer-verification-failed';appearanceRecovery='restored';diskRecovery='restored';visibleRecovery='unverified'}
+    foreach ($language in @('en-US','zh-CN')) {
+      $env:DREAMSKIN_LANG = $language
+      $message = Get-DreamSkinDefaultLaunchFailureText -Result $failure -StateRoot $state
+      Check ($message.Contains('renderer-verification-failed') -and $message -notmatch 'not-needed|unverified') "localized launch failure preserves diagnostic category: $language"
+      Check (($message -match '[\u4e00-\u9fff]') -eq ($language -eq 'zh-CN')) "launch failure follows selected language: $language"
+      Check ((Get-DreamSkinDefaultShortcutName) -ceq $englishName) "language does not change shortcut filename: $language"
+      $appearanceKeys = @{
+        'not-needed'='DefaultRecoveryNotNeeded'; 'retained'='DefaultRecoveryRetained'; 'restored'='DefaultRecoveryRestored'
+        'conflict-preserved'='DefaultRecoveryConflictPreserved'; 'blocked'='DefaultRecoveryBlocked'; 'preserved-rendered'='DefaultRecoveryPreservedRendered'
+      }
+      foreach ($recoveryState in $script:DreamSkinStartAppearanceRecoveryStates) {
+        $failure.appearanceRecovery = $recoveryState
+        $recoveryMessage = Get-DreamSkinDefaultLaunchFailureText -Result $failure -StateRoot $state
+        $expected = Get-DreamSkinText -Key $appearanceKeys[$recoveryState] -Language $language
+        Check ($recoveryMessage.Contains($expected)) "appearance recovery meaning retained: $language / $recoveryState"
+      }
+    }
+    $env:DREAMSKIN_LANG = $null
+    Set-DreamSkinLanguage -Language 'zh-CN' -StateRoot $state
+    Check ((Get-DreamSkinDefaultLaunchFailureText -Result $failure -StateRoot $state) -match '[\u4e00-\u9fff]') 'independent launcher honors saved language preference'
+    Set-DreamSkinLanguage -Language 'system' -StateRoot $state
+  } finally { $env:DREAMSKIN_LANG = $previousLanguage }
 
   $script:launchMode = 'success'
   function Start-Process {

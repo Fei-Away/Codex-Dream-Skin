@@ -14,7 +14,6 @@ $commonPath = Join-Path $payloadScripts 'common-windows.ps1'
 $themePath = Join-Path $payloadScripts 'theme-windows.ps1'
 $stateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'Codex Dream Skin.lnk'
-$defaultName = 'Codex ' + [char]0x00b7 + ' ' + (-join ([char[]]@(0x9ed8,0x8ba4,0x4e3b,0x9898,0x542f,0x52a8))) + '.lnk'
 $managerMaintenance = $null
 
 function Assert-DreamSkinBootstrapActions {
@@ -97,7 +96,7 @@ try {
     }
     if (Test-Path -LiteralPath (Join-Path $payloadScripts 'launch-themed-codex.ps1') -PathType Leaf) {
       . (Join-Path $payloadScripts 'launch-themed-codex.ps1') -FunctionsOnly
-      Remove-DreamSkinDefaultShortcut -StateRoot $stateRoot -ShortcutPath (Join-Path $PSScriptRoot $defaultName)
+      Remove-DreamSkinDefaultShortcuts -StateRoot $stateRoot -Directory $PSScriptRoot
     }
     if (Test-Path -LiteralPath $engine.Root -PathType Container) {
       Remove-DreamSkinRuntimeTree -Path $engine.Root -StateRoot $stateRoot
@@ -187,6 +186,7 @@ try {
 
   if ($Install) {
     . (Join-Path $engine.Scripts 'launch-themed-codex.ps1') -FunctionsOnly
+    $defaultName = Get-DreamSkinDefaultShortcutName
     $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Codex Dream Skin'
     Assert-DreamSkinNoReparseComponents -Path $menu
     [IO.Directory]::CreateDirectory($menu) | Out-Null

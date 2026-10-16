@@ -10,6 +10,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Load localization even when functions are imported by startup or isolated tests.
+. (Join-Path $PSScriptRoot 'localization-windows.ps1')
+
+function Get-DreamSkinPanelText {
+  param([Parameter(Mandatory = $true)][string]$Key, [string]$StateRoot)
+  $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
+  return Get-DreamSkinText -Key $Key -Language $language
+}
+
 function New-DreamSkinPanelDraft {
   param([string]$StateRoot, [string]$SavedThemeDirectory, [string]$BackgroundPath)
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
@@ -257,7 +266,7 @@ function Save-DreamSkinPanelSettings {
       Write-Warning 'Saved settings are valid; the previous recovery backup was retained.'
     }
     return [pscustomobject]@{ Outcome = 'success'; Category = 'none'; DiskRecovery = 'not-needed'; VisibleRecovery = 'not-needed'
-      Message = '启动设置已保存；下次默认启动将使用此主题和背景。已运行的皮肤也可能随之更新。' }
+      Message = (Get-DreamSkinPanelText -Key 'PanelSaved' -StateRoot $StateRoot) }
   } catch {
     if ($category -eq 'recovery-blocked') { $diskRecovery = 'blocked' }
     if ($oldMoved) {
@@ -305,12 +314,12 @@ function Save-DreamSkinPanelSettings {
       Write-DreamSkinPanelEvent -StateRoot $StateRoot -OperationId $OperationId -Action Save -Stage recovery -Outcome $diskRecovery -Category $visible -Message 'Disk settings were restored; visible recovery has a separate status.'
     }
     return [pscustomobject]@{ Outcome = 'failure'; Category = $category; DiskRecovery = $diskRecovery; VisibleRecovery = $visible
-      Message = $(if ($category -eq 'operation-busy') { '另一项皮肤操作正在进行，请稍后重试。' }
-        elseif ($category -eq 'recovery-blocked') { '上一次保存仍需恢复，原恢复备份与记录已保留，请查看日志。' }
-        elseif ($diskRecovery -eq 'restored' -and $visible -eq 'verified') { '保存失败；原启动设置与窗口外观已验证恢复。' }
-        elseif ($diskRecovery -eq 'restored') { '保存失败，原启动设置已恢复；当前窗口外观尚未验证。' }
-        elseif ($diskRecovery -eq 'blocked') { '保存失败且恢复未完成，恢复备份已保留，请查看日志。' }
-        else { '设置校验失败，原启动设置保持不变，请检查主题和图片。' }) }
+      Message = $(if ($category -eq 'operation-busy') { (Get-DreamSkinPanelText -Key 'PanelOperationBusy' -StateRoot $StateRoot) }
+        elseif ($category -eq 'recovery-blocked') { (Get-DreamSkinPanelText -Key 'PanelSaveRecoveryBlocked' -StateRoot $StateRoot) }
+        elseif ($diskRecovery -eq 'restored' -and $visible -eq 'verified') { (Get-DreamSkinPanelText -Key 'PanelSaveRecoveredVerified' -StateRoot $StateRoot) }
+        elseif ($diskRecovery -eq 'restored') { (Get-DreamSkinPanelText -Key 'PanelSaveRecoveredUnverified' -StateRoot $StateRoot) }
+        elseif ($diskRecovery -eq 'blocked') { (Get-DreamSkinPanelText -Key 'PanelSaveRecoveryIncomplete' -StateRoot $StateRoot) }
+        else { (Get-DreamSkinPanelText -Key 'PanelValidationFailed' -StateRoot $StateRoot) }) }
   } finally {
     if ($draft -and -not $journalWritten -and (Test-Path -LiteralPath $draft.Root)) {
       try { Remove-DreamSkinManagedDirectoryVerified -Path $draft.Root -Root $paths.Root } catch {}
@@ -359,12 +368,12 @@ function Invoke-DreamSkinPanelApply {
     }
     if ($null -eq $startResult) {
       if ($child.ExitCode -eq 0 -and $recovery -and $recovery.outcome -ceq 'cancelled') {
-        return [pscustomobject]@{ Outcome = 'cancelled'; Category = 'cancelled'; Message = '已取消应用，启动设置保持不变。'; DiskRecovery = 'not-needed'; VisibleRecovery = 'not-needed' }
+        return [pscustomobject]@{ Outcome = 'cancelled'; Category = 'cancelled'; Message = (Get-DreamSkinPanelText -Key 'PanelApplyCancelled' -StateRoot $StateRoot); DiskRecovery = 'not-needed'; VisibleRecovery = 'not-needed' }
       }
-      return [pscustomobject]@{ Outcome = 'failure'; Category = 'missing-start-result'; Message = '启动未返回可验证结果，请查看日志。'; DiskRecovery = 'unverified'; VisibleRecovery = 'unverified' }
+      return [pscustomobject]@{ Outcome = 'failure'; Category = 'missing-start-result'; Message = (Get-DreamSkinPanelText -Key 'PanelStartResultMissing' -StateRoot $StateRoot); DiskRecovery = 'unverified'; VisibleRecovery = 'unverified' }
     }
     if ($startResult.outcome -eq 'success' -and $child.ExitCode -ne 0) {
-      return [pscustomobject]@{ Outcome = 'failure'; Category = 'conflicting-start-result'; Message = '启动结果与进程状态不一致，请查看日志。'; DiskRecovery = 'unverified'; VisibleRecovery = 'unverified' }
+      return [pscustomobject]@{ Outcome = 'failure'; Category = 'conflicting-start-result'; Message = (Get-DreamSkinPanelText -Key 'PanelStartResultConflict' -StateRoot $StateRoot); DiskRecovery = 'unverified'; VisibleRecovery = 'unverified' }
     }
     $disk = 'not-needed'; $visible = 'not-needed'
     if ($startResult.outcome -eq 'failure') { $disk = 'unverified'; $visible = 'unverified' }
@@ -374,11 +383,11 @@ function Invoke-DreamSkinPanelApply {
     }
     # The existing strict, token-bound start result is the only success evidence.
     return [pscustomobject]@{ Outcome = $startResult.outcome; Category = $startResult.category; DiskRecovery = $disk; VisibleRecovery = $visible
-      Message = $(if ($startResult.outcome -eq 'success') { '主题和背景已通过 Codex 加载验证，并保存为下次启动设置。' }
-        elseif ($disk -eq 'restored' -and $visible -eq 'verified') { '应用失败；原启动设置与窗口外观已验证恢复。' }
-        elseif ($disk -eq 'restored') { '应用失败；原启动设置已恢复，窗口外观恢复尚未通过验证。' }
-        elseif ($disk -eq 'blocked') { '应用失败且恢复未完成，恢复备份已保留。' }
-        else { '主题加载未通过验证，请查看日志后重试。' }) }
+      Message = $(if ($startResult.outcome -eq 'success') { (Get-DreamSkinPanelText -Key 'PanelApplied' -StateRoot $StateRoot) }
+        elseif ($disk -eq 'restored' -and $visible -eq 'verified') { (Get-DreamSkinPanelText -Key 'PanelApplyRecoveredVerified' -StateRoot $StateRoot) }
+        elseif ($disk -eq 'restored') { (Get-DreamSkinPanelText -Key 'PanelApplyRecoveredUnverified' -StateRoot $StateRoot) }
+        elseif ($disk -eq 'blocked') { (Get-DreamSkinPanelText -Key 'PanelApplyRecoveryIncomplete' -StateRoot $StateRoot) }
+        else { (Get-DreamSkinPanelText -Key 'PanelApplyUnverified' -StateRoot $StateRoot) }) }
   } finally {
     $child.Dispose()
     foreach ($temporaryResult in @(
@@ -414,11 +423,11 @@ try {
     'Shortcut' {
       . (Join-Path $PSScriptRoot 'launch-themed-codex.ps1') -FunctionsOnly
       $null = New-DreamSkinDefaultShortcut -StateRoot $StateRoot
-      $result = [pscustomobject]@{ Outcome = 'success'; Category = 'none'; Message = '默认主题启动快捷方式已创建或修复。未保存的草稿不会自动提交。'; DiskRecovery = 'not-needed'; VisibleRecovery = 'not-needed' }
+      $result = [pscustomobject]@{ Outcome = 'success'; Category = 'none'; Message = (Get-DreamSkinPanelText -Key 'PanelShortcutCreated' -StateRoot $StateRoot); DiskRecovery = 'not-needed'; VisibleRecovery = 'not-needed' }
     }
   }
 } catch {
-  $result = [pscustomobject]@{ Outcome = 'failure'; Category = 'operation-failed'; Message = '操作未完成，请查看日志后重试。'; DiskRecovery = 'unverified'; VisibleRecovery = 'unverified' }
+  $result = [pscustomobject]@{ Outcome = 'failure'; Category = 'operation-failed'; Message = (Get-DreamSkinPanelText -Key 'PanelOperationFailed' -StateRoot $StateRoot); DiskRecovery = 'unverified'; VisibleRecovery = 'unverified' }
 }
 Write-DreamSkinPanelEvent -StateRoot $StateRoot -OperationId $OperationId -Action $Action -Stage completed -Outcome $result.Outcome -Category $result.Category -Message $result.Message
 Write-DreamSkinPanelResult -StateRoot $StateRoot -OperationId $OperationId -Action $Action -Outcome $result.Outcome -Category $result.Category -Message $result.Message -DiskRecovery $result.DiskRecovery -VisibleRecovery $result.VisibleRecovery

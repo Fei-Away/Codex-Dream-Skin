@@ -1,6 +1,7 @@
 ﻿[CmdletBinding()]
 param([Parameter(Mandatory = $true)][string]$Root)
 $ErrorActionPreference = 'Stop'
+$originalPanelLanguage = $env:DREAMSKIN_LANG
 . (Join-Path $Root 'scripts/common-windows.ps1')
 . (Join-Path $Root 'scripts/theme-windows.ps1')
 . (Join-Path $Root 'scripts/panel-operation.ps1') -FunctionsOnly
@@ -11,6 +12,33 @@ $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('dreamskin-panel-test-' + [gui
 Ensure-DreamSkinManagedDirectory -Path $testRoot -Root $testRoot
 function Assert-Panel { param([bool]$Condition, [string]$Label); if (-not $Condition) { throw $Label } }
 try {
+  # FunctionsOnly must also make localization available, without starting an operation.
+  $localizedKeys = @(
+    'PanelSaved', 'PanelOperationBusy', 'PanelSaveRecoveryBlocked', 'PanelSaveRecoveredVerified',
+    'PanelSaveRecoveredUnverified', 'PanelSaveRecoveryIncomplete', 'PanelValidationFailed',
+    'PanelApplyCancelled', 'PanelStartResultMissing', 'PanelStartResultConflict', 'PanelApplied',
+    'PanelApplyRecoveredVerified', 'PanelApplyRecoveredUnverified', 'PanelApplyRecoveryIncomplete',
+    'PanelApplyUnverified', 'PanelShortcutCreated', 'PanelOperationFailed',
+    'DefaultLauncherUnavailable', 'DefaultLaunchUnconfirmed', 'DefaultShortcutDescription',
+    'DefaultRecoveryNotNeeded', 'DefaultRecoveryRestored', 'DefaultRecoveryVerified',
+    'DefaultRecoveryUnverified', 'DefaultRecoveryBlocked', 'DefaultRecoverySuperseded',
+    'DefaultRecoveryRetained', 'DefaultRecoveryConflictPreserved', 'DefaultRecoveryPreservedRendered'
+  )
+  foreach ($key in $localizedKeys) {
+    $english = Get-DreamSkinText -Key $key -Language 'en-US'
+    $chinese = Get-DreamSkinText -Key $key -Language 'zh-CN'
+    Assert-Panel ($english -match '[A-Za-z]' -and $english -notmatch '[\u4e00-\u9fff]') ('Missing English operation text: ' + $key)
+    Assert-Panel ($chinese -match '[\u4e00-\u9fff]' -and $english -cne $chinese) ('Missing Chinese operation text: ' + $key)
+  }
+  foreach ($language in @('en-US', 'zh-CN')) {
+    $formatted = Get-DreamSkinText -Key DefaultLaunchUnconfirmed -Language $language -FormatArguments @('fixture-category', 'fixture-appearance', 'fixture-disk', 'fixture-visible')
+    foreach ($part in @('fixture-category', 'fixture-appearance', 'fixture-disk', 'fixture-visible')) {
+      Assert-Panel ($formatted.Contains($part)) ('Default launch details lost a recovery field: ' + $language + ' / ' + $part)
+    }
+    Assert-Panel ($formatted -notmatch '\{[0-9]+\}') ('Unexpanded default launch placeholder: ' + $language)
+  }
+  Assert-Panel (@(Get-ChildItem -LiteralPath $testRoot -Force).Count -eq 0) 'FunctionsOnly localization performed an operation.'
+  $env:DREAMSKIN_LANG = 'en-US'
   $paths = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $testRoot
   $initial = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $paths.Active
   $themeDir = Join-Path $paths.Saved 'panel-source'
@@ -34,6 +62,14 @@ try {
   $op = [guid]::NewGuid().ToString('N')
   $result = Save-DreamSkinPanelSettings -StateRoot $testRoot -OperationId $op -SavedThemeDirectory $themeDir -BackgroundPath $otherImage
   Assert-Panel ($result.Outcome -eq 'success') ('Combined save failed: ' + $result.Category)
+  Assert-Panel ($result.Message -match '^Startup settings saved\.' -and $result.Message -notmatch '[\u4e00-\u9fff]') 'English save returned untranslated text.'
+  Set-DreamSkinLanguage -Language 'zh-CN' -StateRoot $testRoot
+  $env:DREAMSKIN_LANG = $null
+  $chineseSave = Save-DreamSkinPanelSettings -StateRoot $testRoot -OperationId ([guid]::NewGuid().ToString('N')) -SavedThemeDirectory $themeDir -BackgroundPath $otherImage
+  Assert-Panel ($chineseSave.Outcome -eq 'success' -and $chineseSave.Message -match '[\u4e00-\u9fff]') 'Saved Chinese preference was not honored by the FunctionsOnly save path.'
+  $env:DREAMSKIN_LANG = 'en-US'
+  $englishOverride = Save-DreamSkinPanelSettings -StateRoot $testRoot -OperationId ([guid]::NewGuid().ToString('N')) -SavedThemeDirectory $themeDir -BackgroundPath $otherImage
+  Assert-Panel ($englishOverride.Outcome -eq 'success' -and $englishOverride.Message -match '^Startup settings saved\.') 'English environment did not override the saved Chinese preference.'
   $active = Read-DreamSkinTheme -ThemeDirectory $paths.Active
   Assert-Panel ($active.Theme.id -eq 'panel-source') 'Combined save discarded the source contract.'
   Assert-Panel ((Read-DreamSkinUtf8File -Path (Join-Path $paths.Active 'theme.css')) -eq $css) 'Combined save discarded Safe CSS.'
@@ -48,6 +84,7 @@ try {
   Write-DreamSkinUtf8FileAtomically -Path $badImage -Content 'not an image'
   $bad = Save-DreamSkinPanelSettings -StateRoot $testRoot -OperationId ([guid]::NewGuid().ToString('N')) -SavedThemeDirectory $themeDir -BackgroundPath $badImage
   Assert-Panel ($bad.Outcome -eq 'failure' -and $bad.DiskRecovery -eq 'not-needed') 'Bad image was accepted or published.'
+  Assert-Panel ($bad.Message -match '^Settings validation failed\.') 'Validation failure did not use English result text.'
   Assert-Panel ((Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $paths.Active) -eq $good) 'Bad image damaged active settings.'
   $outside = Save-DreamSkinPanelSettings -StateRoot $testRoot -OperationId ([guid]::NewGuid().ToString('N')) -SavedThemeDirectory $paths.Active
   Assert-Panel ($outside.Outcome -eq 'failure') 'Unmanaged theme source accepted.'
@@ -194,16 +231,27 @@ try {
     return $process
   }
   try {
+    foreach ($language in @('en-US', 'zh-CN')) {
+      $env:DREAMSKIN_LANG = $language
     foreach ($scenario in @('success', 'missing', 'cancelled', 'nonzero-success')) {
       $script:panelChildScenario = $scenario
       $script:panelChildToken = [guid]::NewGuid().ToString('N')
       $applied = Invoke-DreamSkinPanelApply -StateRoot $testRoot -OperationId $script:panelChildToken -SavedThemeDirectory $themeDir
       $expected = switch ($scenario) { success { 'success' }; cancelled { 'cancelled' }; default { 'failure' } }
       Assert-Panel ($applied.Outcome -eq $expected) ('Incorrect child result interpretation: ' + $scenario)
+      if ($language -eq 'en-US') {
+        Assert-Panel ($applied.Message -match '[A-Za-z]' -and $applied.Message -notmatch '[\u4e00-\u9fff]') ('English apply returned untranslated text: ' + $scenario)
+      } else {
+        Assert-Panel ($applied.Message -match '[\u4e00-\u9fff]') ('Chinese apply returned untranslated text: ' + $scenario)
+      }
       Assert-Panel $script:panelChildDisposed ('Child process handle leaked: ' + $scenario)
       Assert-Panel (-not (Test-Path -LiteralPath (Get-DreamSkinStartResultPath -StateRoot $testRoot -Token $script:panelChildToken))) 'Strict child result was not cleaned up.'
       Assert-Panel (-not (Test-Path -LiteralPath (Join-Path $testRoot ('.panel-start-recovery-' + $script:panelChildToken + '.json')))) 'Recovery child result was not cleaned up.'
     }
+    }
   } finally { Remove-Item function:Start-Process }
   Write-Output 'PASS: isolated panel draft, CSS, validation, publication recovery, pause/preferences, contention and result token.'
-} finally { Remove-DreamSkinManagedDirectoryVerified -Path $testRoot -Root ([IO.Path]::GetDirectoryName($testRoot)) }
+} finally {
+  $env:DREAMSKIN_LANG = $originalPanelLanguage
+  Remove-DreamSkinManagedDirectoryVerified -Path $testRoot -Root ([IO.Path]::GetDirectoryName($testRoot))
+}

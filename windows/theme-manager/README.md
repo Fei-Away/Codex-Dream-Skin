@@ -1,8 +1,10 @@
 # Native Windows theme manager
 
 Open **Codex Dream Skin** from the desktop or Start Menu, or double-click its tray
-icon. All entries open the same native manager; repeat launches activate the
-existing window. The former PowerShell theme-selection window is removed.
+icon. These management entries open the same native manager; repeat launches activate the
+existing window. **Codex Dream Skin** is the management entry; use **Codex Dream
+Skin - Launch** to start Codex directly with the saved theme and background.
+The former PowerShell theme-selection window is removed.
 
 The window has **Theme and startup** and **Logs** tabs. Select the current startup
 snapshot or a saved theme, choose a PNG/JPEG/WebP background, and inspect the
@@ -15,8 +17,17 @@ reports that a visual preview is unavailable and the backend validates them on s
 Codex. An existing watcher may also update the currently visible skin. **Apply /
 reapply and launch Codex** uses the managed startup transaction and only reports
 success after a matching verified operation result. **Create / repair launch
-shortcut** creates an entry that reads the saved startup snapshot; it does not
-implicitly save a draft. Changes preserve the source theme and Safe CSS.
+shortcut** creates **Codex Dream Skin - Launch** on the desktop. This entry reads
+the latest saved startup snapshot on every launch; it does not implicitly save a
+draft. Saving a different theme or background does not require a new shortcut.
+Changes preserve the source theme and Safe CSS.
+
+Buttons and operation messages follow the manager's Chinese or English language
+preference. The launch shortcut filename remains
+`Codex Dream Skin - Launch.lnk` in both languages. Shortcut repair migrates the
+older `Codex · 默认主题启动.lnk` only after checking that it belongs to Dream Skin;
+unrelated same-name entries are preserved. The dedicated shortcut does not alter
+the official Codex entry or enable Windows sign-in startup.
 
 The window also adjusts the current active theme's transparency (0–100%) immediately
 and can restore **Follow theme**. This section explicitly operates on the active

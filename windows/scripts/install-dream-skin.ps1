@@ -60,7 +60,7 @@ try {
     $portArgument = if ($PortExplicit) { " -Port $Port" } else { '' }
 
     foreach ($folder in @($desktop, $startMenu)) {
-      $defaultName = 'Codex ' + [char]0x00b7 + ' ' + (-join ([char[]]@(0x9ed8,0x8ba4,0x4e3b,0x9898,0x542f,0x52a8))) + '.lnk'
+      $defaultName = Get-DreamSkinDefaultShortcutName
       $null = New-DreamSkinDefaultShortcut -StateRoot $StateRoot -ShortcutPath (Join-Path $folder $defaultName)
       $shortcut = $shell.CreateShortcut((Join-Path $folder 'Codex Dream Skin.lnk'))
       $shortcut.TargetPath = $powershell

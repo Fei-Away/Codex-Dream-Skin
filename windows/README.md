@@ -33,7 +33,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 
 安装器会校验官方 Codex Store 包和 Node.js，保存可恢复的外观配置，并初始化本地主题仓库。默认还会创建这些快捷方式：
 
-- `Codex Dream Skin`：启动或重新应用皮肤。
+- `Codex Dream Skin`：打开原生主题管理面板。
+- `Codex Dream Skin - Launch`：使用已保存的主题与背景直接启动 Codex。
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
@@ -51,7 +52,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 
 ## 启动与验证
 
-推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。
+使用 `Codex Dream Skin - Launch` 快捷方式带主题启动。它发现 Codex 已经运行且需要重启时会先询问。`Codex Dream Skin` 打开管理面板，可选择主题和背景后保存为启动设置；保存后同一个启动图标会读取最新组合，无需重新生成。
 
 命令行启动：
 
@@ -175,7 +176,7 @@ Get-AppxPackage -Name OpenAI.Codex
 
 ### 验证找不到 CDP 端点
 
-通过 `Codex Dream Skin` 快捷方式启动 Codex，再运行验证脚本。普通 Codex 启动方式不会打开 Dream Skin 所需的调试会话。
+通过 `Codex Dream Skin - Launch` 快捷方式启动 Codex，再运行验证脚本。普通 Codex 启动方式不会打开 Dream Skin 所需的调试会话。
 
 Codex Store `26.715.10079.0` 起，owl runtime 可能把应用包激活参数转换为 `codex://` 路径。当前启动器会识别这一行为，并对同一个已验证 Store 包内的精确 `ChatGPT.exe` 尝试一次原始参数回退；不会修改文件或 WindowsApps 权限。
 

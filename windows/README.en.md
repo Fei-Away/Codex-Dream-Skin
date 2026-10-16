@@ -29,6 +29,35 @@ the existing copy; themes and images are retained.
 
 Run the installer after Codex has fully exited. Normal use does not require administrator access or ownership changes under WindowsApps.
 
+## Save a theme and launch it in one click
+
+Open **Codex Dream Skin** from the desktop or Start Menu to manage themes, or
+double-click its tray icon. This entry opens the manager; it does not immediately
+launch Codex with a theme.
+
+1. On **Theme and startup**, choose a saved theme and, optionally, a different
+   background. These selections are a draft until you explicitly save or apply them.
+2. Choose **Save startup settings** to save the complete theme and background
+   combination. Saving does not launch Codex, although an existing skin watcher
+   may update the current appearance.
+3. Choose **Create / repair launch shortcut** to create
+   **Codex Dream Skin - Launch** on your desktop. Creating the shortcut does not
+   save an unfinished draft.
+4. Double-click **Codex Dream Skin - Launch** whenever you want to start Codex
+   with the saved combination. If Codex needs to restart, confirm the prompt.
+
+The same launch shortcut reads the latest explicitly saved or applied active
+theme on every launch. Saving a different theme or background does not require
+another shortcut. It does not change the official Codex shortcut or enable
+automatic launch when you sign in to Windows. The interface retains Chinese and
+English labels; the launch shortcut filename is always
+`Codex Dream Skin - Launch.lnk` in either language. Older installations may still
+have `Codex · 默认主题启动.lnk`; shortcut repair checks ownership before migrating
+that name and preserves unrelated shortcuts.
+
+For recovery and log details, see the [Windows panel guide](../docs/windows-panel-startup.md)
+and the [native manager reference](./theme-manager/README.md).
+
 ## Advanced: install from source
 
 Ordinary users can skip this section. Open PowerShell in the repository's
@@ -40,7 +69,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 
 The installer validates the official Codex Store package and Node.js, saves a recoverable appearance baseline, and initializes the local theme store. By default it also creates these shortcuts:
 
-- `Codex Dream Skin`: launch or reapply the skin.
+- `Codex Dream Skin`: open the native theme manager.
+- `Codex Dream Skin - Launch`: launch Codex with the saved theme and background.
 - `Codex Dream Skin - Tray`: open the system tray theme controls.
 - `Codex Dream Skin - Restore`: restore the stock appearance and close the saved CDP session.
 
@@ -58,7 +88,11 @@ Exit the Dream Skin tray and close Codex, update the checkout (`git pull`, or do
 
 ## Launch and verify
 
-The `Codex Dream Skin` shortcut is the recommended launcher. It asks for confirmation before restarting an open Codex window.
+Use **Codex Dream Skin - Launch** to launch with the saved theme and background.
+It asks for confirmation before restarting an open Codex window. **Codex Dream
+Skin** opens the manager, where **Apply / reapply and launch Codex** can validate
+and apply the selected draft immediately. An apply is reported as successful only
+after startup and visible renderer verification pass.
 
 Command-line launch:
 
@@ -85,7 +119,8 @@ Next, use the generated screenshot to check horizontal overflow and text contras
 
 ## Change and save themes
 
-Open `Codex Dream Skin - Tray` to:
+Open **Codex Dream Skin** for the native manager, or **Codex Dream Skin - Tray**
+for the tray controls, to:
 
 - Import a PNG, JPEG, or WebP background.
 - Import an ordinary `.zip` theme pack into Saved Themes (`.dreamskin` is not supported).
@@ -197,7 +232,8 @@ When `-Port` is omitted, the launcher searches for a free port beginning at `933
 
 ### Verification cannot find a CDP endpoint
 
-Launch Codex through the `Codex Dream Skin` shortcut, then run verification. A normal Codex launch does not open the debug session used by Dream Skin.
+Launch Codex through **Codex Dream Skin - Launch**, then run verification. A
+normal official Codex launch does not open the debug session used by Dream Skin.
 
 Starting with Codex Store `26.715.10079.0`, the owl runtime may convert package-activation arguments into a `codex://` path. The launcher detects that behavior and makes one raw-argument fallback attempt against the exact `ChatGPT.exe` in the same validated Store package; it does not change files or WindowsApps permissions.
 

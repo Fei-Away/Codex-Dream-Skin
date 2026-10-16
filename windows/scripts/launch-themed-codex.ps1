@@ -4,12 +4,13 @@ param([switch]$FunctionsOnly)
 . (Join-Path $PSScriptRoot 'common-windows.ps1')
 . (Join-Path $PSScriptRoot 'theme-windows.ps1')
 . (Join-Path $PSScriptRoot 'operation-log.ps1')
+. (Join-Path $PSScriptRoot 'localization-windows.ps1')
 
 function Assert-DreamSkinDefaultEngine {
   param([Parameter(Mandatory = $true)][string]$StateRoot)
   $engine = Get-DreamSkinRuntimeEnginePaths -StateRoot $StateRoot
   Assert-DreamSkinNoReparseComponents -Path $engine.Root
-  foreach ($relative in @('VERSION', 'scripts\common-windows.ps1', 'scripts\theme-windows.ps1', 'scripts\config-utf8.ps1', 'scripts\operation-log.ps1', 'scripts\launch-themed-codex.ps1', 'scripts\start-dream-skin.ps1')) {
+  foreach ($relative in @('VERSION', 'scripts\common-windows.ps1', 'scripts\theme-windows.ps1', 'scripts\config-utf8.ps1', 'scripts\operation-log.ps1', 'scripts\localization-windows.ps1', 'scripts\launch-themed-codex.ps1', 'scripts\start-dream-skin.ps1')) {
     $path = Join-Path $engine.Root $relative
     Assert-DreamSkinNoReparseComponents -Path $path
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Managed default launcher is incomplete; reinstall Dream Skin.' }
@@ -25,12 +26,34 @@ function Get-DreamSkinDefaultShortcutArguments {
   return '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + (ConvertTo-DreamSkinProcessArgument -Value $Launcher)
 }
 
+function Get-DreamSkinDefaultShortcutName {
+  return 'Codex Dream Skin - Launch.lnk'
+}
+
+function Get-DreamSkinLegacyDefaultShortcutNames {
+  # Retain the former display name only for verified migration and uninstall.
+  return 'Codex ' + [char]0x00b7 + ' ' + (-join ([char[]]@(0x9ed8,0x8ba4,0x4e3b,0x9898,0x542f,0x52a8))) + '.lnk'
+}
+
+function Remove-DreamSkinLegacyDefaultShortcuts {
+  param([Parameter(Mandatory = $true)][string]$StateRoot, [Parameter(Mandatory = $true)][string]$Directory)
+  foreach ($name in @(Get-DreamSkinLegacyDefaultShortcutNames)) {
+    Remove-DreamSkinDefaultShortcut -StateRoot $StateRoot -ShortcutPath (Join-Path $Directory $name)
+  }
+}
+
+function Remove-DreamSkinDefaultShortcuts {
+  param([Parameter(Mandatory = $true)][string]$StateRoot, [Parameter(Mandatory = $true)][string]$Directory)
+  foreach ($name in @((Get-DreamSkinDefaultShortcutName)) + @(Get-DreamSkinLegacyDefaultShortcutNames)) {
+    Remove-DreamSkinDefaultShortcut -StateRoot $StateRoot -ShortcutPath (Join-Path $Directory $name)
+  }
+}
+
 function New-DreamSkinDefaultShortcut {
   param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'), [string]$ShortcutPath)
   $engine = Assert-DreamSkinDefaultEngine -StateRoot $StateRoot
   if (-not $ShortcutPath) {
-    $name = 'Codex ' + [char]0x00b7 + ' ' + (-join ([char[]]@(0x9ed8,0x8ba4,0x4e3b,0x9898,0x542f,0x52a8))) + '.lnk'
-    $ShortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) $name
+    $ShortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) (Get-DreamSkinDefaultShortcutName)
   }
   $path = [IO.Path]::GetFullPath($ShortcutPath)
   if ([IO.Path]::GetExtension($path) -ine '.lnk') { throw 'Default shortcut must be a .lnk file.' }
@@ -44,6 +67,9 @@ function New-DreamSkinDefaultShortcut {
     if (-not (Test-DreamSkinPathEqual -Left $existing.TargetPath -Right $powershell) -or $existing.Arguments -cne $arguments) {
       throw 'An unrelated shortcut already exists; choose another name.'
     }
+    if ([IO.Path]::GetFileName($path) -ceq (Get-DreamSkinDefaultShortcutName)) {
+      Remove-DreamSkinLegacyDefaultShortcuts -StateRoot $StateRoot -Directory ([IO.Path]::GetDirectoryName($path))
+    }
     return $path
   }
   $temporary = Join-Path ([IO.Path]::GetDirectoryName($path)) ('.dream-shortcut-' + [guid]::NewGuid().ToString('N') + '.lnk')
@@ -52,7 +78,7 @@ function New-DreamSkinDefaultShortcut {
   $shortcut.TargetPath = $powershell
   $shortcut.Arguments = $arguments
   $shortcut.WorkingDirectory = $engine.Root
-  $shortcut.Description = 'Launch Codex with the saved Dream Skin default theme'
+  $shortcut.Description = Get-DreamSkinText -Key 'DefaultShortcutDescription' -Language (Resolve-DreamSkinLanguage -StateRoot $StateRoot)
   $icon = Join-Path $engine.Root 'assets\codex-dream-skin.ico'
   Assert-DreamSkinNoReparseComponents -Path $icon
   if (Test-Path -LiteralPath $icon -PathType Leaf) { $shortcut.IconLocation = "$icon,0" }
@@ -63,6 +89,10 @@ function New-DreamSkinDefaultShortcut {
     [IO.File]::Move($temporary, $path)
   } finally {
     Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+  }
+  # Only retire verified aliases after the new entry has been saved successfully.
+  if ([IO.Path]::GetFileName($path) -ceq (Get-DreamSkinDefaultShortcutName)) {
+    Remove-DreamSkinLegacyDefaultShortcuts -StateRoot $StateRoot -Directory ([IO.Path]::GetDirectoryName($path))
   }
   return $path
 }
@@ -109,6 +139,23 @@ function Read-DreamSkinLaunchRecovery {
     $value.diskRecovery -isnot [string] -or $allowed -cnotcontains $value.diskRecovery -or
     $value.visibleRecovery -isnot [string] -or $allowed -cnotcontains $value.visibleRecovery) { throw 'Invalid recovery result fields.' }
   return $value
+}
+
+function Get-DreamSkinDefaultLaunchFailureText {
+  param([Parameter(Mandatory = $true)]$Result, [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'))
+  $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
+  $recoveryKeys = @{
+    'not-needed' = 'DefaultRecoveryNotNeeded'; 'restored' = 'DefaultRecoveryRestored'; 'verified' = 'DefaultRecoveryVerified'
+    'unverified' = 'DefaultRecoveryUnverified'; 'blocked' = 'DefaultRecoveryBlocked'; 'superseded' = 'DefaultRecoverySuperseded'
+    'retained' = 'DefaultRecoveryRetained'; 'conflict-preserved' = 'DefaultRecoveryConflictPreserved'; 'preserved-rendered' = 'DefaultRecoveryPreservedRendered'
+  }
+  $values = @([string]$Result.category)
+  foreach ($value in @($Result.appearanceRecovery, $Result.diskRecovery, $Result.visibleRecovery)) {
+    $key = $recoveryKeys[[string]$value]
+    if (-not $key) { $key = 'DefaultRecoveryUnverified' }
+    $values += Get-DreamSkinText -Key $key -Language $language
+  }
+  return Get-DreamSkinText -Key 'DefaultLaunchUnconfirmed' -Language $language -FormatArguments $values
 }
 
 function Invoke-DreamSkinDefaultLaunch {
@@ -179,14 +226,16 @@ if (-not $FunctionsOnly) {
     $id = [guid]::NewGuid().ToString('N')
     $null = Write-DreamSkinOperationEvent -StateRoot $stateRoot -OperationId $id -Source launcher -Action default-launch -Stage validate -Outcome failure -Category engine-invalid -Message $_.Exception.Message
     Add-Type -AssemblyName System.Windows.Forms
-    [Windows.Forms.MessageBox]::Show('The managed Dream Skin launcher is unavailable. Reinstall Dream Skin and see operation logs.', 'Codex Dream Skin', 'OK', 'Warning') | Out-Null
+    $message = Get-DreamSkinText -Key 'DefaultLauncherUnavailable' -Language (Resolve-DreamSkinLanguage -StateRoot $stateRoot)
+    [Windows.Forms.MessageBox]::Show($message, 'Codex Dream Skin', 'OK', 'Warning') | Out-Null
     exit 1
   }
   $result = Invoke-DreamSkinDefaultLaunch
   if ($result.outcome -ceq 'cancelled') { exit 0 }
   if ($result.outcome -cne 'success') {
     Add-Type -AssemblyName System.Windows.Forms
-    [Windows.Forms.MessageBox]::Show("Default theme launch was not confirmed. Category: $($result.category). Appearance recovery: $($result.appearanceRecovery). Settings recovery: $($result.diskRecovery). Visible recovery: $($result.visibleRecovery). See Dream Skin operation logs.", 'Codex Dream Skin', 'OK', 'Warning') | Out-Null
+    $message = Get-DreamSkinDefaultLaunchFailureText -Result $result -StateRoot $stateRoot
+    [Windows.Forms.MessageBox]::Show($message, 'Codex Dream Skin', 'OK', 'Warning') | Out-Null
     exit 1
   }
 }
