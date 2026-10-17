@@ -87,6 +87,10 @@ try {
       }
       & $engine.Restore @restoreParameters
     }
+    if (Test-Path -LiteralPath (Join-Path $payloadScripts 'launch-themed-codex.ps1') -PathType Leaf) {
+      . (Join-Path $payloadScripts 'launch-themed-codex.ps1') -FunctionsOnly
+      Remove-DreamSkinDefaultShortcuts -StateRoot $stateRoot -Directory $PSScriptRoot
+    }
     if (Test-Path -LiteralPath $engine.Root -PathType Container) {
       Remove-DreamSkinRuntimeTree -Path $engine.Root -StateRoot $stateRoot
     }
@@ -133,6 +137,9 @@ try {
     'scripts\injector.mjs',
     'scripts\install-dream-skin.ps1',
     'scripts\localization-windows.ps1',
+    'scripts\launch-themed-codex.ps1',
+    'scripts\operation-log.ps1',
+    'scripts\panel-operation.ps1',
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',

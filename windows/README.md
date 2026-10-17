@@ -33,7 +33,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 
 安装器会校验官方 Codex Store 包和 Node.js，保存可恢复的外观配置，并初始化本地主题仓库。默认还会创建这些快捷方式：
 
-- `Codex Dream Skin`：启动或重新应用皮肤。
+- `Codex Dream Skin`：打开原生主题管理面板。
 - `Codex Dream Skin - Tray`：打开系统托盘主题控制。
 - `Codex Dream Skin - Restore`：恢复官方外观并关闭已保存的 CDP 会话。
 
@@ -51,7 +51,11 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 
 ## 启动与验证
 
-推荐从 `Codex Dream Skin` 快捷方式启动。它发现 Codex 已经运行时会先询问是否重启。
+打开 `Codex Dream Skin` 管理面板，选择主题和背景后保存为启动设置，再点击 **创建 / 修复默认启动快捷方式**。这次点击同时在桌面和安装目录生成 `Codex Dream Skin - Launch` 两份快捷方式；创建本身既不保存草稿，也不启动 Codex。Setup 使用已注册并验证的安装目录；没有有效 Setup 安装的源码用户使用 `%LOCALAPPDATA%\CodexDreamSkin`（`engine` 的父目录），使目录副本在引擎升级后仍保留。
+
+两份入口指向同一个受管启动脚本，双击任意一份即可带保存的主题与背景启动。发现 Codex 已经运行且需要重启时会先询问。以后保存不同组合无需重新生成图标。安装、构建、升级和 Windows 登录不会自动新增 Launch，也不在开始菜单新增 Launch；原有入口保持不变。
+
+面板提供**界面效果示意**：在背景上绘制固定侧栏、消息卡片和输入框，套用主题颜色、透明度与构图焦点。示意只读取草稿，不启动或截图 Codex，也不执行自定义 CSS；`auto` 明暗按 Windows 应用明暗偏好示意。最终布局和渲染仍以实际 Codex 为准。默认内容区为 940 × 740，最小为 640 × 560。
 
 命令行启动：
 
@@ -77,6 +81,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\verify-d
 随后用生成的截图检查横向溢出和文字对比度，再分别在首页与普通任务页手动检查项目菜单和输入框交互。完整视觉检查项见 [`references/qa-inventory.md`](./references/qa-inventory.md)。
 
 ## 更换和保存主题
+
+原生主题面板现在提供主题/背景草稿预览、保存为启动设置、验证应用、创建默认启动快捷方式及操作日志。日常可以直接从用户明确创建的默认启动图标读取保存的外观；详细使用和更新流程见 [`docs/windows-panel-startup.md`](../docs/windows-panel-startup.md)。
 
 打开 `Codex Dream Skin - Tray` 后可以：
 
@@ -173,7 +179,7 @@ Get-AppxPackage -Name OpenAI.Codex
 
 ### 验证找不到 CDP 端点
 
-通过 `Codex Dream Skin` 快捷方式启动 Codex，再运行验证脚本。普通 Codex 启动方式不会打开 Dream Skin 所需的调试会话。
+通过 `Codex Dream Skin - Launch` 快捷方式启动 Codex，再运行验证脚本。普通 Codex 启动方式不会打开 Dream Skin 所需的调试会话。
 
 Codex Store `26.715.10079.0` 起，owl runtime 可能把应用包激活参数转换为 `codex://` 路径。当前启动器会识别这一行为，并对同一个已验证 Store 包内的精确 `ChatGPT.exe` 尝试一次原始参数回退；不会修改文件或 WindowsApps 权限。
 

@@ -35,6 +35,8 @@ try {
 
   $initializationLock = Enter-DreamSkinOperationLock
   try {
+    . (Join-Path $PSScriptRoot 'panel-operation.ps1') -FunctionsOnly -StateRoot $StateRoot
+    $null = Repair-DreamSkinPanelSave -StateRoot $StateRoot
     $paths = Initialize-DreamSkinThemeStore -SkillRoot $SkillRoot -StateRoot $StateRoot
   } finally {
     Exit-DreamSkinOperationLock -Mutex $initializationLock
@@ -226,6 +228,7 @@ try {
     param([Parameter(Mandatory = $true)][scriptblock]$Action)
     $themeOperationLock = Enter-DreamSkinOperationLock
     try {
+      $null = Repair-DreamSkinPanelSave -StateRoot $StateRoot
       return & $Action
     } finally {
       Exit-DreamSkinOperationLock -Mutex $themeOperationLock

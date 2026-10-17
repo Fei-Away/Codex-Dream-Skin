@@ -140,8 +140,17 @@ try {
     Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $StateRoot 'paused') -Force -ErrorAction SilentlyContinue
     if ($Uninstall) {
+      . (Join-Path $PSScriptRoot 'launch-themed-codex.ps1') -FunctionsOnly
       $desktop = [Environment]::GetFolderPath('Desktop')
       $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+      $shortcutFolders = @($desktop, $StateRoot, (Get-DreamSkinRuntimeEnginePaths -StateRoot $StateRoot).Root,
+        $startMenu, (Join-Path $startMenu 'Codex Dream Skin'))
+      try { $shortcutFolders += Resolve-DreamSkinShortcutInstallDirectory -StateRoot $StateRoot } catch {
+        Write-Warning 'The Setup shortcut location could not be validated; unverified entries were preserved.'
+      }
+      foreach ($folder in @($shortcutFolders | Select-Object -Unique)) {
+        Remove-DreamSkinDefaultShortcuts -StateRoot $StateRoot -Directory $folder
+      }
       @(
         (Join-Path $desktop 'Codex Dream Skin.lnk'),
         (Join-Path $desktop 'Codex Dream Skin - Restore.lnk'),

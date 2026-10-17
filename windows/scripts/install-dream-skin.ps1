@@ -25,6 +25,8 @@ try {
   }
 
   $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+  . (Join-Path $PSScriptRoot 'panel-operation.ps1') -FunctionsOnly -StateRoot $StateRoot
+  $null = Repair-DreamSkinPanelSave -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
   $StatePath = Join-Path $StateRoot 'state.json'

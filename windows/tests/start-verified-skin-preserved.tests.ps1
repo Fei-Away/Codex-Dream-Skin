@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory = $true)][string]$Root)
 
 # A verify can fail while the theme is demonstrably on screen: the renderer
@@ -28,6 +28,8 @@ if ([regex]::Matches($rawSource, $dotSourcePattern).Count -ne 3) {
 }
 $rawSource = [regex]::Replace($rawSource, $dotSourcePattern, '')
 $rawSource = $rawSource.Replace(". (Join-Path (Split-Path -Parent `$Injector) 'apply-community-theme.ps1') -FunctionsOnly", '')
+$rawSource = $rawSource.Replace('. $draftScript -FunctionsOnly', '')
+$rawSource = $rawSource.Replace("(Join-Path (Split-Path -Parent `$Injector) 'panel-operation.ps1')", "'fixture-panel-script'")
 $rawSource = $rawSource.Replace('exit 0', 'return')
 $rawSource = $rawSource.Replace(
   '$Injector = Join-Path $PSScriptRoot ''injector.mjs''',
@@ -52,6 +54,7 @@ function Invoke-DreamSkinStartupFixture {
     [switch]$DeclineRestart,
     [switch]$ChangeIdentityAfterConsent,
     [switch]$SelectTheme,
+    [switch]$WithBackground,
     [switch]$SupersedeTheme,
     [switch]$WriteThemeFailure,
     [switch]$SuccessfulVerification
@@ -99,6 +102,11 @@ function Invoke-DreamSkinStartupFixture {
     $script:themeWriteCalls += 1
     $script:themeFingerprint = 'selected'
     if ($WriteThemeFailure) { throw 'fixture-theme-write-failure' }
+  }
+  function Set-DreamSkinPanelDraft {
+    param($StateRoot, $SavedThemeDirectory, $BackgroundPath)
+    if ($BackgroundPath -cne 'fixture-background.png') { throw 'The background parameter was not preserved across function loading.' }
+    Use-DreamSkinSavedTheme -ThemeDirectory $SavedThemeDirectory -StateRoot $StateRoot
   }
   function Restore-DreamSkinActiveThemeSnapshot {
     param($SnapshotDirectory, $StateRoot, $ExpectedContentFingerprint)
@@ -278,6 +286,7 @@ function Invoke-DreamSkinStartupFixture {
       $startParameters = @{ Port = 9335; RestartExisting = $ExplicitRestart; PromptRestart = $PromptForRestart }
       if ($WithResultToken) { $startParameters.ResultToken = '0123456789abcdef0123456789abcdef' }
       if ($SelectTheme) { $startParameters.SavedThemeDirectory = 'fixture-saved-theme' }
+      if ($WithBackground) { $startParameters.BackgroundPath = 'fixture-background.png' }
       & $startBlock @startParameters
     } catch {
       $script:lastError = $_.Exception.Message
@@ -389,9 +398,15 @@ if ($promptedHidden.RestartPromptCalls -ne 1 -or -not $promptedHidden.CodexStopp
   throw "Hidden manager apply did not recover with consent: $($promptedHidden.LastError)"
 }
 $declined = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
-  -OncePayload $hiddenPayload -ReuseExistingCdp -PromptForRestart -DeclineRestart -SelectTheme
+  -OncePayload $hiddenPayload -ReuseExistingCdp -PromptForRestart -DeclineRestart -SelectTheme -WithBackground
 if ($declined.RestartPromptCalls -ne 1 -or $declined.CodexStopped -or $declined.ThemeWriteCalls -ne 0) {
   throw 'Declining hidden-session recovery mutated the theme or stopped Codex.'
+}
+$combined = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload, $renderedPayload) `
+  -OncePayload $renderedPayload -ReuseExistingCdp -PromptForRestart -SelectTheme -WithBackground -SuccessfulVerification
+if ($combined.RestartPromptCalls -ne 1 -or $combined.ThemeWriteCalls -ne 1 -or
+  $combined.ThemeFingerprint -cne 'selected' -or -not $combined.SnapshotRemoved) {
+  throw 'Combined theme/background did not commit through the same consent and verified startup transaction.'
 }
 $replaced = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
   -OncePayload $hiddenPayload -ReuseExistingCdp -PromptForRestart -ChangeIdentityAfterConsent -SelectTheme
@@ -410,8 +425,8 @@ foreach ($probe in @($renderedPayload, $malformedPayload, '{"targets":[]}',
 $failedSelection = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
   -OncePayload $hiddenPayload -ReuseExistingCdp -SelectTheme -WithResultToken
 if (-not $failedSelection.Failed -or $failedSelection.ThemeFingerprint -cne 'previous' -or
-  $failedSelection.ThemeRestoreCalls -ne 1 -or -not $failedSelection.SnapshotRemoved) {
-  throw "Failed verification did not roll back its selection: $($failedSelection.LastError)"
+  $failedSelection.ThemeRestoreCalls -ne 1 -or $failedSelection.SnapshotRemoved) {
+  throw "Failed verification did not restore disk settings and retain its unverified visible recovery snapshot: $($failedSelection.LastError)"
 }
 $supersededSelection = Invoke-DreamSkinStartupFixture -VerifyPayloads @($hiddenPayload) `
   -OncePayload $hiddenPayload -ReuseExistingCdp -SelectTheme -SupersedeTheme

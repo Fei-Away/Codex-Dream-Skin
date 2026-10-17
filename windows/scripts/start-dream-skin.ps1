@@ -8,6 +8,10 @@ param(
   [ValidateRange(0, 300000)][int]$OperationLockTimeoutMilliseconds = 0,
   [switch]$RequireUnpaused,
   [string]$SavedThemeDirectory,
+  [string]$BackgroundPath,
+  [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'),
+  [switch]$PanelRequest,
+  [ValidateSet('panel', 'shortcut', 'tray-or-cli')][string]$OperationSource = 'tray-or-cli',
   [ValidatePattern('^[a-f0-9]{32}$')][string]$ResultToken
 )
 
@@ -81,6 +85,33 @@ function Test-DreamSkinHiddenVerificationOutput {
   } catch { return $false }
 }
 
+function Write-DreamSkinStartupEvent {
+  param([string]$Stage, [string]$Outcome, [string]$Category, [string]$Message)
+  try {
+    # Injector also establishes the script identity used by isolated fixtures.
+    $logScript = Join-Path (Split-Path -Parent $Injector) 'operation-log.ps1'
+    if (-not (Get-Command Write-DreamSkinOperationEvent -ErrorAction SilentlyContinue) -and
+      (Test-Path -LiteralPath $logScript)) { . $logScript }
+    if (Get-Command Write-DreamSkinOperationEvent -ErrorAction SilentlyContinue) {
+      $null = Write-DreamSkinOperationEvent -StateRoot $StateRoot -OperationId $startupOperationId `
+        -Source $OperationSource -Action Apply -Stage $Stage -Outcome $Outcome -Category $Category -Message $Message
+    }
+  } catch {}
+}
+
+function Write-DreamSkinPanelStartupRecovery {
+  param([ValidateSet('success', 'failure', 'cancelled')][string]$Outcome = 'failure')
+  if (-not $PanelRequest -or -not $ResultToken) { return }
+  try {
+    $path = Join-Path $StateRoot ('.panel-start-recovery-' + $ResultToken + '.json')
+    Assert-DreamSkinNoReparseComponents -Path $path
+    if (Test-Path -LiteralPath $path) { throw 'A recovery result already exists.' }
+    $payload = [ordered]@{ schemaVersion = 1; operationId = $ResultToken; outcome = $Outcome
+      diskRecovery = $selectionDiskRecovery; visibleRecovery = $selectionVisibleRecovery }
+    Write-DreamSkinUtf8FileAtomically -Path $path -Content ($payload | ConvertTo-Json -Compress)
+  } catch { Write-Warning 'The panel recovery result could not be recorded.' }
+}
+
 function Restore-DreamSkinStartupThemeSelection {
   param([object]$Transaction, [object]$Paths, [string]$StateRoot)
   # Caller holds the operation lock. External changes must still win.
@@ -93,17 +124,22 @@ function Restore-DreamSkinStartupThemeSelection {
   return 'restored'
 }
 
-$StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
+$StateRoot = [IO.Path]::GetFullPath($StateRoot)
+$startupOperationId = if ($ResultToken) { $ResultToken } else { [guid]::NewGuid().ToString('N') }
+$selectionDiskRecovery = 'not-needed'
+$selectionVisibleRecovery = 'not-needed'
+Write-DreamSkinStartupEvent -Stage request -Outcome started -Category none -Message 'Managed startup requested.'
 $operationLock = $null
-$startFailureCategory = 'internal-start-failure'
+$startFailureCategory = 'operation-busy'
 $appearanceTransaction = $null
 $appearanceRecovery = 'not-needed'
 $themeSelectionTransaction = $null
 try {
   $operationLock = Enter-DreamSkinOperationLock `
     -TimeoutMilliseconds $OperationLockTimeoutMilliseconds
+  $startFailureCategory = 'internal-start-failure'
   Assert-DreamSkinPort -Port $Port
-  if ($SavedThemeDirectory -and $ForegroundInjector) {
+  if (($SavedThemeDirectory -or $BackgroundPath) -and $ForegroundInjector) {
     throw 'Saved-theme selection requires the verified background startup operation.'
   }
   if ($ProfilePath) { $ProfilePath = [System.IO.Path]::GetFullPath($ProfilePath) }
@@ -128,6 +164,18 @@ try {
   $StdoutPath = Join-Path $StateRoot 'injector.log'
   $StderrPath = Join-Path $StateRoot 'injector-error.log'
   $VerifyPath = Join-Path $StateRoot 'verify.log'
+  $pendingPanelSave = Join-Path $StateRoot '.panel-pending-save.json'
+  if ([IO.File]::Exists($pendingPanelSave) -or [IO.Directory]::Exists($pendingPanelSave)) {
+    $startFailureCategory = 'state-reconciliation-failed'
+    $selectionDiskRecovery = 'blocked'
+    $selectionVisibleRecovery = 'unverified'
+    $null = & {
+      param($repairRoot, $repairScript)
+      . $repairScript -FunctionsOnly
+      Repair-DreamSkinPanelSave -StateRoot $repairRoot
+    } $StateRoot (Join-Path (Split-Path -Parent $Injector) 'panel-operation.ps1')
+    $selectionDiskRecovery = 'restored'
+  }
   $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot
   $pauseWasSet = Test-DreamSkinPaused -StateRoot $StateRoot
   if ($RequireUnpaused -and $pauseWasSet) {
@@ -231,6 +279,8 @@ try {
       $restartAuthorized = Confirm-DreamSkinRestart -Message `
         (Get-DreamSkinText -Key 'RestartPrompt' -Language $language)
       if (-not $restartAuthorized) {
+        Write-DreamSkinStartupEvent -Stage confirmation -Outcome cancelled -Category cancelled -Message 'Restart was declined; saved settings were preserved.'
+        Write-DreamSkinPanelStartupRecovery -Outcome cancelled
         Write-Host (Get-DreamSkinText -Key 'LaunchCancelled' -Language $language)
         exit 0
       }
@@ -275,7 +325,7 @@ try {
         throw 'Interrupted startup appearance could not be recovered safely; config was preserved.'
       }
     }
-    if ($SavedThemeDirectory) {
+    if ($SavedThemeDirectory -or $BackgroundPath) {
       # Selection belongs to this locked child, after consent and before launch.
       # Reuse the community apply snapshot contract without its UI entry point.
       . (Join-Path (Split-Path -Parent $Injector) 'apply-community-theme.ps1') -FunctionsOnly
@@ -286,14 +336,43 @@ try {
         throw 'The active theme changed while its rollback snapshot was being copied.'
       }
       try {
-        $null = Use-DreamSkinSavedTheme -ThemeDirectory $SavedThemeDirectory -StateRoot $StateRoot
+        if ($BackgroundPath) {
+          $null = & {
+            param($draftRoot, $draftTheme, $draftImage, $draftScript)
+            . $draftScript -FunctionsOnly
+            Set-DreamSkinPanelDraft -StateRoot $draftRoot -SavedThemeDirectory $draftTheme -BackgroundPath $draftImage
+          } $StateRoot $SavedThemeDirectory $BackgroundPath (Join-Path (Split-Path -Parent $Injector) 'panel-operation.ps1')
+        } else {
+          $null = Use-DreamSkinSavedTheme -ThemeDirectory $SavedThemeDirectory -StateRoot $StateRoot
+        }
         $selectedFingerprint = Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $themePaths.Active
       } catch {
         # A partial write is still ours: no lock has been released since snapshot.
         $selectionError = $_
+        $selectionDiskRecovery = 'blocked'
         $null = Restore-DreamSkinActiveThemeSnapshot -SnapshotDirectory $snapshot `
           -StateRoot $StateRoot -ExpectedContentFingerprint $previousFingerprint
-        Remove-DreamSkinManagedDirectoryVerified -Path $snapshot -Root $StateRoot
+        $selectionDiskRecovery = 'restored'
+        if ($null -ne $cdpIdentity -and -not $pauseWasSet) {
+          $selectionVisibleRecovery = 'unverified'
+          try {
+            $partialRestoreIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
+            if ($null -ne $partialRestoreIdentity -and $partialRestoreIdentity.BrowserId -ceq $cdpIdentity.BrowserId) {
+              $partialOnce = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+                $Injector, '--once', '--port', "$Port", '--browser-id', $partialRestoreIdentity.BrowserId,
+                '--theme-dir', $themePaths.Active, '--timeout-ms', '15000')
+              if ($partialOnce.ExitCode -eq 0) {
+                $partialVerify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+                  $Injector, '--verify', '--port', "$Port", '--browser-id', $partialRestoreIdentity.BrowserId,
+                  '--theme-dir', $themePaths.Active, '--timeout-ms', '15000')
+                if ($partialVerify.ExitCode -eq 0) { $selectionVisibleRecovery = 'verified' }
+              }
+            }
+          } catch {}
+        }
+        if ($selectionVisibleRecovery -in @('not-needed', 'verified')) {
+          Remove-DreamSkinManagedDirectoryVerified -Path $snapshot -Root $StateRoot
+        }
         throw $selectionError
       }
       $themeSelectionTransaction = [pscustomobject]@{
@@ -457,6 +536,7 @@ try {
         Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken `
           -Outcome 'success' -Category 'none' -AppearanceRecovery $appearanceRecovery
       }
+      Write-DreamSkinStartupEvent -Stage foreground-exit -Outcome success -Category none -Message 'The foreground injector completed without an error.'
       exit 0
     } catch {
       $foregroundError = $_
@@ -734,6 +814,8 @@ try {
   }
 
   Write-Host "Codex Dream Skin is active on verified loopback port $Port."
+  Write-DreamSkinStartupEvent -Stage verification -Outcome success -Category none -Message 'Theme loading passed renderer verification.'
+  Write-DreamSkinPanelStartupRecovery -Outcome success
   if ($ResultToken) {
     Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken `
       -Outcome 'success' -Category 'none' -AppearanceRecovery $appearanceRecovery
@@ -754,6 +836,8 @@ try {
       }
       $selectionRecovery = Restore-DreamSkinStartupThemeSelection `
         -Transaction $themeSelectionTransaction -Paths $themePaths -StateRoot $StateRoot
+      $selectionDiskRecovery = $selectionRecovery
+      $selectionVisibleRecovery = 'unverified'
       if ($selectionRecovery -ceq 'restored' -and $null -ne $cdpIdentity -and
         -not (Test-DreamSkinPaused -StateRoot $StateRoot)) {
         $restoreIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
@@ -761,14 +845,31 @@ try {
           $restoredInjection = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
             $Injector, '--once', '--port', "$Port", '--browser-id', $restoreIdentity.BrowserId,
             '--theme-dir', $themePaths.Active, '--timeout-ms', '15000')
-          if ($restoredInjection.ExitCode -ne 0) { Write-Warning 'The previous theme files were restored, but their live appearance could not be verified.' }
+          if ($restoredInjection.ExitCode -eq 0) {
+            $restoredVerification = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+              $Injector, '--verify', '--port', "$Port", '--browser-id', $restoreIdentity.BrowserId,
+              '--theme-dir', $themePaths.Active, '--timeout-ms', '15000')
+            if ($restoredVerification.ExitCode -eq 0) { $selectionVisibleRecovery = 'verified' }
+          }
+          if ($selectionVisibleRecovery -ne 'verified') { Write-Warning 'The previous theme files were restored, but their live appearance could not be verified.' }
         }
       }
-      Remove-DreamSkinManagedDirectoryVerified -Path $themeSelectionTransaction.Snapshot -Root $StateRoot
-      $themeSelectionTransaction = $null
+      if ($selectionRecovery -ceq 'restored' -and $selectionVisibleRecovery -eq 'verified') {
+        Remove-DreamSkinManagedDirectoryVerified -Path $themeSelectionTransaction.Snapshot -Root $StateRoot
+        $themeSelectionTransaction = $null
+      }
     } catch {
+      if ($selectionDiskRecovery -ne 'restored') { $selectionDiskRecovery = 'blocked' }
       Write-Warning 'Theme selection recovery was blocked; its private rollback snapshot was retained.'
     }
+  }
+  Write-DreamSkinPanelStartupRecovery
+  try {
+    $logCategory = Get-DreamSkinStartFailureCategory -Exception $startError.Exception -FallbackCategory $startFailureCategory
+    Write-DreamSkinStartupEvent -Stage failed -Outcome failure -Category $logCategory -Message 'Managed startup failed; inspect recovery status and engine diagnostics.'
+  } catch {}
+  if ($selectionDiskRecovery -ne 'not-needed') {
+    Write-DreamSkinStartupEvent -Stage recovery -Outcome $selectionDiskRecovery -Category $selectionVisibleRecovery -Message 'Disk and visible recovery are tracked separately.'
   }
   if ($ResultToken) {
     try {

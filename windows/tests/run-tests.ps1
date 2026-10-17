@@ -7,7 +7,20 @@ $Root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $Root 'scripts\theme-windows.ps1')
 . (Join-Path $Root 'scripts\localization-windows.ps1')
 & (Join-Path $PSScriptRoot 'theme-manager-maintenance.tests.ps1')
+& (Join-Path $PSScriptRoot 'default-launch-log.tests.ps1')
+& (Join-Path $PSScriptRoot 'launch-shortcut-pair.tests.ps1')
+& (Join-Path $PSScriptRoot 'panel-operation.tests.ps1') -Root $Root
 & (Join-Path $PSScriptRoot 'codex-home.tests.ps1')
+
+# Preserve acquisition, contention and release logic without competing with the
+# user's active manager or operations. Standalone fixtures isolate their own locks.
+$fixtureMutexPrefix = 'Local\CodexDreamSkin.Regression-' + [guid]::NewGuid().ToString('N') + '.'
+foreach ($functionName in @('Enter-DreamSkinOperationLock', 'Enter-DreamSkinThemeManagerMaintenance')) {
+  $originalSource = (Get-Command $functionName -CommandType Function).ScriptBlock.ToString()
+  $isolatedSource = $originalSource.Replace('Local\CodexDreamSkin.', $fixtureMutexPrefix)
+  if ($isolatedSource -ceq $originalSource) { throw ('Could not isolate regression mutex: ' + $functionName) }
+  Set-Item ('Function:\' + $functionName) ([scriptblock]::Create($isolatedSource))
+}
 
 if ((Resolve-DreamSkinLanguage -Language 'zh-CN') -cne 'zh-CN' -or
   (Resolve-DreamSkinLanguage -Language 'en-US') -cne 'en-US') {
@@ -1177,6 +1190,9 @@ try {
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\injector.mjs') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\install-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\localization-windows.ps1') -Destination $releaseFixtureScripts -Force
+  foreach ($panelScript in @('launch-themed-codex.ps1', 'operation-log.ps1', 'panel-operation.ps1')) {
+    Copy-Item -LiteralPath (Join-Path $Root ('scripts\' + $panelScript)) -Destination $releaseFixtureScripts -Force
+  }
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\restore-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\start-dream-skin.ps1') -Destination $releaseFixtureScripts -Force
   Copy-Item -LiteralPath (Join-Path $Root 'scripts\theme-windows.ps1') -Destination $releaseFixtureScripts -Force
