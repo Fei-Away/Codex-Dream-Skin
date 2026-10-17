@@ -46,6 +46,13 @@ launch Codex with a theme.
 4. Double-click **Codex Dream Skin - Launch** whenever you want to start Codex
    with the saved combination. If Codex needs to restart, confirm the prompt.
 
+The manager shows an **illustrative interface preview**: a fixed sidebar, message
+cards and composer over the background, using the theme's colors, transparency
+and composition focus. It reads the draft without starting or capturing Codex
+and does not execute custom CSS. `auto` light/dark follows the Windows app
+preference for the mockup. Actual Codex layout and rendering may differ.
+The default client area is 940 × 740; the minimum window size is 640 × 560.
+
 The same launch shortcut reads the latest explicitly saved or applied active
 theme on every launch. Saving a different theme or background does not require
 another shortcut. It does not change the official Codex shortcut or enable

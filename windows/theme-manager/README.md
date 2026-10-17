@@ -8,10 +8,22 @@ The former PowerShell theme-selection window is removed.
 
 The window has **Theme and startup** and **Logs** tabs. Select the current startup
 snapshot or a saved theme, choose a PNG/JPEG/WebP background, and inspect the
-background preview. These choices are a draft: selecting a row or picture never
-changes startup settings. The preview is illustrative, not proof of Codex rendering.
+illustrative Codex interface preview. A fixed sidebar, message cards and composer
+are drawn over the background with the selected theme's colors, appearance,
+composition focus and applicable transparency. These choices are a draft:
+selecting a row or picture never changes startup settings. The mockup runs offline:
+it neither starts Codex nor captures a window or executes theme CSS. `auto` uses
+the Windows app light/dark preference for the illustration. It cannot reproduce
+custom CSS, real blur or Codex's changing layout; visible rendering still needs
+live acceptance. The current active theme's local transparency override is not
+applied indiscriminately to other draft themes.
 WebP files remain selectable if Windows lacks a decoder; the panel explicitly
 reports that a visual preview is unavailable and the backend validates them on save.
+
+The default client area is 940 × 740, reduced from 980 × 740 to use less space;
+the minimum window size remains 640 × 560. The theme page scrolls vertically when
+its content cannot fit, keeping the preview and action rows separate. Verify long English labels and display
+scaling as well as the default size after rebuilding.
 
 **Save startup settings** validates and commits the combination without launching
 Codex. An existing watcher may also update the currently visible skin. **Apply /
@@ -70,6 +82,32 @@ are constructed. During a transaction conflicting controls are disabled, and the
 panel waits for restart confirmation rather than terminating a pending transaction.
 The parent never holds an operation mutex while waiting for the child.
 
+## Source map and design boundaries
+
+| Responsibility | Location | Reason for the separation |
+| --- | --- | --- |
+| Layout, draft state, buttons and language | `App/Program.cs` | Keep user interaction separate from rendering and startup transactions |
+| Image decoding and native illustrative drawing | `App/ThemePreview.cs` | Change mockup styling without changing the launcher |
+| Read-only theme preview model | `Core/ThemePreviewData.cs` | Resolve colors, appearance, focus and transparency without executing CSS |
+| Image limits and operation-result validation | `Core/PanelData.cs` | Preview is not a replacement for backend validation |
+| Safe child-process request | `App/PanelOperations.cs` | Fixed host and argument list avoid command-string construction |
+| Draft save/recovery and action dispatch | `../scripts/panel-operation.ps1` | Preserve operation locking, interrupted-save recovery and verified outcomes |
+| Launcher and optional shortcut pair | `../scripts/launch-themed-codex.ps1` | Keep direct launch separate from the button-only creation action |
+
+Logging responsibilities are separated from preview rendering.
+`../scripts/operation-log.ps1` owns writing, redaction, rotation and failure
+isolation. Calls in `panel-operation.ps1`, `launch-themed-codex.ps1` and
+`start-dream-skin.ps1` identify operation stages. `OperationLogStore` in
+`Core/PanelData.cs` owns bounded reading and diagnostic redaction; `BuildLogPage`,
+`RefreshLogs`, `DisplayLogs` and `ExportLogs` in `App/Program.cs` own the UI.
+Recovery journals and token-bound operation results are separate safety mechanisms,
+not diagnostic logs that can be removed with the tab.
+
+The [panel guide](../../docs/windows-panel-startup.md) records behavior, reasons,
+shortcut locations, installation integration and a dated validation matrix for reviewers.
+The matrix distinguishes automated checks, tester-confirmed flows and unverified scenarios. Source changes
+and a successful build do not establish Setup or live-render acceptance.
+
 ## Build and checks
 
 Requires .NET SDK 8 or newer and Node.js for the packaging helper. No installed
@@ -92,6 +130,7 @@ dotnet run --project windows/theme-manager/NativeTests/DreamSkin.ThemeManager.Na
 
 These check mutex contention, render both tabs against isolated generated theme
 and log fixtures at normal/minimum sizes into `.local-evidence/panel-*.png`, and
+check draft ownership across refresh, replacement and removal, including an empty selection. They also
 recycle an isolated generated fixture, then
 confirm that it appears in the real Recycle Bin with its original location.
 The fixture remains in the test user's Recycle Bin. The normal test project

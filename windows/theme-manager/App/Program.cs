@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Win32;
 
 namespace DreamSkin.ThemeManager;
 
@@ -97,31 +98,58 @@ internal sealed class ManagerForm : Form
         Text = Copy("DreamSkin · Theme Manager", "DreamSkin · 主题管理");
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(980, 740);
+        // Keep the existing height and minimum size; the default is only 40 px narrower.
+        ClientSize = new Size(940, 740);
         MinimumSize = new Size(640, 560);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
         var themePage = new TabPage(Copy("Theme and startup", "主题与启动")) { AutoScroll = true };
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(16), ColumnCount = 1, RowCount = 8 };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Top, Padding = new Padding(16), ColumnCount = 1, RowCount = 8 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        // A shrinking percent row can otherwise overlap the controls below its
+        // minimum-sized preview. Let the page scroll once the content cannot fit.
+        var sizingLayout = false;
+        void FitThemeLayout()
+        {
+            if (sizingLayout || layout.Controls.Count < 8) return;
+            sizingLayout = true;
+            try
+            {
+                var height = layout.Padding.Vertical;
+                foreach (Control child in layout.Controls)
+                {
+                    var width = Math.Max(1, layout.ClientSize.Width - layout.Padding.Horizontal - child.Margin.Horizontal);
+                    height += child.Margin.Vertical + (layout.GetRow(child) == 2 ? child.MinimumSize.Height :
+                        Math.Max(child.MinimumSize.Height, child.GetPreferredSize(new Size(width, 0)).Height));
+                }
+                var target = Math.Max(themePage.ClientSize.Height, height);
+                if (layout.Height != target) layout.Height = target;
+            }
+            finally { sizingLayout = false; }
+        }
         layout.Resize += (_, _) =>
         {
             var width = Math.Max(200, layout.ClientSize.Width - layout.Padding.Horizontal - 12);
             activeLabel.MaximumSize = status.MaximumSize = new Size(width, 0);
+            FitThemeLayout();
         };
+        layout.Layout += (_, _) => FitThemeLayout();
+        themePage.ClientSizeChanged += (_, _) => FitThemeLayout();
         for (int i = 0; i < 8; i++) layout.RowStyles.Add(new RowStyle(i == 2 ? SizeType.Percent : SizeType.AutoSize, i == 2 ? 100 : 0));
         layout.Controls.Add(activeLabel, 0, 0);
         layout.Controls.Add(new Label { AutoSize = true, Text = Copy("Choose a theme and background; selections are a draft until saved or applied.", "选择主题与背景；点击保存或应用前，选择仅为草稿。") }, 0, 1);
         var selection = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, MinimumSize = new Size(400, 130) };
-        selection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34));
-        selection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 66));
+        // Give the theme list a stable width and let the illustration use the rest.
+        selection.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
+        selection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         selection.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         themes.AccessibleName = Copy("Theme draft", "草稿主题");
         selection.Controls.Add(themes, 0, 0);
         var previewLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
         previewLayout.Resize += (_, _) => previewInfo.MaximumSize = new Size(Math.Max(100, previewLayout.ClientSize.Width - 8), 0);
         previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        preview.AccessibleName = Copy("Codex interface illustration", "Codex 界面示意");
         previewLayout.Controls.Add(preview, 0, 0);
         previewLayout.Controls.Add(previewInfo, 0, 1);
         selection.Controls.Add(previewLayout, 1, 0);
@@ -198,7 +226,7 @@ internal sealed class ManagerForm : Form
         try
         {
             using var lease = new OperationLease();
-            var selected = (themes.SelectedItem as ThemeRow)?.Theme.Directory;
+            var selected = (themes.SelectedItem as ThemeRow)?.Theme;
             active = store.Active();
             var saved = store.List();
             var value = active == null ? null : store.Override(active.Id);
@@ -214,11 +242,23 @@ internal sealed class ManagerForm : Form
                 try
                 {
                     themes.Items.Clear(); themes.Items.AddRange(rows);
-                    themes.SelectedItem = rows.FirstOrDefault(r => r.Theme.Directory == selected) ?? rows.FirstOrDefault();
+                    themes.SelectedItem = rows.FirstOrDefault(r => r.Theme.Directory == selected?.Directory) ?? rows.FirstOrDefault();
                 }
                 finally { themes.EndUpdate(); }
             }
-            if (string.IsNullOrEmpty(status.Text)) status.Text = Copy("Saving may also update an already running skin session. Preview is an illustration, not a Codex render verification.", "保存可能同时更新正在运行的皮肤。预览为背景示意，不代表已在 Codex 验证生效。");
+            var current = (themes.SelectedItem as ThemeRow)?.Theme;
+            // Refresh suppresses selection events. A removed/replaced theme must
+            // not transfer its image draft to the automatically selected theme.
+            if (!string.Equals(selected?.Directory, current?.Directory, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(selected?.Id, current?.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                backgroundDraft = null;
+                if (current == null) draftStatus.Text = Copy("No theme selected.", "未选择主题。");
+                else if (current.Directory == active?.Directory) draftStatus.Text = Copy("Saved startup settings. Choose a theme or image to prepare a draft.", "已保存的启动设置。选择主题或图片可创建草稿。");
+                else DraftChanged();
+                if (!IsDisposed && !Disposing) _ = RefreshPreview();
+            }
+            if (string.IsNullOrEmpty(status.Text)) status.Text = Copy("Saving may also update an already running skin session. The interface illustration is not a Codex render verification.", "保存可能同时更新正在运行的皮肤。预览为界面示意，不代表已在 Codex 验证生效。");
             if (string.IsNullOrEmpty(draftStatus.Text)) draftStatus.Text = Copy("Saved startup settings. Choose a theme or image to prepare a draft.", "已保存的启动设置。选择主题或图片可创建草稿。");
             UpdateDelete();
         }
@@ -259,18 +299,38 @@ internal sealed class ManagerForm : Form
     private async Task RefreshPreview()
     {
         int version = ++previewVersion;
-        if (themes.SelectedItem is not ThemeRow row) return;
+        if (themes.SelectedItem is not ThemeRow row)
+        {
+            var oldImage = preview.Image;
+            preview.Image = null;
+            oldImage?.Dispose();
+            previewInfo.Text = "";
+            return;
+        }
         var customBackground = backgroundDraft;
-        previewInfo.Text = Copy("Loading preview…", "正在读取预览…");
+        previewInfo.Text = Copy("Drawing interface illustration…", "正在绘制界面示意…");
         try
         {
-            var result = await Task.Run(() => ImagePreview.Load(customBackground ?? PreviewFiles.Background(row.Theme)));
+            // A draft uses its own theme's override, never the unrelated active
+            // theme slider. Reading a preview must not save or launch anything.
+            var transparency = store.Override(row.Theme.Id);
+            var preferDark = PreferDarkPreview();
+            var rendered = await Task.Run(() =>
+            {
+                var theme = ThemePreviewData.Read(row.Theme, transparency, preferDark);
+                return (Result: ImagePreview.Load(customBackground ?? PreviewFiles.Background(row.Theme), theme, chinese), Theme: theme);
+            });
+            var result = rendered.Result;
+            // A slower previous image must not replace a newer selection or leak its bitmap.
             if (version != previewVersion || IsDisposed) { result.Image?.Dispose(); return; }
             var old = preview.Image;
             preview.Image = result.Image;
             old?.Dispose();
-            previewInfo.Text = result.Message + (customBackground != null ? Copy(" · Custom background draft", " · 自选背景草稿") : Copy(" · Theme background", " · 主题背景"));
-            if (result.Image == null) previewInfo.Text += Copy("\nNo system preview; still selectable for save-time validation.", "\n无系统预览；仍可选择，保存时会完整校验。");
+            var backgroundLabel = customBackground != null ? Copy(" · Custom background draft", " · 自选背景草稿") : Copy(" · Theme background", " · 主题背景");
+            previewInfo.Text = result.Image == null
+                ? result.Message + backgroundLabel + Copy("\nNo system decoder; still selectable for save-time validation.", "\n无系统解码支持；仍可选择，保存时会完整校验。")
+                : Copy("Interface illustration · ", "界面示意 · ") + result.Message + backgroundLabel +
+                    Copy($"\nTransparency: {rendered.Theme.Transparency:0}% · Actual Codex appearance may differ.", $"\n透明度：{rendered.Theme.Transparency:0}% · 实际效果以 Codex 为准。");
         }
         catch (Exception ex)
         {
@@ -278,6 +338,19 @@ internal sealed class ManagerForm : Form
             var old = preview.Image; preview.Image = null; old?.Dispose();
             previewInfo.Text = ErrorText(ex);
         }
+    }
+
+    private static bool PreferDarkPreview()
+    {
+        // Auto themes need an offline fallback. Do not inspect a running Codex
+        // session or infer shell appearance from wallpaper brightness.
+        try
+        {
+            using var settings = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            if (settings?.GetValue("AppsUseLightTheme") is int value && value is 0 or 1) return value == 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
+        return SystemColors.Window.GetBrightness() < .5;
     }
 
     private async Task RunOperation(string action)
@@ -437,6 +510,9 @@ internal sealed class ManagerForm : Form
         pendingId = null;
         try { using var lease = new OperationLease(); store.SetTransparency(id, pendingValue); RefreshStore(); }
         catch (Exception ex) { RefreshStore(); ShowError(ex); }
+        // Transparency remains the existing immediate-save control; only redraw
+        // the illustration afterwards, without submitting a theme/background draft.
+        if (!IsDisposed && !Disposing) _ = RefreshPreview();
     }
 
     private void DeleteSelected()
@@ -451,6 +527,9 @@ internal sealed class ManagerForm : Form
             store.ValidateDeletion(row.Theme);
             RecycleBin.MoveDirectory(row.Theme.Directory, Handle);
             RefreshStore();
+            // Removing a saved row selects another theme while refresh events
+            // are suppressed; redraw that selection instead of a deleted draft.
+            _ = RefreshPreview();
         }
         catch (Exception ex) { RefreshStore(); ShowError(ex); }
         finally { dialogOpen = false; }

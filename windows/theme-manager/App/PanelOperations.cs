@@ -43,32 +43,3 @@ internal static class PanelOperations
         return result;
     }
 }
-
-internal sealed record PreviewResult(Bitmap? Image, string Message);
-
-internal static class ImagePreview
-{
-    internal static PreviewResult Load(string path)
-    {
-        var data = PreviewFiles.Read(path);
-        try
-        {
-            using var stream = new MemoryStream(data.Bytes, writable: false);
-            using var original = Image.FromStream(stream, useEmbeddedColorManagement: false, validateImageData: true);
-            if (original.Width != data.Width || original.Height != data.Height) throw new StoreException("invalidImage");
-            var scale = Math.Min(1d, Math.Min(800d / original.Width, 500d / original.Height));
-            var preview = new Bitmap(Math.Max(1, (int)(original.Width * scale)), Math.Max(1, (int)(original.Height * scale)));
-            try
-            {
-                using var graphics = Graphics.FromImage(preview);
-                graphics.DrawImage(original, new Rectangle(0, 0, preview.Width, preview.Height));
-                return new(preview, $"{data.Format} · {data.Width} × {data.Height}");
-            }
-            catch { preview.Dispose(); throw; }
-        }
-        catch (ArgumentException) when (data.Format == "WebP")
-        {
-            return new(null, $"WebP · {data.Width} × {data.Height}");
-        }
-    }
-}

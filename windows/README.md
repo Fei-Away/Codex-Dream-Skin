@@ -55,6 +55,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-
 
 两份入口指向同一个受管启动脚本，双击任意一份即可带保存的主题与背景启动。发现 Codex 已经运行且需要重启时会先询问。以后保存不同组合无需重新生成图标。安装、构建、升级和 Windows 登录不会自动新增 Launch，也不在开始菜单新增 Launch；原有入口保持不变。
 
+面板提供**界面效果示意**：在背景上绘制固定侧栏、消息卡片和输入框，套用主题颜色、透明度与构图焦点。示意只读取草稿，不启动或截图 Codex，也不执行自定义 CSS；`auto` 明暗按 Windows 应用明暗偏好示意。最终布局和渲染仍以实际 Codex 为准。默认内容区为 940 × 740，最小为 640 × 560。
+
 命令行启动：
 
 ```powershell

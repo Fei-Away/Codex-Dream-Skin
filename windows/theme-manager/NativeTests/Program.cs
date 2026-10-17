@@ -61,6 +61,21 @@ internal static class Program
                 image.Save(Path.Combine(active, "background.png"), System.Drawing.Imaging.ImageFormat.Png);
             }
             File.WriteAllText(Path.Combine(active, "theme.json"), "{\"id\":\"fixture-active\",\"name\":\"夏日站台 · 深色透明测试主题\",\"image\":\"background.png\"}");
+            // Inspect compositing with a generated wallpaper, not a live Codex
+            // screenshot. A transparent sidebar must reveal the original image.
+            var sampleTheme = ThemePreviewData.Read(ThemeStore.ReadTheme(active), 0, preferDark: true)
+                with { Panel = new PreviewColor(12, 18, 24, 255) };
+            var opaqueSample = ImagePreview.Load(Path.Combine(active, "background.png"), sampleTheme, chinese: true);
+            var transparentSample = ImagePreview.Load(Path.Combine(active, "background.png"),
+                sampleTheme with { Panel = new PreviewColor(12, 18, 24, 0), Transparency = 100 }, chinese: false);
+            using (var opaqueImage = opaqueSample.Image ?? throw new Exception("Opaque illustration was not decoded."))
+            using (var transparentImage = transparentSample.Image ?? throw new Exception("Transparent illustration was not decoded."))
+            {
+                if (opaqueImage.Width != 960 || opaqueImage.Height != 600 ||
+                    opaqueImage.GetPixel(50, 450).ToArgb() != System.Drawing.Color.FromArgb(12, 18, 24).ToArgb() ||
+                    transparentImage.GetPixel(50, 450).ToArgb() != System.Drawing.Color.FromArgb(55, 77, 115).ToArgb())
+                    throw new Exception("Interface illustration did not preserve wallpaper and surface transparency.");
+            }
             var saved = Path.Combine(uiRoot, "themes", "second"); Directory.CreateDirectory(saved);
             File.Copy(Path.Combine(active, "background.png"), Path.Combine(saved, "background.png"));
             File.WriteAllText(Path.Combine(saved, "theme.json"), "{\"id\":\"fixture-second\",\"name\":\"另一个保存的中文主题\",\"image\":\"background.png\"}");
@@ -88,9 +103,11 @@ internal static class Program
             prepare.GetAwaiter().GetResult();
             var evidence = Path.Combine(Directory.GetCurrentDirectory(), ".local-evidence");
             Directory.CreateDirectory(evidence);
-            foreach (var size in new[] { new System.Drawing.Size(980, 740), new System.Drawing.Size(640, 560) })
+            foreach (var size in new[] { new System.Drawing.Size(940, 740), new System.Drawing.Size(640, 560) })
             {
-                form.ClientSize = size;
+                // MinimumSize includes the window frame, unlike ClientSize.
+                if (size.Width == 640) form.Size = form.MinimumSize;
+                else form.ClientSize = size;
                 for (int page = 0; page < 2; page++)
                 {
                     form.SelectInspectionPage(page); form.PerformLayout(); Application.DoEvents();
@@ -110,8 +127,20 @@ internal static class Program
                     var controls = Descendants(form).ToArray();
                     if (page == 0 && (!controls.OfType<ListBox>().Any(c => c.Visible && c.Items.Count == 2) ||
                         !controls.OfType<Button>().Any(c => c.Visible && c.Text == "保存为启动设置") ||
-                        !controls.OfType<PictureBox>().Any(c => c.Visible && c.Image != null)))
+                        !controls.OfType<PictureBox>().Any(c => c.Visible && c.Image?.Size == new System.Drawing.Size(960, 600)) ||
+                        !controls.OfType<Label>().Any(c => c.Visible && c.Text.StartsWith("界面示意", StringComparison.Ordinal))))
                         throw new Exception("Theme page controls or preview are missing from native rendering.");
+                    if (page == 0)
+                    {
+                        // Presence alone misses a percent row shrinking below the
+                        // preview minimum and drawing over the next row's buttons.
+                        var themeLayout = form.Controls.OfType<TabControl>().Single().TabPages[0]
+                            .Controls.OfType<TableLayoutPanel>().Single();
+                        var rows = themeLayout.Controls.Cast<Control>().OrderBy(themeLayout.GetRow).ToArray();
+                        for (int row = 1; row < rows.Length; row++)
+                            if (rows[row].Top < rows[row - 1].Bottom)
+                                throw new Exception($"Theme rows overlap at {size}: row {row - 1} {rows[row - 1].Bounds}; row {row} {rows[row].Bounds}.");
+                    }
                     if (page == 1 && !controls.OfType<ListView>().Any(c => c.Visible && c.Items.Count == 1))
                     {
                         var details = string.Join(";", controls.OfType<ListView>().Select(c => $"visible={c.Visible},count={c.Items.Count}"));
@@ -122,6 +151,42 @@ internal static class Program
                     rendered.Save(Path.Combine(evidence, $"panel-{(page == 0 ? "theme" : "logs")}-{size.Width}.png"), System.Drawing.Imaging.ImageFormat.Png);
                 }
             }
+            // Refresh must preserve a draft for the same theme, but discard it
+            // after external deletion or replacement, just as after panel deletion.
+            var themeList = form.Controls.OfType<TabControl>().Single().TabPages[0].Controls
+                .OfType<TableLayoutPanel>().Single().Controls.OfType<TableLayoutPanel>().Single()
+                .Controls.OfType<ListBox>().Single();
+            themeList.SelectedIndex = 1;
+            var draftField = typeof(ManagerForm).GetField("backgroundDraft",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var draftPath = Path.Combine(active, "background.png");
+            draftField.SetValue(form, draftPath);
+            void RefreshFixture()
+            {
+                var task = form.PrepareInspectionAsync();
+                var until = DateTime.UtcNow.AddSeconds(10);
+                while (!task.IsCompleted && DateTime.UtcNow < until) { Application.DoEvents(); Thread.Sleep(10); }
+                if (!task.IsCompleted) throw new Exception("Draft refresh did not complete.");
+                task.GetAwaiter().GetResult();
+            }
+            RefreshFixture();
+            if (!Equals(draftField.GetValue(form), draftPath)) throw new Exception("Refresh discarded the unchanged theme's draft.");
+            File.WriteAllText(Path.Combine(saved, "theme.json"), "{\"id\":\"fixture-replaced\",\"name\":\"替换的主题\",\"image\":\"background.png\"}");
+            RefreshFixture();
+            if (draftField.GetValue(form) != null || themeList.SelectedIndex != 1)
+                throw new Exception("A replacement theme inherited the previous identity's image draft.");
+            draftField.SetValue(form, draftPath);
+            Directory.Delete(saved, recursive: true);
+            RefreshFixture();
+            if (draftField.GetValue(form) != null || themeList.SelectedIndex != 0)
+                throw new Exception("A removed theme transferred its image draft to the fallback selection.");
+            Directory.Delete(active, recursive: true);
+            RefreshFixture();
+            if (themeList.Items.Count != 0 || form.Controls.OfType<TabControl>().Single().TabPages[0].Controls
+                .OfType<TableLayoutPanel>().Single().Controls.OfType<TableLayoutPanel>().Single().Controls
+                .OfType<TableLayoutPanel>().Single().Controls.OfType<PictureBox>().Single().Image != null)
+                throw new Exception("An empty theme list retained the previous image preview.");
+            Console.WriteLine("PASS draft follows selected theme identity across refresh, replacement and removal; empty selection clears preview");
             if (Directory.EnumerateFiles(uiRoot, ".panel-result-*.json").Any() || File.Exists(Path.Combine(uiRoot, "theme-preferences.json")))
                 throw new Exception("UI inspection unexpectedly mutated settings.");
             Console.WriteLine("PASS isolated Chinese theme and log pages rendered at normal/minimum sizes without starting an operation");

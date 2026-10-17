@@ -420,6 +420,8 @@ try {
   switch ($Action) {
     'Save' { $result = Save-DreamSkinPanelSettings -StateRoot $StateRoot -OperationId $OperationId -SavedThemeDirectory $SavedThemeDirectory -BackgroundPath $BackgroundPath }
     'Apply' { $result = Invoke-DreamSkinPanelApply -StateRoot $StateRoot -OperationId $OperationId -SavedThemeDirectory $SavedThemeDirectory -BackgroundPath $BackgroundPath }
+    # Only the explicit panel action creates the extra links. It neither saves
+    # the selected draft nor starts Codex; both links read the saved snapshot.
     'Shortcut' {
       . (Join-Path $PSScriptRoot 'launch-themed-codex.ps1') -FunctionsOnly
       $null = New-DreamSkinDefaultShortcutPair -StateRoot $StateRoot
