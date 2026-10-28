@@ -120,6 +120,7 @@ html[data-dream-skin="active"] {
 }
 
 html[data-dream-skin="active"] [class~="bg-token-dropdown-background"] {
+  background-color: rgb(var(--ds-panel-rgb)) !important;
   color: var(--ds-text);
   --color-token-foreground: var(--ds-text);
   --color-token-text-secondary: var(--ds-muted);
@@ -210,6 +211,18 @@ html[data-dream-skin="active"][data-dream-shell="light"]:is([data-dream-art-safe
 html[data-dream-skin="active"] body {
   background: var(--ds-bg) !important;
   color: var(--ds-text) !important;
+}
+
+/* Keep the wallpaper painted while Codex swaps home for the first thread.
+   Route markers update after DOM mutations and can briefly match neither view. */
+html[data-dream-skin="active"][data-dream-art-wide="true"]:is(
+    [data-dream-task-mode="ambient"], [data-dream-task-mode="banner"], [data-dream-task-mode="full"])
+  body {
+  background-image: var(--dream-skin-art) !important;
+  background-position: var(--ds-art-position) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
 }
 
 html[data-dream-skin="active"] body::before {
@@ -309,6 +322,24 @@ html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surfa
   border-bottom: 0 !important;
   border-radius: 16px 0 0 0 !important;
   box-shadow: -8px 0 28px rgb(var(--ds-bg-rgb) / .18) !important;
+}
+
+/* A route-independent veil prevents the opaque base surface from covering
+   the wallpaper before the home/thread route marker has settled. */
+html[data-dream-skin="active"][data-dream-art-wide="true"]:is(
+    [data-dream-task-mode="ambient"], [data-dream-task-mode="banner"])
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) {
+  background: linear-gradient(90deg,
+    var(--ds-task-immersive-edge),
+    var(--ds-task-immersive-mid) 64%,
+    var(--ds-task-immersive-far)) !important;
+}
+html[data-dream-skin="active"][data-dream-art-wide="true"][data-dream-task-mode="full"]
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) {
+  background: linear-gradient(90deg,
+    var(--ds-immersive-edge),
+    var(--ds-immersive-mid) 64%,
+    var(--ds-immersive-far)) !important;
 }
 
 html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"]))::before {
@@ -1568,21 +1599,21 @@ html[data-dream-skin="active"][data-dream-art-wide="true"]:not([data-dream-task-
   background: linear-gradient(90deg, var(--ds-titlebar-sidebar), var(--ds-titlebar-edge)) !important;
 }
 
-/* Resolved background alpha follows user preference, author alpha, then 70%.
-   Text, icons, switches and interaction-state colors retain their opacity. */
+/* Workspace background alpha follows user preference, author alpha, then 70%.
+   Popups use an opaque panel so text behind them cannot show through. */
 /* Fixed skins can disagree with the native appearance. Pair native surfaces
-   with the skin foreground in that case; all surfaces use the resolved alpha. */
+   with the skin foreground in that case. */
 html[data-dream-skin="active"]:is([data-dream-shell="light"][data-theme="dark"], [data-dream-shell="dark"][data-theme="light"]) {
   --color-surface: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1));
   --color-surface-secondary: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1));
   --color-surface-tertiary: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1));
   --color-surface-elevated: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1));
   --color-surface-elevated-secondary: rgb(var(--ds-panel-2-rgb) / var(--ds-upload-panel-alt-alpha, 1));
-  --color-token-dropdown-background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1));
+  --color-token-dropdown-background: rgb(var(--ds-panel-rgb));
 }
 html[data-dream-skin="active"]:is([data-dream-shell="light"][data-theme="dark"], [data-dream-shell="dark"][data-theme="light"])
   :is([role="menu"], [data-ds-part="dialog"]) {
-  background-color: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1)) !important;
+  background-color: rgb(var(--ds-panel-rgb)) !important;
 }
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] {
   --ds-immersive-composer-solid: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
@@ -1591,13 +1622,29 @@ html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] {
   --color-surface-tertiary: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
   --color-surface-elevated: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
   --color-surface-elevated-secondary: rgb(var(--ds-panel-2-rgb) / var(--ds-upload-panel-alt-alpha, var(--ds-upload-panel-alpha)));
-  --color-token-dropdown-background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha));
+  --color-token-dropdown-background: rgb(var(--ds-panel-rgb));
 }
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"]
-  [class~="group/settings"] [class~="rounded-2xl"][class~="border"],
+  [class~="group/settings"] [class~="rounded-2xl"][class~="border"] {
+  background-color: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha)) !important;
+}
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] [data-ds-part="dialog"],
 html[data-dream-skin="active"][style*="--ds-upload-panel-alpha:"] [role="menu"] {
-  background-color: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha)) !important;
+  background-color: rgb(var(--ds-panel-rgb)) !important;
+}
+
+/* Native poppers and listboxes can be mounted outside the menu/dialog nodes. */
+html[data-dream-skin="active"] :is([role="listbox"], [data-radix-popper-content-wrapper] > [class~="bg-token-dropdown-background"]) {
+  background-color: rgb(var(--ds-panel-rgb)) !important;
+}
+
+/* Native dropdown utilities and validated community dialog styles may use
+   layered !important declarations. Keep floating surfaces opaque. */
+@layer properties {
+  html[data-dream-skin="active"] [class~="bg-token-dropdown-background"],
+  html[data-dream-skin="active"] [data-ds-part="dialog"]:not(:has([data-testid="image-preview-dismiss-area"] table)) {
+    background-color: rgb(var(--ds-panel-rgb)) !important;
+  }
 }
 
 /* Work and Codex place the same composer body at different depths. Paint the
@@ -1701,8 +1748,8 @@ html[data-dream-skin="active"][data-dream-upload-alpha="true"]
   --color-text-secondary: var(--ds-text);
   --color-text-tertiary: var(--ds-text);
 }
-/* These three native popup families can overlap conversation text. Blur the
-   backdrop of the painted popup, retaining the uploaded background alpha. */
+/* Native popup families can overlap conversation text. Keep their blur while
+   their panel background stays opaque. */
 html[data-dream-skin="active"][data-dream-upload-alpha="true"]
   :is([role="menu"], [data-ds-part="dialog"], [data-composer-overlay-floating-ui="true"] > :has(> [data-mention-list-scroll-area])) {
   backdrop-filter: blur(24px) !important;
@@ -1843,4 +1890,34 @@ html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="
     [data-codex-composer-root][data-composer-placement="thread"] [data-ds-part="composer"] {
     backdrop-filter: blur(16px) saturate(108%) !important;
   }
+}
+
+/* Route parts move between retained Codex pages after the first send.
+   Paint the marked main like the unmarked transition fallback, so the
+   handoff cannot change its veil for a frame. */
+@layer properties {
+  html[data-dream-skin="active"][data-dream-art-wide="true"]:is(
+      [data-dream-task-mode="ambient"], [data-dream-task-mode="banner"])
+    main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])[data-ds-part="main"] {
+    background-color: transparent !important;
+    background-image: linear-gradient(90deg,
+      var(--ds-task-immersive-edge),
+      var(--ds-task-immersive-mid) 64%,
+      var(--ds-task-immersive-far)) !important;
+  }
+}
+
+/* A request-input card enlarges the absolute composer footer. The native
+   transcript keeps filling the whole scroll layout, so messages pass behind
+   the question card while scrolling. Reserve the measured footer height in
+   the viewport itself; the old in-flow spacer would reserve it twice. */
+html[data-dream-skin="active"][data-codex-os="win32"]
+  [data-request-input-activity-root]:has([data-codex-composer-request-navigation]) > .thread-scroll-container {
+  height: calc(100% - var(--thread-scroll-padding-bottom, 0px)) !important;
+  scroll-padding-bottom: 0 !important;
+}
+html[data-dream-skin="active"][data-codex-os="win32"]
+  [data-request-input-activity-root]:has([data-codex-composer-request-navigation]) > .thread-scroll-container
+  > div:first-child > .pointer-events-none.sticky.bottom-0 {
+  height: 0 !important;
 }

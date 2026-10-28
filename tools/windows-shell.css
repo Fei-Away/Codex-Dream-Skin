@@ -69,3 +69,33 @@ html[data-dream-skin="active"][data-codex-os="win32"][data-codex-window-chrome="
     backdrop-filter: blur(16px) saturate(108%) !important;
   }
 }
+
+/* Route parts move between retained Codex pages after the first send.
+   Paint the marked main like the unmarked transition fallback, so the
+   handoff cannot change its veil for a frame. */
+@layer properties {
+  html[data-dream-skin="active"][data-dream-art-wide="true"]:is(
+      [data-dream-task-mode="ambient"], [data-dream-task-mode="banner"])
+    main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])[data-ds-part="main"] {
+    background-color: transparent !important;
+    background-image: linear-gradient(90deg,
+      var(--ds-task-immersive-edge),
+      var(--ds-task-immersive-mid) 64%,
+      var(--ds-task-immersive-far)) !important;
+  }
+}
+
+/* A request-input card enlarges the absolute composer footer. The native
+   transcript keeps filling the whole scroll layout, so messages pass behind
+   the question card while scrolling. Reserve the measured footer height in
+   the viewport itself; the old in-flow spacer would reserve it twice. */
+html[data-dream-skin="active"][data-codex-os="win32"]
+  [data-request-input-activity-root]:has([data-codex-composer-request-navigation]) > .thread-scroll-container {
+  height: calc(100% - var(--thread-scroll-padding-bottom, 0px)) !important;
+  scroll-padding-bottom: 0 !important;
+}
+html[data-dream-skin="active"][data-codex-os="win32"]
+  [data-request-input-activity-root]:has([data-codex-composer-request-navigation]) > .thread-scroll-container
+  > div:first-child > .pointer-events-none.sticky.bottom-0 {
+  height: 0 !important;
+}

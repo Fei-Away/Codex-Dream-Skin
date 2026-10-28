@@ -514,10 +514,11 @@ export async function runRendererRuntimeTest(assetRoot) {
     /(?:^|[;{])\s*(?:color|opacity|--ds-on-accent|--ds-text|--ds-muted|--ds-theme-color-text|--ds-theme-color-muted)\s*:[^;{}]*--ds-upload-/m,
     "Uploaded background alpha must not change foreground colors or element opacity");
   // Room's 33% panels can overlap existing conversation glyphs in attachment
-  // suggestions and cmdk search. Blur the painted popup, not its outer portal,
-  // without replacing the author's alpha or changing legacy opaque themes.
+  // suggestions and cmdk search. Keep menu and dialog paint opaque while
+  // preserving the separate transparency contract for workspace surfaces.
   const popupRules = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)];
-  const tablePreviewRules = popupRules.filter((rule) => rule[1].includes('[data-testid="image-preview-dismiss-area"]'));
+  const tablePreviewRules = popupRules.filter((rule) => rule[1].includes('[data-testid="image-preview-dismiss-area"]')
+    && !rule[1].includes(':not(:has('));
   assert.equal(tablePreviewRules.length, 5, "Table expansion needs scoped scrim, alpha-only backdrop blur, fullscreen shell, panel and nested-background rules");
   for (const rule of tablePreviewRules) {
     assert.ok(rule[1].trim().startsWith('html[data-dream-skin="active"]') && /\btable\b/.test(rule[1]),
@@ -549,17 +550,19 @@ export async function runRendererRuntimeTest(assetRoot) {
   const mismatchScope = 'html[data-dream-skin="active"]:is([data-dream-shell="light"][data-theme="dark"], [data-dream-shell="dark"][data-theme="light"])';
   const mismatchSurface = popupRules.find((rule) => rule[1].trim() === mismatchScope);
   assert.ok(mismatchSurface, "Surface bridging must cover both mismatches while excluding matching appearances");
-  for (const token of ["surface", "surface-secondary", "surface-tertiary", "surface-elevated", "token-dropdown-background"]) {
+  for (const token of ["surface", "surface-secondary", "surface-tertiary", "surface-elevated"]) {
     assert.ok(mismatchSurface[2].includes(`--color-${token}: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, 1));`),
       `${token} must use the skin panel with an opaque fallback for legacy themes`);
   }
-  for (const [target, property, panel, alpha] of [
-    [':is([role="menu"], [data-ds-part="dialog"])', "background-color", "panel", "panel"],
+  assert.ok(mismatchSurface[2].includes('--color-token-dropdown-background: rgb(var(--ds-panel-rgb));'),
+    'Dropdown paint must remain opaque even when workspace surfaces use uploaded alpha');
+  for (const [target, property, panel] of [
+    [':is([role="menu"], [data-ds-part="dialog"])', "background-color", "panel"],
   ]) {
     const rule = popupRules.find((entry) => entry[1].replace(/\s+/g, " ").trim() === `${mismatchScope} ${target}`);
     assert.ok(rule, `${target} needs a local mismatch-only background bridge`);
-    assert.ok(rule[2].includes(`${property}: rgb(var(--ds-${panel}-rgb) / var(--ds-upload-${alpha}-alpha, 1)) !important;`),
-      `${target} must preserve declared alpha and otherwise remain opaque`);
+    assert.ok(rule[2].includes(`${property}: rgb(var(--ds-${panel}-rgb)) !important;`),
+      `${target} must remain opaque over conversation text`);
   }
   for (const target of ['[data-markdown-copy="code-block"]', '[data-markdown-table="true"] [data-block-actions="true"]']) {
     const themedBackgrounds = popupRules.filter((rule) => rule[1].trim().endsWith(target)
