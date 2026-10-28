@@ -1603,6 +1603,9 @@ try {
       port = $recordedInjectorPort
       browserId = $recordedInjectorBrowserId
     }
+    # PowerShell 7 deserializes the saved ISO timestamp as DateTime. Exercise
+    # the same JSON round-trip used when restarting a recorded injector.
+    $recordedInjectorState = $recordedInjectorState | ConvertTo-Json | ConvertFrom-Json
     if (-not (Stop-DreamSkinRecordedInjector -State $recordedInjectorState)) {
       throw 'The identity-validated recorded injector did not report a successful stop.'
     }

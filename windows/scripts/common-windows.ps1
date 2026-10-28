@@ -1451,7 +1451,11 @@ function Stop-DreamSkinRecordedInjector {
     if ($processHandle.HasExited) { return $true }
     throw "The recorded injector PID $processId is running, but its start time cannot be inspected. State was preserved."
   }
-  $startMatches = -not $State.injectorStartedAt -or $startedAt -eq "$($State.injectorStartedAt)"
+  $expectedStartedAt = if ($State.injectorStartedAt) {
+    try { ([DateTime]$State.injectorStartedAt).ToUniversalTime().ToString('o') }
+    catch { throw "The saved Dream Skin injector start time is invalid. State was preserved." }
+  } else { $null }
+  $startMatches = -not $expectedStartedAt -or $startedAt -eq $expectedStartedAt
   $identityMatches = [bool]($isNodeExecutable -and $nodeMatches -and $injectorMatches -and $startMatches)
 
   if (-not $identityMatches) {
