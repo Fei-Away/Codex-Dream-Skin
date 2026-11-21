@@ -1252,6 +1252,11 @@ html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surfa
   background-image: none !important;
 }
 
+html[data-dream-skin="active"] [data-local-conversation-final-assistant="true"][data-ds-part="message"]
+  [data-wide-markdown-block-kind="image"] {
+  max-width: 100%;
+}
+
 /* Native wide blocks escape the prose column with negative inline margins.
    Keep tables inside the themed message and delegate width overflow to the
    existing horizontal scroller. */
