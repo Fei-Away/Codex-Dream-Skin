@@ -1230,8 +1230,8 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ button:not([cl
   color: currentColor !important;
 }
 
-html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_UTILITY__ button:hover,
-html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ button:not([class~="bg-token-foreground"]):hover {
+html[data-dream-skin="active"] __DREAM_SELECTOR_HOME_UTILITY__ button:not(:where([class~="group/composer-attachment"] > .bg-neutral-solid.text-neutral-solid)):hover,
+html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__ button:not([class~="bg-token-foreground"]):not(:where([class~="group/composer-attachment"] > .bg-neutral-solid.text-neutral-solid)):hover {
   color: var(--ds-text) !important;
   background: rgb(var(--ds-accent-rgb) / .10) !important;
 }
@@ -1517,6 +1517,12 @@ html[data-dream-skin="active"] [data-local-conversation-final-assistant="true"][
       animation-duration: .01ms !important;
       animation-iteration-count: 1 !important;
     }
+  }
+
+  /* The attachment remove button has its own solid background and matching ink. */
+  html[data-dream-skin="active"] [class~="group/composer-attachment"]
+    > button.bg-neutral-solid.text-neutral-solid {
+    color: var(--color-text-neutral-solid) !important;
   }
 }
 
