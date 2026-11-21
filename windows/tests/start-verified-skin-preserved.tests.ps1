@@ -65,6 +65,7 @@ function Invoke-DreamSkinStartupFixture {
   $script:dateCall = 0
   $script:codexStopped = $false
   $script:codexStarted = $false
+  $script:managedWindowReopenCalls = 0
   $script:cdpReady = [bool]$ReuseExistingCdp
   $script:codexProcessRunning = [bool]$ReuseExistingCdp
   $script:appearanceInstallCalls = 0
@@ -194,8 +195,16 @@ function Invoke-DreamSkinStartupFixture {
     $script:codexProcessRunning = $false
   }
   function Start-DreamSkinCodex {
-    param([object]$Codex)
-    $script:codexStarted = $true
+    param([object]$Codex, [string[]]$Arguments)
+    if ($Arguments.Count -gt 0) {
+      if ($Arguments -notcontains '--remote-debugging-port=9335' -or
+        @($Arguments | Where-Object { $_ -like '--user-data-dir=*' }).Count -ne 1) {
+        throw 'Reactivation did not pass the expected debug port and a single user data directory.'
+      }
+      $script:managedWindowReopenCalls += 1
+    } else {
+      $script:codexStarted = $true
+    }
     $script:codexProcessRunning = $true
     return [pscustomobject]@{ Id = 909 }
   }
@@ -291,6 +300,7 @@ function Invoke-DreamSkinStartupFixture {
     Failed = $failed
     CodexStopped = $script:codexStopped
     CodexStarted = $script:codexStarted
+    ManagedWindowReopenCalls = $script:managedWindowReopenCalls
     AppearanceInstallCalls = $script:appearanceInstallCalls
     AppearanceRestoreCalls = $script:appearanceRestoreCalls
     RemoveCalls = $script:removeCalls
@@ -372,8 +382,9 @@ $reusedHidden = Invoke-DreamSkinStartupFixture `
   -ReuseExistingCdp
 if (-not $reusedHidden.Failed -or $reusedHidden.CodexStopped -or
   $reusedHidden.CodexStarted -or $reusedHidden.AppearanceInstallCalls -ne 0 -or
-  $reusedHidden.AppearanceRestoreCalls -ne 0 -or $reusedHidden.RemoveCalls -ne 1) {
-  throw 'A hidden reused CDP session did not remove only its failed live injection.'
+  $reusedHidden.AppearanceRestoreCalls -ne 0 -or $reusedHidden.RemoveCalls -ne 1 -or
+  $reusedHidden.ManagedWindowReopenCalls -ne 1) {
+  throw 'A hidden reused CDP session did not request one reactivation and remove its failed injection while leaving Codex and its appearance settings alone.'
 }
 $explicitRestart = Invoke-DreamSkinStartupFixture `
   -VerifyPayloads @($renderedPayload, $malformedPayload) -OncePayload $malformedPayload `
