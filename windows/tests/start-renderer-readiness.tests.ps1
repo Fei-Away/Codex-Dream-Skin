@@ -49,6 +49,8 @@ $script:appearanceInstallCalls = 0
 $script:appearanceRestoreCalls = 0
 $script:codexStopped = $false
 $script:codexStarted = $false
+$script:hiddenWindow = $false
+$script:reopenArguments = @()
 
 function Enter-DreamSkinOperationLock {
   param([int]$TimeoutMilliseconds)
@@ -80,6 +82,7 @@ function Get-DreamSkinThemePaths {
   }
 }
 function Ensure-DreamSkinManagedDirectory { param([string]$Path, [string]$Root) }
+function New-Item { param([string]$ItemType, [string]$Path, [switch]$Force) }
 function Initialize-DreamSkinThemeStore {
   param([string]$SkillRoot, [string]$StateRoot)
   return Get-DreamSkinThemePaths -StateRoot $StateRoot
@@ -124,8 +127,9 @@ function Stop-DreamSkinCodex {
   $script:cdpReady = $false
 }
 function Start-DreamSkinCodex {
-  param([object]$Codex)
+  param([object]$Codex, [string[]]$Arguments)
   $script:codexStarted = $true
+  $script:reopenArguments = @($Arguments)
   return 909
 }
 function Stop-DreamSkinRecordedInjector { param([object]$State); return $true }
@@ -153,10 +157,16 @@ function Invoke-DreamSkinNative {
   param([string]$FilePath, [object[]]$ArgumentList, [switch]$DiscardStderr, [switch]$SeparateStderr)
   if ($ArgumentList -contains '--verify') {
     $script:verifyCalls += 1
+    if ($script:hiddenWindow) {
+      return [pscustomobject]@{ ExitCode = 2; Output = @('{"targets":[{"result":{"documentHidden":true,"documentVisibility":"hidden","readiness":{"documentPass":false}}}]}') }
+    }
     return [pscustomobject]@{ ExitCode = 2; Output = @('{"pass":false}') }
   }
   if ($ArgumentList -contains '--once') {
     $script:onceCalls += 1
+    if ($script:hiddenWindow -and $script:codexStarted) {
+      return [pscustomobject]@{ ExitCode = 0; Output = @('{"pass":true}') }
+    }
     return [pscustomobject]@{ ExitCode = 2; Output = @('{"mode":"once","targets":[]}') }
   }
   if ($ArgumentList -contains '--remove') {
@@ -217,3 +227,30 @@ if (-not $failed -or $script:verifyCalls -ne 1 -or $script:onceCalls -ne 1 -or
 }
 
 Write-Output 'PASS: renderer readiness failure stops Windows startup and clears transient state.'
+
+$script:hiddenWindow = $true
+$script:codexStarted = $false
+$script:codexStopped = $false
+$script:daemon.HasExited = $false
+$script:daemonStopped = $false
+$script:cdpReady = $false
+$script:verifyCalls = 0
+$script:onceCalls = 0
+$script:stateRemoved = $false
+$script:hostMessages = @()
+$managedProfile = Join-Path $env:TEMP 'Dream Skin hidden-window profile'
+$env:LOCALAPPDATA = Join-Path ([System.IO.Path]::GetTempPath()) 'dreamskin-start-readiness-fixture'
+try {
+  & $startBlock -Port 9335 -ProfilePath $managedProfile
+} finally {
+  $env:LOCALAPPDATA = $originalLocalAppData
+}
+if (-not $script:codexStarted -or $script:codexStopped -or $script:daemonStopped -or
+  $script:stateRemoved -or $script:verifyCalls -ne 1 -or $script:onceCalls -ne 1 -or
+  $script:reopenArguments.Count -ne 3 -or
+  $script:reopenArguments -notcontains '--remote-debugging-address=127.0.0.1' -or
+  $script:reopenArguments -notcontains '--remote-debugging-port=9335' -or
+  $script:reopenArguments -notcontains "--user-data-dir=$managedProfile") {
+  throw 'Startup did not request reactivation with the same loopback port and profile while preserving the existing session.'
+}
+Write-Output 'PASS: startup requests reactivation with the same loopback port and profile without stopping Codex.'

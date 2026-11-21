@@ -598,7 +598,15 @@ try {
       }
       if (-not $forceInjectedAfterVerifyFailure) {
         $forceInjectedAfterVerifyFailure = $true
-        try { [void](Invoke-DreamSkinCodexWindowActivation -Codex $codex) } catch {}
+        if (Test-DreamSkinHiddenVerificationOutput -Output $verify.Output) {
+          # AppActivate can only focus an existing window.
+          # Reactivate Codex with the same profile to reopen the main window.
+          $reopenArguments = @('--remote-debugging-address=127.0.0.1',
+            "--remote-debugging-port=$Port", "--user-data-dir=$ProfilePath")
+          [void](Start-DreamSkinCodex -Codex $codex -Arguments $reopenArguments)
+        } else {
+          try { [void](Invoke-DreamSkinCodexWindowActivation -Codex $codex) } catch {}
+        }
         $once = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
           $Injector, '--once', '--port', "$Port",
           '--browser-id', $cdpIdentity.BrowserId, '--theme-dir', $themePaths.Active,
