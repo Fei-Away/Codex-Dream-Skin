@@ -916,7 +916,9 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__::before { cont
    data-ds-part="composer", while this internal native layer stays
    transparent so base and Community Safe CSS paint the same node. */
 html[data-dream-skin="active"] __DREAM_SELECTOR_COMPOSER_CHROME__[data-composer-utility-bar-variant="home"]
-  > [class*="_ComposerLayoutBody_"] {
+  > [class*="_ComposerLayoutBody_"],
+html[data-dream-skin="active"] [data-codex-composer-root][data-composer-placement="home"]
+  [data-ds-part="composer"] > [data-composer-body] {
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
