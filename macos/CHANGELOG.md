@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- 修复宽图超出 Agent 回复卡片右边框的问题。
+
 ## 1.5.21
 
 - 本版修复 Windows Node.js 代理警告问题；macOS 无运行时行为变更，仅同步版本号。完整说明见 [v1.5.21 发布说明](../docs/releases/v1.5.21.md)。
