@@ -179,12 +179,17 @@ function makeFixture({
       new Map([["data-local-conversation-user-anchor", "true"]]),
     );
     partFixtures.userMessageBubble = makeDomNode(
-      "user-message-bubble", partFixtures.userMessage, new Map(),
+      "user-message-bubble", partFixtures.userMessage,
+      new Map([["data-user-message-bubble", "true"]]),
       ['[class*="max-w-"][class*="rounded-2xl"][class*="text-start"]'],
     );
     partFixtures.assistantMessage = makeDomNode(
       "assistant-message", partFixtures.thread,
       new Map([["data-local-conversation-final-assistant", "true"]]),
+    );
+    partFixtures.followupBubble = makeDomNode(
+      "followup-bubble", partFixtures.thread,
+      new Map([["data-user-message-bubble", "true"]]),
     );
     partFixtures.composer = makeDomNode("composer", partFixtures.main);
     partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
@@ -198,11 +203,12 @@ function makeFixture({
     register(".group\\/project-selector", partFixtures.projectList);
     register(".thread-scroll-container", partFixtures.thread);
     const messageSelector =
-      ':is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])';
+      ':is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant], [data-user-message-bubble]:not(:is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant]) *))';
     register(messageSelector, partFixtures.legacyMessage);
     if (modernMessages) {
       register(messageSelector, partFixtures.userMessage);
       register(messageSelector, partFixtures.assistantMessage);
+      register(messageSelector, partFixtures.followupBubble);
     }
     register(':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])', partFixtures.composer);
     register(':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutRoot_"] [class*="_ComposerLayoutFooter_"], [data-composer-surface-variant][data-composer-radius-variant] :is([data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"]))', partFixtures.composerToolbar);
@@ -859,6 +865,8 @@ export async function runRendererRuntimeTest(assetRoot) {
     "Codex 26.818 user bubbles must expose the public message part at their adaptive boundary.");
   assert.equal(modernMessages.partFixtures.assistantMessage.getAttribute("data-ds-part"), "message",
     "Codex 26.727 assistant message containers must expose the public message part.");
+  assert.equal(modernMessages.partFixtures.followupBubble.getAttribute("data-ds-part"), "message",
+    "Standalone user bubbles must expose the public message part.");
 
   const generic = makeFixture({ nativeAppearance: "dark", generic: true });
   vm.runInNewContext(generic.payloadFor(), generic.context);
