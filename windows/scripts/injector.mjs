@@ -1296,7 +1296,18 @@ export async function verifySession(
       Boolean(result.genericInput?.visible || (homeScope && result.homeSurface?.visible));
     const l0StructurePass = result.scope?.level === 'L0' &&
       result.scope?.baseState === 'settings' && Boolean(result.settingsAnchor?.visible);
-    const structurePass = l0StructurePass || (l1ScopePass &&
+    // Codex 26.1117 can render a complete thread without the old header-tint
+    // anchor (#453). Keep the missing anchor in scope diagnostics, but accept
+    // this specific layout only with visible native shell/sidebar and a fully
+    // on-screen composer. Other missing L1 anchors remain failures.
+    const headerlessComposer = result.composer ?? result.genericInput;
+    const headerlessLayoutPass = result.scope?.level === 'L0' &&
+      ['home', 'thread'].includes(result.scope?.baseState) &&
+      Array.isArray(result.scope?.missingL1) && result.scope.missingL1.length === 1 &&
+      result.scope.missingL1[0] === 'header-tint' &&
+      Boolean(result.shell?.visible && result.sidebar?.visible &&
+        headerlessComposer?.visible && headerlessComposer.withinViewport);
+    const structurePass = l0StructurePass || headerlessLayoutPass || (l1ScopePass &&
       (Boolean(result.shell?.visible && result.sidebar?.visible) || genericStructurePass));
     const documentPass = result.documentVisibility === 'visible' && !result.documentHidden;
     const viewportPass = result.viewport.width >= ${MIN_RENDERER_VIEWPORT_WIDTH} &&
@@ -1320,7 +1331,7 @@ export async function verifySession(
     result.expectedRevision = expectedRevision;
     result.readiness = {
       windowPass, documentPass, viewportPass, structurePass,
-      nativeWindowPass, fallbackWindowPass,
+      nativeWindowPass, fallbackWindowPass, headerlessLayoutPass,
     };
     // A visible shell can coexist with a Home composer pushed below the window.
     // Mere intersection is insufficient: the observed Windows regression left

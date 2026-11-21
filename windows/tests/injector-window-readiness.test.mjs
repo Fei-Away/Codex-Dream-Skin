@@ -197,6 +197,7 @@ test("normal L1 renderer requires and records the exact target window binding", 
     structurePass: true,
     nativeWindowPass: true,
     fallbackWindowPass: false,
+    headerlessLayoutPass: false,
   });
   assert.deepEqual(session.calls, [
     { method: "Browser.getWindowForTarget", params: { targetId: "page-main" } },
@@ -204,7 +205,7 @@ test("normal L1 renderer requires and records the exact target window binding", 
   ]);
 });
 
-test("visible settings is the only L0 structure exception", async () => {
+test("visible settings and strict headerless layouts are the only L0 structure exceptions", async () => {
   const settings = await verify({
     dom: makeDomFixture({
       scope: { level: "L0", baseState: "settings" },
@@ -299,6 +300,68 @@ test("visible settings is the only L0 structure exception", async () => {
   assert.equal(falseHome.result.homePresent, false);
   assert.equal(falseHome.result.pass, false,
     "A renderer that claims Home must expose a real Home identity signal.");
+});
+
+const headerlessScope = { level: "L0", baseState: "thread", missingL1: ["header-tint"] };
+
+test("#453 accepts a complete headerless thread or home without hiding the missing anchor", async () => {
+  for (const baseState of ["thread", "home"]) {
+    const { result } = await verify({ dom: makeDomFixture({
+      scope: { ...headerlessScope, baseState },
+      home: baseState === "home" ? makeHome({ rect: makeRect(900, 650, 20, 20) }) : null,
+    }) });
+    assert.equal(result.pass, true, baseState);
+    assert.equal(result.readiness.headerlessLayoutPass, true, baseState);
+    assert.equal(result.scope.level, "L0", "Compatibility must not claim all L1 anchors exist");
+    assert.deepEqual(Array.from(result.scope.missingL1), ["header-tint"]);
+  }
+  const { result } = await verify({ dom: makeDomFixture({
+    scope: headerlessScope,
+    composer: null,
+    genericInput: makeElement({ rect: makeRect(620, 80, 180, 620) }),
+  }) });
+  assert.equal(result.pass, true, "A visible semantic composer can replace the legacy composer selector");
+});
+
+test("#453 headerless compatibility requires the native shell, sidebar and complete composer", async () => {
+  for (const [label, options] of [
+    ["missing shell", { shell: null }],
+    ["hidden shell", { shell: makeElement({ visible: false }) }],
+    ["missing sidebar", { sidebar: null }],
+    ["hidden sidebar", { sidebar: makeElement({ style: { display: "none" } }) }],
+    ["missing composer", { composer: null }],
+    ["hidden composer", { composer: makeElement({ visible: false }) }],
+    ["clipped composer", { composer: makeElement({ rect: makeRect(600, 100, 200, 750) }) }],
+    ["other missing anchor", { scope: { ...headerlessScope, missingL1: ["left-panel"] } }],
+    ["additional missing anchor", { scope: { ...headerlessScope, missingL1: ["header-tint", "left-panel"] } }],
+    ["missing diagnostics", { scope: { level: "L0", baseState: "thread" } }],
+    ["malformed diagnostics", { scope: { ...headerlessScope, missingL1: "header-tint" } }],
+    ["unrecognized route", { scope: { ...headerlessScope, baseState: "detail" } }],
+  ]) {
+    const { result } = await verify({ dom: makeDomFixture({ scope: headerlessScope, ...options }) });
+    assert.equal(result.readiness.headerlessLayoutPass, false, label);
+    assert.equal(result.pass, false, label);
+  }
+});
+
+test("#453 headerless compatibility preserves visibility, payload and home checks", async () => {
+  for (const [label, options, mutate, sessionOptions] of [
+    ["hidden document", { visibilityState: "hidden", hidden: true }],
+    ["small viewport", { viewportWidth: 319, viewportHeight: 239 }],
+    ["horizontal overflow", { scrollWidth: 1281 }],
+    ["wrong version", {}, dom => { dom.window.__CODEX_DREAM_SKIN_STATE__.version = "0.0.0"; }],
+    ["wrong theme", {}, dom => { dom.window.__CODEX_DREAM_SKIN_STATE__.themeId = "other-theme"; }],
+    ["wrong revision", {}, dom => { dom.window.__CODEX_DREAM_SKIN_STATE__.revision = "other-revision"; }],
+    ["missing style", {}, dom => { dom.document.getElementById = () => null; }],
+    ["missing home identity", { scope: { ...headerlessScope, baseState: "home" } }],
+    ["window transport error", {}, null, { bindingError: new Error("CDP socket closed") }],
+    ["minimized window", {}, null, { currentBounds: { width: 1280, height: 800, windowState: "minimized" } }],
+  ]) {
+    const dom = makeDomFixture({ scope: headerlessScope, ...options });
+    mutate?.(dom);
+    const { result } = await verify({ dom, ...sessionOptions });
+    assert.equal(result.pass, false, label);
+  }
 });
 
 test("home verification does not require a fixed suggestion-card count", async () => {
