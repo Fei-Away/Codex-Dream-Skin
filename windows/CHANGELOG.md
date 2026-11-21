@@ -1,5 +1,9 @@
 # Windows Changelog
 
+## Unreleased
+
+- 修复半透明主题下，选中文字后的操作条和注释输入框透出聊天正文、文字重叠的问题。
+
 ## 1.5.21
 
 - 修复启用 `NODE_USE_ENV_PROXY` 时，Node 的无害 stderr 警告被 Windows PowerShell 5.1 升级为终止错误、导致安装或主题操作失败的问题；图片、Safe CSS、主题 ZIP 和 payload 校验统一通过原生命令封装执行。
