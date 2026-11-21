@@ -1701,11 +1701,17 @@ html[data-dream-skin="active"][data-dream-upload-alpha="true"]
   --color-text-secondary: var(--ds-text);
   --color-text-tertiary: var(--ds-text);
 }
-/* These three native popup families can overlap conversation text. Blur the
+/* These native popup families can overlap conversation text. Blur the
    backdrop of the painted popup, retaining the uploaded background alpha. */
 html[data-dream-skin="active"][data-dream-upload-alpha="true"]
-  :is([role="menu"], [data-ds-part="dialog"], [data-composer-overlay-floating-ui="true"] > :has(> [data-mention-list-scroll-area])) {
+  :is([role="menu"], [data-ds-part="dialog"], [data-composer-overlay-floating-ui="true"] > :has(> [data-mention-list-scroll-area]),
+      [role="presentation"].pointer-events-auto.w-fit.max-w-full.overflow-hidden.rounded-lg.bg-surface-elevated-secondary) {
   backdrop-filter: blur(24px) !important;
+}
+html[data-dream-skin="active"][data-dream-upload-alpha="true"]
+  [data-selected-text-annotation-editor] [data-browser-comment-editor-surface]
+  > .pointer-events-auto.isolate.bg-surface-elevated-secondary {
+  background-color: rgb(var(--ds-panel-2-rgb)) !important;
 }
 html[data-dream-skin="active"] [data-markdown-copy="code-block"] > [data-markdown-copy="exclude"] {
   background: transparent !important;
