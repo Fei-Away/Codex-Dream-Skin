@@ -524,6 +524,12 @@ html[data-dream-skin="active"] __DREAM_SELECTOR_SHELL_MAIN__
   backdrop-filter: blur(10px) saturate(106%) !important;
 }
 
+/* Keep path measurement tied to the header slot as segments collapse. */
+html[data-dream-skin="active"] [data-viewer-header-item]
+  > nav:has(> [data-menu-overlay-surface]) {
+  width: 100%;
+}
+
 html[data-dream-skin="active"] __DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__)) article {
   border: 1px solid rgb(var(--ds-muted-rgb) / .12);
   background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .44));
