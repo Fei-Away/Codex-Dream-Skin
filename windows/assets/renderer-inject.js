@@ -820,11 +820,16 @@
   };
   const resolvedMessageNodes = () => selectorNodes("message").map((node) => {
     if (!node?.hasAttribute?.("data-local-conversation-user-anchor")) return node;
-    // Current Codex user anchors span the conversation column. Prefer the
-    // adaptive native bubble, while retaining the older anchor as a fallback.
-    return node.querySelector?.(
+    const bubble = node.querySelector?.(
       '[class*="max-w-"][class*="rounded-2xl"][class*="text-start"]',
-    ) ?? node;
+    );
+    if (bubble) return bubble;
+    // The annotation trigger can appear without a text bubble. Styling the
+    // fallback anchor would paint the full conversation width in this case.
+    if (node.querySelector?.(
+      'button[data-composer-attachment-pill][data-slot="popover-trigger"][aria-haspopup="dialog"]',
+    ) && !node.querySelector?.("[data-user-message-bubble]")) return null;
+    return node;
   });
   const refreshParts = () => {
     metrics.partPasses += 1;
