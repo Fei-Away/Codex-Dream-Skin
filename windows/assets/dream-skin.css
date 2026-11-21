@@ -260,7 +260,7 @@ html[data-dream-skin="active"] aside.app-shell-left-panel svg:not([style^="color
   color: rgb(var(--ds-muted-rgb) / .96) !important;
 }
 
-html[data-dream-skin="active"] aside.app-shell-left-panel button:hover,
+html[data-dream-skin="active"] aside.app-shell-left-panel button:not([data-interactive-row-button]):hover,
 html[data-dream-skin="active"] aside.app-shell-left-panel a:hover {
   background: rgb(var(--ds-accent-rgb) / .09) !important;
   color: var(--ds-text) !important;
@@ -288,7 +288,7 @@ html[data-dream-skin="active"] aside.app-shell-left-panel button[aria-label^="åˆ
 }
 
 html[data-dream-skin="active"] aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
-html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"] {
+html[data-dream-skin="active"] aside.app-shell-left-panel [aria-current="page"]:not([data-interactive-row-button]) {
   background: rgb(var(--ds-accent-rgb) / .12) !important;
   border: 1px solid rgb(var(--ds-accent-rgb) / .22) !important;
   box-shadow: 0 4px 16px rgb(var(--ds-bg-rgb) / .12) !important;
