@@ -30,8 +30,8 @@ assert.match(
 );
 assert.equal(
   selectorFor("message"),
-  ':is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant])',
-  "The message contract must bridge both legacy and Codex 26.727 role boundaries.",
+  ':is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant], [data-user-message-bubble]:not(:is([data-message-author-role], [data-local-conversation-user-anchor], [data-local-conversation-final-assistant]) *))',
+  "The message contract must recognize standalone user bubbles and preserve existing message boundaries.",
 );
 assert.equal(
   selectorFor("settings-panel"),
