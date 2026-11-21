@@ -427,6 +427,16 @@ export async function runRendererRuntimeTest(assetRoot) {
     "Utility route surfaces must stay route-scoped; an unscoped .bg-surface reset would also strip dialogs, menus and form cards.",
   );
   const sidebar = "(?:__DREAM_SELECTOR_LEFT_PANEL__|aside\\.app-shell-left-panel)";
+  assert.match(
+    css,
+    /button:not\(\[data-interactive-row-button\]\):hover,/,
+    "The row should paint the hover background around its title button.",
+  );
+  assert.match(
+    css,
+    /\[aria-current="page"\]:not\(\[data-interactive-row-button\]\)\s*\{/,
+    "The row should paint the selected background and border around its title button.",
+  );
   const noInlineColor = "svg:not\\(\\[style\\^=[\"']color:[\"']\\]\\):not\\(\\[style\\*=[\"'];color:[\"']\\]\\):not\\(\\[style\\*=[\"']; color:[\"']\\]\\)";
   assert.match(
     css,

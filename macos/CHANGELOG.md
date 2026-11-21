@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- 修复侧栏会话标题在整行高亮之上又显示一层悬停底色或选中边框的问题。
+
 ## 1.5.21
 
 - 本版修复 Windows Node.js 代理警告问题；macOS 无运行时行为变更，仅同步版本号。完整说明见 [v1.5.21 发布说明](../docs/releases/v1.5.21.md)。
