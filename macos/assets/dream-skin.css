@@ -524,6 +524,12 @@ html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surfa
   backdrop-filter: blur(10px) saturate(106%) !important;
 }
 
+/* Keep path measurement tied to the header slot as segments collapse. */
+html[data-dream-skin="active"] [data-viewer-header-item]
+  > nav:has(> [data-menu-overlay-surface]) {
+  width: 100%;
+}
+
 html[data-dream-skin="active"] main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]):not(:has([role="main"])) article {
   border: 1px solid rgb(var(--ds-muted-rgb) / .12);
   background: rgb(var(--ds-panel-rgb) / var(--ds-upload-panel-alpha, .44));
