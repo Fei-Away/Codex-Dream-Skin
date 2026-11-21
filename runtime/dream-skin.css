@@ -1318,11 +1318,6 @@ html[data-dream-skin="active"] .thread-scroll-container
   backdrop-filter: blur(18px) saturate(120%) brightness(102%) !important;
 }
 
-html[data-dream-skin="active"] .thread-scroll-container
-  [data-local-conversation-item-target-ids] :is(p, pre, code, samp, kbd, span) {
-  opacity: 1 !important;
-}
-
 /* Search routes ship an opaque sticky band and input surface. Keep the
    control legible while allowing the selected image to remain continuous. */
 html[data-dream-skin="active"]:is([data-dream-task-mode="ambient"], [data-dream-art-task-mode="ambient"])[data-dream-art-wide="true"]

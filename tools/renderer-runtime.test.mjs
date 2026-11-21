@@ -648,6 +648,11 @@ export async function runRendererRuntimeTest(assetRoot) {
     /\[data-local-conversation-item-target-ids\][\s\S]{0,900}backdrop-filter:\s*blur\(18px\)/,
     "Expanded command details need a readable themed surface.",
   );
+  assert.doesNotMatch(
+    css,
+    /\[data-local-conversation-item-target-ids\]\s+:is\([^)]*\bspan\b[^)]*\)\s*\{[^}]*\bopacity:\s*1\s*!important/,
+    "Activity summary labels and icons must retain their native opacity during transitions.",
+  );
   assert.match(
     css,
     /button\[class~="bg-primary-solid"\][\s\S]{0,520}color:\s*var\(--ds-on-accent\)\s*!important/,
