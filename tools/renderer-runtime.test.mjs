@@ -36,7 +36,7 @@ function classList(initial) {
 function makeFixture({
   nativeAppearance = "dark", settings = false, settingsPanel = false, adopted = true,
   generic = false, genericComposer = true, genericHome = false, genericSearch = false,
-  modernMessages = false, modernComposerLayout = false, cachedPages = false,
+  modernMessages = false, modernComposerLayout = false, cachedPages = false, nativeDialogs = false,
   pathname = "/index.html", initialRoute = "",
 } = {}) {
   const attrs = new Map();
@@ -206,6 +206,16 @@ function makeFixture({
     }
     register(':is(.composer-surface-chrome, [class*="_ComposerLayoutRoot_"], [data-composer-surface-variant][data-composer-radius-variant])', partFixtures.composer);
     register(':is(.composer-surface-chrome [class*="_footer_"], [class*="_ComposerLayoutRoot_"] [class*="_ComposerLayoutFooter_"], [data-composer-surface-variant][data-composer-radius-variant] :is([data-composer-footer-responsive], [class*="_ComposerLayoutFooter_"], [class*="_footer_"]))', partFixtures.composerToolbar);
+  }
+  if (nativeDialogs) {
+    partFixtures.dialog = makeDomNode("dialog", body);
+    partFixtures.popoverHost = makeDomNode("popover-host", body, new Map([["popover", "manual"]]));
+    partFixtures.popoverSurface = makeDomNode("popover-surface", partFixtures.popoverHost,
+      new Map(), [":scope > [data-anchor-positioning]"]);
+    partFixtures.unanchoredPopover = makeDomNode("unanchored-popover", body, new Map([["popover", "auto"]]));
+    register('[role="dialog"]', partFixtures.dialog);
+    register('[role="dialog"]', partFixtures.popoverHost);
+    register('[role="dialog"]', partFixtures.unanchoredPopover);
   }
   if (cachedPages) {
     const page = (name, active) => makeDomNode(name, body,
@@ -859,6 +869,17 @@ export async function runRendererRuntimeTest(assetRoot) {
     "Codex 26.818 user bubbles must expose the public message part at their adaptive boundary.");
   assert.equal(modernMessages.partFixtures.assistantMessage.getAttribute("data-ds-part"), "message",
     "Codex 26.727 assistant message containers must expose the public message part.");
+
+  const nativeDialogs = makeFixture({ nativeDialogs: true });
+  vm.runInNewContext(nativeDialogs.payloadFor(), nativeDialogs.context);
+  assert.equal(nativeDialogs.partFixtures.dialog.getAttribute("data-ds-part"), "dialog",
+    "A regular dialog must retain its theme part.");
+  assert.equal(nativeDialogs.partFixtures.popoverHost.getAttribute("data-ds-part"), null,
+    "The native popover host must not receive dialog styles that affect anchoring.");
+  assert.equal(nativeDialogs.partFixtures.popoverSurface.getAttribute("data-ds-part"), "dialog",
+    "The anchored popover surface must receive the dialog styles.");
+  assert.equal(nativeDialogs.partFixtures.unanchoredPopover.getAttribute("data-ds-part"), "dialog",
+    "A popover without an anchor surface must retain its theme part.");
 
   const generic = makeFixture({ nativeAppearance: "dark", generic: true });
   vm.runInNewContext(generic.payloadFor(), generic.context);

@@ -844,7 +844,12 @@
     addPart(desired, "composer-toolbar", [
       ...selectorNodes("composer-toolbar"), ...fallbackComposerToolbarNodes(composerNodes),
     ]);
-    addPart(desired, "dialog", selectorNodes("overlay-dialog"));
+    // Backdrop filters on the popover host can change the anchor's containing block.
+    addPart(desired, "dialog", selectorNodes("overlay-dialog").map((node) =>
+      node.hasAttribute("popover")
+        ? node.querySelector(":scope > [data-anchor-positioning]") ?? node
+        : node,
+    ));
     const homeHero = selectorNodes("game-source")[0] ??
       selectorNodes("home-icon")[0]?.parentElement;
     addPart(desired, "home-hero", homeHero ? [homeHero] : []);
