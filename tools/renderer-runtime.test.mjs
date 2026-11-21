@@ -190,7 +190,7 @@ function makeFixture({
     partFixtures.composerToolbar = makeDomNode("composer-toolbar", partFixtures.composer);
     register("aside.app-shell-left-panel", partFixtures.sidebar);
     register("main:is(.main-surface, [data-app-shell-main-surface], [class*=\"_MainContentSurface_\"])", partFixtures.main);
-    register("header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [class*=\"_Header_\"])", partFixtures.header);
+    register("header:is(.app-header-tint, [data-app-shell-header-edge-scroll], [data-app-shell-titlebar], [class*=\"_Header_\"])", partFixtures.header);
     register('[data-testid="home-icon"]', partFixtures.homeIcon);
     register('[data-feature="game-source"]', partFixtures.homeHero);
     register('[role="main"]:has([data-testid="home-icon"])', partFixtures.home);
@@ -463,7 +463,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   // canonical CSS therefore gates on the :has()-free home-route-css alias.
   assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\):has\(\[role="main"\]\)/);
   assert.match(css, /main:is\(\.main-surface, \[data-app-shell-main-surface\], \[class\*=\"_MainContentSurface_\"\]\):not\(:has\(\[role="main"\]\)\)/);
-  assert.match(css, /header:is\(\.app-header-tint, \[data-app-shell-header-edge-scroll\], \[class\*=\"_Header_\"\]\)/);
+  assert.match(css, /header:is\(\.app-header-tint, \[data-app-shell-header-edge-scroll\], \[data-app-shell-titlebar\], \[class\*=\"_Header_\"\]\)/);
   // Codex 26.924 tags the route wrapper with the same attribute, so the bare
   // form would hide the thread and composer with the fade (#415).
   assert.match(css, /:is\(\.app-shell-main-content-top-fade, \[data-app-shell-main-content-top-fade\]:not\(:has\(\*\)\), \[class\*=\"_MainContentTopFade_\"\]\)/);
