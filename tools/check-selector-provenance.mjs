@@ -11,9 +11,11 @@
 //
 // The rule is mechanical on purpose: touching the selector source in a commit
 // requires restating what it was checked against in the same commit.
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 const SELECTOR_PATH = "tools/selectors.json";
 
@@ -114,7 +116,7 @@ async function readOptional(file) {
 
 async function main() {
   const [, , baseFile] = process.argv;
-  const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const headSource = await readFile(path.join(repoRoot, SELECTOR_PATH), "utf8");
   const baseSource = baseFile ? await readOptional(baseFile) : null;
   const { verified } = assertProvenanceMovedWithContract(headSource, baseSource);
@@ -125,7 +127,18 @@ async function main() {
   );
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+// Compare real file paths: import.meta.url is percent-encoded, uses
+// file:///C:/ on Windows, and resolves symlinks such as macOS /tmp.
+function isEntryPoint() {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   main().catch((error) => {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;
