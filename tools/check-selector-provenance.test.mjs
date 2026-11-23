@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   SelectorProvenanceError,
   assertProvenanceMovedWithContract,
@@ -136,4 +140,22 @@ test("missing or malformed provenance fails closed", () => {
     assert.throws(() => readProvenance(stringify(value)), pattern, stringify(value).slice(0, 60));
   }
   assert.throws(() => readProvenance("{not json"), /not valid JSON/);
+});
+
+test("the CLI still runs when its path needs URL escaping", async () => {
+  // A space is percent-encoded in import.meta.url, and macOS os.tmpdir() sits
+  // behind the /var -> /private/var symlink; the CLI must still run.
+  const root = await mkdtemp(path.join(os.tmpdir(), "selector provenance "));
+  try {
+    const tools = path.join(root, "tools");
+    await mkdir(tools);
+    const script = path.join(tools, "check-selector-provenance.mjs");
+    await copyFile(fileURLToPath(new URL("./check-selector-provenance.mjs", import.meta.url)), script);
+    await writeFile(path.join(tools, "selectors.json"), "{not json");
+    const result = spawnSync(process.execPath, [script], { encoding: "utf8" });
+    assert.equal(result.status, 1, `stdout=${result.stdout} stderr=${result.stderr}`);
+    assert.match(result.stderr, /not valid JSON/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
