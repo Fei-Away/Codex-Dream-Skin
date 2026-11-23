@@ -77,10 +77,14 @@ if [ "$IN_PLACE" = "false" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
   deploy_project
   install_args=(--in-place --port "$PORT")
   [ "$CREATE_LAUNCHERS" = "true" ] || install_args+=(--no-launchers)
-  [ "$LAUNCH_AFTER_INSTALL" = "true" ] || install_args+=(--no-launch)
+  # Launch separately from the install: a launch failure (e.g. a CDP timeout)
+  # must not roll back an engine whose install already pinned config.toml,
+  # or Restore would be gone with it.
+  install_args+=(--no-launch)
   if "$INSTALL_ROOT/scripts/install-dream-skin-macos.sh" "${install_args[@]}"; then
     commit_deployed_project
-    exit 0
+    [ "$LAUNCH_AFTER_INSTALL" = "true" ] || exit 0
+    exec "$INSTALL_ROOT/scripts/start-dream-skin-macos.sh" --port "$PORT" --prompt-restart
   else
     status=$?
     rollback_deployed_project "$status"

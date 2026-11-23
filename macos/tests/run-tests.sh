@@ -218,6 +218,7 @@ fi
 "$ROOT/tests/community-apply-transaction.test.sh"
 "$ROOT/tests/theme-zip-extract.test.sh"
 "$ROOT/tests/installer-preflight.test.sh"
+"$ROOT/tests/installer-launch-failure.test.sh"
 "$NODE" "$ROOT/tests/theme-config.test.mjs"
 
 # check-image-dimensions rejects decompression bombs before sips can rasterize them.
